@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    name: lint + tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Sync dependencies (locked)
+        run: uv sync --locked
+      - name: Ruff
+        run: uv run ruff check .
+      - name: Pytest
+        run: uv run pytest
+
+  schema:
+    name: schema applies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply schema to a fresh SQLite database
+        run: |
+          mkdir -p data
+          sqlite3 data/wi.sqlite < pipeline/importer/schema.sql
+          sqlite3 data/wi.sqlite ".tables"
+
+  infra:
+    name: tofu validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+      - name: Init (no backend)
+        run: tofu init -backend=false
+      - name: Validate
+        run: tofu validate
+      - name: Format check
+        run: tofu fmt -check -recursive
