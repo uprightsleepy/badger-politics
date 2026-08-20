@@ -1,0 +1,11 @@
+{
+  "_comment": "CFIS donor entity id -> verified org domain for logo display. Every entry is human-verified: the domain's homepage must identify the organization, and the committee-to-org link must be self-evident from the committee's registered name (or verified on the org's own site). Entries failing either check are excluded, never guessed. The build's logo fetcher re-verifies homepages before fetching (scripts/fetch-logos.mjs).",
+  "651839": { "committee": "WEAC PAC", "org": "Wisconsin Education Association Council", "domain": "weac.org", "basis": "self-named acronym; weac.org homepage identifies WEAC (verified 2026-08-20)" },
+  "651935": { "committee": "REALTORS Political Action Committee - Wisconsin", "org": "Wisconsin REALTORS Association", "domain": "wra.org", "basis": "WRA's RPAC; wra.org homepage identifies Wisconsin REALTORS (verified 2026-08-20)" },
+  "1146127": { "committee": "SEIU Wisconsin State Council PAC", "org": "SEIU Wisconsin", "domain": "seiuwi.org", "basis": "self-named; seiuwi.org identifies SEIU (verified 2026-08-20)" },
+  "651778": { "committee": "WEC Energy Group PAC (WEC PAC)", "org": "WEC Energy Group", "domain": "wecenergygroup.com", "basis": "self-named; homepage identifies WEC Energy (verified 2026-08-20)" },
+  "651869": { "committee": "Forest Co Potawatomi Comm PAC", "org": "Forest County Potawatomi Community", "domain": "fcpotawatomi.com", "basis": "self-named; homepage identifies Potawatomi (verified 2026-08-20)" },
+  "664011": { "committee": "Wisconsin Association of Health Plans PAC", "org": "Wisconsin Association of Health Plans", "domain": "wihealthplans.org", "basis": "self-named; homepage identifies Health Plans (verified 2026-08-20)" },
+  "651773": { "committee": "WI Laborers District Council", "org": "Wisconsin Laborers District Council", "domain": "wilaborers.org", "basis": "self-named; homepage identifies Laborers (verified 2026-08-20)" },
+  "16896": { "committee": "Republican Party of Wisconsin", "org": "Republican Party of Wisconsin", "domain": "wisgop.org", "basis": "the org itself; wisgop.org homepage identifies Republican Party of Wisconsin (verified 2026-08-20)" }
+}

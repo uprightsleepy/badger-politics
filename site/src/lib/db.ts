@@ -389,12 +389,13 @@ export const moneyFor = (personId: string) => {
   // committee donors grouped by CFIS entity id (collision-proof), never name
   const committees = db
     .prepare(
-      `SELECT from_name AS name, SUM(amount) AS total, COUNT(*) AS n
+      `SELECT from_entity_id AS entityId, from_name AS name,
+              SUM(amount) AS total, COUNT(*) AS n
        FROM contributions
        WHERE person_id = ? AND from_type = 'Registrant' AND from_entity_id IS NOT NULL
        GROUP BY from_entity_id ORDER BY total DESC LIMIT 5`,
     )
-    .all(personId) as { name: string; total: number; n: number }[];
+    .all(personId) as { entityId: number; name: string; total: number; n: number }[];
   const occupations = db
     .prepare(
       `SELECT occupation, SUM(amount) AS total, COUNT(*) AS n

@@ -2,6 +2,7 @@
 import Base from "../../layouts/Base.astro";
 import StatusBadge from "../../components/StatusBadge.astro";
 import VoteHeatmap from "../../components/VoteHeatmap.astro";
+import OrgLogo from "../../components/OrgLogo.astro";
 import {
   people,
   personVotes,
@@ -257,9 +258,10 @@ const tally = TALLY_ORDER.map((status) => ({
                   <div>
                     <h3 class="font-bold">Top contributing committees</h3>
                     <p class="text-xs text-navy-600">PACs, party and other political committees</p>
-                    <ul class="mt-1 space-y-0.5">
+                    <ul class="mt-1 space-y-1">
                       {money.committees.map((c) => (
-                        <li class="flex items-baseline gap-2">
+                        <li class="flex items-center gap-2">
+                          <OrgLogo entityId={c.entityId} name={c.name} />
                           <span class="min-w-0 flex-1 truncate">{c.name}</span>
                           <span class="shrink-0 font-semibold">{fmtMoney(c.total)}</span>
                         </li>

@@ -1,0 +1,35 @@
+---
+/** Logo tile for a verified org mapping; monogram fallback otherwise.
+ * The logo never replaces the name in the UI, only accompanies it. */
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import orgDomains from "../data/org-domains.json";
+interface Props { entityId: number | string | null; name: string }
+const { entityId, name } = Astro.props;
+
+const entry = entityId != null ? (orgDomains as Record<string, any>)[String(entityId)] : null;
+const logoPath = entry
+  ? fileURLToPath(new URL(`../../public/logos/${entityId}.png`, import.meta.url))
+  : null;
+const hasLogo = logoPath ? existsSync(logoPath) : false;
+const initials = name
+  .split(/\s+/)
+  .filter((w) => /^[A-Za-z]/.test(w))
+  .slice(0, 2)
+  .map((w) => w[0].toUpperCase())
+  .join("");
+---
+{hasLogo ? (
+  <img
+    src={`/logos/${entityId}.png`}
+    alt={`${entry.org} logo`}
+    width="20"
+    height="20"
+    loading="lazy"
+    class="h-5 w-5 shrink-0 rounded bg-white object-contain"
+  />
+) : (
+  <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-navy-100 text-[9px] font-bold text-navy-700" aria-hidden="true">
+    {initials}
+  </span>
+)}

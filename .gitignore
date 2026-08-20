@@ -19,6 +19,7 @@ _data/
 site/public/api/
 site/public/feeds/
 site/public/calendar/
+site/public/logos/
 
 # OpenTofu / Terraform
 .terraform/
