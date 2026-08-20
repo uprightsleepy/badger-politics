@@ -86,6 +86,12 @@ def session_key(identifier: str) -> str:
 
 
 HEARING_RE = re.compile(r"\b(public hearing held|executive session held)\b", re.I)
+# the committee-schedule feed double-escapes some titles ('Veterans’')
+LITERAL_ESCAPE_RE = re.compile(r"\\u([0-9a-fA-F]{4})")
+
+
+def unescape_literal(text: str) -> str:
+    return LITERAL_ESCAPE_RE.sub(lambda m: chr(int(m.group(1), 16)), text)
 REFERRAL_RE = re.compile(r"referred to (?:the )?(.+?)\s*$", re.I)
 IDENTIFIER_RE = re.compile(r"^([A-Za-z]+)\s*(\d+)$")
 
@@ -400,9 +406,9 @@ class Importer:
 
     def import_event(self, event: dict) -> None:
         """Committee hearing (from the events scrape) -> hearings + committees."""
-        name = event.get("name") or ""
+        name = unescape_literal(event.get("name") or "")
         hosts = [
-            p["name"]
+            unescape_literal(p["name"])
             for p in event.get("participants", [])
             if p.get("entity_type") == "organization"
         ]

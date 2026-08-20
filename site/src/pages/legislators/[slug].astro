@@ -118,8 +118,8 @@ const tally = TALLY_ORDER.map((status) => ({
               <p class="mt-1">No opponents have qualified so far.</p>
             )}
             <p class="mt-1 text-xs text-navy-600">
-              Pre-primary status per the Wisconsin Elections Commission ballot-access
-              report; final ballot certified after the August primary.
+              Status comes from the Wisconsin Elections Commission's ballot access
+              report. The final ballot is certified after the August primary.
             </p>
           </div>
         )}
@@ -166,14 +166,15 @@ const tally = TALLY_ORDER.map((status) => ({
         <section class="mt-6">
           <h2 class="text-xl font-bold">Floor attendance</h2>
           <p class="mt-1 text-sm text-navy-600">
-            Every day the chamber held recorded floor votes.
-            {votesTotal.toLocaleString()} votes across {heatDays.length} voting days
-            {missedTotal > 0 ? ` — ${missedTotal} missed` : " — none missed"}.
+            Every day the chamber held recorded floor votes:
+            {votesTotal.toLocaleString()} votes across {heatDays.length} voting days,
+            {missedTotal > 0 ? `${missedTotal} missed` : "none missed"}.
           </p>
-          <div class="mt-1 flex items-center gap-3 text-xs text-navy-600">
-            <span class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[2px] bg-navy-700/60"></span> voted all</span>
+          <div class="mt-1 flex flex-wrap items-center gap-3 text-xs text-navy-600">
+            <span class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[2px] bg-moss-600"></span> voted all</span>
             <span class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[2px] bg-gold-500"></span> present, not voting</span>
             <span class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[2px] bg-badger-600"></span> missed votes</span>
+            <span class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[2px] bg-gray-300"></span> no floor votes</span>
           </div>
           <div class="mt-3 space-y-2">
             {heatYears.map((year, i) => (

@@ -62,7 +62,7 @@ const bills = billsFor(session.id);
     if (statusFilter) {
       const note = document.createElement("p");
       note.className = "mt-2 text-sm text-navy-700";
-      note.innerHTML = `Showing only bills with status “${statusFilter.replace(/_/g, " ")}” — <a class="underline" href="?">show all</a>`;
+      note.innerHTML = `Showing only bills with status “${statusFilter.replace(/_/g, " ")}”. <a class="underline" href="?">Show all</a>`;
       input.parentElement!.appendChild(note);
       apply();
     }

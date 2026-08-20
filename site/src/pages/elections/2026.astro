@@ -12,10 +12,14 @@ const assembly = seats.filter((s) => s.person.chamber === "lower");
 <Base title="2026 legislative elections" description="Every Wisconsin legislative seat on the November 2026 ballot: incumbents, retirements, and qualified candidates.">
   <h1 class="text-2xl font-bold">On the ballot: November 3, 2026</h1>
   <p class="mt-2 max-w-3xl text-navy-700">
-    All 99 Assembly seats and the 17 odd-numbered Senate seats. Candidate status
-    is the Wisconsin Elections Commission's pre-primary ballot-access
-    determination; the general-election ballot is certified after the August 11
-    primary. <a href="/calendar/election-days.ics" class="underline">Add election days to your calendar</a>.
+    All 99 Assembly seats and the 17 odd-numbered Senate seats are on the ballot.
+    Candidate status comes from the Wisconsin Elections Commission's ballot access
+    report. The final ballot is certified after the August 11 primary.
+  </p>
+  <p class="mt-2 flex flex-wrap gap-x-4 text-sm">
+    <a href="https://myvote.wi.gov/en-us/Find-My-Polling-Place" class="font-semibold underline">Find where you vote ↗</a>
+    <a href="https://myvote.wi.gov/en-us/Vote-Absentee-Guide" class="font-semibold underline">Vote absentee ↗</a>
+    <a href="/calendar/election-days.ics" class="underline">Add election days to your calendar</a>
   </p>
   {[
     { label: "Senate (odd districts)", rows: senate },

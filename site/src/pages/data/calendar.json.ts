@@ -12,9 +12,15 @@ const ELECTION_DAYS: [string, string][] = [
 ];
 
 export const GET: APIRoute = () => {
-  const events: Record<string, { type: string; label: string; detail?: string; url?: string }[]> = {};
-  const add = (date: string, e: { type: string; label: string; detail?: string; url?: string }) =>
-    (events[date] ??= []).push(e);
+  type CalEvent = {
+    type: string;
+    label: string;
+    detail?: string;
+    url?: string;
+    links?: { label: string; url: string }[];
+  };
+  const events: Record<string, CalEvent[]> = {};
+  const add = (date: string, e: CalEvent) => (events[date] ??= []).push(e);
 
   const seen = new Set<string>();
   for (const h of [...recentHearings(2000), ...upcomingHearings("1900-01-01")]) {
@@ -31,7 +37,16 @@ export const GET: APIRoute = () => {
     });
   }
   for (const [date, label] of ELECTION_DAYS) {
-    add(date, { type: "election", label, detail: "Polls open 7 AM – 8 PM" });
+    add(date, {
+      type: "election",
+      label,
+      detail: "Polls open 7 AM – 8 PM",
+      links: [
+        { label: "Find where you vote", url: "https://myvote.wi.gov/en-us/Find-My-Polling-Place" },
+        { label: "What's on my ballot", url: "https://myvote.wi.gov/en-us/My-Voter-Info" },
+        { label: "Vote absentee", url: "https://myvote.wi.gov/en-us/Vote-Absentee-Guide" },
+      ],
+    });
   }
   return new Response(JSON.stringify(events), {
     headers: { "Content-Type": "application/json" },

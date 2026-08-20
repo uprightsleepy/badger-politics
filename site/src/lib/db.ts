@@ -219,23 +219,38 @@ export const graveyardBills = (sessionId: string, committee: string | null) =>
     )
     .all(sessionId, committee) as { id: string; identifier: string; title: string | null }[];
 
+const HEARING_SELECT = `SELECT h.*, c.name AS committee_name, c.chamber AS committee_chamber,
+       p.name AS chair_name
+       FROM hearings h LEFT JOIN committees c ON c.id = h.committee_id
+       LEFT JOIN people p ON p.id = c.chair_person_id`;
+
 export const upcomingHearings = (since: string) =>
   db
-    .prepare(
-      `SELECT h.*, c.name AS committee_name, c.chamber AS committee_chamber
-       FROM hearings h LEFT JOIN committees c ON c.id = h.committee_id
-       WHERE h.date >= ? ORDER BY h.date, h.time`,
-    )
+    .prepare(`${HEARING_SELECT} WHERE h.date >= ? ORDER BY h.date, h.time`)
     .all(since) as Hearing[];
 
 export const recentHearings = (limit = 40) =>
   db
-    .prepare(
-      `SELECT h.*, c.name AS committee_name, c.chamber AS committee_chamber
-       FROM hearings h LEFT JOIN committees c ON c.id = h.committee_id
-       ORDER BY h.date DESC, h.time DESC LIMIT ?`,
-    )
+    .prepare(`${HEARING_SELECT} ORDER BY h.date DESC, h.time DESC LIMIT ?`)
     .all(limit) as Hearing[];
+
+/** 'AB 656' -> its bill row in the newest built session that has it. */
+const _billIdCache = new Map<string, { id: string; session_id: string } | null>();
+export const findBillByIdentifier = (identifier: string) => {
+  if (_billIdCache.has(identifier)) return _billIdCache.get(identifier);
+  let found: { id: string; session_id: string } | null = null;
+  for (const session of builtSessions()) {
+    const row = db
+      .prepare("SELECT id, session_id FROM bills WHERE session_id = ? AND identifier = ?")
+      .get(session.id, identifier) as { id: string; session_id: string } | undefined;
+    if (row) {
+      found = row;
+      break;
+    }
+  }
+  _billIdCache.set(identifier, found);
+  return found;
+};
 
 export interface Hearing {
   id: string;
@@ -248,6 +263,7 @@ export interface Hearing {
   source_url: string | null;
   committee_name: string | null;
   committee_chamber: string | null;
+  chair_name: string | null;
 }
 
 export const recentlyActedBills = (sessionIds: string[], limit = 8) =>

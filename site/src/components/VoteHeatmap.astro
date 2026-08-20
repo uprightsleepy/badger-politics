@@ -35,7 +35,7 @@ for (let w = 0; w < 53; w++) {
 function cellFor(date: string, inYear: boolean) {
   if (!inYear) return { cls: "bg-transparent", title: "" };
   const day = byDate.get(date);
-  if (!day) return { cls: "bg-navy-50", title: date };
+  if (!day) return { cls: "bg-gray-300", title: `${date}: no floor votes` };
   const missed = day.total - day.cast - day.nv;
   const pretty = new Date(date + "T00:00:00Z").toLocaleDateString("en-US", {
     month: "short",
@@ -52,7 +52,7 @@ function cellFor(date: string, inYear: boolean) {
       cls: "bg-gold-500",
       title: `${pretty}: present, not voting on ${day.nv} of ${day.total}`,
     };
-  const shade = day.total >= 15 ? "bg-navy-800" : day.total >= 6 ? "bg-navy-600" : "bg-navy-700/60";
+  const shade = day.total >= 15 ? "bg-moss-600" : day.total >= 6 ? "bg-moss-600/80" : "bg-moss-600/55";
   return { cls: shade, title: `${pretty}: voted in all ${day.total} floor vote${day.total > 1 ? "s" : ""}` };
 }
 

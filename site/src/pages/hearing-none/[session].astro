@@ -22,9 +22,9 @@ const stats = sessionStats(session.id);
   <p class="mt-2 max-w-3xl text-lg text-navy-700">
     <strong class="text-badger-700">{stats.graveyard.toLocaleString()}</strong> of the
     {" "}{stats.bills.toLocaleString()} proposals in the {session.name ?? session.id}
-    died without ever receiving a public hearing — grouped below by the committee
-    where they sat, and its chair. A committee chair alone decides whether a bill
-    gets heard.
+    died without ever receiving a public hearing. They are grouped below by the
+    committee where they sat, with its chair. A committee chair alone decides
+    whether a bill gets heard.
   </p>
   <div class="mt-6 space-y-4">
     {committees.map((c) => {

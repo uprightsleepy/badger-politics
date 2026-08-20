@@ -17,7 +17,7 @@ export function getStaticPaths() {
 const { event, bill, sessionId } = Astro.props;
 ---
 
-<Base title={`Roll call: ${bill.identifier} — ${event.motion ?? "vote"}`}>
+<Base title={`Roll call: ${bill.identifier} · ${event.motion ?? "vote"}`}>
   <p class="text-sm text-navy-600">
     <a href={`/bills/${sessionId}/${billSlug(bill.identifier)}/`} class="underline">
       ← {bill.identifier}: {bill.title?.slice(0, 90)}

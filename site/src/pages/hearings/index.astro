@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { upcomingHearings, recentHearings, meta } from "../../lib/db";
-import { fmtDate, fmtTime, chamberName } from "../../lib/format";
+import { upcomingHearings, recentHearings, findBillByIdentifier } from "../../lib/db";
+import { fmtDate, fmtTime, chamberName, billSlug } from "../../lib/format";
 const today = new Date().toISOString().slice(0, 10);
 const upcoming = upcomingHearings(today);
 const recent = recentHearings(30);
@@ -13,7 +13,7 @@ const heading = upcoming.length ? "Upcoming committee hearings" : "Recent commit
   <h1 class="text-2xl font-bold">{heading}</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
     Showing up to testify is the single most effective thing a voter can do.
-    {upcoming.length === 0 && " No upcoming hearings are posted (the Legislature is out of session); recent hearings shown."}
+    {upcoming.length === 0 && " Nothing is scheduled right now, so recent hearings are shown."}
     <a href="/calendar/hearings.ics" class="underline">Subscribe to the calendar</a>.
   </p>
   <ul class="mt-4 space-y-2">
@@ -35,12 +35,54 @@ const heading = upcoming.length ? "Upcoming committee hearings" : "Recent commit
               {h.source_url && <a href={h.source_url} class="underline">Official notice</a>}
             </span>
           </div>
+          {h.chair_name && (
+            <p class="mt-0.5 text-xs text-navy-600">Chair: {h.chair_name}</p>
+          )}
           {agendaBills.length > 0 && (
-            <p class="mt-1 text-navy-700">On the agenda: {agendaBills.join(", ")}</p>
+            <p class="mt-1 text-navy-700">
+              On the agenda:{" "}
+              {agendaBills.map((ident, i) => {
+                const found = findBillByIdentifier(ident);
+                return (
+                  <>
+                    {i > 0 && ", "}
+                    {found ? (
+                      <a href={`/bills/${found.session_id}/${billSlug(ident)}/`} class="underline">
+                        {ident}
+                      </a>
+                    ) : (
+                      ident
+                    )}
+                  </>
+                );
+              })}
+            </p>
           )}
           <p class="mt-1 text-xs text-navy-600">Confirm against the official hearing notice before attending.</p>
         </li>
       );
     })}
   </ul>
+
+  <aside class="mt-6 max-w-3xl rounded-lg border border-navy-100 bg-white p-4 text-sm leading-relaxed">
+    <h2 class="font-bold">Attending a hearing</h2>
+    <ul class="mt-1 list-inside list-disc space-y-1 text-navy-700">
+      <li>Hearings are open to everyone. You can watch without speaking.</li>
+      <li>
+        To speak, fill out a registration slip at the hearing room. You can also
+        register a position without testifying.
+      </li>
+      <li>
+        Can't attend? You can email written comments to the committee's members.
+        Each committee page on the
+        <a href="https://docs.legis.wisconsin.gov/committees" class="underline">Legislature's site</a>
+        lists them.
+      </li>
+      <li>
+        Rooms like “411 South” are inside the
+        <a href="https://www.google.com/maps/search/?api=1&query=Wisconsin+State+Capitol+2+E+Main+St+Madison+WI" class="underline">Wisconsin State Capitol</a>,
+        2 E Main St, Madison.
+      </li>
+    </ul>
+  </aside>
 </Base>

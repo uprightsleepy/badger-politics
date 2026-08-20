@@ -53,8 +53,15 @@ import Base from "../layouts/Base.astro";
               (e) => `
         <li class="rounded border ${e.type === "election" ? "border-gold-500 bg-gold-100" : "border-navy-100"} p-2">
           <span class="font-semibold">${e.type === "election" ? "🗳️ " : ""}${e.label}</span>
-          ${e.detail ? `<span class="text-navy-600"> — ${e.detail}</span>` : ""}
-          ${e.url ? ` <a class="underline" href="${e.url}">official notice</a>` : ""}
+          ${e.detail ? `<span class="text-navy-600"> · ${e.detail}</span>` : ""}
+          ${e.url ? ` <a class="underline" target="_blank" rel="noopener" href="${e.url}">official notice</a>` : ""}
+          ${
+            e.links?.length
+              ? `<p class="mt-1 flex flex-wrap gap-x-4">${e.links
+                  .map((l) => `<a class="font-semibold underline" target="_blank" rel="noopener" href="${l.url}">${l.label} ↗</a>`)
+                  .join("")}</p><p class="mt-1 text-xs text-navy-700">Your polling place depends on your exact address, and this site never stores addresses. The official MyVote lookup takes a few seconds.</p>`
+              : ""
+          }
           ${e.type === "hearing" ? `<p class="mt-1 text-xs text-navy-600">Confirm against the official notice before attending.</p>` : ""}
         </li>`,
             )

@@ -2,13 +2,13 @@
 import Base from "../layouts/Base.astro";
 ---
 
-<Base title="Find my legislators" description="Enter your address once — your Assembly and Senate districts are remembered on this device only.">
+<Base title="Find my legislators" description="Enter your address once. Your Assembly and Senate districts are remembered on this device only.">
   <h1 class="text-2xl font-bold">Find my legislators</h1>
   <p class="mt-2 max-w-2xl text-navy-700">
-    Enter your address (or use your location). Your district is saved
-    <strong>on this device only</strong> — your address is never stored, and is sent
-    only to the U.S. Census geocoder to get coordinates. After that, every bill
-    page pins how your two legislators voted.
+    Enter your address, or use your location. Your district is saved
+    <strong>on this device only</strong>. Your address is never stored. It is sent
+    to one place, the U.S. Census geocoder, just to get coordinates. After that,
+    every bill page shows how your two legislators voted.
   </p>
 
   <form id="addr-form" class="mt-5 flex max-w-xl flex-wrap gap-2">
@@ -33,8 +33,8 @@ import Base from "../layouts/Base.astro";
     <h2 class="text-lg font-bold">Your districts</h2>
     <div id="reps" class="mt-2 space-y-3"></div>
     <p class="mt-3 text-xs text-navy-600">
-      Districts per the Legislature's official 2024 boundaries (LTSB). Saved in
-      your browser only — <button id="forget" class="underline">forget this</button>.
+      Districts follow the Legislature's official 2024 boundaries. Saved in
+      your browser only. <button id="forget" class="underline">Forget this</button>.
     </p>
   </div>
 
@@ -159,7 +159,7 @@ import Base from "../layouts/Base.astro";
         await resolvePoint(match.coordinates.x, match.coordinates.y);
       } catch {
         statusEl.textContent =
-          "The Census geocoder didn't respond. Try the location button instead — it needs no third party.";
+          "The Census geocoder didn't respond. Try the location button instead.";
       }
     });
 
