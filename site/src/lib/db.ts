@@ -371,6 +371,48 @@ export const electionHistoryFor = (chamber: string | null, district: number | nu
   });
 };
 
+/** Campaign money summary for one legislator. Three honest states:
+ * null = no committee mapped (say "not linked", never "$0");
+ * {total: 0} = mapped but no receipts in the window; else the data. */
+export const moneyFor = (personId: string) => {
+  const mapped = db
+    .prepare("SELECT COUNT(*) AS n FROM cfis_committees WHERE person_id = ?")
+    .get(personId) as { n: number };
+  if (mapped.n === 0) return null;
+  const summary = db
+    .prepare(
+      `SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total,
+              MIN(date) AS first, MAX(date) AS last
+       FROM contributions WHERE person_id = ?`,
+    )
+    .get(personId) as { n: number; total: number; first: string | null; last: string | null };
+  // committee donors grouped by CFIS entity id (collision-proof), never name
+  const committees = db
+    .prepare(
+      `SELECT from_name AS name, SUM(amount) AS total, COUNT(*) AS n
+       FROM contributions
+       WHERE person_id = ? AND from_type = 'Registrant' AND from_entity_id IS NOT NULL
+       GROUP BY from_entity_id ORDER BY total DESC LIMIT 5`,
+    )
+    .all(personId) as { name: string; total: number; n: number }[];
+  const occupations = db
+    .prepare(
+      `SELECT occupation, SUM(amount) AS total, COUNT(*) AS n
+       FROM contributions
+       WHERE person_id = ? AND from_type = 'Individual'
+       AND occupation IS NOT NULL AND TRIM(occupation) != ''
+       GROUP BY LOWER(TRIM(occupation)) ORDER BY total DESC LIMIT 5`,
+    )
+    .all(personId) as { occupation: string; total: number; n: number }[];
+  const individualTotal = db
+    .prepare(
+      "SELECT COALESCE(SUM(amount), 0) AS t FROM contributions"
+      + " WHERE person_id = ? AND from_type = 'Individual'",
+    )
+    .get(personId) as { t: number };
+  return { ...summary, committees, occupations, individualTotal: individualTotal.t };
+};
+
 export const sessionStats = (sessionId: string) =>
   db
     .prepare(

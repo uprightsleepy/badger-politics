@@ -125,6 +125,15 @@ CREATE TABLE election_history (
 );
 CREATE INDEX idx_election_history_seat ON election_history (chamber, district, year);
 
+-- Which CFIS candidate committees belong to which legislator (verified
+-- mapping; lets the site distinguish "unmapped" from "raised nothing").
+CREATE TABLE cfis_committees (
+    person_id TEXT NOT NULL REFERENCES people (id),
+    entity_id INTEGER NOT NULL,
+    committee TEXT NOT NULL
+);
+CREATE INDEX idx_cfis_committees_person ON cfis_committees (person_id);
+
 -- Campaign contributions received by sitting legislators' candidate
 -- committees, from the CFIS public API (see docs/money-research.md).
 CREATE TABLE contributions (

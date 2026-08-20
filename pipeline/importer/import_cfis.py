@@ -20,6 +20,16 @@ def run(archives_dir: Path, db_path: Path) -> int:
     known_people = {r[0] for r in conn.execute("SELECT id FROM people")}
     total = 0
     with conn:
+        conn.execute("DELETE FROM cfis_committees")
+        map_path = archives_dir / "committee_map.json"
+        if map_path.exists():
+            for m in json.loads(map_path.read_text(encoding="utf-8")):
+                if m["person_id"] in known_people:
+                    conn.execute(
+                        "INSERT INTO cfis_committees (person_id, entity_id, committee)"
+                        " VALUES (?, ?, ?)",
+                        (m["person_id"], m["entity_id"], m["committee"]),
+                    )
         conn.execute("DELETE FROM contributions")
         for path in files:
             rows = json.loads(path.read_text(encoding="utf-8"))

@@ -23,6 +23,46 @@ import Base from "../layouts/Base.astro";
       <a href="https://github.com/uprightsleepy/badger-politics" class="underline">github.com/uprightsleepy/badger-politics</a>,
       and all data is <a href="/data/" class="underline">free to reuse</a>.
     </p>
+    <h2 id="money" class="text-xl font-bold">How the campaign money data works</h2>
+    <p>
+      Fundraising figures come from committees' own filings with the Wisconsin
+      Ethics Commission, via
+      <a href="https://campaignfinance.wi.gov" class="underline">campaignfinance.wi.gov</a>,
+      refreshed nightly. Some things to know when reading them:
+    </p>
+    <ul class="list-inside list-disc space-y-2">
+      <li>
+        <strong>Corporations cannot contribute to Wisconsin candidates.</strong>
+        Money reaching a legislator's committee comes from individual people,
+        from political committees (PACs, party committees, other candidates),
+        and from conduits that pass along individual contributions.
+      </li>
+      <li>
+        <strong>"Top contributing committees"</strong> lists political
+        committees by their own filings. A PAC's name may reference a company
+        or industry; the money is the PAC's, raised from its contributors, not
+        a corporate payment.
+      </li>
+      <li>
+        <strong>"Top occupations of individual donors"</strong> aggregates what
+        donors themselves reported as their occupation. It says nothing about
+        any employer directing or endorsing the contribution.
+      </li>
+      <li>
+        Totals follow the <strong>person</strong>: they cover all of a
+        legislator's candidate committees, including committees for runs at
+        other offices.
+      </li>
+      <li>
+        Committees are linked to legislators only when the link is certain.
+        Where we haven't verified a committee yet, the page says the data
+        isn't linked. It never shows a false zero.
+      </li>
+      <li>
+        Donors are grouped by the state's own filer identifiers, not by name,
+        so two different people with the same name are never combined.
+      </li>
+    </ul>
     <h2 class="text-xl font-bold">Corrections</h2>
     <p>
       Accuracy is the whole point. Every vote and bill page links to the official
