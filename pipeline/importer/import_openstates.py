@@ -160,14 +160,17 @@ class Importer:
         latest = actions[-1] if actions else None
         chamber = pseudo_chamber(bill.get("from_organization"))
 
+        html_links = [
+            link["url"]
+            for version in bill.get("versions", [])
+            for link in version.get("links", [])
+            if link.get("media_type") == "text/html"
+        ]
+        # Prefer the original proposal text: enrolled/act versions of passed
+        # bills omit the LRB analysis section.
         text_url = next(
-            (
-                link["url"]
-                for version in bill.get("versions", [])
-                for link in version.get("links", [])
-                if link.get("media_type") == "text/html"
-            ),
-            None,
+            (url for url in html_links if "proposaltext" in url),
+            html_links[0] if html_links else None,
         )
         self.conn.execute(
             "INSERT INTO bills (id, session_id, identifier, title, chamber,"

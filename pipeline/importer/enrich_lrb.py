@@ -15,6 +15,7 @@ and raw HTML is cached under pipeline/_data/lrb_cache/ so re-runs are free.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 import sqlite3
 import sys
@@ -58,8 +59,14 @@ def extract_analysis(page_html: str) -> str | None:
     return text or None
 
 
-def fetch_page(session: requests.Session, bill_id: str, url: str) -> str:
-    cache_file = CACHE_DIR / f"{bill_id}.html"
+def cache_path(url: str) -> Path:
+    """Cache is keyed by URL, not bill id: a bill's text_url can change
+    (e.g. enrolled version replacing proposal text) and must refetch."""
+    return CACHE_DIR / f"{hashlib.sha256(url.encode()).hexdigest()[:16]}.html"
+
+
+def fetch_page(session: requests.Session, url: str) -> str:
+    cache_file = cache_path(url)
     if cache_file.exists():
         return cache_file.read_text(encoding="utf-8", errors="replace")
     response = session.get(url, timeout=60)
@@ -87,9 +94,9 @@ def enrich(db_path: Path, limit: int | None, only: str | None, delay: float) -> 
     http.headers["User-Agent"] = USER_AGENT
     done = missing = failed = 0
     for bill_id, url in rows:
-        cached = (CACHE_DIR / f"{bill_id}.html").exists()
+        cached = cache_path(url).exists()
         try:
-            page = fetch_page(http, bill_id, url)
+            page = fetch_page(http, url)
         except requests.RequestException as exc:
             failed += 1
             print(f"FETCH FAILED {bill_id}: {exc}", file=sys.stderr)
