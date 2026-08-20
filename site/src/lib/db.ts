@@ -239,6 +239,7 @@ export const recentHearings = (limit = 40) =>
 
 export interface Hearing {
   id: string;
+  title: string | null;
   committee_id: string | null;
   date: string | null;
   time: string | null;
@@ -256,6 +257,32 @@ export const recentlyActedBills = (sessionIds: string[], limit = 8) =>
        AND classification = 'bill' ORDER BY latest_action_date DESC LIMIT ?`,
     )
     .all(...sessionIds, limit) as Bill[];
+
+/** Days each chamber held attributed floor votes: (chamber, date) -> count.
+ * Memoized — one scan serves every legislator page in the build. */
+let _chamberDays: { chamber: string; date: string; n: number }[] | undefined;
+export const chamberVoteDays = () =>
+  (_chamberDays ??= db
+    .prepare(
+      `SELECT chamber, date, COUNT(*) AS n FROM vote_events
+       WHERE date IS NOT NULL AND chamber IN ('lower', 'upper')
+       AND id IN (SELECT DISTINCT vote_event_id FROM vote_records)
+       GROUP BY chamber, date`,
+    )
+    .all() as { chamber: string; date: string; n: number }[]);
+
+/** One person's per-day participation: cast = aye/nay, nv = present-not-voting. */
+export const personVoteDays = (personId: string) =>
+  db
+    .prepare(
+      `SELECT e.date, e.chamber,
+              SUM(CASE WHEN r.option IN ('yes', 'no') THEN 1 ELSE 0 END) AS cast,
+              SUM(CASE WHEN r.option NOT IN ('yes', 'no') THEN 1 ELSE 0 END) AS nv
+       FROM vote_records r JOIN vote_events e ON e.id = r.vote_event_id
+       WHERE r.person_id = ? AND e.date IS NOT NULL
+       GROUP BY e.date, e.chamber`,
+    )
+    .all(personId) as { date: string; chamber: string; cast: number; nv: number }[];
 
 export const sessionStats = (sessionId: string) =>
   db

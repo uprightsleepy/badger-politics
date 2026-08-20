@@ -41,18 +41,29 @@ page.on("request", (r) => {
 
 // 1. search: "child marriage" -> AB 656
 await page.goto("http://127.0.0.1:8931/", { waitUntil: "networkidle2" });
-await page.waitForSelector(".pagefind-ui__search-input", { timeout: 10000 });
-await page.type(".pagefind-ui__search-input", "child marriage");
-await page.waitForSelector(".pagefind-ui__result-link", { timeout: 10000 });
+await page.waitForSelector("#q", { timeout: 10000 });
+await page.type("#q", "child marriage");
+await page.waitForSelector("#search-results a", { timeout: 10000 });
 await new Promise((r) => setTimeout(r, 800));
-const hits = await page.$$eval(".pagefind-ui__result-link", (as) =>
+const hits = await page.$$eval("#search-results a", (as) =>
   as.slice(0, 5).map((a) => ({ text: a.textContent.trim(), href: a.getAttribute("href") })),
 );
 check(
   "search 'child marriage' surfaces AB 656",
   hits.some((h) => h.href?.includes("/bills/2025/ab656")),
-  JSON.stringify(hits.map((h) => h.text)),
+  JSON.stringify(hits.map((h) => h.text?.slice(0, 30))),
 );
+
+// 1b. degenerate query must NOT dredge up initial-letter matches
+await page.$eval("#q", (el) => (el.value = ""));
+await page.type("#q", "pedophiles");
+await page.waitForFunction(
+  () => document.getElementById("search-results").textContent.length > 0,
+  { timeout: 10000 },
+);
+await new Promise((r) => setTimeout(r, 600));
+const degenerateLinks = await page.$$eval("#search-results a", (as) => as.length);
+check("search 'pedophiles' returns no junk matches", degenerateLinks === 0, `${degenerateLinks} links`);
 
 // 2. my-reps: West Allis address -> AD 14 (Tenorio) + SD 5 (Hutton)
 await page.goto("http://127.0.0.1:8931/my-reps/", { waitUntil: "networkidle2" });

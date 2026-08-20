@@ -1,0 +1,83 @@
+---
+/** GitHub-style calendar of one legislator-year: each cell is a day the
+ * chamber held floor votes. Navy = voted on everything; gold = present but
+ * not voting on some; badger red = missed votes (no record while the
+ * chamber voted). Pure static HTML — tooltips via title attributes. */
+interface Day {
+  date: string;
+  total: number; // chamber floor votes that day
+  cast: number; // this person's aye/nay
+  nv: number; // this person's recorded not-voting/excused
+}
+interface Props {
+  year: number;
+  days: Day[];
+}
+const { year, days } = Astro.props;
+const byDate = new Map(days.map((d) => [d.date, d]));
+
+const start = new Date(Date.UTC(year, 0, 1));
+const startDow = start.getUTCDay();
+const gridStart = new Date(start.getTime() - startDow * 86400000);
+const weeks: { date: string; inYear: boolean }[][] = [];
+for (let w = 0; w < 53; w++) {
+  const col: { date: string; inYear: boolean }[] = [];
+  for (let d = 0; d < 7; d++) {
+    const day = new Date(gridStart.getTime() + (w * 7 + d) * 86400000);
+    col.push({
+      date: day.toISOString().slice(0, 10),
+      inYear: day.getUTCFullYear() === year,
+    });
+  }
+  weeks.push(col);
+}
+
+function cellFor(date: string, inYear: boolean) {
+  if (!inYear) return { cls: "bg-transparent", title: "" };
+  const day = byDate.get(date);
+  if (!day) return { cls: "bg-navy-50", title: date };
+  const missed = day.total - day.cast - day.nv;
+  const pretty = new Date(date + "T00:00:00Z").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+  if (missed > 0)
+    return {
+      cls: "bg-badger-600",
+      title: `${pretty}: missed ${missed} of ${day.total} floor vote${day.total > 1 ? "s" : ""}`,
+    };
+  if (day.nv > 0)
+    return {
+      cls: "bg-gold-500",
+      title: `${pretty}: present, not voting on ${day.nv} of ${day.total}`,
+    };
+  const shade = day.total >= 15 ? "bg-navy-800" : day.total >= 6 ? "bg-navy-600" : "bg-navy-700/60";
+  return { cls: shade, title: `${pretty}: voted in all ${day.total} floor vote${day.total > 1 ? "s" : ""}` };
+}
+
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthCols = months.map((label, m) => ({
+  label,
+  col: Math.floor((Date.UTC(year, m, 1) - gridStart.getTime()) / 86400000 / 7),
+}));
+---
+<div class="overflow-x-auto">
+  <div class="inline-block">
+    <div class="relative mb-0.5 h-4 text-[10px] text-navy-600" style="margin-left: 0;">
+      {monthCols.map((m) => (
+        <span class="absolute" style={`left: ${m.col * 13}px`}>{m.label}</span>
+      ))}
+    </div>
+    <div class="flex gap-[3px]">
+      {weeks.map((col) => (
+        <div class="flex flex-col gap-[3px]">
+          {col.map((cell) => {
+            const c = cellFor(cell.date, cell.inYear);
+            return <div class={`h-2.5 w-2.5 rounded-[2px] ${c.cls}`} title={c.title} />;
+          })}
+        </div>
+      ))}
+    </div>
+  </div>
+</div>

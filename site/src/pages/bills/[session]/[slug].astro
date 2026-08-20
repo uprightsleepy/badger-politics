@@ -24,7 +24,7 @@ const cosponsors = sponsors.filter((s) => !s.is_primary);
 ---
 
 <Base title={`${bill.identifier} (${sessionName})`} description={bill.title ?? undefined}>
-  <article data-pagefind-body>
+  <article data-pagefind-body class="mx-auto max-w-3xl">
     <p class="text-sm text-navy-600">
       <a href="/bills/" class="underline">Bills</a> · {sessionName}
     </p>
@@ -37,7 +37,7 @@ const cosponsors = sponsors.filter((s) => !s.is_primary);
         </a>
       )}
     </div>
-    <p class="mt-2 max-w-3xl text-lg text-navy-700">{bill.title}</p>
+    <p class="mt-2 text-lg text-navy-700">{bill.title}</p>
 
     <div class="mt-6 rounded-lg border border-navy-100 bg-white p-4">
       <Stepper status={bill.status} chamber={bill.chamber} />
@@ -63,7 +63,7 @@ const cosponsors = sponsors.filter((s) => !s.is_primary);
         <p class="text-xs text-navy-600">
           Plain-language analysis by the nonpartisan Legislative Reference Bureau
         </p>
-        <div class="mt-2 max-w-3xl space-y-3 rounded-lg border border-navy-100 bg-white p-4 leading-relaxed">
+        <div class="mt-2 space-y-3 rounded-lg border border-navy-100 bg-white p-4 leading-relaxed">
           {bill.lrb_analysis.split(/\n+/).slice(0, 40).map((para) => <p>{para}</p>)}
         </div>
       </section>

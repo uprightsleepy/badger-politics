@@ -5,6 +5,18 @@ import { personSlug, partyStyle, partyLetter } from "../../lib/format";
 const members = sittingPeople();
 const senate = members.filter((m) => m.chamber === "upper");
 const assembly = members.filter((m) => m.chamber === "lower");
+
+function breakdown(rows: typeof members, seatCount: number) {
+  const dem = rows.filter((m) => m.party === "Democratic").length;
+  const rep = rows.filter((m) => m.party === "Republican").length;
+  const other = rows.length - dem - rep;
+  const occupied = new Set(rows.map((m) => m.district));
+  const vacant = Array.from({ length: seatCount }, (_, i) => i + 1).filter(
+    (d) => !occupied.has(d),
+  );
+  const majority = rep > dem ? "Republican majority" : dem > rep ? "Democratic majority" : "Even split";
+  return { dem, rep, other, vacant, majority, total: seatCount };
+}
 ---
 
 <Base title="Legislators">
@@ -13,11 +25,32 @@ const assembly = members.filter((m) => m.chamber === "lower");
     Don't know your district? <a href="/my-reps/" class="underline">Find your legislators</a>.
   </p>
   {[
-    { label: "Senate", rows: senate },
-    { label: "Assembly", rows: assembly },
-  ].map((chamber) => (
+    { label: "Senate", rows: senate, seats: 33 },
+    { label: "Assembly", rows: assembly, seats: 99 },
+  ].map((chamber) => {
+    const b = breakdown(chamber.rows, chamber.seats);
+    return (
     <section class="mt-6">
-      <h2 class="text-xl font-bold">{chamber.label} · {chamber.rows.length}</h2>
+      <h2 class="text-xl font-bold">{chamber.label} · {chamber.rows.length} of {b.total} seats</h2>
+      <div class="mt-2 rounded-lg border border-navy-100 bg-white p-3">
+        <div class="flex h-3 overflow-hidden rounded-full" role="img" aria-label={`${b.rep} Republicans, ${b.dem} Democrats${b.other ? `, ${b.other} other` : ""}${b.vacant.length ? `, ${b.vacant.length} vacant` : ""}`}>
+          <div class="bg-badger-600" style={`width: ${(b.rep / b.total) * 100}%`}></div>
+          <div class="bg-gold-500" style={`width: ${(b.other / b.total) * 100}%`}></div>
+          <div class="bg-navy-100" style={`width: ${(b.vacant.length / b.total) * 100}%`}></div>
+          <div class="ml-auto bg-navy-600" style={`width: ${(b.dem / b.total) * 100}%`}></div>
+        </div>
+        <p class="mt-2 flex flex-wrap gap-x-4 text-sm">
+          <span class="font-semibold text-badger-700">{b.rep} Republicans</span>
+          <span class="font-semibold text-navy-700">{b.dem} Democrats</span>
+          {b.other > 0 && <span class="font-semibold">{b.other} other</span>}
+          <span class={b.vacant.length ? "font-semibold" : "text-navy-600"}>
+            {b.vacant.length
+              ? `${b.vacant.length} vacant: District ${b.vacant.join(", ")}`
+              : "no vacancies"}
+          </span>
+          <span class="ml-auto text-navy-600">{b.majority}</span>
+        </p>
+      </div>
       <ul class="mt-2 grid gap-1 rounded-lg border border-navy-100 bg-white p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
         {chamber.rows.map((m) => (
           <li class="flex items-center gap-2">
@@ -30,5 +63,6 @@ const assembly = members.filter((m) => m.chamber === "lower");
         ))}
       </ul>
     </section>
-  ))}
+    );
+  })}
 </Base>

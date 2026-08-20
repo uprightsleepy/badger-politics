@@ -408,7 +408,9 @@ class Importer:
         ]
         committee_id = None
         if hosts:
-            committee_name = hosts[0]
+            # the schedule feed doubles 'Joint' for committees whose proper
+            # name already starts with it ('Joint Joint Legislative Audit')
+            committee_name = re.sub(r"^(Joint )+", "Joint ", hosts[0])
             # 'Senate X' / 'Assembly X' -> chamber + bare name; joint stays whole
             chamber = None
             if committee_name.startswith("Senate "):
@@ -437,10 +439,11 @@ class Importer:
         start = event.get("start_date") or ""
         local_date, local_time = to_local(start)
         self.conn.execute(
-            "INSERT INTO hearings (id, committee_id, date, time, location,"
-            " agenda_bill_ids_json, source_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO hearings (id, title, committee_id, date, time, location,"
+            " agenda_bill_ids_json, source_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 event.get("_id") or f"{name}-{start}",
+                name or None,
                 committee_id,
                 local_date,
                 local_time,

@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { upcomingHearings, recentHearings, meta } from "../../lib/db";
-import { fmtDate, chamberName } from "../../lib/format";
+import { fmtDate, fmtTime, chamberName } from "../../lib/format";
 const today = new Date().toISOString().slice(0, 10);
 const upcoming = upcomingHearings(today);
 const recent = recentHearings(30);
@@ -24,9 +24,11 @@ const heading = upcoming.length ? "Upcoming committee hearings" : "Recent commit
         <li class="rounded-lg border border-navy-100 bg-white px-4 py-3 text-sm">
           <div class="flex flex-wrap items-baseline gap-x-3">
             <span class="font-bold">
-              {h.committee_chamber ? `${chamberName(h.committee_chamber)} ` : ""}{h.committee_name ?? "Committee"}
+              {h.committee_name
+                ? `${h.committee_chamber ? `${chamberName(h.committee_chamber)} ` : ""}${h.committee_name}`
+                : (h.title ?? "Committee hearing")}
             </span>
-            <span class="text-navy-600">{fmtDate(h.date)} {h.time && `· ${h.time}`}</span>
+            <span class="text-navy-600">{fmtDate(h.date)} {h.time && `· ${fmtTime(h.time)}`}</span>
             {h.location && <span class="text-navy-600">{h.location}</span>}
             <span class="ml-auto flex gap-3">
               <a href={`/calendar/hearings/${uid}.ics`} class="underline">Add to calendar</a>

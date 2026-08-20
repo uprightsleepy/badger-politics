@@ -95,6 +95,7 @@ CREATE TABLE committees (
 
 CREATE TABLE hearings (
     id                   TEXT PRIMARY KEY,
+    title                TEXT,  -- event name; display fallback when no committee matches
     committee_id         TEXT REFERENCES committees (id),
     date                 TEXT,
     time                 TEXT,

@@ -34,11 +34,11 @@ const bills = billsFor(session.id);
   </div>
   <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white">
     {bills.map((b) => (
-      <li class="flex items-baseline gap-3 px-4 py-2.5 text-sm" data-bill-row data-text={`${b.identifier} ${b.title ?? ""}`.toLowerCase()}>
+      <li class="flex items-center gap-3 px-4 py-2.5 text-sm" data-bill-row data-status={b.status} data-text={`${b.identifier} ${b.title ?? ""}`.toLowerCase()}>
         <a href={`/bills/${session.id}/${billSlug(b.identifier)}/`} class="w-20 shrink-0 font-bold underline">
           {b.identifier}
         </a>
-        <span class="flex-1 truncate">{b.title}</span>
+        <span class="min-w-0 flex-1 truncate">{b.title}</span>
         <StatusBadge status={b.status} />
         <span class="hidden w-24 shrink-0 text-right text-xs text-navy-600 sm:block">
           {fmtDate(b.latest_action_date)}
@@ -47,13 +47,25 @@ const bills = billsFor(session.id);
     ))}
   </ul>
   <script>
-    // the tiny filter helper (the plan's one allowed non-Pagefind script)
+    // the tiny filter helper: free text + ?status= from stat-card links
     const input = document.getElementById("bill-filter") as HTMLInputElement;
-    input?.addEventListener("input", () => {
+    const statusFilter = new URLSearchParams(location.search).get("status");
+    function apply() {
       const q = input.value.toLowerCase();
       document.querySelectorAll<HTMLElement>("[data-bill-row]").forEach((row) => {
-        row.classList.toggle("sorted-hidden", !row.dataset.text!.includes(q));
+        const hide =
+          !row.dataset.text!.includes(q) ||
+          (statusFilter !== null && row.dataset.status !== statusFilter);
+        row.classList.toggle("sorted-hidden", hide);
       });
-    });
+    }
+    if (statusFilter) {
+      const note = document.createElement("p");
+      note.className = "mt-2 text-sm text-navy-700";
+      note.innerHTML = `Showing only bills with status “${statusFilter.replace(/_/g, " ")}” — <a class="underline" href="?">show all</a>`;
+      input.parentElement!.appendChild(note);
+      apply();
+    }
+    input?.addEventListener("input", apply);
   </script>
 </Base>

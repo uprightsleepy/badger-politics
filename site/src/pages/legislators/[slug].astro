@@ -1,8 +1,24 @@
 ---
 import Base from "../../layouts/Base.astro";
 import StatusBadge from "../../components/StatusBadge.astro";
-import { people, personVotes, personSponsorships, electionFor } from "../../lib/db";
-import { personSlug, partyStyle, chamberName, fmtDate, billSlug } from "../../lib/format";
+import VoteHeatmap from "../../components/VoteHeatmap.astro";
+import {
+  people,
+  personVotes,
+  personSponsorships,
+  electionFor,
+  chamberVoteDays,
+  personVoteDays,
+} from "../../lib/db";
+import {
+  personSlug,
+  partyStyle,
+  chamberName,
+  fmtDate,
+  billSlug,
+  STATUS_LABELS,
+  STATUS_STYLES,
+} from "../../lib/format";
 
 export function getStaticPaths() {
   return people().map((p) => ({
@@ -16,6 +32,50 @@ const sponsorships = personSponsorships(person.id);
 const election = electionFor(person.id);
 const sitting = person.current_role === "Representative" || person.current_role === "Senator";
 const opponents = election?.opponents.filter((o) => o.ballot_status !== "Deny") ?? [];
+
+// Attendance heatmap: for each chamber this person served in, take the span
+// of their recorded votes (extended to today's data if they're sitting) and
+// line their participation up against every day the chamber voted.
+const mine = personVoteDays(person.id);
+const heatDays: { date: string; total: number; cast: number; nv: number }[] = [];
+for (const chamber of ["lower", "upper"] as const) {
+  const my = mine.filter((m) => m.chamber === chamber);
+  if (!my.length) continue;
+  const myByDate = new Map(my.map((m) => [m.date, m]));
+  const chamberAll = chamberVoteDays().filter((c) => c.chamber === chamber);
+  const first = my.reduce((a, b) => (a.date < b.date ? a : b)).date;
+  const last =
+    sitting && person.chamber === chamber
+      ? chamberAll.reduce((a, b) => (a.date > b.date ? a : b)).date
+      : my.reduce((a, b) => (a.date > b.date ? a : b)).date;
+  for (const day of chamberAll) {
+    if (day.date < first || day.date > last) continue;
+    const m = myByDate.get(day.date);
+    heatDays.push({ date: day.date, total: day.n, cast: m?.cast ?? 0, nv: m?.nv ?? 0 });
+  }
+}
+const heatYears = [...new Set(heatDays.map((d) => Number(d.date.slice(0, 4))))].sort(
+  (a, b) => b - a,
+);
+const missedTotal = heatDays.reduce((s, d) => s + Math.max(0, d.total - d.cast - d.nv), 0);
+const votesTotal = heatDays.reduce((s, d) => s + d.total, 0);
+
+// Running tally of their sponsored bills by stage; counts recompute from
+// live statuses every nightly rebuild, so they track bills through stages.
+const primarySponsored = sponsorships.filter((s) => s.is_primary);
+const TALLY_ORDER = [
+  "enacted",
+  "vetoed",
+  "passed",
+  "passed_chamber",
+  "in_committee",
+  "introduced",
+  "failed_sjr1",
+];
+const tally = TALLY_ORDER.map((status) => ({
+  status,
+  bills: primarySponsored.filter((s) => s.status === status),
+})).filter((t) => t.bills.length > 0);
 ---
 
 <Base title={person.name} description={`${person.current_role ?? "Legislator"}, ${chamberName(person.chamber)} District ${person.district}`}>
@@ -68,19 +128,65 @@ const opponents = election?.opponents.filter((o) => o.ballot_status !== "Deny") 
 
     <div class="min-w-0 flex-1">
       <section>
-        <h2 class="text-xl font-bold">Sponsored bills · {sponsorships.filter((s) => s.is_primary).length}</h2>
-        <ul class="mt-2 max-h-96 space-y-1 overflow-y-auto rounded-lg border border-navy-100 bg-white p-3 text-sm">
-          {sponsorships.filter((s) => s.is_primary).slice(0, 200).map((s) => (
-            <li class="flex items-baseline gap-2">
-              <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="shrink-0 font-semibold underline">
-                {s.identifier}
-              </a>
-              <span class="truncate">{s.title}</span>
-              <StatusBadge status={s.status} />
-            </li>
+        <h2 class="text-xl font-bold">Sponsored bills · {primarySponsored.length}</h2>
+        <div class="mt-2 flex flex-wrap gap-2 text-sm">
+          {tally.map((t) => (
+            <a
+              href={`#status-${t.status}`}
+              class={`rounded-full px-3 py-1 font-semibold hover:ring-2 hover:ring-navy-600 ${STATUS_STYLES[t.status]}`}
+            >
+              {t.bills.length} {STATUS_LABELS[t.status].toLowerCase()}
+            </a>
           ))}
-        </ul>
+        </div>
+        <div class="mt-3 space-y-2">
+          {tally.map((t) => (
+            <details id={`status-${t.status}`} class="rounded-lg border border-navy-100 bg-white" open={t.status === "enacted"}>
+              <summary class="flex cursor-pointer items-center gap-2 px-3 py-2">
+                <span class="font-semibold">{STATUS_LABELS[t.status]}</span>
+                <span class="text-sm text-navy-600">{t.bills.length} bills</span>
+              </summary>
+              <ul class="max-h-72 space-y-1 overflow-y-auto border-t border-navy-100 p-3 text-sm">
+                {t.bills.map((s) => (
+                  <li class="flex items-center gap-2">
+                    <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-16 shrink-0 font-semibold underline">
+                      {s.identifier}
+                    </a>
+                    <span class="min-w-0 flex-1 truncate">{s.title}</span>
+                    <span class="shrink-0 text-xs text-navy-600">{s.session_id}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ))}
+        </div>
       </section>
+
+      {heatYears.length > 0 && (
+        <section class="mt-6">
+          <h2 class="text-xl font-bold">Floor attendance</h2>
+          <p class="mt-1 text-sm text-navy-600">
+            Every day the chamber held recorded floor votes.
+            {votesTotal.toLocaleString()} votes across {heatDays.length} voting days
+            {missedTotal > 0 ? ` — ${missedTotal} missed` : " — none missed"}.
+          </p>
+          <div class="mt-1 flex items-center gap-3 text-xs text-navy-600">
+            <span class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[2px] bg-navy-700/60"></span> voted all</span>
+            <span class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[2px] bg-gold-500"></span> present, not voting</span>
+            <span class="flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-[2px] bg-badger-600"></span> missed votes</span>
+          </div>
+          <div class="mt-3 space-y-2">
+            {heatYears.map((year, i) => (
+              <details class="rounded-lg border border-navy-100 bg-white px-3 py-2" open={i < 2}>
+                <summary class="cursor-pointer text-sm font-semibold">{year}</summary>
+                <div class="mt-2">
+                  <VoteHeatmap year={year} days={heatDays.filter((d) => d.date.startsWith(String(year)))} />
+                </div>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section class="mt-6">
         <h2 class="text-xl font-bold">Vote history · {votes.length.toLocaleString()}</h2>

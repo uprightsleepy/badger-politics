@@ -27,10 +27,16 @@ class Committee:
 
 
 def normalize_name(name: str) -> str:
-    """Case/punctuation-insensitive, with the noise prefix 'committee on'
-    stripped — openstates names some committees with it baked in."""
+    """Case/punctuation-insensitive, with the noise prefixes 'joint' and
+    'committee on' stripped (repeatedly — the committee-schedule feed can
+    double them: 'Joint Joint Legislative Audit Committee'). Chamber-scoped
+    keys keep same-stem committees in different chambers apart."""
     key = re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
-    return re.sub(r"^(joint )?committee on ", "", key)
+    while True:
+        stripped = re.sub(r"^(joint |committee on )", "", key)
+        if stripped == key:
+            return key
+        key = stripped
 
 
 def load_committees(committees_dir: Path) -> list[Committee]:

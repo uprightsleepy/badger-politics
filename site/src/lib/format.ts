@@ -37,6 +37,14 @@ export const billSlug = (identifier: string): string =>
 export const personSlug = (personId: string): string =>
   personId.replace(/^legacy\//, "legacy-").split("/").pop()!;
 
+/** '13:01' (already America/Chicago) -> '1:01 PM' */
+export const fmtTime = (t: string | null): string => {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"} CT`;
+};
+
 export const fmtDate = (iso: string | null): string => {
   if (!iso) return "";
   const [y, m, d] = iso.split("-").map(Number);

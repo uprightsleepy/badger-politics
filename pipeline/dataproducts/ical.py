@@ -89,7 +89,7 @@ def _hearing_event(hearing: dict) -> list[str] | None:
         return None
     date = hearing["date"].replace("-", "")
     time = (hearing["time"] or "09:00").replace(":", "") + "00"
-    committee = hearing["committee_name"] or "Committee"
+    committee = hearing["committee_name"] or hearing.get("title") or "Committee"
     summary = f"Hearing: {committee}"
     bills_text = ", ".join(hearing["agenda_bills"])
     description = DISCLAIMER

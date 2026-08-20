@@ -18,7 +18,17 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
       Every bill, every vote, every committee graveyard — in plain language,
       updated nightly from official records.
     </p>
-    <div id="search" class="mx-auto mt-6 max-w-xl text-left"></div>
+    <div class="mx-auto mt-6 max-w-xl text-left">
+      <label class="sr-only" for="q">Search bills</label>
+      <input
+        id="q"
+        type="search"
+        placeholder="Search bills — try “child marriage” or “AB 656”"
+        class="w-full rounded-lg border border-navy-100 bg-white px-4 py-3 shadow-sm"
+        autocomplete="off"
+      />
+      <div id="search-results" class="mt-2 space-y-2" aria-live="polite"></div>
+    </div>
     <p class="mt-4 text-sm">
       <a href="/my-reps/" class="font-semibold text-navy-700 underline">
         Enter your address once
@@ -28,14 +38,14 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
   </section>
 
   <section class="grid gap-3 sm:grid-cols-3">
-    <div class="rounded-lg border border-navy-100 bg-white p-4 text-center">
+    <a href={`/bills/${current.id}/`} class="rounded-lg border border-navy-100 bg-white p-4 text-center hover:border-navy-600">
       <div class="text-3xl font-bold">{stats.bills.toLocaleString()}</div>
-      <div class="text-sm text-navy-600">proposals this session</div>
-    </div>
-    <div class="rounded-lg border border-navy-100 bg-white p-4 text-center">
+      <div class="text-sm text-navy-600">proposals this session →</div>
+    </a>
+    <a href={`/bills/${current.id}/?status=enacted`} class="rounded-lg border border-navy-100 bg-white p-4 text-center hover:border-moss-600">
       <div class="text-3xl font-bold text-moss-600">{stats.enacted}</div>
-      <div class="text-sm text-navy-600">became law</div>
-    </div>
+      <div class="text-sm text-navy-600">became law →</div>
+    </a>
     <a href={`/hearing-none/${current.id}/`} class="rounded-lg border border-badger-600/30 bg-badger-50 p-4 text-center hover:border-badger-600">
       <div class="text-3xl font-bold text-badger-700">{stats.graveyard.toLocaleString()}</div>
       <div class="text-sm text-badger-700">died without a hearing →</div>
@@ -46,11 +56,11 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
     <h2 class="text-xl font-bold">Recently acted on</h2>
     <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white">
       {recent.map((b) => (
-        <li class="flex items-baseline gap-3 px-4 py-2.5 text-sm">
+        <li class="flex items-center gap-3 px-4 py-2.5 text-sm">
           <a href={`/bills/${b.session_id}/${billSlug(b.identifier)}/`} class="w-20 shrink-0 font-bold underline">
             {b.identifier}
           </a>
-          <span class="flex-1 truncate">{b.title}</span>
+          <span class="min-w-0 flex-1 truncate">{b.title}</span>
           <StatusBadge status={b.status} />
           <span class="hidden w-24 shrink-0 text-right text-xs text-navy-600 sm:block">
             {fmtDate(b.latest_action_date)}
@@ -60,17 +70,50 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
     </ul>
   </section>
 
-  <link href="/pagefind/pagefind-ui.css" rel="stylesheet" />
-  <script is:inline src="/pagefind/pagefind-ui.js"></script>
-  <script is:inline>
-    window.addEventListener("DOMContentLoaded", () => {
-      if (window.PagefindUI) {
-        new window.PagefindUI({
-          element: "#search",
-          showSubResults: false,
-          placeholder: "Search bills — try “child marriage” or “AB 656”",
-        });
+  <script is:inline type="module">
+    // Thin custom UI over the Pagefind API. Pagefind's default behavior chops
+    // unmatched terms down to fragments (a search for a word not in the corpus
+    // can end up highlighting a middle initial); we reject any result whose
+    // only highlighted terms are shorter than 3 characters.
+    const input = document.getElementById("q");
+    const box = document.getElementById("search-results");
+    let pagefind;
+    let timer;
+
+    const degenerate = (excerpt) => {
+      const marks = [...excerpt.matchAll(/<mark>(.*?)<\/mark>/g)].map((m) =>
+        m[1].replace(/[^A-Za-z0-9]/g, ""),
+      );
+      return marks.length > 0 && marks.every((m) => m.length < 3);
+    };
+
+    async function run() {
+      const q = input.value.trim();
+      if (q.length < 2) {
+        box.innerHTML = "";
+        return;
       }
+      pagefind ??= await import("/pagefind/pagefind.js");
+      const search = await pagefind.debouncedSearch(q);
+      if (search === null) return; // superseded by newer keystroke
+      const loaded = await Promise.all(search.results.slice(0, 12).map((r) => r.data()));
+      const good = loaded.filter((r) => !degenerate(r.excerpt)).slice(0, 8);
+      box.innerHTML = good.length
+        ? good
+            .map(
+              (r) => `
+        <a href="${r.url}" class="block rounded-lg border border-navy-100 bg-white p-3 hover:border-navy-600">
+          <span class="font-bold">${r.meta?.title ?? r.url}</span>
+          <span class="mt-0.5 block text-sm text-navy-700">…${r.excerpt}…</span>
+        </a>`,
+            )
+            .join("")
+        : `<p class="rounded-lg border border-navy-100 bg-white p-3 text-sm text-navy-600">No bills match “${q.replace(/[<>&]/g, "")}”.</p>`;
+    }
+
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(run, 150);
     });
   </script>
 </Base>
