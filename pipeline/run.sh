@@ -27,6 +27,9 @@ python -m scraper.fetch_cfis map ../data/wi.sqlite
 python -m scraper.fetch_cfis transactions     # nightly delta (past months cached)
 python -m importer.import_cfis _data/cfis ../data/wi.sqlite
 
+python -m scraper.fetch_lobbying --refresh    # per-bill registered principals
+python -m importer.import_lobbying _data/lobbying ../data/wi.sqlite
+
 python -m importer.enrich_lrb ../data/wi.sqlite
 python -m importer.checks ../data/wi.sqlite   # hard gate: abort deploy on failure
 

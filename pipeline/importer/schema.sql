@@ -125,6 +125,16 @@ CREATE TABLE election_history (
 );
 CREATE INDEX idx_election_history_seat ON election_history (chamber, district, year);
 
+-- Organizations registered as lobbying on a bill (Ethics Commission's Eye
+-- on Lobbying; registration of interest, NOT a for/against position).
+CREATE TABLE lobbying_interests (
+    bill_id      TEXT NOT NULL REFERENCES bills (id),
+    principal_id INTEGER NOT NULL,
+    principal    TEXT NOT NULL,
+    source_url   TEXT
+);
+CREATE INDEX idx_lobbying_bill ON lobbying_interests (bill_id);
+
 -- Which CFIS candidate committees belong to which legislator (verified
 -- mapping; lets the site distinguish "unmapped" from "raised nothing").
 CREATE TABLE cfis_committees (

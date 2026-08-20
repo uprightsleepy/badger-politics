@@ -414,6 +414,16 @@ export const moneyFor = (personId: string) => {
   return { ...summary, committees, occupations, individualTotal: individualTotal.t };
 };
 
+/** Organizations registered as lobbying on a bill (an interest
+ * registration, not a for/against position). */
+export const lobbyingFor = (billId: string) =>
+  db
+    .prepare(
+      `SELECT principal_id, principal, source_url FROM lobbying_interests
+       WHERE bill_id = ? ORDER BY principal`,
+    )
+    .all(billId) as { principal_id: number; principal: string; source_url: string | null }[];
+
 export const sessionStats = (sessionId: string) =>
   db
     .prepare(

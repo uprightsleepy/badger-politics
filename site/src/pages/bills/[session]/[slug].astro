@@ -4,7 +4,14 @@ import StatusBadge from "../../../components/StatusBadge.astro";
 import Stepper from "../../../components/Stepper.astro";
 import RollCall from "../../../components/RollCall.astro";
 import SponsorNames from "../../../components/SponsorNames.astro";
-import { builtSessions, billsFor, actionsFor, sponsorsFor, votesFor } from "../../../lib/db";
+import {
+  builtSessions,
+  billsFor,
+  actionsFor,
+  sponsorsFor,
+  votesFor,
+  lobbyingFor,
+} from "../../../lib/db";
 import { billSlug, fmtDate, personSlug, chamberName } from "../../../lib/format";
 
 export function getStaticPaths() {
@@ -20,6 +27,7 @@ const { bill, sessionName } = Astro.props;
 const actions = actionsFor(bill.id);
 const sponsors = sponsorsFor(bill.id);
 const votes = votesFor(bill.id);
+const lobbying = lobbyingFor(bill.id);
 const primary = sponsors.filter((s) => s.is_primary);
 const cosponsors = sponsors.filter((s) => !s.is_primary);
 ---
@@ -91,6 +99,32 @@ const cosponsors = sponsors.filter((s) => !s.is_primary);
         )}
       </div>
     </section>
+
+    {lobbying.length > 0 && (
+      <section class="mt-6" data-pagefind-ignore>
+        <h2 class="text-xl font-bold">Registered lobbying interests · {lobbying.length}</h2>
+        <p class="text-xs text-navy-600">
+          Organizations that registered lobbying activity on this bill with the
+          Wisconsin Ethics Commission. Registration means interest, not a
+          position for or against.
+          {lobbying[0].source_url && (
+            <a href={lobbying[0].source_url} class="underline"> Official record</a>
+          )}
+        </p>
+        <ul class="mt-2 grid gap-x-4 gap-y-1 rounded-lg border border-navy-100 bg-white p-3 text-sm sm:grid-cols-2">
+          {lobbying.map((l) => (
+            <li class="truncate">
+              <a
+                href={`https://lobbying.wi.gov/Who/PrincipalInformation/2025REG/Information/${l.principal_id}`}
+                class="hover:underline"
+              >
+                {l.principal}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
 
     {votes.length > 0 && (
       <section class="mt-6" data-pagefind-ignore>
