@@ -97,6 +97,46 @@ def test_sjr1_without_referral_is_not_graveyard() -> None:
     assert derive_graveyard([action("Introduced"), action(SJR1)]) == (0, None, None)
 
 
+def test_session_key_normalizes_all_formats() -> None:
+    from importer.import_openstates import session_key
+
+    assert session_key("2025") == "2025"
+    assert session_key("2026S1") == "2026s1"
+    assert session_key("2009 Regular Session") == "2009"
+    assert session_key("December 2013 Special Session") == "2013s-dec"
+    with pytest.raises(ValueError):
+        session_key("Skynet Session")
+
+
+def test_roster_for_windows_by_term() -> None:
+    from importer.roster import Person, Term, roster_for
+
+    veteran = Person(
+        id="p-old", name="Old Timer", family_name="Timer", party="T", image_url=None,
+        terms=[Term("lower", 5, "2009-01-05", "2014-12-31")],
+    )
+    sitting = Person(
+        id="p-new", name="New Member", family_name="Member", party="T", image_url=None,
+        terms=[Term("lower", 5, "2023-01-03", None)],
+    )
+    mover = Person(
+        id="p-move", name="Chamber Mover", family_name="Mover", party="T", image_url=None,
+        terms=[
+            Term("lower", 9, "2011-01-11", "2013-01-07"),
+            Term("upper", 3, "2013-01-07", None),
+        ],
+    )
+    old = roster_for([veteran, sitting, mover], "2011-01-11", "2013-01-03")
+    assert old.resolve("Timer", "lower").district == 5
+    assert old.resolve("Mover", "lower").district == 9
+    assert old.resolve_or_none("Member", "lower") is None
+
+    new = roster_for([veteran, sitting, mover], "2025-01-06", "2026-05-25")
+    assert new.resolve("Member", "lower").id == "p-new"
+    assert new.resolve("Mover", "upper").district == 3
+    assert new.resolve_or_none("Timer", "lower") is None
+
+
 def test_hearing_times_convert_utc_to_central() -> None:
     from importer.import_openstates import to_local
 

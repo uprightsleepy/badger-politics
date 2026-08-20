@@ -1,10 +1,11 @@
-"""Fetch the Wisconsin legislator roster from the openstates/people repo.
+"""Fetch Wisconsin legislator rosters from the openstates/people repo.
 
-Usage: python -m scraper.fetch_people [dest_dir]
+Usage: python -m scraper.fetch_people [--retired]
 
-Downloads data/wi/legislature/*.yml (one file per sitting legislator, CC0)
-via the GitHub contents API into _data/people/wi/ for the importer's
-session-scoped vote-attribution roster. This is data, not GPL code.
+Downloads data/wi/legislature/*.yml (sitting members) into _data/people/wi/,
+and with --retired also data/wi/retired/*.yml (everyone who served since
+~2009, needed for historical vote attribution) into _data/people/wi-retired/.
+This is data (CC0), not GPL code.
 """
 
 import sys
@@ -13,20 +14,20 @@ from pathlib import Path
 
 import requests
 
-API_URL = "https://api.github.com/repos/openstates/people/contents/data/wi/legislature"
+API_BASE = "https://api.github.com/repos/openstates/people/contents/data/wi"
 USER_AGENT = "badgerpolitics.org data pipeline (contact: hphil.work@gmail.com)"
-DEFAULT_DEST = Path(__file__).resolve().parents[1] / "_data" / "people" / "wi"
+PEOPLE_ROOT = Path(__file__).resolve().parents[1] / "_data" / "people"
 
 
-def fetch_roster(dest: Path) -> int:
+def fetch_dir(repo_dir: str, dest: Path) -> int:
     session = requests.Session()
     session.headers["User-Agent"] = USER_AGENT
 
-    listing = session.get(API_URL, timeout=30)
+    listing = session.get(f"{API_BASE}/{repo_dir}?per_page=1000", timeout=30)
     listing.raise_for_status()
     entries = [e for e in listing.json() if e["name"].endswith(".yml")]
     if not entries:
-        raise RuntimeError(f"no YAML files listed at {API_URL}")
+        raise RuntimeError(f"no YAML files listed for {repo_dir}")
 
     dest.mkdir(parents=True, exist_ok=True)
     for entry in entries:
@@ -38,12 +39,17 @@ def fetch_roster(dest: Path) -> int:
 
 
 def main(argv: list[str]) -> int:
-    dest = Path(argv[0]) if argv else DEFAULT_DEST
-    count = fetch_roster(dest)
-    print(f"fetched {count} legislator files -> {dest}")
+    count = fetch_dir("legislature", PEOPLE_ROOT / "wi")
+    print(f"fetched {count} sitting legislator files -> {PEOPLE_ROOT / 'wi'}")
     if count < 120:  # 99 Assembly + 33 Senate minus vacancies; far fewer means breakage
         print(f"WARNING: expected ~132 sitting legislators, got {count}", file=sys.stderr)
         return 1
+    if "--retired" in argv:
+        retired = fetch_dir("retired", PEOPLE_ROOT / "wi-retired")
+        print(f"fetched {retired} retired legislator files -> {PEOPLE_ROOT / 'wi-retired'}")
+        if retired < 150:
+            print(f"WARNING: expected 200+ retired members, got {retired}", file=sys.stderr)
+            return 1
     return 0
 
 

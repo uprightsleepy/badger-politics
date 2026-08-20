@@ -1,9 +1,10 @@
-"""Session-scoped legislator roster for vote/sponsor name attribution.
+"""Session-scoped legislator rosters for vote/sponsor name attribution.
 
-Loaded from openstates/people YAML (data/wi/legislature). Resolution is
-chamber-scoped and alias-aware. Hard rule: an ambiguous name is a build
-failure, never a best guess — misattributing a vote is the worst bug this
-site can have.
+Loaded from openstates/people YAML — sitting members (data/wi/legislature)
+plus, for historical sessions, retired members (data/wi/retired). Every
+person carries their full term history; a Roster is built for a session's
+date window, so names resolve against who actually served THEN, chamber-
+scoped. Hard rule: an ambiguous name is a build failure, never a best guess.
 """
 
 from __future__ import annotations
@@ -24,12 +25,33 @@ class AmbiguousNameError(Exception):
 
 
 @dataclass
-class Member:
+class Term:
+    chamber: str  # 'lower' | 'upper'
+    district: int | None
+    start: str  # ISO date
+    end: str | None  # None = sitting
+
+
+@dataclass
+class Person:
     id: str
     name: str
     family_name: str
     party: str | None
-    chamber: str  # 'lower' | 'upper'
+    image_url: str | None
+    aliases: list[str] = field(default_factory=list)
+    terms: list[Term] = field(default_factory=list)
+
+
+@dataclass
+class Member:
+    """One person serving in one chamber during one session window."""
+
+    id: str
+    name: str
+    family_name: str
+    party: str | None
+    chamber: str
     district: int | None
     image_url: str | None
     aliases: list[str] = field(default_factory=list)
@@ -40,40 +62,72 @@ def _normalize(name: str) -> str:
     return re.sub(r"[^a-z]", "", name.lower())
 
 
-def _current_role(person: dict) -> dict | None:
-    """The role with no end_date (the sitting one), if any."""
-    for role in person.get("roles", []):
-        if role.get("type") in ("lower", "upper") and not role.get("end_date"):
-            return role
-    return None
-
-
-def load_members(people_dir: Path) -> list[Member]:
-    members = []
-    for path in sorted(people_dir.glob("*.yml")):
-        person = yaml.safe_load(path.read_text(encoding="utf-8"))
-        role = _current_role(person)
-        if role is None:
-            continue
-        district = role.get("district")
-        parties = person.get("party") or []
-        members.append(
-            Member(
-                id=person["id"],
-                name=person["name"],
-                family_name=person.get("family_name") or person["name"].split()[-1],
-                party=parties[0]["name"] if parties else None,
-                chamber=role["type"],
-                district=int(district) if district and str(district).isdigit() else None,
-                image_url=person.get("image"),
-                aliases=[n["name"] for n in person.get("other_names", []) if n.get("name")],
+def load_people(people_dirs: list[Path]) -> list[Person]:
+    people = []
+    for people_dir in people_dirs:
+        for path in sorted(people_dir.glob("*.yml")):
+            raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+            terms = [
+                Term(
+                    chamber=role["type"],
+                    district=(
+                        int(role["district"])
+                        if str(role.get("district", "")).isdigit()
+                        else None
+                    ),
+                    start=str(role.get("start_date") or "1900-01-01"),
+                    end=str(role["end_date"]) if role.get("end_date") else None,
+                )
+                for role in raw.get("roles", [])
+                if role.get("type") in ("lower", "upper")
+            ]
+            if not terms:
+                continue
+            parties = raw.get("party") or []
+            people.append(
+                Person(
+                    id=raw["id"],
+                    name=raw["name"],
+                    family_name=raw.get("family_name") or raw["name"].split()[-1],
+                    party=parties[-1]["name"] if parties else None,
+                    image_url=raw.get("image"),
+                    aliases=[n["name"] for n in raw.get("other_names", []) if n.get("name")],
+                    terms=terms,
+                )
             )
-        )
-    return members
+    return people
+
+
+def roster_for(people: list[Person], start: str, end: str) -> Roster:
+    """Roster of everyone with a term overlapping (start, end) — STRICT
+    boundaries: WI terms end on the successor's inauguration day, which is
+    also the new session's start date, so a term ending exactly on `start`
+    served zero days of the session."""
+    members: dict[tuple[str, str], Member] = {}  # (person, chamber) -> latest term
+    for person in people:
+        for term in person.terms:
+            if term.start >= end or (term.end is not None and term.end <= start):
+                continue
+            key = (person.id, term.chamber)
+            existing = members.get(key)
+            if existing is None or term.start > existing._term_start:  # type: ignore[attr-defined]
+                member = Member(
+                    id=person.id,
+                    name=person.name,
+                    family_name=person.family_name,
+                    party=person.party,
+                    chamber=term.chamber,
+                    district=term.district,
+                    image_url=person.image_url,
+                    aliases=person.aliases,
+                )
+                member._term_start = term.start  # type: ignore[attr-defined]
+                members[key] = member
+    return Roster(list(members.values()))
 
 
 class Roster:
-    """Chamber-scoped name resolution over the sitting membership."""
+    """Chamber-scoped name resolution over one session's membership."""
 
     def __init__(self, members: list[Member]):
         self.members = members
@@ -98,7 +152,7 @@ class Roster:
         if len(candidates) == 1:
             return candidates[0]
         if not candidates:
-            raise UnmatchedNameError(f"{name!r} ({chamber}) matches no sitting legislator")
+            raise UnmatchedNameError(f"{name!r} ({chamber}) matches no roster member")
         detail = ", ".join(f"{m.name} (district {m.district})" for m in candidates)
         raise AmbiguousNameError(f"{name!r} ({chamber}) is ambiguous: {detail}")
 
@@ -108,13 +162,3 @@ class Roster:
             return self.resolve(name, chamber)
         except (UnmatchedNameError, AmbiguousNameError):
             return None
-
-
-def load_roster(people_dir: Path) -> Roster:
-    members = load_members(people_dir)
-    if len(members) < 120:
-        raise RuntimeError(
-            f"roster has only {len(members)} sitting members (expected ~132); "
-            "refresh with: python -m scraper.fetch_people"
-        )
-    return Roster(members)

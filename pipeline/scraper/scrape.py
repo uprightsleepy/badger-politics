@@ -50,17 +50,17 @@ def apply_patches() -> None:
         print(f"applied patch: {patch.name}")
 
 
-def archive_output(prefixes: tuple[str, ...]) -> int:
-    ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+def archive_output(prefixes: tuple[str, ...], archive_dir: Path) -> int:
+    archive_dir.mkdir(parents=True, exist_ok=True)
     copied = 0
     for prefix in (*prefixes, *SHARED_PREFIXES):
         fresh = list(RAW_DIR.glob(f"{prefix}_*.json"))
         if not fresh:
             continue
-        for stale in ARCHIVE_DIR.glob(f"{prefix}_*.json"):
+        for stale in archive_dir.glob(f"{prefix}_*.json"):
             stale.unlink()
         for path in fresh:
-            shutil.copy2(path, ARCHIVE_DIR / path.name)
+            shutil.copy2(path, archive_dir / path.name)
             copied += 1
     return copied
 
@@ -82,6 +82,12 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=sorted(SCRAPERS))
     parser.add_argument("--no-fastmode", action="store_true")
+    parser.add_argument(
+        "--session",
+        help="scrape one historical session (exact scraper identifier, e.g."
+        " '2023' or '2013 Regular Session'); archives to _data/sessions/",
+    )
+    parser.add_argument("--archive-dir", type=Path)
     parser.add_argument("extra", nargs="*", help="extra args passed through to os-update")
     ns = parser.parse_args(argv)
 
@@ -90,12 +96,19 @@ def main(argv: list[str]) -> int:
         return 2
 
     apply_patches()
-    cmd = build_command(ns.target, fastmode=not ns.no_fastmode, extra=ns.extra)
+    extra = list(ns.extra)
+    archive_dir = ns.archive_dir
+    if ns.session:
+        extra.append(f"session={ns.session}")
+        if archive_dir is None:
+            slug = ns.session.replace(" ", "-").lower()
+            archive_dir = PIPELINE_DIR / "_data" / "sessions" / slug
+    cmd = build_command(ns.target, fastmode=not ns.no_fastmode, extra=extra)
     print(f"+ {' '.join(cmd)} (cwd={VENDOR_DIR})", flush=True)
     result = subprocess.run(cmd, cwd=VENDOR_DIR, check=False)
     if result.returncode == 0:
-        copied = archive_output(SCRAPERS[ns.target][1])
-        print(f"scrape ok: archived {copied} JSON files -> {ARCHIVE_DIR}")
+        copied = archive_output(SCRAPERS[ns.target][1], archive_dir or ARCHIVE_DIR)
+        print(f"scrape ok: archived {copied} JSON files -> {archive_dir or ARCHIVE_DIR}")
     return result.returncode
 
 

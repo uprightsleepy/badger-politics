@@ -1,12 +1,20 @@
 """Import openstates-scrapers JSON output into SQLite.
 
-Usage: python -m importer.import_openstates <scrape_dir> <sqlite_path>
-                                            [--people-dir DIR]
+Usage: python -m importer.import_openstates <scrape_dir> [<scrape_dir> ...]
+           <sqlite_path> [--people-dir DIR] [--retired-dir DIR]
+           [--committees-dir DIR]
 
-Reads bill_*.json, vote_event_*.json, event_*.json and the jurisdiction file
-produced by `os-update wi ... --scrape`, plus the openstates/people roster,
-and rebuilds the database from schema.sql. Vote attribution goes through the
-session-scoped roster; ambiguous or unmatched voter names abort the import.
+Rebuilds the database from schema.sql out of one or more archived scrape
+directories (the current biennium plus any backfilled historical sessions).
+Vote attribution goes through a per-session roster built from each session's
+date window — ambiguous or unmatched voter names abort the import.
+
+Historical caveats baked in:
+- committee chairs are only known for the current biennium (openstates
+  tracks current committees), so committee_chair_at_death stays NULL for
+  historical sessions rather than blaming today's chair;
+- sessions are tagged data_quality='full' (roll calls present) or 'partial'
+  (actions only) after import.
 """
 
 from __future__ import annotations
@@ -21,27 +29,50 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from importer.committees import CommitteeIndex, load_committees
-from importer.roster import Roster, load_roster
+from importer.roster import Person, Roster, load_people, roster_for
 from importer.status import SJR1_RE, derive_status
 
 CENTRAL = ZoneInfo("America/Chicago")
-
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
 
 # Roll call pages record presiding officers by TITLE, not name. Mapping a
-# title to a member is a documented per-biennium fact (verified against
-# docs.legis officer listings), never inferred. Historical sessions imported
-# in Phase 4 must add their own entries — unknown titles hard-fail the build.
+# title to a member is a documented per-biennium fact (verified against the
+# docs.legis officer listings for that session), never inferred. Sessions
+# without an entry hard-fail when a title appears — add the verified name.
 TITLE_VOTERS: dict[tuple[str, str], dict[str, str]] = {
-    # 2025-26 biennium: Speaker Robin Vos, Speaker Pro Tempore Kevin Petersen
+    # verified against docs.legis/<year>/legislators/assembly officer listings
     ("2025", "lower"): {"SPEAKER": "Vos", "SPEAKER PRO TEMPORE": "Petersen"},
+    ("2023", "lower"): {"SPEAKER": "Vos", "SPEAKER PRO TEMPORE": "Petersen"},
+    ("2021", "lower"): {"SPEAKER": "Vos", "SPEAKER PRO TEMPORE": "August"},
+    ("2019", "lower"): {"SPEAKER": "Vos", "SPEAKER PRO TEMPORE": "August"},
+    ("2017", "lower"): {"SPEAKER": "Vos", "SPEAKER PRO TEMPORE": "August"},
+    ("2015", "lower"): {"SPEAKER": "Vos", "SPEAKER PRO TEMPORE": "August"},
+    # 2013: pro tem changed mid-session (Kramer removed 2014-03, August
+    # elected) — SPEAKER only; a pro-tem title in 2013 votes must hard-fail
+    # so it gets mapped by date, never guessed.
+    ("2013", "lower"): {"SPEAKER": "Vos"},
 }
 
 
-def biennium(session: str) -> str:
-    """Session identifier -> odd-year biennium key ('2026S1' -> '2025')."""
-    year = int(session[:4])
+def biennium(session_key_str: str) -> str:
+    """Session key -> odd-year biennium key ('2026s1' -> '2025')."""
+    year = int(session_key_str[:4])
     return str(year if year % 2 else year - 1)
+
+
+def session_key(identifier: str) -> str:
+    """Normalize scraper session identifiers to short URL-safe keys:
+    '2023' -> '2023'; '2009 Regular Session' -> '2009';
+    'January 2021 Special Session' -> '2021s-jan'; '2026S1' -> '2026s1'."""
+    if re.fullmatch(r"\d{4}(S\d+)?", identifier):
+        return identifier.lower()
+    m = re.fullmatch(r"(\d{4}) Regular Session", identifier)
+    if m:
+        return m.group(1)
+    m = re.fullmatch(r"([A-Za-z]+) (\d{4}) Special Session", identifier)
+    if m:
+        return f"{m.group(2)}s-{m.group(1)[:3].lower()}"
+    raise ValueError(f"unrecognized session identifier: {identifier!r}")
 
 
 HEARING_RE = re.compile(r"\b(public hearing held|executive session held)\b", re.I)
@@ -59,7 +90,7 @@ def normalize_identifier(raw: str) -> str:
 
 def bill_key(session: str, identifier: str) -> str:
     """Deterministic, URL-friendly PK: ('2025', 'AB 656') -> '2025-ab656'."""
-    return f"{session.lower()}-{identifier.replace(' ', '').lower()}"
+    return f"{session_key(session)}-{identifier.replace(' ', '').lower()}"
 
 
 def pseudo_chamber(pseudo_id: str | None) -> str | None:
@@ -124,11 +155,23 @@ def to_local(start: str) -> tuple[str | None, str | None]:
     return parsed.date().isoformat(), parsed.strftime("%H:%M")
 
 
-def load_json_files(scrape_dir: Path, prefix: str) -> list[dict]:
+def load_json_files(scrape_dirs: list[Path], prefix: str) -> list[dict]:
     return [
         json.loads(p.read_text(encoding="utf-8"))
+        for scrape_dir in scrape_dirs
         for p in sorted(scrape_dir.glob(f"{prefix}_*.json"))
     ]
+
+
+def load_session_defs(scrape_dirs: list[Path]) -> dict[str, dict]:
+    """identifier -> session metadata, merged across archive dirs."""
+    defs: dict[str, dict] = {}
+    for scrape_dir in scrape_dirs:
+        for path in scrape_dir.glob("jurisdiction_*.json"):
+            jur = json.loads(path.read_text(encoding="utf-8"))
+            for s in jur.get("legislative_sessions", []):
+                defs[s["identifier"]] = s
+    return defs
 
 
 def option_bucket(option: str) -> str:
@@ -136,12 +179,34 @@ def option_bucket(option: str) -> str:
 
 
 class Importer:
-    def __init__(self, conn: sqlite3.Connection, roster: Roster, committees: CommitteeIndex):
+    def __init__(
+        self,
+        conn: sqlite3.Connection,
+        rosters: dict[str, Roster],
+        committees: CommitteeIndex,
+        current_sessions: set[str],
+    ):
         self.conn = conn
-        self.roster = roster
+        self.rosters = rosters  # session_key -> Roster
         self.committees = committees
+        self.current_sessions = current_sessions  # keys of the active biennium
         self.bill_ids: dict[str, str] = {}  # scraper _id uuid -> our bill PK
         self.warnings: list[str] = []
+
+    def import_sessions(self, session_defs: dict[str, dict], seen: set[str]) -> None:
+        for identifier in sorted(seen):
+            meta = session_defs.get(identifier, {})
+            self.conn.execute(
+                "INSERT INTO sessions (id, identifier, name, start_date, end_date)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (
+                    session_key(identifier),
+                    identifier,
+                    meta.get("name"),
+                    meta.get("start_date"),
+                    meta.get("end_date"),
+                ),
+            )
 
     def import_committees(self) -> None:
         for c in self.committees.committees:
@@ -151,37 +216,35 @@ class Importer:
                 (c.id, c.chamber, c.name, c.chair_person_id),
             )
 
-    def import_sessions(self, scrape_dir: Path, seen_sessions: set[str]) -> None:
-        jurisdiction_files = list(scrape_dir.glob("jurisdiction_*.json"))
-        defined = {}
-        if jurisdiction_files:
-            jur = json.loads(jurisdiction_files[0].read_text(encoding="utf-8"))
-            defined = {s["identifier"]: s for s in jur.get("legislative_sessions", [])}
-        for identifier in sorted(seen_sessions):
-            meta = defined.get(identifier, {})
-            self.conn.execute(
-                "INSERT INTO sessions (id, identifier, name, start_date, end_date)"
-                " VALUES (?, ?, ?, ?, ?)",
-                (
-                    identifier.lower(),
-                    identifier,
-                    meta.get("name"),
-                    meta.get("start_date"),
-                    meta.get("end_date"),
-                ),
-            )
-
     def import_people(self) -> None:
-        for m in self.roster.members:
-            role = "Representative" if m.chamber == "lower" else "Senator"
+        """Union of every session roster; sitting members keep live titles."""
+        seen: dict[str, dict] = {}
+        ordered = sorted(self.rosters.items())  # oldest -> newest, newest wins
+        for key, roster in ordered:
+            is_current = key in self.current_sessions
+            for m in roster.members:
+                title = "Representative" if m.chamber == "lower" else "Senator"
+                if not is_current:
+                    title = f"Former {title}"
+                previous = seen.get(m.id)
+                if previous and previous["is_current"] and not is_current:
+                    continue
+                seen[m.id] = {
+                    "row": (m.id, m.name, m.party, title, m.chamber, m.district,
+                            m.image_url, m.id),
+                    "is_current": is_current,
+                }
+        for entry in seen.values():
             self.conn.execute(
                 "INSERT INTO people (id, name, party, current_role, chamber, district,"
                 " image_url, openstates_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (m.id, m.name, m.party, role, m.chamber, m.district, m.image_url, m.id),
+                entry["row"],
             )
 
     def import_bill(self, bill: dict) -> None:
         session = bill["legislative_session"]
+        key = session_key(session)
+        roster = self.rosters[key]
         identifier = normalize_identifier(bill["identifier"])
         pk = bill_key(session, identifier)
         self.bill_ids[bill["_id"]] = pk
@@ -193,7 +256,9 @@ class Importer:
         died, committee, committee_chamber = derive_graveyard(actions)
         status = derive_status(actions)
         chair_name = None
-        if died and committee:
+        if died and committee and key in self.current_sessions:
+            # chairs are only known for the current biennium; historical
+            # sessions keep NULL rather than blaming today's chair
             match = self.committees.find(committee, committee_chamber)
             if match:
                 chair_name = match.chair_name
@@ -204,7 +269,6 @@ class Importer:
                 )
         latest = actions[-1] if actions else None
         chamber = pseudo_chamber(bill.get("from_organization"))
-
         html_links = [
             link["url"]
             for version in bill.get("versions", [])
@@ -225,7 +289,7 @@ class Importer:
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'openstates')",
             (
                 pk,
-                session.lower(),
+                key,
                 identifier,
                 bill.get("title"),
                 chamber,
@@ -258,7 +322,7 @@ class Importer:
                 sp_chamber = None
                 if sp.get("person_id"):
                     sp_chamber = json.loads(sp["person_id"][1:]).get("chamber")
-                member = self.roster.resolve_or_none(sp["name"], sp_chamber or chamber)
+                member = roster.resolve_or_none(sp["name"], sp_chamber or chamber)
                 if member is None:
                     self.warnings.append(
                         f"sponsor unresolved (kept by name only): {sp['name']!r} on {pk}"
@@ -279,6 +343,8 @@ class Importer:
 
     def import_vote_event(self, vote: dict) -> None:
         session = vote["legislative_session"]
+        key = session_key(session)
+        roster = self.rosters[key]
         bill_pk = self.bill_ids.get(vote.get("bill") or "")
         if bill_pk is None and vote.get("bill_identifier"):
             bill_pk = bill_key(session, normalize_identifier(vote["bill_identifier"]))
@@ -286,7 +352,7 @@ class Importer:
         if row is None:
             raise RuntimeError(f"vote event references unknown bill: {vote.get('_id')}")
 
-        vote_id = f"{session.lower()}-{vote.get('dedupe_key') or vote['_id']}".lower()
+        vote_id = f"{key}-{vote.get('dedupe_key') or vote['_id']}".lower()
         chamber = pseudo_chamber(vote.get("organization"))
         counts = {option_bucket(c["option"]): 0 for c in vote.get("counts", [])}
         for c in vote.get("counts", []):
@@ -309,13 +375,13 @@ class Importer:
                 (vote.get("sources") or [{}])[0].get("url"),
             ),
         )
-        titles = TITLE_VOTERS.get((biennium(session), chamber), {})
+        titles = TITLE_VOTERS.get((biennium(key), chamber), {})
         for record in vote.get("votes", []):
             voter_name = record["voter_name"].strip()
             voter_name = titles.get(voter_name.upper(), voter_name)
             # Hard rule: roster.resolve raises on ambiguity/no-match, aborting
             # the import — a roll call is never attributed by best guess.
-            member = self.roster.resolve(voter_name, chamber)
+            member = roster.resolve(voter_name, chamber)
             self.conn.execute(
                 "INSERT INTO vote_records (vote_event_id, person_id, option)"
                 " VALUES (?, ?, ?)",
@@ -374,6 +440,17 @@ class Importer:
             ),
         )
 
+    def tag_data_quality(self) -> None:
+        """full = roll calls present; partial = actions only (older sessions)."""
+        self.conn.execute(
+            """UPDATE sessions SET data_quality = CASE WHEN EXISTS (
+                   SELECT 1 FROM vote_records r
+                   JOIN vote_events e ON e.id = r.vote_event_id
+                   JOIN bills b ON b.id = e.bill_id
+                   WHERE b.session_id = sessions.id
+               ) THEN 'full' ELSE 'partial' END"""
+        )
+
     def write_meta(self) -> None:
         counts = self.conn.execute(
             "SELECT session_id, COUNT(*) FROM bills GROUP BY session_id"
@@ -393,20 +470,55 @@ class Importer:
         )
 
 
+def build_rosters(
+    people: list[Person], session_defs: dict[str, dict], seen: set[str]
+) -> dict[str, Roster]:
+    rosters = {}
+    for identifier in seen:
+        meta = session_defs.get(identifier)
+        if not meta or not meta.get("start_date"):
+            raise RuntimeError(f"no session dates for {identifier!r} in jurisdiction data")
+        end = meta.get("end_date") or "9999-12-31"
+        rosters[session_key(identifier)] = roster_for(people, meta["start_date"], end)
+    return rosters
+
+
+def current_session_keys(session_defs: dict[str, dict], seen: set[str]) -> set[str]:
+    """Sessions of the newest biennium present (chairs only known for these)."""
+    keys = {session_key(s) for s in seen}
+    newest = max(biennium(k) for k in keys)
+    return {k for k in keys if biennium(k) == newest}
+
+
 def run_import(
-    scrape_dir: Path, db_path: Path, people_dir: Path, committees_dir: Path
+    scrape_dirs: list[Path],
+    db_path: Path,
+    people_dir: Path,
+    retired_dir: Path,
+    committees_dir: Path,
 ) -> None:
-    roster = load_roster(people_dir)
+    people_dirs = [d for d in (people_dir, retired_dir) if d.exists()]
+    people = load_people(people_dirs)
+    if len(people) < 120:
+        raise RuntimeError(
+            f"only {len(people)} people loaded from {people_dirs};"
+            " run: python -m scraper.fetch_people --retired"
+        )
     committee_index = CommitteeIndex(load_committees(committees_dir))
     if not committee_index.committees:
         raise RuntimeError(
             f"no committees in {committees_dir}; run: python -m scraper.fetch_committees"
         )
-    bills = load_json_files(scrape_dir, "bill")
-    votes = load_json_files(scrape_dir, "vote_event")
-    events = load_json_files(scrape_dir, "event")
+    bills = load_json_files(scrape_dirs, "bill")
+    votes = load_json_files(scrape_dirs, "vote_event")
+    events = load_json_files(scrape_dirs, "event")
     if not bills:
-        raise RuntimeError(f"no bill_*.json files in {scrape_dir}")
+        raise RuntimeError(f"no bill_*.json files in {scrape_dirs}")
+
+    session_defs = load_session_defs(scrape_dirs)
+    seen_sessions = {b["legislative_session"] for b in bills}
+    rosters = build_rosters(people, session_defs, seen_sessions)
+    current = current_session_keys(session_defs, seen_sessions)
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
@@ -414,9 +526,9 @@ def run_import(
     conn = sqlite3.connect(db_path)
     conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
 
-    importer = Importer(conn, roster, committee_index)
+    importer = Importer(conn, rosters, committee_index, current)
     with conn:
-        importer.import_sessions(scrape_dir, {b["legislative_session"] for b in bills})
+        importer.import_sessions(session_defs, seen_sessions)
         importer.import_people()
         importer.import_committees()
         for bill in bills:
@@ -425,6 +537,7 @@ def run_import(
             importer.import_vote_event(vote)
         for event in events:
             importer.import_event(event)
+        importer.tag_data_quality()
         importer.write_meta()
 
     for warning in importer.warnings:
@@ -434,26 +547,31 @@ def run_import(
         for table in ("sessions", "people", "bills", "actions", "sponsorships",
                       "vote_events", "vote_records", "committees", "hearings")
     }
+    quality = conn.execute(
+        "SELECT id, data_quality FROM sessions ORDER BY id"
+    ).fetchall()
     conn.close()
     print("imported:", ", ".join(f"{k}={v}" for k, v in stats.items()))
+    print("sessions:", ", ".join(f"{k}={q}" for k, q in quality))
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("scrape_dir", type=Path)
-    parser.add_argument("db_path", type=Path)
+    parser.add_argument("paths", nargs="+", type=Path,
+                        help="scrape dir(s)... followed by the sqlite path")
+    data_root = Path(__file__).resolve().parents[1] / "_data"
+    parser.add_argument("--people-dir", type=Path, default=data_root / "people" / "wi")
     parser.add_argument(
-        "--people-dir",
-        type=Path,
-        default=Path(__file__).resolve().parents[1] / "_data" / "people" / "wi",
+        "--retired-dir", type=Path, default=data_root / "people" / "wi-retired"
     )
     parser.add_argument(
-        "--committees-dir",
-        type=Path,
-        default=Path(__file__).resolve().parents[1] / "_data" / "people" / "wi-committees",
+        "--committees-dir", type=Path, default=data_root / "people" / "wi-committees"
     )
     ns = parser.parse_args(argv)
-    run_import(ns.scrape_dir, ns.db_path, ns.people_dir, ns.committees_dir)
+    *scrape_dirs, db_path = ns.paths
+    if not scrape_dirs:
+        parser.error("need at least one scrape dir and the sqlite path")
+    run_import(scrape_dirs, db_path, ns.people_dir, ns.retired_dir, ns.committees_dir)
     return 0
 
 
