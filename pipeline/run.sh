@@ -23,6 +23,10 @@ python -m importer.import_wec _data/wec/candidates-${CYCLE}.csv ../data/wi.sqlit
 python -m scraper.fetch_wec_results           # pinned canvass files (no-op when present)
 python -m importer.import_wec_results _data/wec-results ../data/wi.sqlite
 
+python -m scraper.fetch_cfis map ../data/wi.sqlite
+python -m scraper.fetch_cfis transactions     # nightly delta (past months cached)
+python -m importer.import_cfis _data/cfis ../data/wi.sqlite
+
 python -m importer.enrich_lrb ../data/wi.sqlite
 python -m importer.checks ../data/wi.sqlite   # hard gate: abort deploy on failure
 

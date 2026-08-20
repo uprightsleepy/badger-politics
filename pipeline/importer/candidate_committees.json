@@ -1,0 +1,3 @@
+{
+  "_comment": "Curated overrides for legislator -> CFIS candidate committee mapping, used when the automatic unambiguous-name match fails. Each entry is verified against campaignfinance.wi.gov by hand. Shape: person_id -> {entity_id, committee} or {skip: true} for members with no active committee."
+}

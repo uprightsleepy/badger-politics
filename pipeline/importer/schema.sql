@@ -125,6 +125,21 @@ CREATE TABLE election_history (
 );
 CREATE INDEX idx_election_history_seat ON election_history (chamber, district, year);
 
+-- Campaign contributions received by sitting legislators' candidate
+-- committees, from the CFIS public API (see docs/money-research.md).
+CREATE TABLE contributions (
+    id                  INTEGER PRIMARY KEY,  -- CFIS transaction id
+    person_id           TEXT NOT NULL REFERENCES people (id),
+    committee_entity_id INTEGER NOT NULL,
+    date                TEXT,
+    amount              REAL NOT NULL,
+    from_name           TEXT,
+    from_type           TEXT,  -- Individual / Registrant / ...
+    occupation          TEXT,
+    category            TEXT
+);
+CREATE INDEX idx_contributions_person ON contributions (person_id, date);
+
 -- Build metadata, e.g. key='data_through' for the site footer freshness badge.
 CREATE TABLE meta (
     key   TEXT PRIMARY KEY,
