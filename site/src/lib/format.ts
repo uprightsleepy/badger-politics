@@ -56,12 +56,8 @@ export const fmtDate = (iso: string | null): string => {
   });
 };
 
-/** Legislator compensation, set by statute (s. 20.923 via the Joint
- * Committee on Employment Relations). The salary is identical for every
- * member; per diem RATES are set per chamber, but what each member claims
- * varies (per-member claims come from annual chief-clerk records). */
+// statutory compensation (s. 20.923); salary is identical for every member
 export const COMPENSATION = {
-  sessionLabel: "2025-26",
   salary: 60924,
   assembly: { overnight: 171, day: 85.5 },
   senate: { overnight: 140, note: "half rate for Dane County members" },

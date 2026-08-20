@@ -63,9 +63,6 @@ export const billsFor = (sessionId: string): Bill[] =>
     .prepare("SELECT * FROM bills WHERE session_id = ? AND source != 'legiscan' ORDER BY id")
     .all(sessionId) as Bill[];
 
-export const bill = (id: string): Bill | undefined =>
-  db.prepare("SELECT * FROM bills WHERE id = ?").get(id) as Bill | undefined;
-
 export const actionsFor = (billId: string) =>
   db
     .prepare(
@@ -107,9 +104,6 @@ export interface VoteEvent {
   source_url: string | null;
 }
 
-export const voteEvent = (id: string): VoteEvent | undefined =>
-  db.prepare("SELECT * FROM vote_events WHERE id = ?").get(id) as VoteEvent | undefined;
-
 export const voteRecordsFor = (voteEventId: string) =>
   db
     .prepare(
@@ -136,7 +130,7 @@ export const sittingPeople = (): Person[] =>
     )
     .all() as Person[];
 
-export const personVotes = (personId: string, limit = 4000) =>
+export const personVotes = (personId: string, limit: number) =>
   db
     .prepare(
       `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result,
@@ -229,10 +223,13 @@ export const upcomingHearings = (since: string) =>
     .prepare(`${HEARING_SELECT} WHERE h.date >= ? ORDER BY h.date, h.time`)
     .all(since) as Hearing[];
 
-export const recentHearings = (limit = 40) =>
+export const recentHearings = (limit: number) =>
   db
     .prepare(`${HEARING_SELECT} ORDER BY h.date DESC, h.time DESC LIMIT ?`)
     .all(limit) as Hearing[];
+
+export const allHearings = () =>
+  db.prepare(`${HEARING_SELECT} ORDER BY h.date, h.time`).all() as Hearing[];
 
 /** 'AB 656' -> its bill row in the newest built session that has it. */
 const _billIdCache = new Map<string, { id: string; session_id: string } | null>();
@@ -300,10 +297,9 @@ export const personVoteDays = (personId: string) =>
     )
     .all(personId) as { date: string; chamber: string; cast: number; nv: number }[];
 
-/** Majority position (aye/nay) per (vote event, party); ties excluded.
- * Memoized once per build. */
+// majority position (aye/nay) per (vote event, party); ties excluded
 let _partyMajority: Map<string, string> | undefined;
-export const partyMajorities = (): Map<string, string> => {
+const partyMajorities = (): Map<string, string> => {
   if (_partyMajority) return _partyMajority;
   const rows = db
     .prepare(
@@ -366,7 +362,8 @@ export const electionHistoryFor = (chamber: string | null, district: number | nu
     .all(chamber, district) as { year: number; candidate: string; party: string | null; votes: number }[];
   const byYear = new Map<number, typeof rows>();
   for (const r of rows) {
-    (byYear.get(r.year) ?? byYear.set(r.year, []).get(r.year)!).push(r);
+    if (!byYear.has(r.year)) byYear.set(r.year, []);
+    byYear.get(r.year)!.push(r);
   }
   return [...byYear.entries()].map(([year, candidates]) => {
     const total = candidates.reduce((s, c) => s + c.votes, 0);

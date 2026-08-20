@@ -19,7 +19,8 @@ from pathlib import Path
 import requests
 from lxml import html as lxml_html
 
-USER_AGENT = "badgerpolitics.org data pipeline (contact: hphil.work@gmail.com)"
+from scraper.http import USER_AGENT
+
 DEST = Path(__file__).resolve().parents[1] / "_data" / "rosters"
 CHAMBERS = {"assembly": "lower", "senate": "upper"}
 DEFAULT_YEARS = [2013, 2015, 2017, 2019, 2021, 2023, 2025]

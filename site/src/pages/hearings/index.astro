@@ -19,6 +19,7 @@ const heading = upcoming.length ? "Upcoming committee hearings" : "Recent commit
   <ul class="mt-4 space-y-2">
     {shown.map((h) => {
       const agendaBills = JSON.parse(h.agenda_bill_ids_json ?? "[]") as string[];
+      // must match hearing_uid() in pipeline/dataproducts/ical.py
       const uid = h.id.split("/").pop()!.replace(/\s+/g, "-");
       return (
         <li class="rounded-lg border border-navy-100 bg-white px-4 py-3 text-sm">

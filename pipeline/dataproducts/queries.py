@@ -129,16 +129,6 @@ def election_for(conn: sqlite3.Connection, person_id: str) -> dict | None:
     return result
 
 
-def committees(conn: sqlite3.Connection) -> list[dict]:
-    return [
-        dict(r)
-        for r in conn.execute(
-            "SELECT c.*, p.name AS chair_name FROM committees c"
-            " LEFT JOIN people p ON p.id = c.chair_person_id ORDER BY c.name"
-        )
-    ]
-
-
 def hearings(conn: sqlite3.Connection) -> list[dict]:
     rows = [
         dict(r)

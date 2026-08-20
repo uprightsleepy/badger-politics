@@ -1,20 +1,9 @@
-"""Import openstates-scrapers JSON output into SQLite.
+"""Rebuild SQLite from archived scrape dirs (current biennium + backfill).
 
-Usage: python -m importer.import_openstates <scrape_dir> [<scrape_dir> ...]
-           <sqlite_path> [--people-dir DIR] [--retired-dir DIR]
-           [--committees-dir DIR]
+Usage: python -m importer.import_openstates <scrape_dir>... <sqlite_path>
 
-Rebuilds the database from schema.sql out of one or more archived scrape
-directories (the current biennium plus any backfilled historical sessions).
-Vote attribution goes through a per-session roster built from each session's
-date window — ambiguous or unmatched voter names abort the import.
-
-Historical caveats baked in:
-- committee chairs are only known for the current biennium (openstates
-  tracks current committees), so committee_chair_at_death stays NULL for
-  historical sessions rather than blaming today's chair;
-- sessions are tagged data_quality='full' (roll calls present) or 'partial'
-  (actions only) after import.
+Vote attribution goes through per-session rosters; ambiguous or unmatched
+names abort the import. See docs/backfill.md for historical-era details.
 """
 
 from __future__ import annotations
@@ -42,10 +31,8 @@ from importer.status import SJR1_RE, derive_status
 CENTRAL = ZoneInfo("America/Chicago")
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
 
-# Roll call pages record presiding officers by TITLE, not name. Mapping a
-# title to a member is a documented per-biennium fact (verified against the
-# docs.legis officer listings for that session), never inferred. Sessions
-# without an entry hard-fail when a title appears — add the verified name.
+# Presiding officers print as titles on roll calls. Each mapping is a
+# verified per-biennium fact; unmapped titles hard-fail (add, never infer).
 TITLE_VOTERS: dict[tuple[str, str], dict[str, str]] = {
     # verified against docs.legis/<year>/legislators/assembly officer listings
     ("2025", "lower"): {"SPEAKER": "Vos", "SPEAKER PRO TEMPORE": "Petersen"},
@@ -133,10 +120,9 @@ def committee_from_referral(description: str) -> str | None:
 
 
 def derive_graveyard(actions: list[dict]) -> tuple[int, str | None, str | None]:
-    """(died_without_hearing, committee_at_death, committee_chamber) per plan
-    §4: a referral, no hearing/executive-session action, then the SJR1
-    failure action. Chamber comes from the referral action, so a same-named
-    committee in the other chamber can never be blamed."""
+    """(died_without_hearing, committee_at_death, committee_chamber):
+    a referral, no hearing, then the SJR1 death. Chamber comes from the
+    referral so a same-named committee elsewhere is never blamed."""
     death_idx = None
     for i, action in enumerate(actions):
         if SJR1_RE.search(action["description"]):
@@ -247,13 +233,13 @@ class Importer:
                     continue
                 seen[m.id] = {
                     "row": (m.id, m.name, m.party, title, m.chamber, m.district,
-                            m.image_url, m.id),
+                            m.image_url),
                     "is_current": is_current,
                 }
         for entry in seen.values():
             self.conn.execute(
                 "INSERT INTO people (id, name, party, current_role, chamber, district,"
-                " image_url, openstates_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                " image_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 entry["row"],
             )
 
@@ -273,8 +259,7 @@ class Importer:
         status = derive_status(actions)
         chair_name = None
         if died and committee and key in self.current_sessions:
-            # chairs are only known for the current biennium; historical
-            # sessions keep NULL rather than blaming today's chair
+            # chairs known for the current biennium only; history stays NULL
             match = self.committees.find(committee, committee_chamber)
             if match:
                 chair_name = match.chair_name
@@ -395,8 +380,7 @@ class Importer:
         for record in vote.get("votes", []):
             voter_name = record["voter_name"].strip()
             voter_name = titles.get(voter_name.upper(), voter_name)
-            # Hard rule: roster.resolve raises on ambiguity/no-match, aborting
-            # the import — a roll call is never attributed by best guess.
+            # resolve raises on ambiguity/no-match: never attribute by guess
             member = roster.resolve(voter_name, chamber)
             self.conn.execute(
                 "INSERT INTO vote_records (vote_event_id, person_id, option)"
@@ -517,7 +501,7 @@ def build_rosters(
     return rosters
 
 
-def current_session_keys(session_defs: dict[str, dict], seen: set[str]) -> set[str]:
+def current_session_keys(seen: set[str]) -> set[str]:
     """Sessions of the newest biennium present (chairs only known for these)."""
     keys = {session_key(s) for s in seen}
     newest = max(biennium(k) for k in keys)
@@ -557,7 +541,7 @@ def run_import(
     seen_sessions = {b["legislative_session"] for b in bills}
     rosters_dir = people_dir.parents[1] / "rosters"
     rosters = build_rosters(people, session_defs, seen_sessions, rosters_dir)
-    current = current_session_keys(session_defs, seen_sessions)
+    current = current_session_keys(seen_sessions)
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():

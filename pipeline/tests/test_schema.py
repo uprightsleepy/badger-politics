@@ -18,7 +18,7 @@ EXPECTED_TABLES = {
     "committees",
     "hearings",
     "elections",
-    "provenance",
+    "election_history",
     "meta",
 }
 

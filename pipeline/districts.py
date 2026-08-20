@@ -22,13 +22,14 @@ import sys
 from pathlib import Path
 
 import requests
-from shapely.geometry import mapping, shape
+from shapely.geometry import Point, mapping, shape
+
+from scraper.http import USER_AGENT
 
 SERVICE = (
     "https://services1.arcgis.com/FDsAtKBk8Hy4cAH0/arcgis/rest/services/"
     "WI_Assembly_Districts_2024/FeatureServer/0/query"
 )
-USER_AGENT = "badgerpolitics.org data pipeline (contact: hphil.work@gmail.com)"
 RAW_CACHE = Path(__file__).resolve().parent / "_data" / "districts" / "raw.geojson"
 DEFAULT_OUT = (
     Path(__file__).resolve().parents[1] / "site" / "public" / "data"
@@ -112,8 +113,6 @@ def build(out_path: Path, max_bytes: int) -> None:
 
 
 def lookup(out_path: Path, lat: float, lng: float) -> int:
-    from shapely.geometry import Point
-
     data = json.loads(out_path.read_text(encoding="utf-8"))
     point = Point(lng, lat)
     hits = [

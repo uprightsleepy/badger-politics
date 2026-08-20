@@ -88,11 +88,8 @@ def test_truncated_long_surname_resolves_by_prefix() -> None:
 
 def test_short_prefix_never_drifts() -> None:
     r = Roster([member("Dale Kruger", "lower", 1)])
-    # 'KRUG' is a real full surname elsewhere; short names must not
-    # prefix-match longer ones
-    import pytest as _pytest
-
-    with _pytest.raises(UnmatchedNameError):
+    # short names must not prefix-match longer surnames
+    with pytest.raises(UnmatchedNameError):
         r.resolve("KRUG", "lower")
 
 

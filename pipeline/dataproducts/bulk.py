@@ -86,7 +86,6 @@ def export_sqlite(db_path: Path, exports_dir: Path) -> Path:
         )
         conn.execute("DELETE FROM bills WHERE source = 'legiscan'")
         conn.execute("DELETE FROM elections WHERE source = 'legiscan'")
-        conn.execute("DELETE FROM provenance WHERE source = 'legiscan'")
     conn.execute("VACUUM")
     remaining = conn.execute(
         "SELECT (SELECT COUNT(*) FROM bills WHERE source='legiscan')"

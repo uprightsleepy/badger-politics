@@ -1,15 +1,6 @@
-"""Overlay WEC candidate data onto the elections table.
+"""Overlay the wec_pdf CSV onto elections: on_ballot + opponents per seat.
 
 Usage: python -m importer.import_wec <candidates.csv> <sqlite_path> --cycle 2026
-
-Reads the normalized CSV produced by wec_pdf (or any future WEC format
-converted to the same contract) and fills on_ballot + opponents_json for
-seats on the given cycle's ballot. Rows become source='wec'.
-
-on_ballot for the sitting incumbent means: they have an Approve row and did
-not file noncandidacy. Opponents are every other Approve/Challenged
-candidate for the seat (Challenged kept, labeled — challenges may still be
-resolved in their favor).
 """
 
 from __future__ import annotations

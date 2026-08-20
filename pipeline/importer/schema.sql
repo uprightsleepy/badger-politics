@@ -4,25 +4,23 @@
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE sessions (
-    id                 TEXT PRIMARY KEY,
-    identifier         TEXT NOT NULL UNIQUE,   -- odd year of the biennium, e.g. '2025'
-    name               TEXT,
-    start_date         TEXT,
-    end_date           TEXT,
-    adjourned_sine_die TEXT,
+    id           TEXT PRIMARY KEY,
+    identifier   TEXT NOT NULL UNIQUE,   -- odd year of the biennium, e.g. '2025'
+    name         TEXT,
+    start_date   TEXT,
+    end_date     TEXT,
     -- full = actions + roll calls; partial = actions only (older sessions)
-    data_quality       TEXT CHECK (data_quality IN ('full', 'partial'))
+    data_quality TEXT CHECK (data_quality IN ('full', 'partial'))
 );
 
 CREATE TABLE people (
-    id            TEXT PRIMARY KEY,
-    name          TEXT NOT NULL,
-    party         TEXT,
-    current_role  TEXT,
-    chamber       TEXT,
-    district      INTEGER,
-    image_url     TEXT,
-    openstates_id TEXT
+    id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    party        TEXT,
+    current_role TEXT,
+    chamber      TEXT,
+    district     INTEGER,
+    image_url    TEXT
 );
 
 CREATE TABLE bills (
@@ -126,13 +124,6 @@ CREATE TABLE election_history (
     votes     INTEGER NOT NULL
 );
 CREATE INDEX idx_election_history_seat ON election_history (chamber, district, year);
-
-CREATE TABLE provenance (
-    table_name TEXT NOT NULL,
-    row_id     TEXT NOT NULL,
-    source     TEXT NOT NULL,
-    fetched_at TEXT NOT NULL
-);
 
 -- Build metadata, e.g. key='data_through' for the site footer freshness badge.
 CREATE TABLE meta (

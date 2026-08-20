@@ -1,34 +1,34 @@
-"""Session-scoped legislator rosters for vote/sponsor name attribution.
-
-Loaded from openstates/people YAML — sitting members (data/wi/legislature)
-plus, for historical sessions, retired members (data/wi/retired). Every
-person carries their full term history; a Roster is built for a session's
-date window, so names resolve against who actually served THEN, chamber-
-scoped. Hard rule: an ambiguous name is a build failure, never a best guess.
-"""
+"""Session-scoped legislator rosters for vote and sponsor attribution.
+Hard rule: an ambiguous name is a build failure, never a best guess."""
 
 from __future__ import annotations
 
+import csv
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 
+MERGES_PATH = Path(__file__).resolve().parent / "person_merges.json"
+ALIASES_PATH = Path(__file__).resolve().parent / "person_aliases.json"
+TERMS_PATH = Path(__file__).resolve().parent / "person_terms.json"
+
 
 class UnmatchedNameError(Exception):
-    """A name on a vote/sponsor line resolved to no roster member."""
+    pass
 
 
 class AmbiguousNameError(Exception):
-    """A name on a vote/sponsor line resolved to more than one roster member."""
+    pass
 
 
 @dataclass
 class Term:
     chamber: str  # 'lower' | 'upper'
     district: int | None
-    start: str  # ISO date
+    start: str
     end: str | None  # None = sitting
 
 
@@ -57,30 +57,38 @@ class Member:
     image_url: str | None
     aliases: list[str] = field(default_factory=list)
 
+    @classmethod
+    def from_person(cls, person: Person, chamber: str, district: int | None) -> Member:
+        return cls(
+            id=person.id,
+            name=person.name,
+            family_name=person.family_name,
+            party=person.party,
+            chamber=chamber,
+            district=district,
+            image_url=person.image_url,
+            aliases=person.aliases,
+        )
+
 
 def _normalize(name: str) -> str:
-    """Case/punctuation/whitespace-insensitive key for name comparison."""
     return re.sub(r"[^a-z]", "", name.lower())
 
 
-MERGES_PATH = Path(__file__).resolve().parent / "person_merges.json"
-ALIASES_PATH = Path(__file__).resolve().parent / "person_aliases.json"
-TERMS_PATH = Path(__file__).resolve().parent / "person_terms.json"
+def _curation(path: Path) -> dict:
+    """Load a curation JSON, dropping the _comment key."""
+    return {
+        k: v
+        for k, v in json.loads(path.read_text(encoding="utf-8")).items()
+        if not k.startswith("_")
+    }
 
 
 def apply_merges(people: list[Person]) -> list[Person]:
-    """Fold manually-verified duplicate records into their canonical person
-    (see person_merges.json). Terms and aliases merge; the dupe's name
-    becomes an alias so listings naming either form still resolve."""
-    import json
-
-    merges = {
-        k: v
-        for k, v in json.loads(MERGES_PATH.read_text(encoding="utf-8")).items()
-        if not k.startswith("_")
-    }
+    """Fold manually verified duplicates, extra aliases, and missing terms
+    (see the three curation JSON files) into the people list."""
     by_id = {p.id: p for p in people}
-    for dupe_id, canonical_id in merges.items():
+    for dupe_id, canonical_id in _curation(MERGES_PATH).items():
         dupe, canonical = by_id.get(dupe_id), by_id.get(canonical_id)
         if dupe is None or canonical is None:
             continue
@@ -88,20 +96,10 @@ def apply_merges(people: list[Person]) -> list[Person]:
         canonical.aliases.extend([dupe.name, *dupe.aliases])
         canonical.legacy_ids.extend(dupe.legacy_ids)
         del by_id[dupe_id]
-    extra_aliases = {
-        k: v
-        for k, v in json.loads(ALIASES_PATH.read_text(encoding="utf-8")).items()
-        if not k.startswith("_")
-    }
-    for person_id, aliases in extra_aliases.items():
+    for person_id, aliases in _curation(ALIASES_PATH).items():
         if person_id in by_id:
             by_id[person_id].aliases.extend(aliases)
-    extra_terms = {
-        k: v
-        for k, v in json.loads(TERMS_PATH.read_text(encoding="utf-8")).items()
-        if not k.startswith("_")
-    }
-    for person_id, terms in extra_terms.items():
+    for person_id, terms in _curation(TERMS_PATH).items():
         if person_id in by_id:
             by_id[person_id].terms.extend(
                 Term(t["chamber"], t.get("district"), t["start"], t.get("end"))
@@ -122,14 +120,12 @@ def load_people(people_dirs: list[Path]) -> list[Person]:
                 start = str(role["start_date"]) if role.get("start_date") else None
                 end = str(role["end_date"]) if role.get("end_date") else None
                 if not start and end:
-                    # some files omit start_date (e.g. executives' past
-                    # legislative roles); assume one constitutional term —
-                    # under-coverage fails loudly as unmatched, never as a
-                    # wrong attribution
+                    # startless role: assume one constitutional term; under-
+                    # coverage fails loudly as unmatched, never misattributes
                     term_years = 2 if role["type"] == "lower" else 4
                     start = f"{int(end[:4]) - term_years}{end[4:]}"
                 if not start:
-                    continue  # undatable role: exclude rather than guess
+                    continue
                 terms.append(
                     Term(
                         chamber=role["type"],
@@ -165,13 +161,9 @@ def load_people(people_dirs: list[Path]) -> list[Person]:
 
 
 def load_legacy_terms(legacy_dir: Path, people: list[Person]) -> list[Person]:
-    """Fold the openstates legacy CSV dump (data.openstates.org, 2009-2018
-    era) into the people list: per-biennium member terms attach to known
-    people via their legacy_openstates identifier, and members with no
-    modern people-file at all are synthesized. This is the authoritative
-    membership source for sessions older than docs.legis's listings (2013+)."""
-    import csv
-
+    """Fold the openstates legacy CSV dump (2009-2018 era) into the people
+    list; members with no modern file are synthesized. Authoritative
+    membership for sessions before docs.legis listings begin (2013)."""
     roles_path = legacy_dir / "wi_legislator_roles.csv"
     legs_path = legacy_dir / "wi_legislators.csv"
     if not roles_path.exists():
@@ -179,7 +171,6 @@ def load_legacy_terms(legacy_dir: Path, people: list[Person]) -> list[Person]:
 
     by_legacy: dict[str, Person] = {}
     for person in people:
-        # merged duplicates may carry several legacy ids
         for legacy_id in person.legacy_ids:
             by_legacy[legacy_id] = person
     legacy_meta = {
@@ -214,7 +205,6 @@ def load_legacy_terms(legacy_dir: Path, people: list[Person]) -> list[Person]:
                 legacy_ids=[row["leg_id"]],
             )
             synthesized[row["leg_id"]] = person
-        # skip if an equivalent term is already covered
         covered = any(
             t.chamber == term.chamber and t.start <= term.start and
             (t.end is None or t.end >= term.end)
@@ -226,38 +216,22 @@ def load_legacy_terms(legacy_dir: Path, people: list[Person]) -> list[Person]:
 
 
 def roster_for(people: list[Person], start: str, end: str) -> Roster:
-    """Roster of everyone with a term overlapping (start, end) — STRICT
-    boundaries: WI terms end on the successor's inauguration day, which is
-    also the new session's start date, so a term ending exactly on `start`
-    served zero days of the session."""
-    members: dict[tuple[str, str], Member] = {}  # (person, chamber) -> latest term
+    """Members with a term overlapping (start, end), strict boundaries:
+    WI terms end on inauguration day, which is the next session's start."""
+    latest: dict[tuple[str, str], tuple[str, Member]] = {}  # key -> (term_start, member)
     for person in people:
         for term in person.terms:
             if term.start >= end or (term.end is not None and term.end <= start):
                 continue
             key = (person.id, term.chamber)
-            existing = members.get(key)
-            if existing is None or term.start > existing._term_start:  # type: ignore[attr-defined]
-                member = Member(
-                    id=person.id,
-                    name=person.name,
-                    family_name=person.family_name,
-                    party=person.party,
-                    chamber=term.chamber,
-                    district=term.district,
-                    image_url=person.image_url,
-                    aliases=person.aliases,
-                )
-                member._term_start = term.start  # type: ignore[attr-defined]
-                members[key] = member
-    return Roster(list(members.values()))
+            existing = latest.get(key)
+            if existing is None or term.start > existing[0]:
+                latest[key] = (term.start, Member.from_person(person, term.chamber, term.district))
+    return Roster([m for _, m in latest.values()])
 
 
 def find_person(people: list[Person], name: str) -> Person:
-    """Resolve a full name (from an authoritative membership listing) to a
-    Person. Exact normalized match on name/aliases first; else unique
-    family-name + first-name-prefix match. Ambiguity or absence raises —
-    membership identity is never guessed."""
+    """Resolve a listing name to a Person; ambiguity or absence raises."""
     key = _normalize(name)
     exact = [
         p for p in people
@@ -281,8 +255,7 @@ def find_person(people: list[Person], name: str) -> Person:
         return loose[0]
     if len(loose) > 1:
         raise AmbiguousNameError(f"listing name {name!r} is ambiguous across people files")
-    # nicknames ('Vincent' vs 'Vinnie') defeat prefix matching: accept a
-    # family-only match when exactly one person bears that surname
+    # nicknames defeat prefix matching; accept a unique family-only match
     family_only = [p for p in people if _normalize(p.family_name) == family]
     if len(family_only) == 1:
         return family_only[0]
@@ -292,45 +265,35 @@ def find_person(people: list[Person], name: str) -> Person:
 
 
 def merge_listing(roster: Roster, listing: list[dict], people: list[Person]) -> Roster:
-    """Union a docs.legis membership listing into a windowed roster: the
-    listing is authoritative for who served (it includes mid-session
-    replacements and members whose people-file dates are incomplete)."""
+    """Union a docs.legis membership listing (authoritative for who served,
+    including mid-session replacements) into a windowed roster."""
     members = {(m.id, m.chamber): m for m in roster.members}
     for entry in listing:
         person = find_person(people, entry["name"])
         key = (person.id, entry["chamber"])
         if key not in members:
-            members[key] = Member(
-                id=person.id,
-                name=person.name,
-                family_name=person.family_name,
-                party=person.party,
-                chamber=entry["chamber"],
-                district=entry.get("district"),
-                image_url=person.image_url,
-                aliases=person.aliases,
-            )
+            members[key] = Member.from_person(person, entry["chamber"], entry.get("district"))
     return Roster(list(members.values()))
 
 
 class Roster:
     """Chamber-scoped name resolution over one session's membership."""
 
+    # printed names at least this long may prefix-match one longer roster
+    # form (docs.legis truncates: 'CABRAL-GUEVA'); short names never do
+    TRUNCATION_MIN = 10
+
     def __init__(self, members: list[Member]):
         self.members = members
-        # (chamber, normalized-name-form) -> [Member]; every form a vote page
-        # might print maps to the members it could mean.
         self._index: dict[tuple[str, str], list[Member]] = {}
         for m in members:
             forms = {m.name, m.family_name, *m.aliases}
-            # 'Surname, F.' style used on WI roll call pages
             words = m.name.split()
             first = words[0]
             forms.add(f"{m.family_name}, {first[0]}.")
             forms.add(f"{m.family_name}, {first}")
             if len(words) >= 3:
                 # compound surnames print as the last two words
-                # ('Nikiya Harris Dodd' appears as 'HARRIS DODD')
                 compound = " ".join(words[-2:])
                 forms.add(compound)
                 forms.add(f"{compound}, {first[0]}.")
@@ -340,14 +303,7 @@ class Roster:
                 if m not in bucket:
                     bucket.append(m)
 
-    # docs.legis roll-call tables truncate long surnames (e.g. Cabral-Guevara
-    # prints as 'CABRAL-GUEVA'); a printed name at least this long (normalized)
-    # may prefix-match a single longer roster form. Short names never do —
-    # 'KRUG' must not drift into 'KRUGER'.
-    TRUNCATION_MIN = 10
-
     def resolve(self, name: str, chamber: str) -> Member:
-        """Resolve a printed name within one chamber, or fail loudly."""
         key = _normalize(name)
         candidates = self._index.get((chamber, key), [])
         if not candidates and len(key) >= self.TRUNCATION_MIN:
@@ -366,7 +322,7 @@ class Roster:
         raise AmbiguousNameError(f"{name!r} ({chamber}) is ambiguous: {detail}")
 
     def resolve_or_none(self, name: str, chamber: str) -> Member | None:
-        """Lenient variant for sponsorships: unknown/ambiguous -> None, never a guess."""
+        """Lenient variant for sponsorships: None, never a guess."""
         try:
             return self.resolve(name, chamber)
         except (UnmatchedNameError, AmbiguousNameError):

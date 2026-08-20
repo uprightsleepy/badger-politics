@@ -14,11 +14,12 @@ from pathlib import Path
 
 import requests
 
+from scraper.http import USER_AGENT
+
 DEFAULT_URL = (
     "https://elections.wi.gov/sites/default/files/documents/"
     "D.%20Ballot%20Access%20Report%206.9.2026.pdf"
 )
-USER_AGENT = "badgerpolitics.org data pipeline (contact: hphil.work@gmail.com)"
 DEFAULT_DEST = Path(__file__).resolve().parents[1] / "_data" / "wec" / "ballot-access.pdf"
 
 

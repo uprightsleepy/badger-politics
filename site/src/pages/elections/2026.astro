@@ -1,7 +1,8 @@
 ---
 import Base from "../../layouts/Base.astro";
+import PartyChip from "../../components/PartyChip.astro";
 import { sittingPeople, electionFor } from "../../lib/db";
-import { personSlug, partyStyle, partyLetter } from "../../lib/format";
+import { personSlug } from "../../lib/format";
 const seats = sittingPeople()
   .map((p) => ({ person: p, election: electionFor(p.id) }))
   .filter((s) => s.election?.cycle_year === 2026);
@@ -33,9 +34,7 @@ const assembly = seats.filter((s) => s.person.chamber === "lower");
           return (
             <li class="flex flex-wrap items-baseline gap-x-3 px-4 py-2">
               <span class="w-10 shrink-0 font-bold">D{person.district}</span>
-              <span class={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${partyStyle(person.party)}`}>
-                {partyLetter(person.party)}
-              </span>
+              <PartyChip party={person.party} />
               <a href={`/legislators/${personSlug(person.id)}/`} class="underline">{person.name}</a>
               {election!.on_ballot === 0 && (
                 <span class="rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">retiring</span>

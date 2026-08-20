@@ -1,15 +1,8 @@
-/** Every dated civic event for the interactive calendar: hearings (with
- * links + times) and statewide election days. Regenerated each build. */
+/** All dated civic events (hearings + election days) for the calendar page. */
 import type { APIRoute } from "astro";
-import { recentHearings, upcomingHearings } from "../../lib/db";
+import { allHearings } from "../../lib/db";
 import { chamberName, fmtTime } from "../../lib/format";
-
-const ELECTION_DAYS: [string, string][] = [
-  ["2026-02-17", "Wisconsin Spring Primary"],
-  ["2026-04-07", "Wisconsin Spring Election"],
-  ["2026-08-11", "Wisconsin Partisan Primary"],
-  ["2026-11-03", "Wisconsin General Election"],
-];
+import ELECTION_DAYS from "../../data/election-days.json";
 
 export const GET: APIRoute = () => {
   type CalEvent = {
@@ -22,10 +15,8 @@ export const GET: APIRoute = () => {
   const events: Record<string, CalEvent[]> = {};
   const add = (date: string, e: CalEvent) => (events[date] ??= []).push(e);
 
-  const seen = new Set<string>();
-  for (const h of [...recentHearings(2000), ...upcomingHearings("1900-01-01")]) {
-    if (!h.date || seen.has(h.id)) continue;
-    seen.add(h.id);
+  for (const h of allHearings()) {
+    if (!h.date) continue;
     const name = h.committee_name
       ? `${h.committee_chamber ? `${chamberName(h.committee_chamber)} ` : ""}${h.committee_name}`
       : (h.title ?? "Committee hearing");

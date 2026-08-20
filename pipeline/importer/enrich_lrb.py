@@ -1,15 +1,7 @@
 """Fetch bill-text pages and extract the LRB plain-language analysis.
+Throttled, identifying User-Agent, cached under _data/lrb_cache/.
 
-Usage: python -m importer.enrich_lrb <sqlite_path> [--limit N] [--only BILL_ID]
-                                     [--delay SECONDS]
-
-Every Wisconsin bill text opens with an "Analysis by the Legislative
-Reference Bureau" section written in plain language — the site leads with it
-instead of legalese. The scraper doesn't capture it, so this step fetches
-each bill's official text page (bills.text_url) and extracts the section.
-
-Politeness: identifying User-Agent, throttled (default 0.5s between fetches),
-and raw HTML is cached under pipeline/_data/lrb_cache/ so re-runs are free.
+Usage: python -m importer.enrich_lrb <sqlite_path> [--limit N] [--only ID] [--delay S]
 """
 
 from __future__ import annotations
@@ -25,7 +17,8 @@ from pathlib import Path
 import requests
 from lxml import html as lxml_html
 
-USER_AGENT = "badgerpolitics.org data pipeline (contact: hphil.work@gmail.com)"
+from scraper.http import USER_AGENT
+
 CACHE_DIR = Path(__file__).resolve().parents[1] / "_data" / "lrb_cache"
 
 ANALYSIS_START = re.compile(r"analysis by the legislative reference bureau", re.I)

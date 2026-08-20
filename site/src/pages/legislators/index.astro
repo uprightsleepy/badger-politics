@@ -1,7 +1,8 @@
 ---
 import Base from "../../layouts/Base.astro";
+import PartyChip from "../../components/PartyChip.astro";
 import { sittingPeople } from "../../lib/db";
-import { personSlug, partyStyle, partyLetter } from "../../lib/format";
+import { personSlug } from "../../lib/format";
 const members = sittingPeople();
 const senate = members.filter((m) => m.chamber === "upper");
 const assembly = members.filter((m) => m.chamber === "lower");
@@ -54,9 +55,7 @@ function breakdown(rows: typeof members, seatCount: number) {
       <ul class="mt-2 grid gap-1 rounded-lg border border-navy-100 bg-white p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
         {chamber.rows.map((m) => (
           <li class="flex items-center gap-2">
-            <span class={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${partyStyle(m.party)}`}>
-              {partyLetter(m.party)}
-            </span>
+            <PartyChip party={m.party} />
             <a href={`/legislators/${personSlug(m.id)}/`} class="truncate underline">{m.name}</a>
             <span class="ml-auto text-xs text-navy-600">D{m.district}</span>
           </li>

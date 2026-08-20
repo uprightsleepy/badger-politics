@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import RollCall from "../../components/RollCall.astro";
-import { builtSessions, billsFor, votesFor, bill as getBill } from "../../lib/db";
+import { builtSessions, billsFor, votesFor } from "../../lib/db";
 import { billSlug } from "../../lib/format";
 
 export function getStaticPaths() {

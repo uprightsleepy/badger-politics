@@ -12,7 +12,8 @@ from pathlib import Path
 
 import requests
 
-USER_AGENT = "badgerpolitics.org data pipeline (contact: hphil.work@gmail.com)"
+from scraper.http import USER_AGENT
+
 DEST = Path(__file__).resolve().parents[1] / "_data" / "wec-results"
 
 FILES = {

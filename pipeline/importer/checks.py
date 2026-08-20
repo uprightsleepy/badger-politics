@@ -1,15 +1,7 @@
-"""Integrity gates run after every import. A failure aborts the deploy.
+"""Integrity gates run after every import; a failure aborts the deploy.
+Hard rule: never weaken a gate to make a run pass.
 
 Usage: python -m importer.checks <sqlite_path> [--counts-file PATH]
-
-Gates (hard rule: never weaken one to make a run pass):
-1. For every vote event with individual records, the per-option record sums
-   must equal the stored yes/no/nv counts (mirrors the scraper's invariant).
-2. Per-session bill count must be >= the previous successful run's count
-   minus a small tolerance (catches a silently broken scrape). State lives
-   in a small JSON file next to the database, updated only on success.
-3. Referential integrity: every vote_record resolves to a person and a vote
-   event, every bill to a session, every action/sponsorship to a bill.
 """
 
 from __future__ import annotations
@@ -37,12 +29,9 @@ def check_vote_counts(conn: sqlite3.Connection) -> list[str]:
         """
     ).fetchall()
     for event_id, yes_c, no_c, nv_c, yes_r, no_r, nv_r in rows:
-        # yes/no reconcile EXACTLY — they decide outcomes. 'not voting' must
-        # match exactly OR have zero records: docs.legis sometimes omits the
-        # entire NV name list (e.g. 2013 sv0012: 'NOT VOTING - 1', empty name
-        # tables), which the scraper warns about. A PARTIAL NV parse (0 <
-        # records != count) still fails here, and full NV drops are caught at
-        # scrape time by the patched per-type invariant in patches/0002.
+        # yes/no reconcile exactly (they decide outcomes); NV is all-or-none
+        # because docs.legis sometimes omits the NV name list entirely
+        # (2013 sv0012) — partial NV parses still fail, see patches/0002
         problems = (yes_c or 0) != yes_r or (no_c or 0) != no_r
         if nv_r != 0 and nv_r != (nv_c or 0):
             problems = True

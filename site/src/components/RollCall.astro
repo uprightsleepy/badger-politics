@@ -1,5 +1,6 @@
 ---
-import { partyStyle, partyLetter, chamberName, personSlug } from "../lib/format";
+import PartyChip from "./PartyChip.astro";
+import { chamberName, personSlug } from "../lib/format";
 import type { VoteEvent } from "../lib/db";
 import { voteRecordsFor } from "../lib/db";
 interface Props { event: VoteEvent; compact?: boolean }
@@ -54,9 +55,7 @@ const groups = [
                 data-district={r.district}
                 data-option={group.label}
               >
-                <span class={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${partyStyle(r.party)}`}>
-                  {partyLetter(r.party)}
-                </span>
+                <PartyChip party={r.party} size="sm" />
                 <a href={`/legislators/${personSlug(r.person_id)}/`} class="truncate hover:underline">
                   {r.name}
                 </a>

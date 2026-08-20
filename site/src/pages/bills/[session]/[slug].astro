@@ -3,6 +3,7 @@ import Base from "../../../layouts/Base.astro";
 import StatusBadge from "../../../components/StatusBadge.astro";
 import Stepper from "../../../components/Stepper.astro";
 import RollCall from "../../../components/RollCall.astro";
+import SponsorNames from "../../../components/SponsorNames.astro";
 import { builtSessions, billsFor, actionsFor, sponsorsFor, votesFor } from "../../../lib/db";
 import { billSlug, fmtDate, personSlug, chamberName } from "../../../lib/format";
 
@@ -75,17 +76,7 @@ const cosponsors = sponsors.filter((s) => !s.is_primary);
         {primary.length > 0 && (
           <p>
             <strong>Introduced by:</strong>{" "}
-            {primary.map((s, i) => (
-              <>
-                {i > 0 && ", "}
-                {s.person_id ? (
-                  <a href={`/legislators/${personSlug(s.person_id)}/`} class="underline">{s.name}</a>
-                ) : (
-                  s.name
-                )}
-                {s.party && <span class="text-navy-600"> ({s.party[0]})</span>}
-              </>
-            ))}
+            <SponsorNames sponsors={primary} />
           </p>
         )}
         {cosponsors.length > 0 && (
@@ -94,17 +85,7 @@ const cosponsors = sponsors.filter((s) => !s.is_primary);
               {cosponsors.length} cosponsors
             </summary>
             <p class="mt-1">
-              {cosponsors.map((s, i) => (
-                <>
-                  {i > 0 && ", "}
-                  {s.person_id ? (
-                    <a href={`/legislators/${personSlug(s.person_id)}/`} class="underline">{s.name}</a>
-                  ) : (
-                    s.name
-                  )}
-                  {s.party && <span class="text-navy-600"> ({s.party[0]})</span>}
-                </>
-              ))}
+              <SponsorNames sponsors={cosponsors} />
             </p>
           </details>
         )}

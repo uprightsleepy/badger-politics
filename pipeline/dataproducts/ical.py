@@ -1,17 +1,11 @@
-"""iCal artifacts: showing up to testify is the highest-leverage thing a
-voter can do, so every hearing gets an "Add to calendar" file.
-
-  /calendar/hearings.ics             all hearings, one VCALENDAR
-  /calendar/hearings/{id}.ics        single hearing (the per-row button)
-  /calendar/election-days.ics        statewide election dates for the cycle
-
-Times are local America/Chicago with an embedded VTIMEZONE so Google/Apple/
-Outlook import them correctly. Every event embeds "confirm against the
-official hearing notice" plus the source link (plan §11).
+"""iCal artifacts: hearings (combined + per-hearing) and election days.
+Local America/Chicago times with embedded VTIMEZONE.
+NOTE: hearing uid must match site/src/pages/hearings/index.astro's href rule.
 """
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -35,13 +29,10 @@ RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU
 END:STANDARD
 END:VTIMEZONE"""
 
-# WI 2026 statewide election days (WEC calendar)
-ELECTION_DAYS_2026 = [
-    ("2026-02-17", "Wisconsin Spring Primary"),
-    ("2026-04-07", "Wisconsin Spring Election"),
-    ("2026-08-11", "Wisconsin Partisan Primary"),
-    ("2026-11-03", "Wisconsin General Election"),
-]
+# single source shared with the site's calendar endpoint
+ELECTION_DAYS_PATH = (
+    Path(__file__).resolve().parents[2] / "site" / "src" / "data" / "election-days.json"
+)
 
 DISCLAIMER = (
     "Confirm against the official hearing notice before attending. "
@@ -84,6 +75,10 @@ def _calendar(name: str, events: list[list[str]]) -> str:
     return "\r\n".join(_fold(line) for line in lines) + "\r\n"
 
 
+def hearing_uid(hearing: dict) -> str:
+    return hearing["id"].rsplit("/", 1)[-1].replace(" ", "-")
+
+
 def _hearing_event(hearing: dict) -> list[str] | None:
     if not hearing["date"]:
         return None
@@ -97,7 +92,7 @@ def _hearing_event(hearing: dict) -> list[str] | None:
         description = f"Bills: {bills_text}. {DISCLAIMER}"
     if hearing["source_url"]:
         description += f" Official notice: {hearing['source_url']}"
-    uid = hearing["id"].rsplit("/", 1)[-1].replace(" ", "-")
+    uid = hearing_uid(hearing)
     event = [
         "BEGIN:VEVENT",
         f"UID:{uid}@badgerpolitics.org",
@@ -126,7 +121,7 @@ def build_ical(conn: sqlite3.Connection, out: Path) -> int:
             continue
         events.append(event)
         single = _calendar("Badger Politics — Hearing", [event])
-        uid = hearing["id"].rsplit("/", 1)[-1].replace(" ", "-")
+        uid = hearing_uid(hearing)
         (calendar_dir / "hearings" / f"{uid}.ics").write_text(
             single, encoding="utf-8", newline=""
         )
@@ -140,7 +135,8 @@ def build_ical(conn: sqlite3.Connection, out: Path) -> int:
     files += 1
 
     election_events = []
-    for date, name in ELECTION_DAYS_2026:
+    election_days = json.loads(ELECTION_DAYS_PATH.read_text(encoding="utf-8"))
+    for date, name in election_days:
         compact = date.replace("-", "")
         election_events.append(
             [

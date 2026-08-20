@@ -1,20 +1,8 @@
-"""Thin wrapper invoking openstates-scrapers (wi) as a subprocess CLI.
+"""Invoke openstates-scrapers as a subprocess CLI (GPL boundary: never
+imported). Applies patches/ first, then archives output to _data/ because
+os-update clears its own output dir each run. Never run two concurrently.
 
-Usage: python -m scraper.scrape bills|events [--no-fastmode] [extra os-update args]
-
-GPL boundary: openstates-scrapers is GPL-3.0 and is pinned as a git submodule
-at pipeline/vendor/openstates-scrapers. It is ONLY ever executed as a CLI
-(os-update via its docker compose 'scrape' service locally, or directly on
-PATH inside the Phase 6 pipeline image). Its modules are never imported.
-
-Before running, any patches in pipeline/patches/*.patch are applied to the
-submodule working tree (idempotently; the pinned commit itself is never
-edited — see patches/README.md for upstream intent).
-
-os-update CLEARS its _data output directory at the start of every run, so
-after a successful scrape this wrapper archives the JSON to
-pipeline/_data/wi/ — the stable directory the importer reads — replacing
-only the object types the run produced. Never run two scrapes concurrently.
+Usage: python -m scraper.scrape bills|events [--session ID] [--no-fastmode]
 """
 
 import argparse

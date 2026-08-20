@@ -1,15 +1,7 @@
-"""Parse WEC's "Candidate Tracking by Office" (Appendix B of the ballot
-access report PDF) into a normalized CSV.
+"""Parse WEC's "Candidate Tracking by Office" PDF into the normalized CSV
+that import_wec consumes. Drift alarms fail loud, never guess.
 
 Usage: python -m importer.wec_pdf <ballot_access.pdf> <candidates.csv>
-
-Output columns: office, incumbent, incumbent_noncandidacy, candidate,
-party, ballot_status. The CSV is the stable contract import_wec consumes;
-whatever WEC publishes next cycle only has to be converted back to it.
-
-Drift alarms (fail loud, never guess): the tracking header must be found,
-every candidate row must end in a known ballot status, and at least 100
-legislative offices must be present (99 Assembly + 17 Senate in a midterm).
 """
 
 from __future__ import annotations

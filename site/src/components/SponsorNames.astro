@@ -1,0 +1,18 @@
+---
+import { personSlug } from "../lib/format";
+interface Props {
+  sponsors: { name: string; person_id: string | null; party: string | null }[];
+}
+const { sponsors } = Astro.props;
+---
+{sponsors.map((s, i) => (
+  <>
+    {i > 0 && ", "}
+    {s.person_id ? (
+      <a href={`/legislators/${personSlug(s.person_id)}/`} class="underline">{s.name}</a>
+    ) : (
+      s.name
+    )}
+    {s.party && <span class="text-navy-600"> ({s.party[0]})</span>}
+  </>
+))}

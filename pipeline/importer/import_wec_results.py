@@ -2,12 +2,8 @@
 
 Usage: python -m importer.import_wec_results <xlsx_dir> <sqlite_path>
 
-Parses every .xlsx in the directory (the official 'Ward by Ward Report'
-files from elections.wi.gov results pages). Each contest appears as a
-title row ('STATE SENATOR DISTRICT 1'), a party header row containing
-'Total Votes Cast', a candidate-name row, then ward rows whose votes are
-summed per candidate. The election year comes from the report header
-('2022 General Election'). Non-legislative contests are skipped.
+Each contest appears as a title row, a party header containing 'Total Votes
+Cast', a candidate row, then ward rows whose votes are summed per candidate.
 """
 
 from __future__ import annotations
@@ -86,10 +82,6 @@ def parse_workbook(path: Path) -> list[tuple[int, str, int, str, str | None, int
                     for i, v in enumerate(numeric):
                         if isinstance(v, (int, float)) and i < len(totals):
                             totals[i] += int(v)
-                elif first and CONTEST_RE.match(first) is None and all(
-                    not t for t in texts[2:]
-                ):
-                    continue
     flush()
     wb.close()
     return rows_out
@@ -103,16 +95,16 @@ def run(xlsx_dir: Path, db_path: Path) -> int:
         all_rows.extend(rows)
     if not all_rows:
         raise RuntimeError(f"no legislative contests parsed from {xlsx_dir}")
+    # a general election covers all 99 Assembly districts
+    for year in {r[0] for r in all_rows}:
+        assembly = {r[2] for r in all_rows if r[0] == year and r[1] == "lower"}
+        if len(assembly) < 95:
+            raise RuntimeError(
+                f"{year}: only {len(assembly)} Assembly districts parsed — format drift?"
+            )
 
     conn = sqlite3.connect(db_path)
     with conn:
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS election_history (
-                 year INTEGER NOT NULL,
-                 chamber TEXT NOT NULL CHECK (chamber IN ('lower', 'upper')),
-                 district INTEGER NOT NULL, candidate TEXT NOT NULL,
-                 party TEXT, votes INTEGER NOT NULL)"""
-        )
         conn.execute("DELETE FROM election_history")
         conn.executemany(
             "INSERT INTO election_history (year, chamber, district, candidate,"
@@ -124,7 +116,6 @@ def run(xlsx_dir: Path, db_path: Path) -> int:
     ).fetchone()[0]
     conn.close()
     print(f"election_history: {len(all_rows)} rows across {seats} contests")
-    # sanity: an Assembly general election should cover ~99 districts
     return 0
 
 
