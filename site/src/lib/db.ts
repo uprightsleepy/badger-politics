@@ -405,6 +405,17 @@ export const moneyFor = (personId: string) => {
        GROUP BY LOWER(TRIM(occupation)) ORDER BY total DESC LIMIT 5`,
     )
     .all(personId) as { occupation: string; total: number; n: number }[];
+  // donors report these in arbitrary casing; de-shout long all-caps words
+  // but keep short ones (CEO, RN, CPA) as likely acronyms
+  for (const o of occupations) {
+    const trimmed = o.occupation.trim();
+    o.occupation = /^not employed$/i.test(trimmed)
+      ? "Not employed"
+      : trimmed
+          .split(/\s+/)
+          .map((w) => (w.length > 3 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w))
+          .join(" ");
+  }
   const individualTotal = db
     .prepare(
       "SELECT COALESCE(SUM(amount), 0) AS t FROM contributions"
