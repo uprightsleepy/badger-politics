@@ -83,6 +83,7 @@ const cosponsors = sponsors.filter((s) => !s.is_primary);
                 ) : (
                   s.name
                 )}
+                {s.party && <span class="text-navy-600"> ({s.party[0]})</span>}
               </>
             ))}
           </p>
@@ -101,6 +102,7 @@ const cosponsors = sponsors.filter((s) => !s.is_primary);
                   ) : (
                     s.name
                   )}
+                  {s.party && <span class="text-navy-600"> ({s.party[0]})</span>}
                 </>
               ))}
             </p>
