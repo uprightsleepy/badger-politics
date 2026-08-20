@@ -197,5 +197,6 @@ def test_biennium_covers_special_sessions() -> None:
     assert biennium("2023S1") == "2023"
     # the 2025-26 speaker map applies to the special session too
     assert TITLE_VOTERS[(biennium("2026S1"), "lower")]["SPEAKER"] == "Vos"
-    # historical sessions have no map yet: titles there must hard-fail
-    assert (biennium("2011"), "lower") not in TITLE_VOTERS
+    # unmapped bienniums must stay absent so titles there hard-fail
+    # (2009 is partial — no individual roll call records, no titles needed)
+    assert (biennium("2009"), "lower") not in TITLE_VOTERS
