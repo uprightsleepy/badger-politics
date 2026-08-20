@@ -12,6 +12,14 @@ python -m scraper.scrape events           # os-update wi events --scrape
 python -m scraper.fetch_people            # openstates/people WI roster (YAML)
 python -m scraper.fetch_committees        # committee rosters + chairs (YAML)
 python -m importer.import_openstates _data/wi ../data/wi.sqlite
+
+# --- Phase 2: derived features + elections (CYCLE = active election year) ---
+CYCLE="${CYCLE:-2026}"
+python -m scraper.fetch_wec                   # WEC ballot-access report (PDF)
+python -m importer.wec_pdf _data/wec/ballot-access.pdf _data/wec/candidates-${CYCLE}.csv
+python -m importer.elections ../data/wi.sqlite --cycle "$CYCLE"
+python -m importer.import_wec _data/wec/candidates-${CYCLE}.csv ../data/wi.sqlite --cycle "$CYCLE"
+
 python -m importer.enrich_lrb ../data/wi.sqlite
 python -m importer.checks ../data/wi.sqlite   # hard gate: abort deploy on failure
 
