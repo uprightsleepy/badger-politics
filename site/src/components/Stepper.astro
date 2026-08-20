@@ -1,0 +1,31 @@
+---
+import { stepperState } from "../lib/format";
+interface Props { status: string | null; chamber: string | null }
+const { status, chamber } = Astro.props;
+const { steps, reached, failed } = stepperState(status, chamber);
+---
+<ol class="flex items-start" aria-label="How this bill becomes law">
+  {steps.map((step, i) => {
+    const done = i < reached;
+    const stopped = failed && i === reached - 1;
+    const circle = stopped
+      ? "border-badger-600 bg-badger-600 text-white"
+      : done
+        ? "border-navy-700 bg-navy-700 text-white"
+        : "border-navy-100 bg-white text-navy-100";
+    return (
+      <li class="flex flex-1 flex-col items-center text-center">
+        <div class="flex w-full items-center">
+          <div class={`h-0.5 flex-1 ${i === 0 ? "invisible" : done ? "bg-navy-700" : "bg-navy-100"}`} />
+          <span class={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${circle}`}>
+            {stopped ? "✕" : done ? "✓" : ""}
+          </span>
+          <div class={`h-0.5 flex-1 ${i === steps.length - 1 ? "invisible" : i < reached - 1 ? "bg-navy-700" : "bg-navy-100"}`} />
+        </div>
+        <span class={`mt-1.5 px-1 text-[11px] leading-tight sm:text-xs ${done ? "font-semibold text-ink" : "text-navy-600"}`}>
+          {step.label}
+        </span>
+      </li>
+    );
+  })}
+</ol>

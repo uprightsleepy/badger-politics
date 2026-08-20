@@ -1,0 +1,34 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base title="About" description="Why Badger Politics exists, how it's built, and how to get corrections.">
+  <h1 class="text-2xl font-bold">About Badger Politics</h1>
+  <div class="mt-3 max-w-3xl space-y-4 leading-relaxed">
+    <p>
+      <strong>Badger Politics is an independent project, not affiliated with the
+      State of Wisconsin.</strong> It exists so that any Wisconsinite can answer,
+      in plain language: what is my Legislature doing, how did my legislators
+      vote, and what died quietly without a hearing?
+    </p>
+    <p>
+      Everything is built from official public records — the Legislature's own
+      website and the Wisconsin Elections Commission — refreshed nightly. There
+      are no accounts, no tracking cookies, and no ads. The
+      <a href="/my-reps/" class="underline">Find my legislators</a> feature keeps
+      your district in your browser only; your address is never stored.
+    </p>
+    <p>
+      The full pipeline and site are open source at
+      <a href="https://github.com/uprightsleepy/badger-politics" class="underline">github.com/uprightsleepy/badger-politics</a>,
+      and all data is <a href="/data/" class="underline">free to reuse</a>.
+    </p>
+    <h2 class="text-xl font-bold">Corrections</h2>
+    <p>
+      Accuracy is the whole point. If anything here disagrees with the official
+      record (linked from every vote and bill page), please
+      <a href="https://github.com/uprightsleepy/badger-politics/issues" class="underline">open an issue</a>
+      — corrections are treated as the highest-priority bugs.
+    </p>
+  </div>
+</Base>

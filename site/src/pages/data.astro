@@ -1,0 +1,54 @@
+---
+import Base from "../layouts/Base.astro";
+import { meta } from "../lib/db";
+const m = meta();
+---
+
+<Base title="Data & API" description="Free JSON API, Atom feeds, calendars, and bulk downloads of Wisconsin legislative data.">
+  <h1 class="text-2xl font-bold">Data &amp; API</h1>
+  <p class="mt-2 max-w-3xl text-navy-700">
+    Everything on this site is available as data, free, no key required. Data is
+    collected nightly from docs.legis.wisconsin.gov (current through {m.data_through})
+    and provenance-filtered so every row is public-domain-clean.
+  </p>
+  <section class="mt-6 max-w-3xl space-y-4 text-sm leading-relaxed">
+    <div class="rounded-lg border border-navy-100 bg-white p-4">
+      <h2 class="font-bold">Static JSON API</h2>
+      <p class="mt-1">CDN-served JSON, one file per resource:</p>
+      <ul class="mt-1 list-inside list-disc font-mono text-xs">
+        <li>/api/v1/sessions.json · /api/v1/meta.json</li>
+        <li>/api/v1/bills/2025/index.json · /api/v1/bills/2025/ab656.json</li>
+        <li>/api/v1/votes/&lbrace;vote_id&rbrace;.json</li>
+        <li>/api/v1/legislators/index.json · /api/v1/legislators/&lbrace;id&rbrace;.json</li>
+      </ul>
+    </div>
+    <div class="rounded-lg border border-navy-100 bg-white p-4">
+      <h2 class="font-bold">Feeds &amp; calendars</h2>
+      <p class="mt-1">
+        Atom feeds per bill (<span class="font-mono text-xs">/feeds/bills/&lbrace;id&rbrace;.xml</span>),
+        per legislator, per committee, plus the
+        <a href="/feeds/weekly.xml" class="underline">weekly digest</a>. iCal:
+        <a href="/calendar/hearings.ics" class="underline">hearings</a> and
+        <a href="/calendar/election-days.ics" class="underline">2026 election days</a>.
+      </p>
+    </div>
+    <div class="rounded-lg border border-navy-100 bg-white p-4">
+      <h2 class="font-bold">Bulk downloads</h2>
+      <p class="mt-1">
+        Per-session CSVs and the full SQLite snapshot are published with each
+        release on <a href="https://github.com/uprightsleepy/badger-politics/releases" class="underline">GitHub Releases</a>.
+        LegiScan-sourced rows (if any) are display-only and excluded from all exports.
+      </p>
+    </div>
+    <div class="rounded-lg border border-navy-100 bg-white p-4">
+      <h2 class="font-bold">Methodology, briefly</h2>
+      <p class="mt-1">
+        Nightly scrape of official Legislature pages (via the open-source
+        openstates-scrapers), imported into SQLite behind hard integrity gates:
+        roll-call sums must reconcile with official counts, and any ambiguous
+        legislator name fails the build rather than guessing. See
+        <a href="https://github.com/uprightsleepy/badger-politics" class="underline">the source</a>.
+      </p>
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,78 @@
+---
+import "../styles/global.css";
+import { meta } from "../lib/db";
+interface Props {
+  title: string;
+  description?: string;
+}
+const { title, description = "Free, independent tracking of the Wisconsin Legislature: every bill, every vote, every committee graveyard." } = Astro.props;
+const dataThrough = meta().data_through;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · Badger Politics</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body class="min-h-screen bg-paper text-ink antialiased">
+    <header class="border-b border-navy-100 bg-navy-900 text-white">
+      <nav class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 text-sm">
+        <a href="/" class="mr-auto flex items-center gap-2 text-base font-bold tracking-tight">
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" class="text-gold-500"><path fill="currentColor" d="M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.3 6.7 3.7v8L12 19.7 5.3 16V8L12 4.3Z"/><path fill="currentColor" d="M12 7 7.5 9.5v5L12 17l4.5-2.5v-5L12 7Z"/></svg>
+          Badger Politics
+        </a>
+        <a href="/bills/" class="hover:text-gold-500">Bills</a>
+        <a href="/legislators/" class="hover:text-gold-500">Legislators</a>
+        <a href="/hearing-none/" class="hover:text-gold-500">Hearing None</a>
+        <a href="/hearings/" class="hover:text-gold-500">Hearings</a>
+        <a href="/elections/2026/" class="hover:text-gold-500">2026 Ballot</a>
+        <a href="/my-reps/" id="nav-my-reps" class="rounded-full bg-navy-700 px-3 py-1 hover:bg-navy-600">
+          Find my legislators
+        </a>
+      </nav>
+    </header>
+
+    <main class="mx-auto max-w-5xl px-4 py-8">
+      <slot />
+    </main>
+
+    <footer class="mt-16 border-t border-navy-100 bg-white">
+      <div class="mx-auto max-w-5xl space-y-3 px-4 py-8 text-sm text-navy-700">
+        <p class="font-semibold text-ink">
+          Badger Politics is an independent project, not affiliated with the State of Wisconsin.
+        </p>
+        <p>
+          Data is refreshed nightly from official Wisconsin Legislature records
+          {dataThrough && <span>— current through <strong>{dataThrough}</strong></span>}.
+          Always confirm against the <a href="https://docs.legis.wisconsin.gov" class="underline">official source</a> linked on each page.
+        </p>
+        <p class="flex flex-wrap gap-x-4">
+          <a href="/data/" class="underline">Data &amp; API</a>
+          <a href="/about/" class="underline">About &amp; corrections</a>
+          <a href="/feeds/weekly.xml" class="underline">This week (Atom)</a>
+          <a href="/calendar/hearings.ics" class="underline">Hearings calendar</a>
+          <a href="https://github.com/uprightsleepy/badger-politics" class="underline">Source code</a>
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      // "Your reps" chip: district saved by /my-reps lives in localStorage only
+      const saved = localStorage.getItem("bp-district");
+      if (saved) {
+        const { ad, sd } = JSON.parse(saved);
+        const link = document.getElementById("nav-my-reps");
+        if (link) link.textContent = `Your reps · AD ${ad} / SD ${sd}`;
+      }
+    </script>
+    <script
+      is:inline
+      data-goatcounter="https://badgerpolitics.goatcounter.com/count"
+      async
+      src="//gc.zgo.at/count.js"></script>
+  </body>
+</html>

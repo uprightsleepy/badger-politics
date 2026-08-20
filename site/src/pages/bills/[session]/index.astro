@@ -1,0 +1,59 @@
+---
+import Base from "../../../layouts/Base.astro";
+import StatusBadge from "../../../components/StatusBadge.astro";
+import { builtSessions, billsFor } from "../../../lib/db";
+import { billSlug, fmtDate } from "../../../lib/format";
+
+export function getStaticPaths() {
+  return builtSessions().map((session) => ({
+    params: { session: session.id },
+    props: { session },
+  }));
+}
+const { session } = Astro.props;
+const bills = billsFor(session.id);
+---
+
+<Base title={`Bills · ${session.name ?? session.id}`}>
+  <h1 class="text-2xl font-bold">{session.name ?? session.id}</h1>
+  <p class="mt-1 text-sm text-navy-600">
+    {bills.length.toLocaleString()} proposals
+    {session.data_quality === "partial" && (
+      <span class="ml-2 rounded-full bg-gold-100 px-2 py-0.5 text-xs font-semibold">
+        partial data: individual roll calls unavailable for this session
+      </span>
+    )}
+  </p>
+  <div class="mt-4">
+    <input
+      type="search"
+      id="bill-filter"
+      placeholder="Filter by number or title…"
+      class="w-full max-w-md rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm"
+    />
+  </div>
+  <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white">
+    {bills.map((b) => (
+      <li class="flex items-baseline gap-3 px-4 py-2.5 text-sm" data-bill-row data-text={`${b.identifier} ${b.title ?? ""}`.toLowerCase()}>
+        <a href={`/bills/${session.id}/${billSlug(b.identifier)}/`} class="w-20 shrink-0 font-bold underline">
+          {b.identifier}
+        </a>
+        <span class="flex-1 truncate">{b.title}</span>
+        <StatusBadge status={b.status} />
+        <span class="hidden w-24 shrink-0 text-right text-xs text-navy-600 sm:block">
+          {fmtDate(b.latest_action_date)}
+        </span>
+      </li>
+    ))}
+  </ul>
+  <script>
+    // the tiny filter helper (the plan's one allowed non-Pagefind script)
+    const input = document.getElementById("bill-filter") as HTMLInputElement;
+    input?.addEventListener("input", () => {
+      const q = input.value.toLowerCase();
+      document.querySelectorAll<HTMLElement>("[data-bill-row]").forEach((row) => {
+        row.classList.toggle("sorted-hidden", !row.dataset.text!.includes(q));
+      });
+    });
+  </script>
+</Base>

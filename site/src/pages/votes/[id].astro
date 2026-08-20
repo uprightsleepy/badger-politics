@@ -1,0 +1,30 @@
+---
+import Base from "../../layouts/Base.astro";
+import RollCall from "../../components/RollCall.astro";
+import { builtSessions, billsFor, votesFor, bill as getBill } from "../../lib/db";
+import { billSlug } from "../../lib/format";
+
+export function getStaticPaths() {
+  return builtSessions().flatMap((session) =>
+    billsFor(session.id).flatMap((b) =>
+      votesFor(b.id).map((event) => ({
+        params: { id: event.id },
+        props: { event, bill: b, sessionId: session.id },
+      })),
+    ),
+  );
+}
+const { event, bill, sessionId } = Astro.props;
+---
+
+<Base title={`Roll call: ${bill.identifier} — ${event.motion ?? "vote"}`}>
+  <p class="text-sm text-navy-600">
+    <a href={`/bills/${sessionId}/${billSlug(bill.identifier)}/`} class="underline">
+      ← {bill.identifier}: {bill.title?.slice(0, 90)}
+    </a>
+  </p>
+  <h1 class="mt-2 text-2xl font-bold">Roll call vote</h1>
+  <div class="mt-4">
+    <RollCall event={event} compact />
+  </div>
+</Base>

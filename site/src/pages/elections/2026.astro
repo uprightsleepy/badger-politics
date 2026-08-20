@@ -1,0 +1,54 @@
+---
+import Base from "../../layouts/Base.astro";
+import { sittingPeople, electionFor } from "../../lib/db";
+import { personSlug, partyStyle, partyLetter } from "../../lib/format";
+const seats = sittingPeople()
+  .map((p) => ({ person: p, election: electionFor(p.id) }))
+  .filter((s) => s.election?.cycle_year === 2026);
+const senate = seats.filter((s) => s.person.chamber === "upper");
+const assembly = seats.filter((s) => s.person.chamber === "lower");
+---
+
+<Base title="2026 legislative elections" description="Every Wisconsin legislative seat on the November 2026 ballot: incumbents, retirements, and qualified candidates.">
+  <h1 class="text-2xl font-bold">On the ballot: November 3, 2026</h1>
+  <p class="mt-2 max-w-3xl text-navy-700">
+    All 99 Assembly seats and the 17 odd-numbered Senate seats. Candidate status
+    is the Wisconsin Elections Commission's pre-primary ballot-access
+    determination; the general-election ballot is certified after the August 11
+    primary. <a href="/calendar/election-days.ics" class="underline">Add election days to your calendar</a>.
+  </p>
+  {[
+    { label: "Senate (odd districts)", rows: senate },
+    { label: "Assembly (all districts)", rows: assembly },
+  ].map((chamber) => (
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">{chamber.label}</h2>
+      <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+        {chamber.rows.map(({ person, election }) => {
+          const opponents = election!.opponents.filter((o) => o.ballot_status !== "Deny");
+          return (
+            <li class="flex flex-wrap items-baseline gap-x-3 px-4 py-2">
+              <span class="w-10 shrink-0 font-bold">D{person.district}</span>
+              <span class={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${partyStyle(person.party)}`}>
+                {partyLetter(person.party)}
+              </span>
+              <a href={`/legislators/${personSlug(person.id)}/`} class="underline">{person.name}</a>
+              {election!.on_ballot === 0 && (
+                <span class="rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">retiring</span>
+              )}
+              {election!.on_ballot === 1 && opponents.length === 0 && (
+                <span class="text-xs text-navy-600">unopposed so far</span>
+              )}
+              {opponents.length > 0 && (
+                <span class="min-w-0 flex-1 truncate text-navy-700">
+                  {election!.on_ballot === 0 ? "Candidates: " : "Challengers: "}
+                  {opponents.map((o) => `${o.name} (${o.party?.[0] ?? "?"})`).join(", ")}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  ))}
+</Base>

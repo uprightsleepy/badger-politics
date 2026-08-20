@@ -1,0 +1,8 @@
+---
+import { STATUS_LABELS, STATUS_STYLES } from "../lib/format";
+interface Props { status: string | null }
+const { status } = Astro.props;
+const label = STATUS_LABELS[status ?? ""] ?? "Introduced";
+const style = STATUS_STYLES[status ?? ""] ?? "bg-navy-50 text-navy-700";
+---
+<span class={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${style}`}>{label}</span>

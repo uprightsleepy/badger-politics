@@ -1,0 +1,185 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base title="Find my legislators" description="Enter your address once — your Assembly and Senate districts are remembered on this device only.">
+  <h1 class="text-2xl font-bold">Find my legislators</h1>
+  <p class="mt-2 max-w-2xl text-navy-700">
+    Enter your address (or use your location). Your district is saved
+    <strong>on this device only</strong> — your address is never stored, and is sent
+    only to the U.S. Census geocoder to get coordinates. After that, every bill
+    page pins how your two legislators voted.
+  </p>
+
+  <form id="addr-form" class="mt-5 flex max-w-xl flex-wrap gap-2">
+    <label class="sr-only" for="addr">Street address in Wisconsin</label>
+    <input
+      id="addr"
+      type="text"
+      required
+      placeholder="e.g. 7120 W National Ave, West Allis, WI"
+      class="min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-3 py-2"
+    />
+    <button type="submit" class="rounded-lg bg-navy-800 px-4 py-2 font-semibold text-white hover:bg-navy-700">
+      Find
+    </button>
+    <button type="button" id="geo-btn" class="rounded-lg border border-navy-100 bg-white px-4 py-2 hover:bg-navy-50">
+      Use my location
+    </button>
+  </form>
+  <p id="status" class="mt-3 text-sm text-navy-600" role="status"></p>
+
+  <div id="result" class="mt-6 hidden max-w-xl rounded-lg border border-navy-100 bg-white p-4">
+    <h2 class="text-lg font-bold">Your districts</h2>
+    <div id="reps" class="mt-2 space-y-3"></div>
+    <p class="mt-3 text-xs text-navy-600">
+      Districts per the Legislature's official 2024 boundaries (LTSB). Saved in
+      your browser only — <button id="forget" class="underline">forget this</button>.
+    </p>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status")!;
+    const resultEl = document.getElementById("result")!;
+    const repsEl = document.getElementById("reps")!;
+    let districts: any = null;
+    let reps: any = null;
+
+    async function loadData() {
+      if (!districts) {
+        statusEl.textContent = "Loading district boundaries…";
+        [districts, reps] = await Promise.all([
+          fetch("/data/wi-districts-2024.geojson").then((r) => r.json()),
+          fetch("/data/reps.json").then((r) => r.json()),
+        ]);
+      }
+    }
+
+    function pointInRing(x: number, y: number, ring: number[][]): boolean {
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i];
+        const [xj, yj] = ring[j];
+        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+          inside = !inside;
+        }
+      }
+      return inside;
+    }
+
+    function pointInPolygon(x: number, y: number, geom: any): boolean {
+      const polys = geom.type === "Polygon" ? [geom.coordinates] : geom.coordinates;
+      for (const poly of polys) {
+        if (pointInRing(x, y, poly[0]) && !poly.slice(1).some((h: number[][]) => pointInRing(x, y, h))) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function findDistrict(lng: number, lat: number) {
+      for (const f of districts.features) {
+        if (pointInPolygon(lng, lat, f.geometry)) return f.properties;
+      }
+      return null;
+    }
+
+    function show(props: { ad: number; sd: number }) {
+      localStorage.setItem("bp-district", JSON.stringify(props));
+      const rep = reps.assembly[props.ad];
+      const sen = reps.senate[props.sd];
+      repsEl.innerHTML = [
+        rep &&
+          `<p><strong>Assembly District ${props.ad}:</strong> <a class="underline" href="/legislators/${rep.slug}/">${rep.name}</a> (${rep.party?.[0] ?? "?"})</p>`,
+        sen &&
+          `<p><strong>Senate District ${props.sd}:</strong> <a class="underline" href="/legislators/${sen.slug}/">${sen.name}</a> (${sen.party?.[0] ?? "?"})</p>`,
+        `<p class="text-sm">Now every bill page will pin how they voted.</p>`,
+      ]
+        .filter(Boolean)
+        .join("");
+      resultEl.classList.remove("hidden");
+      statusEl.textContent = "";
+    }
+
+    async function resolvePoint(lng: number, lat: number) {
+      await loadData();
+      const props = findDistrict(lng, lat);
+      if (props) {
+        show(props);
+      } else {
+        statusEl.textContent =
+          "That point doesn't fall inside a Wisconsin legislative district.";
+      }
+    }
+
+    // The Census geocoder has no CORS headers; it supports JSONP, which keeps
+    // the no-server architecture (the address goes to census.gov only).
+    function geocode(addr: string): Promise<any> {
+      return new Promise((resolve, reject) => {
+        const cb = "bpGeo" + Date.now();
+        const script = document.createElement("script");
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new Error("timeout"));
+        }, 15000);
+        function cleanup() {
+          clearTimeout(timer);
+          delete (window as any)[cb];
+          script.remove();
+        }
+        (window as any)[cb] = (data: any) => {
+          cleanup();
+          resolve(data);
+        };
+        script.onerror = () => {
+          cleanup();
+          reject(new Error("load error"));
+        };
+        script.src =
+          "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=jsonp&callback=" +
+          cb +
+          "&address=" +
+          encodeURIComponent(addr);
+        document.head.appendChild(script);
+      });
+    }
+
+    document.getElementById("addr-form")!.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const addr = (document.getElementById("addr") as HTMLInputElement).value;
+      statusEl.textContent = "Looking up address…";
+      try {
+        const data = await geocode(addr);
+        const match = data?.result?.addressMatches?.[0];
+        if (!match) {
+          statusEl.textContent =
+            "Couldn't find that address. Try adding the city, or use your location instead.";
+          return;
+        }
+        await resolvePoint(match.coordinates.x, match.coordinates.y);
+      } catch {
+        statusEl.textContent =
+          "The Census geocoder didn't respond. Try the location button instead — it needs no third party.";
+      }
+    });
+
+    document.getElementById("geo-btn")!.addEventListener("click", () => {
+      statusEl.textContent = "Asking your browser for your location…";
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolvePoint(pos.coords.longitude, pos.coords.latitude),
+        () => (statusEl.textContent = "Location unavailable or denied."),
+      );
+    });
+
+    document.getElementById("forget")!.addEventListener("click", () => {
+      localStorage.removeItem("bp-district");
+      resultEl.classList.add("hidden");
+      statusEl.textContent = "Forgotten.";
+    });
+
+    const saved = localStorage.getItem("bp-district");
+    if (saved) {
+      loadData().then(() => show(JSON.parse(saved)));
+    }
+  </script>
+</Base>

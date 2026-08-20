@@ -1,0 +1,76 @@
+---
+import Base from "../layouts/Base.astro";
+import StatusBadge from "../components/StatusBadge.astro";
+import { builtSessions, sessionStats, recentlyActedBills } from "../lib/db";
+import { billSlug, fmtDate } from "../lib/format";
+const sessions = builtSessions();
+const current = sessions.find((s) => s.id === "2025") ?? sessions[0];
+const stats = sessionStats(current.id);
+const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
+---
+
+<Base title="Wisconsin politics, in plain language">
+  <section class="py-8 text-center">
+    <h1 class="mx-auto max-w-2xl text-4xl font-bold tracking-tight">
+      What is the Wisconsin Legislature doing?
+    </h1>
+    <p class="mx-auto mt-3 max-w-xl text-lg text-navy-700">
+      Every bill, every vote, every committee graveyard — in plain language,
+      updated nightly from official records.
+    </p>
+    <div id="search" class="mx-auto mt-6 max-w-xl text-left"></div>
+    <p class="mt-4 text-sm">
+      <a href="/my-reps/" class="font-semibold text-navy-700 underline">
+        Enter your address once
+      </a>
+      and every page shows how <em>your</em> legislators voted.
+    </p>
+  </section>
+
+  <section class="grid gap-3 sm:grid-cols-3">
+    <div class="rounded-lg border border-navy-100 bg-white p-4 text-center">
+      <div class="text-3xl font-bold">{stats.bills.toLocaleString()}</div>
+      <div class="text-sm text-navy-600">proposals this session</div>
+    </div>
+    <div class="rounded-lg border border-navy-100 bg-white p-4 text-center">
+      <div class="text-3xl font-bold text-moss-600">{stats.enacted}</div>
+      <div class="text-sm text-navy-600">became law</div>
+    </div>
+    <a href={`/hearing-none/${current.id}/`} class="rounded-lg border border-badger-600/30 bg-badger-50 p-4 text-center hover:border-badger-600">
+      <div class="text-3xl font-bold text-badger-700">{stats.graveyard.toLocaleString()}</div>
+      <div class="text-sm text-badger-700">died without a hearing →</div>
+    </a>
+  </section>
+
+  <section class="mt-10">
+    <h2 class="text-xl font-bold">Recently acted on</h2>
+    <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white">
+      {recent.map((b) => (
+        <li class="flex items-baseline gap-3 px-4 py-2.5 text-sm">
+          <a href={`/bills/${b.session_id}/${billSlug(b.identifier)}/`} class="w-20 shrink-0 font-bold underline">
+            {b.identifier}
+          </a>
+          <span class="flex-1 truncate">{b.title}</span>
+          <StatusBadge status={b.status} />
+          <span class="hidden w-24 shrink-0 text-right text-xs text-navy-600 sm:block">
+            {fmtDate(b.latest_action_date)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <link href="/pagefind/pagefind-ui.css" rel="stylesheet" />
+  <script is:inline src="/pagefind/pagefind-ui.js"></script>
+  <script is:inline>
+    window.addEventListener("DOMContentLoaded", () => {
+      if (window.PagefindUI) {
+        new window.PagefindUI({
+          element: "#search",
+          showSubResults: false,
+          placeholder: "Search bills — try “child marriage” or “AB 656”",
+        });
+      }
+    });
+  </script>
+</Base>

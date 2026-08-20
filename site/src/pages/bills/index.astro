@@ -1,0 +1,34 @@
+---
+import Base from "../../layouts/Base.astro";
+import { allSessions, builtSessions, sessionStats } from "../../lib/db";
+const built = new Set(builtSessions().map((s) => s.id));
+const sessions = allSessions();
+---
+
+<Base title="Bills by session">
+  <h1 class="text-2xl font-bold">Bills by session</h1>
+  <ul class="mt-4 space-y-2">
+    {sessions.map((s) => {
+      const stats = sessionStats(s.id);
+      return (
+        <li class="flex flex-wrap items-baseline gap-3 rounded-lg border border-navy-100 bg-white px-4 py-3">
+          {built.has(s.id) ? (
+            <a href={`/bills/${s.id}/`} class="font-bold underline">{s.name ?? s.id}</a>
+          ) : (
+            <span class="font-bold text-navy-600">{s.name ?? s.id}</span>
+          )}
+          <span class="text-sm text-navy-600">
+            {stats.bills.toLocaleString()} proposals · {stats.enacted} became law ·
+            {" "}{stats.graveyard} died without a hearing
+          </span>
+          {s.data_quality === "partial" && (
+            <span class="rounded-full bg-gold-100 px-2 py-0.5 text-xs font-semibold">partial</span>
+          )}
+          {!built.has(s.id) && (
+            <span class="text-xs text-navy-600">(pages coming with the full history build)</span>
+          )}
+        </li>
+      );
+    })}
+  </ul>
+</Base>

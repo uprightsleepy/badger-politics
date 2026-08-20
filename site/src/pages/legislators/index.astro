@@ -1,0 +1,34 @@
+---
+import Base from "../../layouts/Base.astro";
+import { sittingPeople } from "../../lib/db";
+import { personSlug, partyStyle, partyLetter } from "../../lib/format";
+const members = sittingPeople();
+const senate = members.filter((m) => m.chamber === "upper");
+const assembly = members.filter((m) => m.chamber === "lower");
+---
+
+<Base title="Legislators">
+  <h1 class="text-2xl font-bold">Wisconsin legislators</h1>
+  <p class="mt-1 text-sm text-navy-600">
+    Don't know your district? <a href="/my-reps/" class="underline">Find your legislators</a>.
+  </p>
+  {[
+    { label: "Senate", rows: senate },
+    { label: "Assembly", rows: assembly },
+  ].map((chamber) => (
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">{chamber.label} · {chamber.rows.length}</h2>
+      <ul class="mt-2 grid gap-1 rounded-lg border border-navy-100 bg-white p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+        {chamber.rows.map((m) => (
+          <li class="flex items-center gap-2">
+            <span class={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${partyStyle(m.party)}`}>
+              {partyLetter(m.party)}
+            </span>
+            <a href={`/legislators/${personSlug(m.id)}/`} class="truncate underline">{m.name}</a>
+            <span class="ml-auto text-xs text-navy-600">D{m.district}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+</Base>

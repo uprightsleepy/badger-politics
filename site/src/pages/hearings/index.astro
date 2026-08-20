@@ -1,0 +1,44 @@
+---
+import Base from "../../layouts/Base.astro";
+import { upcomingHearings, recentHearings, meta } from "../../lib/db";
+import { fmtDate, chamberName } from "../../lib/format";
+const today = new Date().toISOString().slice(0, 10);
+const upcoming = upcomingHearings(today);
+const recent = recentHearings(30);
+const shown = upcoming.length ? upcoming : recent;
+const heading = upcoming.length ? "Upcoming committee hearings" : "Recent committee hearings";
+---
+
+<Base title="Committee hearings" description="Upcoming Wisconsin Legislature committee hearings, with add-to-calendar files.">
+  <h1 class="text-2xl font-bold">{heading}</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    Showing up to testify is the single most effective thing a voter can do.
+    {upcoming.length === 0 && " No upcoming hearings are posted (the Legislature is out of session); recent hearings shown."}
+    <a href="/calendar/hearings.ics" class="underline">Subscribe to the calendar</a>.
+  </p>
+  <ul class="mt-4 space-y-2">
+    {shown.map((h) => {
+      const agendaBills = JSON.parse(h.agenda_bill_ids_json ?? "[]") as string[];
+      const uid = h.id.split("/").pop()!.replace(/\s+/g, "-");
+      return (
+        <li class="rounded-lg border border-navy-100 bg-white px-4 py-3 text-sm">
+          <div class="flex flex-wrap items-baseline gap-x-3">
+            <span class="font-bold">
+              {h.committee_chamber ? `${chamberName(h.committee_chamber)} ` : ""}{h.committee_name ?? "Committee"}
+            </span>
+            <span class="text-navy-600">{fmtDate(h.date)} {h.time && `· ${h.time}`}</span>
+            {h.location && <span class="text-navy-600">{h.location}</span>}
+            <span class="ml-auto flex gap-3">
+              <a href={`/calendar/hearings/${uid}.ics`} class="underline">Add to calendar</a>
+              {h.source_url && <a href={h.source_url} class="underline">Official notice</a>}
+            </span>
+          </div>
+          {agendaBills.length > 0 && (
+            <p class="mt-1 text-navy-700">On the agenda: {agendaBills.join(", ")}</p>
+          )}
+          <p class="mt-1 text-xs text-navy-600">Confirm against the official hearing notice before attending.</p>
+        </li>
+      );
+    })}
+  </ul>
+</Base>

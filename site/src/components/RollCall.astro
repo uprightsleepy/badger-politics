@@ -1,0 +1,71 @@
+---
+import { partyStyle, partyLetter, chamberName, personSlug } from "../lib/format";
+import type { VoteEvent } from "../lib/db";
+import { voteRecordsFor } from "../lib/db";
+interface Props { event: VoteEvent; compact?: boolean }
+const { event, compact = false } = Astro.props;
+const records = voteRecordsFor(event.id);
+const byOption = (opt: string) => records.filter((r) => r.option === opt);
+const groups = [
+  { key: "yes", label: "Aye", rows: byOption("yes"), style: "text-moss-600" },
+  { key: "no", label: "Nay", rows: byOption("no"), style: "text-badger-700" },
+  {
+    key: "other",
+    label: "Not voting",
+    rows: records.filter((r) => r.option !== "yes" && r.option !== "no"),
+    style: "text-navy-600",
+  },
+];
+---
+<div class="rounded-lg border border-navy-100 bg-white p-4" data-rollcall data-chamber={event.chamber}>
+  <div class="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+    <h3 class="font-semibold">
+      {chamberName(event.chamber)}: {event.motion ?? "Vote"}
+    </h3>
+    <span class={`text-sm font-bold ${event.result === "pass" ? "text-moss-600" : "text-badger-700"}`}>
+      {event.result === "pass" ? "Passed" : "Failed"}
+      {event.yes_count != null && ` ${event.yes_count}–${event.no_count ?? 0}`}
+    </span>
+    <span class="text-sm text-navy-600">{event.date}</span>
+    {event.source_url && (
+      <a href={event.source_url} class="text-sm underline">official source</a>
+    )}
+    {!compact && <a href={`/votes/${event.id}/`} class="text-sm underline">full page</a>}
+  </div>
+  <p class="mb-3 hidden rounded bg-gold-100 px-3 py-2 text-sm font-medium" data-your-reps-note></p>
+  {records.length === 0 ? (
+    <p class="text-sm text-navy-600">
+      No individual roll call recorded for this vote (committee votes and some
+      older sessions record totals only).
+    </p>
+  ) : (
+    <div class="grid gap-3 sm:grid-cols-3">
+      {groups.filter((g) => g.rows.length).map((group) => (
+        <div>
+          <h4 class={`mb-1 text-xs font-bold uppercase tracking-wide ${group.style}`}>
+            {group.label} · {group.rows.length}
+          </h4>
+          <ul class="space-y-0.5 text-sm">
+            {group.rows.map((r) => (
+              <li
+                class="flex items-center gap-1.5 rounded px-1"
+                data-vote-row
+                data-chamber={r.chamber}
+                data-district={r.district}
+                data-option={group.label}
+              >
+                <span class={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${partyStyle(r.party)}`}>
+                  {partyLetter(r.party)}
+                </span>
+                <a href={`/legislators/${personSlug(r.person_id)}/`} class="truncate hover:underline">
+                  {r.name}
+                </a>
+                {r.district != null && <span class="text-xs text-navy-600">({r.district})</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  )}
+</div>

@@ -1,0 +1,57 @@
+---
+import Base from "../../layouts/Base.astro";
+import { builtSessions, graveyardFor, graveyardBills, sessionStats } from "../../lib/db";
+import { billSlug } from "../../lib/format";
+
+export function getStaticPaths() {
+  return builtSessions().map((session) => ({
+    params: { session: session.id },
+    props: { session },
+  }));
+}
+const { session } = Astro.props;
+const committees = graveyardFor(session.id);
+const stats = sessionStats(session.id);
+---
+
+<Base
+  title={`Hearing None · ${session.name ?? session.id}`}
+  description={`${stats.graveyard} Wisconsin bills died without ever getting a public hearing in the ${session.name}.`}
+>
+  <h1 class="text-3xl font-bold tracking-tight">Hearing: none</h1>
+  <p class="mt-2 max-w-3xl text-lg text-navy-700">
+    <strong class="text-badger-700">{stats.graveyard.toLocaleString()}</strong> of the
+    {" "}{stats.bills.toLocaleString()} proposals in the {session.name ?? session.id}
+    died without ever receiving a public hearing — grouped below by the committee
+    where they sat, and its chair. A committee chair alone decides whether a bill
+    gets heard.
+  </p>
+  <div class="mt-6 space-y-4">
+    {committees.map((c) => {
+      const bills = graveyardBills(session.id, c.committee_at_death);
+      return (
+        <details class="rounded-lg border border-navy-100 bg-white">
+          <summary class="flex cursor-pointer flex-wrap items-baseline gap-x-3 px-4 py-3">
+            <span class="font-bold">{c.committee_at_death ?? "(no committee recorded)"}</span>
+            {c.committee_chair_at_death && (
+              <span class="text-sm text-navy-600">Chair: {c.committee_chair_at_death}</span>
+            )}
+            <span class="ml-auto rounded-full bg-badger-50 px-2.5 py-0.5 text-sm font-bold text-badger-700">
+              {c.n} bills, 0 hearings
+            </span>
+          </summary>
+          <ul class="space-y-1 border-t border-navy-100 px-4 py-3 text-sm">
+            {bills.map((b) => (
+              <li class="flex items-baseline gap-2">
+                <a href={`/bills/${session.id}/${billSlug(b.identifier)}/`} class="shrink-0 font-semibold underline">
+                  {b.identifier}
+                </a>
+                <span class="truncate">{b.title}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      );
+    })}
+  </div>
+</Base>

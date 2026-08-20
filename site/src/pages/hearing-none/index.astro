@@ -1,0 +1,24 @@
+---
+import Base from "../../layouts/Base.astro";
+import { builtSessions, sessionStats } from "../../lib/db";
+const sessions = builtSessions();
+---
+<Base title="Hearing None">
+  <h1 class="text-3xl font-bold">Hearing: none</h1>
+  <p class="mt-2 max-w-3xl text-navy-700">
+    Most bills don't get voted down — they die in a committee that never gave
+    them a hearing. Pick a session:
+  </p>
+  <ul class="mt-4 space-y-2">
+    {sessions.map((s) => (
+      <li>
+        <a href={`/hearing-none/${s.id}/`} class="font-semibold underline">
+          {s.name ?? s.id}
+        </a>
+        <span class="ml-2 text-sm text-navy-600">
+          {sessionStats(s.id).graveyard.toLocaleString()} bills died unheard
+        </span>
+      </li>
+    ))}
+  </ul>
+</Base>

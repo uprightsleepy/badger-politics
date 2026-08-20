@@ -1,0 +1,108 @@
+---
+import Base from "../../layouts/Base.astro";
+import StatusBadge from "../../components/StatusBadge.astro";
+import { people, personVotes, personSponsorships, electionFor } from "../../lib/db";
+import { personSlug, partyStyle, chamberName, fmtDate, billSlug } from "../../lib/format";
+
+export function getStaticPaths() {
+  return people().map((p) => ({
+    params: { slug: personSlug(p.id) },
+    props: { person: p },
+  }));
+}
+const { person } = Astro.props;
+const votes = personVotes(person.id, 3000);
+const sponsorships = personSponsorships(person.id);
+const election = electionFor(person.id);
+const sitting = person.current_role === "Representative" || person.current_role === "Senator";
+const opponents = election?.opponents.filter((o) => o.ballot_status !== "Deny") ?? [];
+---
+
+<Base title={person.name} description={`${person.current_role ?? "Legislator"}, ${chamberName(person.chamber)} District ${person.district}`}>
+  <div class="flex flex-col gap-6 md:flex-row">
+    <aside class="w-full shrink-0 md:w-64">
+      <div class="rounded-lg border border-navy-100 bg-white p-4">
+        {person.image_url && (
+          <img
+            src={person.image_url}
+            alt={`Portrait of ${person.name}`}
+            width="120"
+            height="150"
+            loading="lazy"
+            class="mb-3 rounded"
+          />
+        )}
+        <h1 class="text-xl font-bold">{person.name}</h1>
+        <p class="mt-1 text-sm">
+          <span class={`mr-1 rounded-full px-2 py-0.5 text-xs font-bold ${partyStyle(person.party)}`}>
+            {person.party ?? "—"}
+          </span>
+          {person.current_role} · {chamberName(person.chamber)}
+          {person.district != null && ` District ${person.district}`}
+        </p>
+        {sitting && election && (
+          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
+            <h2 class="font-bold">Up for reelection: Nov {election.cycle_year}</h2>
+            {election.on_ballot === 1 && <p class="mt-1">On the ballot ✓</p>}
+            {election.on_ballot === 0 && (
+              <p class="mt-1 font-semibold text-badger-700">Not running (retiring)</p>
+            )}
+            {election.on_ballot == null && <p class="mt-1">Candidate list pending</p>}
+            {opponents.length > 0 && (
+              <p class="mt-1">
+                {election.on_ballot === 0 ? "Candidates" : "Challengers"}:{" "}
+                {opponents.map((o) => `${o.name} (${o.party[0] ?? "?"})`).join(", ")}
+              </p>
+            )}
+            {election.on_ballot === 1 && opponents.length === 0 && (
+              <p class="mt-1">No opponents have qualified so far.</p>
+            )}
+            <p class="mt-1 text-xs text-navy-600">
+              Pre-primary status per the Wisconsin Elections Commission ballot-access
+              report; final ballot certified after the August primary.
+            </p>
+          </div>
+        )}
+      </div>
+    </aside>
+
+    <div class="min-w-0 flex-1">
+      <section>
+        <h2 class="text-xl font-bold">Sponsored bills · {sponsorships.filter((s) => s.is_primary).length}</h2>
+        <ul class="mt-2 max-h-96 space-y-1 overflow-y-auto rounded-lg border border-navy-100 bg-white p-3 text-sm">
+          {sponsorships.filter((s) => s.is_primary).slice(0, 200).map((s) => (
+            <li class="flex items-baseline gap-2">
+              <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="shrink-0 font-semibold underline">
+                {s.identifier}
+              </a>
+              <span class="truncate">{s.title}</span>
+              <StatusBadge status={s.status} />
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section class="mt-6">
+        <h2 class="text-xl font-bold">Vote history · {votes.length.toLocaleString()}</h2>
+        <ul class="mt-2 max-h-[32rem] space-y-1 overflow-y-auto rounded-lg border border-navy-100 bg-white p-3 text-sm">
+          {votes.map((v) => (
+            <li class="flex items-baseline gap-2">
+              <span
+                class={`w-14 shrink-0 text-xs font-bold uppercase ${
+                  v.option === "yes" ? "text-moss-600" : v.option === "no" ? "text-badger-700" : "text-navy-600"
+                }`}
+              >
+                {v.option === "yes" ? "Aye" : v.option === "no" ? "Nay" : "NV"}
+              </span>
+              <a href={`/votes/${v.vote_event_id}/`} class="shrink-0 font-semibold underline">
+                {v.identifier}
+              </a>
+              <span class="truncate">{v.motion ?? v.title}</span>
+              <span class="ml-auto shrink-0 text-xs text-navy-600">{fmtDate(v.date)}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  </div>
+</Base>
