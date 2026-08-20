@@ -38,6 +38,37 @@ import Base from "../layouts/Base.astro";
     </p>
   </div>
 
+  <div id="polling" class="mt-4 max-w-xl rounded-lg border border-navy-100 bg-white p-4">
+    <h2 class="text-lg font-bold">Your polling place</h2>
+    <p class="mt-1 text-sm text-navy-700">
+      Polling places are assigned by ward and can change between elections, so
+      the official lookup is the source of truth.
+      <a href="https://myvote.wi.gov/en-us/Find-My-Polling-Place" class="font-semibold underline">
+        Look yours up on MyVote ↗
+      </a>
+      then save it here. It stays on this device and shows up on election days.
+    </p>
+    <form id="polling-form" class="mt-3 flex flex-wrap gap-2">
+      <label class="sr-only" for="polling-input">Polling place</label>
+      <input
+        id="polling-input"
+        type="text"
+        placeholder="e.g. West Allis City Hall, 7525 W Greenfield Ave"
+        class="min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm"
+      />
+      <button type="submit" class="rounded-lg bg-navy-800 px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700">
+        Save
+      </button>
+    </form>
+    <p id="polling-saved" class="mt-2 hidden text-sm">
+      Saved: <strong id="polling-value"></strong>
+      <button id="polling-forget" class="ml-2 text-xs underline">forget</button>
+      <span class="mt-1 block text-xs text-navy-600">
+        Double-check on MyVote before each election. Locations can change.
+      </span>
+    </p>
+  </div>
+
   <script>
     const statusEl = document.getElementById("status")!;
     const resultEl = document.getElementById("result")!;
@@ -181,5 +212,32 @@ import Base from "../layouts/Base.astro";
     if (saved) {
       loadData().then(() => show(JSON.parse(saved)));
     }
+
+    // polling place: user-entered, device-only
+    const pollingInput = document.getElementById("polling-input") as HTMLInputElement;
+    const pollingSaved = document.getElementById("polling-saved")!;
+    const pollingValue = document.getElementById("polling-value")!;
+    function renderPolling() {
+      const place = localStorage.getItem("bp-polling");
+      pollingSaved.classList.toggle("hidden", !place);
+      if (place) {
+        pollingValue.textContent = place;
+        pollingInput.value = place;
+      }
+    }
+    document.getElementById("polling-form")!.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const value = pollingInput.value.trim();
+      if (value) {
+        localStorage.setItem("bp-polling", value);
+        renderPolling();
+      }
+    });
+    document.getElementById("polling-forget")!.addEventListener("click", () => {
+      localStorage.removeItem("bp-polling");
+      pollingInput.value = "";
+      renderPolling();
+    });
+    renderPolling();
   </script>
 </Base>

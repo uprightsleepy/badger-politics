@@ -59,7 +59,12 @@ import Base from "../layouts/Base.astro";
             e.links?.length
               ? `<p class="mt-1 flex flex-wrap gap-x-4">${e.links
                   .map((l) => `<a class="font-semibold underline" target="_blank" rel="noopener" href="${l.url}">${l.label} ↗</a>`)
-                  .join("")}</p><p class="mt-1 text-xs text-navy-700">Your polling place depends on your exact address, and this site never stores addresses. The official MyVote lookup takes a few seconds.</p>`
+                  .join("")}</p>` +
+                (localStorage.getItem("bp-polling")
+                  ? `<p class="mt-1 text-sm">📍 Your saved polling place: <strong>${localStorage
+                      .getItem("bp-polling")!
+                      .replace(/[<>&]/g, "")}</strong> <a class="text-xs underline" href="/my-reps/#polling">change</a></p><p class="mt-0.5 text-xs text-navy-700">Double-check on MyVote before voting. Locations can change.</p>`
+                  : `<p class="mt-1 text-xs text-navy-700">Look up your polling place once on MyVote, then <a class="underline" href="/my-reps/#polling">save it here</a> to see it on every election day.</p>`)
               : ""
           }
           ${e.type === "hearing" ? `<p class="mt-1 text-xs text-navy-600">Confirm against the official notice before attending.</p>` : ""}
