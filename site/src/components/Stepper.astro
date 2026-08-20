@@ -12,18 +12,19 @@ const { steps, reached, failed } = stepperState(status, chamber);
       ? "border-badger-600 bg-badger-600 text-white"
       : done
         ? "border-navy-700 bg-navy-700 text-white"
-        : "border-navy-100 bg-white text-navy-100";
+        : "border-navy-300 bg-white";
+    const state = stopped ? "stopped here" : done ? "completed" : "not reached";
     return (
       <li class="flex flex-1 flex-col items-center text-center">
         <div class="flex w-full items-center">
-          <div class={`h-0.5 flex-1 ${i === 0 ? "invisible" : done ? "bg-navy-700" : "bg-navy-100"}`} />
-          <span class={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${circle}`}>
+          <div class={`h-0.5 flex-1 ${i === 0 ? "invisible" : done ? "bg-navy-700" : "bg-navy-300"}`} />
+          <span class={`step-token flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${circle}`} aria-hidden="true">
             {stopped ? "✕" : done ? "✓" : ""}
           </span>
-          <div class={`h-0.5 flex-1 ${i === steps.length - 1 ? "invisible" : i < reached - 1 ? "bg-navy-700" : "bg-navy-100"}`} />
+          <div class={`h-0.5 flex-1 ${i === steps.length - 1 ? "invisible" : i < reached - 1 ? "bg-navy-700" : "bg-navy-300"}`} />
         </div>
         <span class={`mt-1.5 px-1 text-[11px] leading-tight sm:text-xs ${done ? "font-semibold text-ink" : "text-navy-600"}`}>
-          {step.label}
+          {step.label}<span class="sr-only">, {state}</span>
         </span>
       </li>
     );

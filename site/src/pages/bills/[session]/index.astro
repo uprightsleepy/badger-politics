@@ -25,39 +25,51 @@ const bills = billsFor(session.id);
     )}
   </p>
   <div class="mt-4">
+    <label class="sr-only" for="bill-filter">Filter bills by number or title</label>
     <input
       type="search"
       id="bill-filter"
       placeholder="Filter by number or title…"
       class="w-full max-w-md rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm"
     />
+    <p id="filter-status" role="status" class="mt-2 text-sm text-navy-600"></p>
   </div>
   <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white">
     {bills.map((b) => (
-      <li class="flex items-center gap-3 px-4 py-2.5 text-sm" data-bill-row data-status={b.status} data-text={`${b.identifier} ${b.title ?? ""}`.toLowerCase()}>
-        <a href={`/bills/${session.id}/${billSlug(b.identifier)}/`} class="w-20 shrink-0 font-bold underline">
-          {b.identifier}
+      <li class="text-sm" data-bill-row data-status={b.status} data-text={`${b.identifier} ${b.title ?? ""}`.toLowerCase()}>
+        <a href={`/bills/${session.id}/${billSlug(b.identifier)}/`} class="flex items-center gap-3 px-4 py-2.5 hover:bg-navy-50">
+          <span class="w-20 shrink-0 font-bold underline">{b.identifier}</span>
+          <span class="min-w-0 flex-1 truncate">{b.title}</span>
+          <StatusBadge status={b.status} />
+          <span class="hidden w-24 shrink-0 text-right text-xs text-navy-600 sm:block">
+            {fmtDate(b.latest_action_date)}
+          </span>
         </a>
-        <span class="min-w-0 flex-1 truncate">{b.title}</span>
-        <StatusBadge status={b.status} />
-        <span class="hidden w-24 shrink-0 text-right text-xs text-navy-600 sm:block">
-          {fmtDate(b.latest_action_date)}
-        </span>
       </li>
     ))}
   </ul>
+  <p id="no-match" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600"></p>
   <script>
     // the tiny filter helper: free text + ?status= from stat-card links
     const input = document.getElementById("bill-filter") as HTMLInputElement;
+    const filterStatus = document.getElementById("filter-status")!;
+    const noMatch = document.getElementById("no-match")!;
     const statusFilter = new URLSearchParams(location.search).get("status");
     function apply() {
       const q = input.value.toLowerCase();
-      document.querySelectorAll<HTMLElement>("[data-bill-row]").forEach((row) => {
+      const rows = document.querySelectorAll<HTMLElement>("[data-bill-row]");
+      let shown = 0;
+      rows.forEach((row) => {
         const hide =
           !row.dataset.text!.includes(q) ||
           (statusFilter !== null && row.dataset.status !== statusFilter);
         row.classList.toggle("sorted-hidden", hide);
+        if (!hide) shown++;
       });
+      const filtering = q !== "" || statusFilter !== null;
+      filterStatus.textContent = filtering ? `${shown} of ${rows.length} bills shown` : "";
+      noMatch.textContent = shown === 0 ? `No bills match "${input.value}".` : "";
+      noMatch.classList.toggle("hidden", shown > 0);
     }
     if (statusFilter) {
       const note = document.createElement("p");

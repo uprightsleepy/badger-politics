@@ -4,4 +4,8 @@ interface Props { party: string | null; size?: "sm" | "md" }
 const { party, size = "md" } = Astro.props;
 const dims = size === "sm" ? "h-4 w-4 text-[10px]" : "h-5 w-5 text-xs";
 ---
-<span class={`inline-flex ${dims} shrink-0 items-center justify-center rounded-full font-bold ${partyStyle(party)}`}>{partyLetter(party)}</span>
+<span
+  class={`inline-flex ${dims} shrink-0 items-center justify-center rounded-full font-bold ${partyStyle(party)}`}
+  role="img"
+  aria-label={party ?? "party unknown"}
+><span aria-hidden="true">{partyLetter(party)}</span></span>

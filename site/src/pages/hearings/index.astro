@@ -21,19 +21,18 @@ const heading = upcoming.length ? "Upcoming committee hearings" : "Recent commit
       const agendaBills = JSON.parse(h.agenda_bill_ids_json ?? "[]") as string[];
       // must match hearing_uid() in pipeline/dataproducts/ical.py
       const uid = h.id.split("/").pop()!.replace(/\s+/g, "-");
+      const name = h.committee_name
+        ? `${h.committee_chamber ? `${chamberName(h.committee_chamber)} ` : ""}${h.committee_name}`
+        : (h.title ?? "Committee hearing");
       return (
         <li class="rounded-lg border border-navy-100 bg-white px-4 py-3 text-sm">
           <div class="flex flex-wrap items-baseline gap-x-3">
-            <span class="font-bold">
-              {h.committee_name
-                ? `${h.committee_chamber ? `${chamberName(h.committee_chamber)} ` : ""}${h.committee_name}`
-                : (h.title ?? "Committee hearing")}
-            </span>
+            <span class="font-bold">{name}</span>
             <span class="text-navy-600">{fmtDate(h.date)} {h.time && `· ${fmtTime(h.time)}`}</span>
             {h.location && <span class="text-navy-600">{h.location}</span>}
             <span class="ml-auto flex gap-3">
-              <a href={`/calendar/hearings/${uid}.ics`} class="underline">Add to calendar</a>
-              {h.source_url && <a href={h.source_url} class="underline">Official notice</a>}
+              <a href={`/calendar/hearings/${uid}.ics`} class="underline" aria-label={`Add ${name} hearing on ${fmtDate(h.date)} to calendar`}>Add to calendar</a>
+              {h.source_url && <a href={h.source_url} class="underline" aria-label={`Official notice for ${name} hearing on ${fmtDate(h.date)}`}>Official notice</a>}
             </span>
           </div>
           {h.chair_name && (

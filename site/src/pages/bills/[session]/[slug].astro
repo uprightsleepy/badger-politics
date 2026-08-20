@@ -162,9 +162,15 @@ const cosponsors = sponsors.filter((s) => !s.is_primary);
         const names: string[] = [];
         block.querySelectorAll("[data-vote-row]").forEach((row) => {
           if (row.getAttribute("data-district") === wanted) {
-            row.classList.add("bg-gold-100", "font-semibold");
+            row.classList.add("bg-gold-100", "font-semibold", "border-l-4", "border-gold-600", "pl-2");
             const a = row.querySelector("a");
-            if (a) names.push(`${a.textContent!.trim()} voted ${row.getAttribute("data-option")}`);
+            if (a) {
+              names.push(`${a.textContent!.trim()} voted ${row.getAttribute("data-option")}`);
+              const sr = document.createElement("span");
+              sr.className = "sr-only";
+              sr.textContent = "Your representative: ";
+              a.prepend(sr);
+            }
           }
         });
         const note = block.querySelector("[data-your-reps-note]");

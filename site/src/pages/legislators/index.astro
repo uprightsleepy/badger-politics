@@ -56,7 +56,7 @@ function breakdown(rows: typeof members, seatCount: number) {
         {chamber.rows.map((m) => (
           <li class="flex items-center gap-2">
             <PartyChip party={m.party} />
-            <a href={`/legislators/${personSlug(m.id)}/`} class="truncate underline">{m.name}</a>
+            <a href={`/legislators/${personSlug(m.id)}/`} class="truncate py-1 underline">{m.name}</a>
             <span class="ml-auto text-xs text-navy-600">D{m.district}</span>
           </li>
         ))}

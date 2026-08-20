@@ -6,6 +6,7 @@
   --color-ink: #1a2333;
   --color-navy-50: #eef2f7;
   --color-navy-100: #d9e2ee;
+  --color-navy-300: #9fb3cc;
   --color-navy-600: #2d4a73;
   --color-navy-700: #24395c;
   --color-navy-800: #1d2e4a;
@@ -15,6 +16,7 @@
   --color-badger-700: #932f23;
   --color-gold-100: #f7ecd4;
   --color-gold-500: #c9962e;
+  --color-gold-600: #a87a1e;
   --color-moss-600: #3e7051;
   --color-moss-50: #edf5f0;
 
@@ -25,10 +27,42 @@
 html {
   background-color: var(--color-paper);
   color: var(--color-ink);
-  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 /* the tiny sort helper flips this class */
 .sorted-hidden {
   display: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-navy-700);
+  outline-offset: 2px;
+}
+.bg-navy-900 :focus-visible {
+  outline-color: var(--color-gold-500);
+}
+
+/* missed-vote heatmap cells carry stripes so the state survives without color */
+.hm-miss {
+  background-color: #7a2418;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.6) 0 1px,
+    transparent 1px 3.5px
+  );
+}
+
+/* keep data-graphic colors under Windows High Contrast */
+@media (forced-colors: active) {
+  .hm-cell,
+  .hm-miss,
+  .step-token {
+    forced-color-adjust: none;
+  }
 }

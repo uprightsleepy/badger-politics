@@ -26,8 +26,13 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
         placeholder="Search bills. Try “child marriage” or “AB 656”"
         class="w-full rounded-lg border border-navy-100 bg-white px-4 py-3 shadow-sm"
         autocomplete="off"
+        role="combobox"
+        aria-expanded="false"
+        aria-controls="search-results"
+        aria-autocomplete="list"
       />
-      <div id="search-results" class="mt-2 space-y-2" aria-live="polite"></div>
+      <p id="search-status" role="status" class="sr-only"></p>
+      <div id="search-results" class="mt-2 space-y-2"></div>
     </div>
     <p class="mt-4 text-sm">
       <a href="/my-reps/" class="font-semibold text-navy-700 underline">
@@ -77,6 +82,7 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
     // only highlighted terms are shorter than 3 characters.
     const input = document.getElementById("q");
     const box = document.getElementById("search-results");
+    const status = document.getElementById("search-status");
     let pagefind;
     let timer;
 
@@ -91,6 +97,8 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
       const q = input.value.trim();
       if (q.length < 2) {
         box.innerHTML = "";
+        status.textContent = "";
+        input.setAttribute("aria-expanded", "false");
         return;
       }
       pagefind ??= await import("/pagefind/pagefind.js");
@@ -109,11 +117,24 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
             )
             .join("")
         : `<p class="rounded-lg border border-navy-100 bg-white p-3 text-sm text-navy-600">No bills match “${q.replace(/[<>&]/g, "")}”.</p>`;
+      status.textContent = good.length
+        ? `${good.length} result${good.length > 1 ? "s" : ""}. Press Enter to open the first.`
+        : "No results.";
+      input.setAttribute("aria-expanded", good.length ? "true" : "false");
     }
 
     input.addEventListener("input", () => {
       clearTimeout(timer);
       timer = setTimeout(run, 150);
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        box.querySelector("a")?.click();
+      } else if (e.key === "Escape") {
+        box.innerHTML = "";
+        status.textContent = "";
+        input.setAttribute("aria-expanded", "false");
+      }
     });
   </script>
 </Base>
