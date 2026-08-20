@@ -37,11 +37,20 @@ def check_vote_counts(conn: sqlite3.Connection) -> list[str]:
         """
     ).fetchall()
     for event_id, yes_c, no_c, nv_c, yes_r, no_r, nv_r in rows:
-        expected = (yes_c or 0, no_c or 0, nv_c or 0)
-        actual = (yes_r, no_r, nv_r)
-        if expected != actual:
+        # yes/no reconcile EXACTLY — they decide outcomes. 'not voting' must
+        # match exactly OR have zero records: docs.legis sometimes omits the
+        # entire NV name list (e.g. 2013 sv0012: 'NOT VOTING - 1', empty name
+        # tables), which the scraper warns about. A PARTIAL NV parse (0 <
+        # records != count) still fails here, and full NV drops are caught at
+        # scrape time by the patched per-type invariant in patches/0002.
+        problems = (yes_c or 0) != yes_r or (no_c or 0) != no_r
+        if nv_r != 0 and nv_r != (nv_c or 0):
+            problems = True
+        if problems:
             failures.append(
-                f"vote {event_id}: stored counts y/n/nv={expected} but records={actual}"
+                f"vote {event_id}: stored counts y/n/nv="
+                f"{(yes_c or 0, no_c or 0, nv_c or 0)} but records="
+                f"{(yes_r, no_r, nv_r)}"
             )
     if not rows:
         failures.append("no vote events have individual vote records at all")

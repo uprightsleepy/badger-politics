@@ -79,3 +79,29 @@ def test_wrong_chamber_hard_fails(roster: Roster) -> None:
 def test_lenient_variant_returns_none_never_guesses(roster: Roster) -> None:
     assert roster.resolve_or_none("JOHNSON", "lower") is None
     assert roster.resolve_or_none("ZZYZX", "upper") is None
+
+
+def test_truncated_long_surname_resolves_by_prefix() -> None:
+    r = Roster([member("Marisabel Cabral-Guevara", "lower", 55)])
+    assert r.resolve("CABRAL-GUEVA", "lower").name == "Marisabel Cabral-Guevara"
+
+
+def test_short_prefix_never_drifts() -> None:
+    r = Roster([member("Dale Kruger", "lower", 1)])
+    # 'KRUG' is a real full surname elsewhere; short names must not
+    # prefix-match longer ones
+    import pytest as _pytest
+
+    with _pytest.raises(UnmatchedNameError):
+        r.resolve("KRUG", "lower")
+
+
+def test_truncation_ambiguity_hard_fails() -> None:
+    r = Roster(
+        [
+            member("Ana Gonzalez-Rivera", "lower", 1),
+            member("Bo Gonzalez-Riviera", "lower", 2),
+        ]
+    )
+    with pytest.raises(AmbiguousNameError):
+        r.resolve("GONZALEZ-RIV", "lower")

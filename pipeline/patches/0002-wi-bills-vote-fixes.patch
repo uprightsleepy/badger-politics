@@ -1,0 +1,180 @@
+diff --git a/scrapers/wi/bills.py b/scrapers/wi/bills.py
+index 3df22d5dd..e32ec3ba1 100644
+--- a/scrapers/wi/bills.py
++++ b/scrapers/wi/bills.py
+@@ -62,6 +62,10 @@ class WIBillScraper(Scraper):
+                 )
+                 # there wasn't a subject get the one from end of the prior page
+                 if not preceding_subject:
++                    if last_subject is None:
++                        # older subject indexes (2011 and prior) can open with
++                        # bill links before any subject heading
++                        continue
+                     preceding_subject = last_subject[0]
+                 else:
+                     preceding_subject = preceding_subject[-1]
+@@ -116,16 +120,32 @@ class WIBillScraper(Scraper):
+         doc = lxml.html.fromstring(data)
+         doc.make_links_absolute(url)
+         bill_list = doc.xpath('//ul[@class="infoLinks"]/li/div[@class="row-fluid"]')
++        rows = []
+         for b in bill_list:
+             bill_url = b.xpath('./div[@class="span3"]/a/@href')[0]
+-            bill_id = bill_url.rsplit("/", 1)[-1]
+-            bill_id = bill_id.upper()
+-
+             title = (
+                 b.xpath('./div[@class="span6"]/text()')[0]
+                 .replace(" - Relating to: ", "")
+                 .strip()
+             )
++            rows.append((bill_url, title))
++        if not rows:
++            # pre-2013 listings use ul.docLinks with
++            # '2011 Assembly Bill 1 - Relating to: ...' item text
++            for li in doc.xpath('//ul[@class="docLinks"]/li'):
++                hrefs = li.xpath(".//a/@href")
++                if not hrefs:
++                    continue
++                text = " ".join(li.text_content().split())
++                title = (
++                    text.split(" - Relating to: ", 1)[1].strip()
++                    if " - Relating to: " in text
++                    else text
++                )
++                rows.append((hrefs[0], title))
++        for bill_url, title in rows:
++            bill_id = bill_url.rsplit("/", 1)[-1]
++            bill_id = bill_id.upper()
+ 
+             bill = Bill(
+                 bill_id,
+@@ -364,7 +384,8 @@ class WIBillScraper(Scraper):
+             # http://docs.legis.wisconsin.gov/2019/related/votes/senate/sv0082
+             # breaks the normal header pattern
+             motion = doc.xpath("string(//div/p/font/text())").strip()
+-        vote.motion_text = motion
++        if motion:
++            vote.motion_text = motion
+ 
+         vote_types = ["yes", "no", "not voting"]
+         vote_counts = {}  # Vote counts for yes, no, other
+@@ -381,11 +402,56 @@ class WIBillScraper(Scraper):
+             for name in names:
+                 vote.vote(vote_type, name.strip())
+ 
++        if not trs:
++            # pre-2017 layout: one table per vote type; a
++            # '<strong>AYES - N</strong>' label cell is followed by columns
++            # of nested single-column name tables
++            label_map = {"AYES": "yes", "NAYS": "no", "NOT VOTING": "not voting"}
++            vote_counts = {v: 0 for v in vote_types}
++            name_counts = {v: 0 for v in vote_types}
++            for strong in doc.xpath('//div[@id="document"]//td//strong'):
++                text = " ".join(strong.text_content().split())
++                m = re.match(r"(AYES|NAYS|NOT VOTING)\s*-\s*(\d+)", text)
++                if not m:
++                    continue
++                vote_type = label_map[m.group(1)]
++                # outermost row: some pages nest the label in its own
++                # mini-table; names always render in Arial font tags while
++                # labels use Times New Roman
++                row = strong.xpath("./ancestor::tr[last()]")[0]
++                names = [
++                    n.strip()
++                    for n in row.xpath(".//font[@face='Arial']/text()")
++                    if n.strip()
++                ]
++                vote_counts[vote_type] = int(m.group(2))
++                name_counts[vote_type] = len(names)
++                for name in names:
++                    vote.vote(vote_type, name)
++
+         for vote_type in vote_types:
+             vote.set_count(vote_type, vote_counts[vote_type])
+ 
+-        if name_counts != vote_counts:
+-            raise ValueError("Vote Count and number of Names don't match")
++        self.check_name_counts(name_counts, vote_counts, url)
++
++    def check_name_counts(self, name_counts, vote_counts, url):
++        """yes/no name lists must reconcile exactly. A 'not voting' list may
++        be entirely absent (docs.legis sometimes omits it, e.g. 2013 sv0012
++        says NOT VOTING - 1 but renders empty name tables) - that is warned;
++        a PARTIALLY parsed list still raises, since that means the parser
++        dropped names."""
++        for vote_type in ("yes", "no"):
++            if name_counts.get(vote_type, 0) != vote_counts.get(vote_type, 0):
++                raise ValueError("Vote Count and number of Names don't match")
++        nv_names = name_counts.get("not voting", 0)
++        nv_count = vote_counts.get("not voting", 0)
++        if nv_names != nv_count:
++            if nv_names == 0:
++                self.warning(
++                    "page omits its NOT VOTING - %s name list: %s" % (nv_count, url)
++                )
++            else:
++                raise ValueError("Vote Count and number of Names don't match")
+ 
+     def add_house_votes(self, vote, url):
+         try:
+@@ -395,10 +461,17 @@ class WIBillScraper(Scraper):
+             return
+ 
+         doc = lxml.html.fromstring(html)
+-        motion = doc.xpath("//div/p/b/text()")[1]
+-        vote.motion_text = motion
+-
+-        header_td = doc.xpath('//div/p[text()[contains(., "AYES")]]')[0].text_content()
++        motions = doc.xpath("//div/p/b/text()")
++        if len(motions) > 1:
++            # pre-2017 pages have no header <p>; keep the history-line motion
++            vote.motion_text = motions[1]
++
++        header_p = doc.xpath('//div/p[text()[contains(., "AYES")]]')
++        if header_p:
++            header_td = header_p[0].text_content()
++        else:
++            # pre-2017 layout keeps the counts line in a table cell
++            header_td = " ".join(doc.text_content().split())
+         vote_counts = re.findall(
+             r"AYES - (\d+).*NAYS - (\d+).*NOT VOTING - (\d+).*", header_td
+         )
+@@ -409,20 +482,30 @@ class WIBillScraper(Scraper):
+ 
+         yes_names_count = 0
+         no_names_count = 0
++        nv_names_count = 0
+ 
+-        for td in doc.xpath("//tbody/tr/td[4]"):
++        # pre-2017 pages have no <tbody>; same column layout either way
++        member_tds = doc.xpath("//tbody/tr/td[4]") or doc.xpath("//table//tr/td[4]")
++        for td in member_tds:
+             name = td.text_content()
+             for vote_td in td.xpath("./preceding-sibling::td"):
++                if vote_td.xpath(".//u"):
++                    # underlined A/N/NV cells are column headers (pre-2017)
++                    continue
+                 if vote_td.text_content() == "Y":
+                     vote.vote("yes", name)
+                     yes_names_count += 1
+                 elif vote_td.text_content() == "N":
+                     vote.vote("no", name)
+                     no_names_count += 1
+-                elif vote_td.text_content() == "NV":
++                elif vote_td.text_content() in ("NV", "x", "X"):
+                     vote.vote("not voting", name)
+-
+-        if yes_names_count != int(vote_counts[0][0]):
+-            raise ValueError("Yes votes and number of Names doesn't match")
+-        if no_names_count != int(vote_counts[0][1]):
+-            raise ValueError("No votes and number of Names doesn't match")
++                    nv_names_count += 1
++
++        self.check_name_counts(
++            {"yes": yes_names_count, "no": no_names_count,
++             "not voting": nv_names_count},
++            {"yes": int(vote_counts[0][0]), "no": int(vote_counts[0][1]),
++             "not voting": int(vote_counts[0][2])},
++            url,
++        )

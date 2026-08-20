@@ -63,6 +63,30 @@ def test_bill_count_state_written_on_success(db_path: Path, tmp_path: Path) -> N
     assert json.loads(counts_file.read_text(encoding="utf-8")) == {"2025": 1}
 
 
+def test_nv_all_or_none(db_path: Path, tmp_path: Path) -> None:
+    conn = sqlite3.connect(db_path)
+    # page-omitted NV list: count says 2, zero NV records -> allowed
+    conn.execute(
+        "INSERT INTO vote_events (id, bill_id, yes_count, no_count, nv_count)"
+        " VALUES ('v2', '2025-ab1', 1, 0, 2)"
+    )
+    conn.execute(
+        "INSERT INTO vote_records (vote_event_id, person_id, option)"
+        " VALUES ('v2', 'p1', 'yes')"
+    )
+    conn.commit()
+    assert run_checks(db_path, tmp_path / "c.json") == []
+    # partial NV parse: 1 of 2 -> still fails
+    conn.execute(
+        "INSERT INTO vote_records (vote_event_id, person_id, option)"
+        " VALUES ('v2', 'p2', 'not voting')"
+    )
+    conn.commit()
+    conn.close()
+    failures = run_checks(db_path, tmp_path / "c.json")
+    assert any("v2" in f for f in failures)
+
+
 def test_orphan_vote_record_fails(db_path: Path, tmp_path: Path) -> None:
     conn = sqlite3.connect(db_path)
     conn.execute("DELETE FROM people WHERE id = 'p3'")

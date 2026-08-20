@@ -1,0 +1,5 @@
+{
+  "_comment": "Extra printed-name forms per person id, for names the openstates files don't carry. Manually verified against the official record - e.g. members who changed names mid-service and appear under the earlier name on old roll calls.",
+  "ocd-person/249d6372-947a-4931-be4c-10275243ffd4": ["Harris", "Harris, N."],
+  "ocd-person/ad0c7a18-f952-4ab3-9ce0-91e69ea19f4e": ["Pope-Roberts", "Sondy Pope-Roberts"]
+}

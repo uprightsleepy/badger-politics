@@ -29,7 +29,14 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from importer.committees import CommitteeIndex, load_committees
-from importer.roster import Person, Roster, load_people, roster_for
+from importer.roster import (
+    Person,
+    Roster,
+    load_legacy_terms,
+    load_people,
+    merge_listing,
+    roster_for,
+)
 from importer.status import SJR1_RE, derive_status
 
 CENTRAL = ZoneInfo("America/Chicago")
@@ -51,6 +58,9 @@ TITLE_VOTERS: dict[tuple[str, str], dict[str, str]] = {
     # elected) — SPEAKER only; a pro-tem title in 2013 votes must hard-fail
     # so it gets mapped by date, never guessed.
     ("2013", "lower"): {"SPEAKER": "Vos"},
+    # 2011-12: Speaker Jeff Fitzgerald (R-Horicon); docs.legis officer pages
+    # don't exist that far back — basis: 2011-12 Wisconsin Blue Book.
+    ("2011", "lower"): {"SPEAKER": "Fitzgerald"},
 }
 
 
@@ -471,15 +481,30 @@ class Importer:
 
 
 def build_rosters(
-    people: list[Person], session_defs: dict[str, dict], seen: set[str]
+    people: list[Person],
+    session_defs: dict[str, dict],
+    seen: set[str],
+    rosters_dir: Path,
 ) -> dict[str, Roster]:
     rosters = {}
     for identifier in seen:
         meta = session_defs.get(identifier)
         if not meta or not meta.get("start_date"):
             raise RuntimeError(f"no session dates for {identifier!r} in jurisdiction data")
-        end = meta.get("end_date") or "9999-12-31"
-        rosters[session_key(identifier)] = roster_for(people, meta["start_date"], end)
+        start = meta["start_date"]
+        # sessions without an end_date are bounded to their biennium: the
+        # next Legislature convenes in early January two years on, and an
+        # unbounded window would sweep later members into old rosters
+        end = meta.get("end_date") or f"{int(start[:4]) + 2}-01-01"
+        key = session_key(identifier)
+        roster = roster_for(people, start, end)
+        # union in the docs.legis membership listing (authoritative for who
+        # served; covers people-file date gaps and mid-session replacements)
+        listing_path = rosters_dir / f"{biennium(key)}.json"
+        if listing_path.exists():
+            listing = json.loads(listing_path.read_text(encoding="utf-8"))
+            roster = merge_listing(roster, listing, people)
+        rosters[key] = roster
     return rosters
 
 
@@ -496,9 +521,13 @@ def run_import(
     people_dir: Path,
     retired_dir: Path,
     committees_dir: Path,
+    executive_dir: Path | None = None,
 ) -> None:
-    people_dirs = [d for d in (people_dir, retired_dir) if d.exists()]
+    extra = [executive_dir] if executive_dir else []
+    people_dirs = [d for d in (people_dir, retired_dir, *extra) if d and d.exists()]
     people = load_people(people_dirs)
+    legacy_dir = people_dir.parents[1] / "legacy"
+    people = load_legacy_terms(legacy_dir, people)
     if len(people) < 120:
         raise RuntimeError(
             f"only {len(people)} people loaded from {people_dirs};"
@@ -517,7 +546,8 @@ def run_import(
 
     session_defs = load_session_defs(scrape_dirs)
     seen_sessions = {b["legislative_session"] for b in bills}
-    rosters = build_rosters(people, session_defs, seen_sessions)
+    rosters_dir = people_dir.parents[1] / "rosters"
+    rosters = build_rosters(people, session_defs, seen_sessions, rosters_dir)
     current = current_session_keys(session_defs, seen_sessions)
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -565,13 +595,19 @@ def main(argv: list[str]) -> int:
         "--retired-dir", type=Path, default=data_root / "people" / "wi-retired"
     )
     parser.add_argument(
+        "--executive-dir", type=Path, default=data_root / "people" / "wi-executive"
+    )
+    parser.add_argument(
         "--committees-dir", type=Path, default=data_root / "people" / "wi-committees"
     )
     ns = parser.parse_args(argv)
     *scrape_dirs, db_path = ns.paths
     if not scrape_dirs:
         parser.error("need at least one scrape dir and the sqlite path")
-    run_import(scrape_dirs, db_path, ns.people_dir, ns.retired_dir, ns.committees_dir)
+    run_import(
+        scrape_dirs, db_path, ns.people_dir, ns.retired_dir, ns.committees_dir,
+        ns.executive_dir,
+    )
     return 0
 
 

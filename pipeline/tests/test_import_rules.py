@@ -137,6 +137,32 @@ def test_roster_for_windows_by_term() -> None:
     assert new.resolve_or_none("Timer", "lower") is None
 
 
+def test_startless_role_assumes_one_term(tmp_path) -> None:
+    from importer.roster import load_people
+
+    (tmp_path / "exec.yml").write_text(
+        """
+id: ocd-person/exec1
+name: Sara Example
+family_name: Example
+party: [{name: Test}]
+roles:
+- end_date: '2023-01-03'
+  type: lower
+  district: '13'
+- start_date: '2023-01-02'
+  type: lt_governor
+""",
+        encoding="utf-8",
+    )
+    people = load_people([tmp_path])
+    assert len(people) == 1
+    term = people[0].terms[0]
+    assert term.start == "2021-01-03"  # end minus one 2-year Assembly term
+    assert term.end == "2023-01-03"
+    assert len(people[0].terms) == 1  # the executive role is not a chamber term
+
+
 def test_hearing_times_convert_utc_to_central() -> None:
     from importer.import_openstates import to_local
 

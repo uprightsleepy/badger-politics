@@ -56,6 +56,9 @@ def populate(db_path: Path, cycle_year: int) -> None:
         people = conn.execute(
             "SELECT id, chamber, district FROM people"
             " WHERE chamber IN ('lower', 'upper') AND district IS NOT NULL"
+            # sitting members only — the table also carries former
+            # legislators ('Former Representative'/'Former Senator')
+            " AND current_role IN ('Representative', 'Senator')"
         ).fetchall()
         for person_id, chamber, district in people:
             year = next_election_year(chamber, district, cycle_year)

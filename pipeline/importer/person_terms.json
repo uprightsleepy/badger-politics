@@ -1,0 +1,21 @@
+{
+  "_comment": "Manually verified service terms missing from every automated source (openstates people files, docs.legis listings, legacy CSV). Each entry cites its basis. Never inferred.",
+  "ocd-person/82c2d686-98d3-4dc9-8655-4e61057c0922": [
+    {
+      "chamber": "lower",
+      "district": 86,
+      "start": "2011-01-03",
+      "end": "2012-07-01",
+      "basis": "Jerry Petrowski represented AD 86 until winning the SD 29 special election of June 5, 2012 (vacancy from Pam Galloway's resignation); the legacy CSV records his whole 2011-2012 term as Senate only."
+    }
+  ],
+  "ocd-person/2a532097-b605-4d3e-90ce-d8ae3121a706": [
+    {
+      "chamber": "lower",
+      "district": 95,
+      "start": "2011-01-03",
+      "end": "2011-09-01",
+      "basis": "Jennifer Shilling represented AD 95 until winning the SD 32 recall election of August 9, 2011 (defeating Dan Kapanke); the legacy CSV records her whole 2011-2012 term as Senate only."
+    }
+  ]
+}

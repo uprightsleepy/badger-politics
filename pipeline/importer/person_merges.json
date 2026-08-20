@@ -1,0 +1,10 @@
+{
+ "_comment": "Duplicate openstates person records: dupe id -> canonical id (canonical = the later-era record). Each entry manually verified as the SAME human via matching chamber + district + complementary service eras - never merged by heuristic; a Sr./Jr. pair would look identical.",
+ "ocd-person/7d50b133-2b77-4740-8636-4d494ac9b567": "ocd-person/8c8db3b7-0faf-4964-9166-4d7423ce6e24",
+ "ocd-person/4df03201-042e-4d75-8f16-abbd4fd487f4": "ocd-person/555ef03c-d74b-484c-9c16-299fb5d5d6d5",
+ "ocd-person/1074a2e9-e256-4e8c-88a0-ec91b3404358": "ocd-person/6ed73b80-5a79-4731-a085-78a76772ab05",
+ "ocd-person/bb0d02e7-a5fd-4076-831c-0d22ebd25317": "ocd-person/19e57ea7-992b-4bac-a3c1-df122b1fb495",
+ "ocd-person/a8da0b17-6392-4702-bbea-340bcc7a669f": "ocd-person/7664451b-e1ca-44cf-bfa6-aa94c8089e27",
+ "ocd-person/2256e2d1-35a6-4627-93b1-9c0535c47813": "ocd-person/d9553bd0-fc0f-4095-8283-72ba055628c9",
+ "ocd-person/48979856-63c1-4564-adc9-820ba1158760": "ocd-person/967afe3c-119d-4051-a8b1-674f328c4775"
+}

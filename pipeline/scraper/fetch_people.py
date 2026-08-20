@@ -47,6 +47,11 @@ def main(argv: list[str]) -> int:
     if "--retired" in argv:
         retired = fetch_dir("retired", PEOPLE_ROOT / "wi-retired")
         print(f"fetched {retired} retired legislator files -> {PEOPLE_ROOT / 'wi-retired'}")
+        # current executives may carry past legislative roles (e.g. a sitting
+        # Lt. Governor who served in the Assembly) — they live in neither
+        # legislature/ nor retired/
+        executive = fetch_dir("executive", PEOPLE_ROOT / "wi-executive")
+        print(f"fetched {executive} executive files -> {PEOPLE_ROOT / 'wi-executive'}")
         if retired < 150:
             print(f"WARNING: expected 200+ retired members, got {retired}", file=sys.stderr)
             return 1
