@@ -300,6 +300,80 @@ export const personVoteDays = (personId: string) =>
     )
     .all(personId) as { date: string; chamber: string; cast: number; nv: number }[];
 
+/** Majority position (aye/nay) per (vote event, party); ties excluded.
+ * Memoized once per build. */
+let _partyMajority: Map<string, string> | undefined;
+export const partyMajorities = (): Map<string, string> => {
+  if (_partyMajority) return _partyMajority;
+  const rows = db
+    .prepare(
+      `SELECT r.vote_event_id, p.party, r.option, COUNT(*) AS n
+       FROM vote_records r JOIN people p ON p.id = r.person_id
+       WHERE r.option IN ('yes', 'no') AND p.party IN ('Democratic', 'Republican')
+       GROUP BY r.vote_event_id, p.party, r.option`,
+    )
+    .all() as { vote_event_id: string; party: string; option: string; n: number }[];
+  const counts = new Map<string, { yes: number; no: number }>();
+  for (const row of rows) {
+    const key = `${row.vote_event_id}|${row.party}`;
+    const c = counts.get(key) ?? { yes: 0, no: 0 };
+    c[row.option as "yes" | "no"] += row.n;
+    counts.set(key, c);
+  }
+  _partyMajority = new Map();
+  for (const [key, c] of counts) {
+    if (c.yes !== c.no) _partyMajority.set(key, c.yes > c.no ? "yes" : "no");
+  }
+  return _partyMajority;
+};
+
+/** Share of a member's aye/nay floor votes matching their party's majority
+ * position, per session. Presented as a plain number, never a grade. */
+export const partyAgreement = (personId: string, party: string | null) => {
+  if (party !== "Democratic" && party !== "Republican") return [];
+  const majorities = partyMajorities();
+  const votes = db
+    .prepare(
+      `SELECT r.vote_event_id, r.option, b.session_id
+       FROM vote_records r
+       JOIN vote_events e ON e.id = r.vote_event_id
+       JOIN bills b ON b.id = e.bill_id
+       WHERE r.person_id = ? AND r.option IN ('yes', 'no')`,
+    )
+    .all(personId) as { vote_event_id: string; option: string; session_id: string }[];
+  const bySession = new Map<string, { agree: number; total: number }>();
+  for (const v of votes) {
+    const majority = majorities.get(`${v.vote_event_id}|${party}`);
+    if (!majority) continue;
+    const s = bySession.get(v.session_id) ?? { agree: 0, total: 0 };
+    s.total += 1;
+    if (v.option === majority) s.agree += 1;
+    bySession.set(v.session_id, s);
+  }
+  return [...bySession.entries()]
+    .map(([session, s]) => ({ session, pct: (s.agree / s.total) * 100, n: s.total }))
+    .sort((a, b) => (a.session < b.session ? 1 : -1));
+};
+
+/** Official WEC general-election results for one seat, newest first. */
+export const electionHistoryFor = (chamber: string | null, district: number | null) => {
+  if (!chamber || district == null) return [];
+  const rows = db
+    .prepare(
+      `SELECT year, candidate, party, votes FROM election_history
+       WHERE chamber = ? AND district = ? ORDER BY year DESC, votes DESC`,
+    )
+    .all(chamber, district) as { year: number; candidate: string; party: string | null; votes: number }[];
+  const byYear = new Map<number, typeof rows>();
+  for (const r of rows) {
+    (byYear.get(r.year) ?? byYear.set(r.year, []).get(r.year)!).push(r);
+  }
+  return [...byYear.entries()].map(([year, candidates]) => {
+    const total = candidates.reduce((s, c) => s + c.votes, 0);
+    return { year, total, candidates };
+  });
+};
+
 export const sessionStats = (sessionId: string) =>
   db
     .prepare(

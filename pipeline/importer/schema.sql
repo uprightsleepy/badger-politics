@@ -115,6 +115,18 @@ CREATE TABLE elections (
     source         TEXT
 );
 
+-- Official WEC general-election results for legislative contests, summed
+-- from ward-by-ward canvass spreadsheets. Display data (no FKs).
+CREATE TABLE election_history (
+    year      INTEGER NOT NULL,
+    chamber   TEXT NOT NULL CHECK (chamber IN ('lower', 'upper')),
+    district  INTEGER NOT NULL,
+    candidate TEXT NOT NULL,
+    party     TEXT,
+    votes     INTEGER NOT NULL
+);
+CREATE INDEX idx_election_history_seat ON election_history (chamber, district, year);
+
 CREATE TABLE provenance (
     table_name TEXT NOT NULL,
     row_id     TEXT NOT NULL,
