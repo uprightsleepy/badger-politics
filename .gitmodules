@@ -1,0 +1,3 @@
+[submodule "pipeline/vendor/openstates-scrapers"]
+	path = pipeline/vendor/openstates-scrapers
+	url = https://github.com/openstates/openstates-scrapers.git

@@ -36,6 +36,8 @@ CREATE TABLE bills (
     status                   TEXT,
     latest_action_date       TEXT,
     latest_action_desc       TEXT,
+    -- official bill-text page (text/html version link); LRB analysis source
+    text_url                 TEXT,
     -- LRB plain-language analysis, extracted from the bill text page
     lrb_analysis             TEXT,
     -- the graveyard flag: referred, never heard, then failed pursuant to SJR 1
@@ -47,7 +49,8 @@ CREATE TABLE bills (
 
 CREATE TABLE sponsorships (
     bill_id        TEXT NOT NULL REFERENCES bills (id),
-    person_id      TEXT REFERENCES people (id),
+    person_id      TEXT REFERENCES people (id),   -- NULL when unresolvable (kept by name, never guessed)
+    name           TEXT NOT NULL,                 -- as printed on the bill
     classification TEXT,
     is_primary     INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1))
 );
@@ -78,7 +81,9 @@ CREATE TABLE vote_events (
 CREATE TABLE vote_records (
     vote_event_id TEXT NOT NULL REFERENCES vote_events (id),
     person_id     TEXT NOT NULL REFERENCES people (id),
-    option        TEXT NOT NULL CHECK (option IN ('yes', 'no', 'not voting', 'excused'))
+    -- the full openstates vote-option vocabulary
+    option        TEXT NOT NULL CHECK (option IN
+        ('yes', 'no', 'not voting', 'excused', 'absent', 'abstain', 'paired', 'other'))
 );
 
 CREATE TABLE committees (

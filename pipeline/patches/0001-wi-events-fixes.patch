@@ -1,0 +1,24 @@
+diff --git a/scrapers/wi/events.py b/scrapers/wi/events.py
+index ac0bcfd3b..b592860f4 100644
+--- a/scrapers/wi/events.py
++++ b/scrapers/wi/events.py
+@@ -35,6 +35,10 @@ class WIEventScraper(Scraper, LXMLMixin):
+             title = self.extract_field(row, "title")
+             start = self.extract_field(row, "start")
+ 
++            if not title or not start:
++                self.warning(f"Skipping event row with missing title or start: {row!r}")
++                continue
++
+             start = dateutil.parser.parse(start)
+             start = self._tz.localize(start)
+ 
+@@ -87,7 +91,7 @@ class WIEventScraper(Scraper, LXMLMixin):
+     def extract_field(self, row: str, field: str):
+         try:
+             return re.findall(
+-                rf"{field}:\s+'(.*?)'", row, flags=re.MULTILINE | re.DOTALL
++                rf"{field}:\s+['\"](.*?)['\"]", row, flags=re.MULTILINE | re.DOTALL
+             )[0]
+         except IndexError:
+             return None
