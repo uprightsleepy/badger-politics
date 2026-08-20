@@ -23,8 +23,10 @@ python -m importer.import_wec _data/wec/candidates-${CYCLE}.csv ../data/wi.sqlit
 python -m importer.enrich_lrb ../data/wi.sqlite
 python -m importer.checks ../data/wi.sqlite   # hard gate: abort deploy on failure
 
-# --- Phase 3+: data products, site build, deploy ---
-# python -m dataproducts.build ../data/wi.sqlite ../site/public/
+# --- Phase 3: static JSON API, feeds, calendars, bulk exports ---
+python -m dataproducts.build ../data/wi.sqlite ../site/public/
+
+# --- Phase 5+: site build, deploy ---
 # (cd ../site && npm run build)               # astro reads data/wi.sqlite
 # npx pagefind --site ../site/dist
 # firebase deploy --only hosting --project "$FB_PROJECT" --non-interactive

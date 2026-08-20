@@ -18,6 +18,9 @@ import sqlite3
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+CENTRAL = ZoneInfo("America/Chicago")
 
 from importer.committees import CommitteeIndex, load_committees
 from importer.roster import Roster, load_roster
@@ -105,6 +108,20 @@ def derive_graveyard(actions: list[dict]) -> tuple[int, str | None, str | None]:
         if HEARING_RE.search(action["description"]):
             return 0, committee, chamber
     return (1 if referred else 0), committee, chamber
+
+
+def to_local(start: str) -> tuple[str | None, str | None]:
+    """Scraper timestamps are UTC ISO strings; hearings display in Central
+    ('2025-01-07T15:00:00+00:00' -> ('2025-01-07', '09:00'))."""
+    if not start:
+        return None, None
+    try:
+        parsed = datetime.fromisoformat(start)
+    except ValueError:
+        return start[:10] or None, start[11:16] or None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(CENTRAL)
+    return parsed.date().isoformat(), parsed.strftime("%H:%M")
 
 
 def load_json_files(scrape_dir: Path, prefix: str) -> list[dict]:
@@ -342,14 +359,15 @@ class Importer:
                     except ValueError:
                         agenda_bills.append(entity["name"])
         start = event.get("start_date") or ""
+        local_date, local_time = to_local(start)
         self.conn.execute(
             "INSERT INTO hearings (id, committee_id, date, time, location,"
             " agenda_bill_ids_json, source_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 event.get("_id") or f"{name}-{start}",
                 committee_id,
-                start[:10],
-                start[11:16] if len(start) > 11 else None,
+                local_date,
+                local_time,
                 (event.get("location") or {}).get("name"),
                 json.dumps(agenda_bills),
                 (event.get("sources") or [{}])[0].get("url"),

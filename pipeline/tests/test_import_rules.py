@@ -97,6 +97,16 @@ def test_sjr1_without_referral_is_not_graveyard() -> None:
     assert derive_graveyard([action("Introduced"), action(SJR1)]) == (0, None, None)
 
 
+def test_hearing_times_convert_utc_to_central() -> None:
+    from importer.import_openstates import to_local
+
+    assert to_local("2025-01-07T15:00:00+00:00") == ("2025-01-07", "09:00")  # CST
+    assert to_local("2025-06-03T15:00:00+00:00") == ("2025-06-03", "10:00")  # CDT
+    # a UTC time past midnight lands on the previous Central day
+    assert to_local("2025-06-04T02:30:00+00:00") == ("2025-06-03", "21:30")
+    assert to_local("") == (None, None)
+
+
 def test_committee_index_is_chamber_scoped() -> None:
     from importer.committees import Committee, CommitteeIndex
 
