@@ -6,6 +6,13 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 
+// local builds keep the key in site/.env (gitignored); CI sets it in the job env
+const envPath = new URL("../.env", import.meta.url);
+if (!process.env.LOGO_DEV_TOKEN && existsSync(envPath)) {
+  const match = (await readFile(envPath, "utf-8")).match(/^LOGO_DEV_TOKEN=(.+)$/m);
+  if (match) process.env.LOGO_DEV_TOKEN = match[1].trim();
+}
+
 const token = process.env.LOGO_DEV_TOKEN;
 const entries = Object.entries(
   JSON.parse(await readFile(new URL("../src/data/org-domains.json", import.meta.url), "utf-8")),
