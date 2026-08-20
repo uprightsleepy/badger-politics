@@ -49,45 +49,66 @@ def _normalize(text: str) -> str:
     return " ".join(folded.lower().replace(".", " ").replace("-", " ").split())
 
 
+# our people hold state legislative office; a committee named for any other
+# office is never auto-attributed (statewide runs go through curation)
+OTHER_OFFICE_WORDS = {
+    "judge", "sheriff", "mayor", "alderman", "alderperson", "county", "school",
+    "congress", "congressional", "clerk", "coroner", "court", "supervisor",
+    "governor", "treasurer", "attorney", "regent", "municipal", "trustee",
+}
+
+
+def _token_match(committee_word: str, name_word: str) -> bool:
+    """Prefix matching only between substantial tokens: an initial like 'R.'
+    can never satisfy a name word."""
+    if len(committee_word) < 3 or len(name_word) < 3:
+        return committee_word == name_word
+    return committee_word.startswith(name_word) or name_word.startswith(committee_word)
+
+
 def match_committees(person_name: str, hits: list[dict]) -> list[dict]:
-    """All committees safely attributable to this person: candidate-type
-    (or unlabeled) committees where EVERY word of the person's name
-    prefix-matches a committee-name word. A committee naming a different
-    first name can never pass, so this never guesses."""
+    """Committees safely attributable to this person: candidate/legacy-typed,
+    no other-office words, and EVERY word of the person's name must match a
+    substantial committee-name token."""
     words = _normalize(person_name).split()
     matched = []
     for h in hits:
         ctype = (((h.get("committee") or {}).get("committeeType") or {}).get("name") or "")
-        # legacy committees carry type 'Unregistered'; the name rule below
-        # does the identity work, the type filter only excludes PACs etc.
         if ctype and "candidate" not in ctype.lower() and ctype.lower() != "unregistered":
             continue
         cwords = _normalize(h["name"]).split()
-        if all(
-            any(c.startswith(w) or w.startswith(c) for c in cwords) for w in words
-        ):
+        if set(cwords) & OTHER_OFFICE_WORDS:
+            continue
+        if all(any(_token_match(c, w) for c in cwords) for w in words):
             matched.append(h)
     return matched
 
 
-def name_variants(person_id: str, name: str, alias_map: dict[str, list[str]]) -> list[str]:
-    """The display name plus full-name aliases (e.g. 'Robert Wittke' for
-    'Bob Wittke'); initial-style aliases are excluded so a single letter
-    can never satisfy the every-word rule."""
+def name_variants(
+    name: str, family_name: str, aliases: list[str]
+) -> list[str]:
+    """The display name plus aliases that carry independent identity: at
+    least two substantial words, and at least one word beyond the surname
+    (a bare-surname alias like 'RIVERA WAGNER' has no identifying power)."""
+    surname_tokens = set(_normalize(family_name).split())
     variants = [name]
-    for alias in alias_map.get(person_id, []):
-        words = alias.replace(",", " ").split()
-        if len(words) >= 2 and all(len(w.strip(".")) >= 3 for w in words):
+    for alias in aliases:
+        words = _normalize(alias.replace(",", " ")).split()
+        if (
+            len(words) >= 2
+            and all(len(w) >= 3 for w in words)
+            and not set(words) <= surname_tokens
+        ):
             variants.append(alias)
     return variants
 
 
-def load_alias_map() -> dict[str, list[str]]:
+def load_person_details() -> dict[str, tuple[str, list[str]]]:
     from importer.roster import load_people
 
     people_root = Path(__file__).resolve().parents[1] / "_data" / "people"
     dirs = [d for d in (people_root / "wi", people_root / "wi-executive") if d.exists()]
-    return {p.id: p.aliases for p in load_people(dirs)}
+    return {p.id: (p.family_name, p.aliases) for p in load_people(dirs)}
 
 
 def build_map(db_path: Path) -> None:
@@ -97,7 +118,7 @@ def build_map(db_path: Path) -> None:
         " WHERE current_role IN ('Representative', 'Senator') ORDER BY name"
     ).fetchall()
     conn.close()
-    alias_map = load_alias_map()
+    person_details = load_person_details()
 
     curated = {}
     if CURATED_PATH.exists():
@@ -135,9 +156,10 @@ def build_map(db_path: Path) -> None:
                     seen_ids.add(h["id"])
                     hit_list.append(h)
             time.sleep(DELAY)
+        family_name, aliases = person_details.get(person_id, (name.split()[-1], []))
         matches: list[dict] = []
         matched_ids: set[int] = set()
-        for variant in name_variants(person_id, name, alias_map):
+        for variant in name_variants(name, family_name, aliases):
             for m in match_committees(variant, hit_list):
                 if m["id"] not in matched_ids:
                     matched_ids.add(m["id"])
@@ -220,6 +242,8 @@ def fetch_transactions(since: str) -> None:
                         "committee_entity_id": committee_id,
                         "date": (t.get("date") or "")[:10],
                         "amount": t.get("amount"),
+                        # CFIS's own entity id: collision-proof donor identity
+                        "from_entity_id": from_entity.get("id"),
                         "from_name": from_entity.get("name"),
                         "from_type": (from_entity.get("entityType") or {}).get("name"),
                         "occupation": t.get("fromOccupationTitle"),

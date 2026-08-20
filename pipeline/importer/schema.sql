@@ -133,6 +133,7 @@ CREATE TABLE contributions (
     committee_entity_id INTEGER NOT NULL,
     date                TEXT,
     amount              REAL NOT NULL,
+    from_entity_id      INTEGER,  -- CFIS donor entity: collision-proof identity
     from_name           TEXT,
     from_type           TEXT,  -- Individual / Registrant / ...
     occupation          TEXT,

@@ -31,11 +31,12 @@ def run(archives_dir: Path, db_path: Path) -> int:
                     )
                 conn.execute(
                     "INSERT OR REPLACE INTO contributions (id, person_id,"
-                    " committee_entity_id, date, amount, from_name, from_type,"
-                    " occupation, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    " committee_entity_id, date, amount, from_entity_id, from_name,"
+                    " from_type, occupation, category)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (r["id"], r["person_id"], r["committee_entity_id"], r["date"],
-                     r["amount"] or 0, r["from_name"], r["from_type"],
-                     r["occupation"], r["category"]),
+                     r["amount"] or 0, r.get("from_entity_id"), r["from_name"],
+                     r["from_type"], r["occupation"], r["category"]),
                 )
                 total += 1
     count, people = conn.execute(

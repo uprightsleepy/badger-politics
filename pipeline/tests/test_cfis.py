@@ -41,6 +41,29 @@ def test_other_persons_committee_never_matches() -> None:
     assert match_committees("Tyler August", hits) == []
 
 
+def test_middle_initial_never_satisfies_a_name_word() -> None:
+    # regression: 'John R. Wagner for Judge' must not match 'Rivera Wagner'
+    hits = [hit("John R. Wagner for Judge", committee_type="Unregistered")]
+    assert match_committees("Rivera Wagner", hits) == []
+
+
+def test_other_office_committees_excluded() -> None:
+    hits = [hit("Jane Smith for Judge"), hit("Jane Smith for County Clerk", entity_id=2),
+            hit("Jane Smith for Governor", entity_id=3)]
+    assert match_committees("Jane Smith", hits) == []
+
+
+def test_bare_surname_alias_carries_no_identity() -> None:
+    from scraper.fetch_cfis import name_variants
+
+    variants = name_variants(
+        "Amaad Rivera-Wagner", "Rivera-Wagner", ["RIVERA WAGNER", "A.I. Rivera-Wagner"]
+    )
+    assert variants == ["Amaad Rivera-Wagner"]
+    # but a real formal-name alias survives
+    assert "Robert Wittke" in name_variants("Bob Wittke", "Wittke", ["Robert Wittke"])
+
+
 def test_import_rejects_unknown_person(tmp_path: Path) -> None:
     db = tmp_path / "wi.sqlite"
     conn = sqlite3.connect(db)
