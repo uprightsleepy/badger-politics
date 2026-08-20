@@ -20,11 +20,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-CENTRAL = ZoneInfo("America/Chicago")
-
 from importer.committees import CommitteeIndex, load_committees
 from importer.roster import Roster, load_roster
 from importer.status import SJR1_RE, derive_status
+
+CENTRAL = ZoneInfo("America/Chicago")
 
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
 
