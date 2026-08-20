@@ -10,11 +10,14 @@ from importer.import_openstates import (
 )
 
 
-def action(description: str, classification: list[str] | None = None) -> dict:
+def action(
+    description: str, classification: list[str] | None = None, chamber: str = "lower"
+) -> dict:
     return {
         "description": description,
         "date": "2025-06-01T05:00:00+00:00",
         "classification": classification or [],
+        "chamber": chamber,
     }
 
 
@@ -58,9 +61,10 @@ def test_referred_never_heard_then_sjr1_dies() -> None:
         ),
         action(SJR1),
     ]
-    died, committee = derive_graveyard(actions)
+    died, committee, chamber = derive_graveyard(actions)
     assert died == 1
     assert committee == "Children and Families"
+    assert chamber == "lower"
 
 
 def test_hearing_before_sjr1_is_not_graveyard() -> None:
@@ -69,7 +73,7 @@ def test_hearing_before_sjr1_is_not_graveyard() -> None:
         action("Public hearing held"),
         action(SJR1),
     ]
-    assert derive_graveyard(actions) == (0, "Health")
+    assert derive_graveyard(actions) == (0, "Health", "lower")
 
 
 def test_executive_session_counts_as_heard() -> None:
@@ -78,7 +82,7 @@ def test_executive_session_counts_as_heard() -> None:
         action("Executive session held"),
         action(SJR1),
     ]
-    died, _ = derive_graveyard(actions)
+    died, _, _ = derive_graveyard(actions)
     assert died == 0
 
 
@@ -86,11 +90,27 @@ def test_no_sjr1_action_is_not_graveyard() -> None:
     actions = [
         action("Read first time and referred to Committee on Health", ["referral-committee"]),
     ]
-    assert derive_graveyard(actions) == (0, None)
+    assert derive_graveyard(actions) == (0, None, None)
 
 
 def test_sjr1_without_referral_is_not_graveyard() -> None:
-    assert derive_graveyard([action("Introduced"), action(SJR1)]) == (0, None)
+    assert derive_graveyard([action("Introduced"), action(SJR1)]) == (0, None, None)
+
+
+def test_committee_index_is_chamber_scoped() -> None:
+    from importer.committees import Committee, CommitteeIndex
+
+    index = CommitteeIndex(
+        [
+            Committee("c1", "Children and Families", "lower", "p1", "Rep. Chair"),
+            Committee("c2", "Children and Families", "upper", "p2", "Sen. Chair"),
+            Committee("c3", "Finance", None, "p3", "Co-Chair"),
+        ]
+    )
+    assert index.find("Children and Families", "lower").chair_name == "Rep. Chair"
+    assert index.find("Children and Families", "upper").chair_name == "Sen. Chair"
+    assert index.find("Joint Committee on Finance", "lower").id == "c3"
+    assert index.find("Unknown Committee", "lower") is None
 
 
 def test_biennium_covers_special_sessions() -> None:

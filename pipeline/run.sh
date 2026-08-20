@@ -10,6 +10,7 @@ cd "$(dirname "$0")"
 python -m scraper.scrape bills            # os-update wi bills --scrape --fastmode
 python -m scraper.scrape events           # os-update wi events --scrape
 python -m scraper.fetch_people            # openstates/people WI roster (YAML)
+python -m scraper.fetch_committees        # committee rosters + chairs (YAML)
 python -m importer.import_openstates _data/wi ../data/wi.sqlite
 python -m importer.enrich_lrb ../data/wi.sqlite
 python -m importer.checks ../data/wi.sqlite   # hard gate: abort deploy on failure

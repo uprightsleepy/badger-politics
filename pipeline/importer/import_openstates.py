@@ -19,7 +19,9 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from importer.committees import CommitteeIndex, load_committees
 from importer.roster import Roster, load_roster
+from importer.status import SJR1_RE, derive_status
 
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
 
@@ -39,7 +41,6 @@ def biennium(session: str) -> str:
     return str(year if year % 2 else year - 1)
 
 
-SJR1_RE = re.compile(r"failed to pass pursuant to senate joint resolution 1", re.I)
 HEARING_RE = re.compile(r"\b(public hearing held|executive session held)\b", re.I)
 REFERRAL_RE = re.compile(r"referred to (?:the )?(.+?)\s*$", re.I)
 IDENTIFIER_RE = re.compile(r"^([A-Za-z]+)\s*(\d+)$")
@@ -81,25 +82,29 @@ def committee_from_referral(description: str) -> str | None:
     return name
 
 
-def derive_graveyard(actions: list[dict]) -> tuple[int, str | None]:
-    """(died_without_hearing, committee_at_death) per plan §4: a referral, no
-    hearing/executive-session action, then the SJR1 failure action."""
+def derive_graveyard(actions: list[dict]) -> tuple[int, str | None, str | None]:
+    """(died_without_hearing, committee_at_death, committee_chamber) per plan
+    §4: a referral, no hearing/executive-session action, then the SJR1
+    failure action. Chamber comes from the referral action, so a same-named
+    committee in the other chamber can never be blamed."""
     death_idx = None
     for i, action in enumerate(actions):
         if SJR1_RE.search(action["description"]):
             death_idx = i
             break
     if death_idx is None:
-        return 0, None
+        return 0, None, None
     referred = False
-    committee = None
+    committee = chamber = None
     for action in actions[:death_idx]:
         if "referral-committee" in (action.get("classification") or []):
             referred = True
-            committee = committee_from_referral(action["description"]) or committee
+            name = committee_from_referral(action["description"])
+            if name:
+                committee, chamber = name, action.get("chamber")
         if HEARING_RE.search(action["description"]):
-            return 0, committee
-    return (1 if referred else 0), committee
+            return 0, committee, chamber
+    return (1 if referred else 0), committee, chamber
 
 
 def load_json_files(scrape_dir: Path, prefix: str) -> list[dict]:
@@ -114,11 +119,20 @@ def option_bucket(option: str) -> str:
 
 
 class Importer:
-    def __init__(self, conn: sqlite3.Connection, roster: Roster):
+    def __init__(self, conn: sqlite3.Connection, roster: Roster, committees: CommitteeIndex):
         self.conn = conn
         self.roster = roster
+        self.committees = committees
         self.bill_ids: dict[str, str] = {}  # scraper _id uuid -> our bill PK
         self.warnings: list[str] = []
+
+    def import_committees(self) -> None:
+        for c in self.committees.committees:
+            self.conn.execute(
+                "INSERT INTO committees (id, chamber, name, chair_person_id)"
+                " VALUES (?, ?, ?, ?)",
+                (c.id, c.chamber, c.name, c.chair_person_id),
+            )
 
     def import_sessions(self, scrape_dir: Path, seen_sessions: set[str]) -> None:
         jurisdiction_files = list(scrape_dir.glob("jurisdiction_*.json"))
@@ -155,8 +169,22 @@ class Importer:
         pk = bill_key(session, identifier)
         self.bill_ids[bill["_id"]] = pk
 
-        actions = sorted(bill.get("actions", []), key=lambda a: a["date"])
-        died, committee = derive_graveyard(actions)
+        actions = [
+            {**a, "chamber": pseudo_chamber(a.get("organization_id"))}
+            for a in sorted(bill.get("actions", []), key=lambda a: a["date"])
+        ]
+        died, committee, committee_chamber = derive_graveyard(actions)
+        status = derive_status(actions)
+        chair_name = None
+        if died and committee:
+            match = self.committees.find(committee, committee_chamber)
+            if match:
+                chair_name = match.chair_name
+            else:
+                self.warnings.append(
+                    f"graveyard committee not in roster: {committee!r}"
+                    f" ({committee_chamber}) on {pk}"
+                )
         latest = actions[-1] if actions else None
         chamber = pseudo_chamber(bill.get("from_organization"))
 
@@ -174,9 +202,10 @@ class Importer:
         )
         self.conn.execute(
             "INSERT INTO bills (id, session_id, identifier, title, chamber,"
-            " classification, latest_action_date, latest_action_desc, text_url,"
-            " died_without_hearing, committee_at_death, source)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'openstates')",
+            " classification, status, latest_action_date, latest_action_desc,"
+            " text_url, died_without_hearing, committee_at_death,"
+            " committee_chair_at_death, source)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'openstates')",
             (
                 pk,
                 session.lower(),
@@ -184,11 +213,13 @@ class Importer:
                 bill.get("title"),
                 chamber,
                 ",".join(bill.get("classification", [])),
+                status,
                 latest["date"][:10] if latest else None,
                 latest["description"] if latest else None,
                 text_url,
                 died,
                 committee if died else None,
+                chair_name if died else None,
             ),
         )
         for i, action in enumerate(actions):
@@ -199,7 +230,7 @@ class Importer:
                     f"{pk}-a{i}",
                     pk,
                     action["date"][:10],
-                    pseudo_chamber(action.get("organization_id")),
+                    action["chamber"],
                     action["description"],
                     ",".join(action.get("classification") or []),
                 ),
@@ -291,13 +322,17 @@ class Importer:
                 chamber, committee_name = "upper", committee_name[len("Senate "):]
             elif committee_name.startswith("Assembly "):
                 chamber, committee_name = "lower", committee_name[len("Assembly "):]
-            committee_id = re.sub(
-                r"[^a-z0-9]+", "-", f"{chamber or 'joint'}-{committee_name}".lower()
-            ).strip("-")
-            self.conn.execute(
-                "INSERT OR IGNORE INTO committees (id, chamber, name) VALUES (?, ?, ?)",
-                (committee_id, chamber, committee_name),
-            )
+            match = self.committees.find(committee_name, chamber)
+            if match:
+                committee_id = match.id
+            else:
+                committee_id = re.sub(
+                    r"[^a-z0-9]+", "-", f"{chamber or 'joint'}-{committee_name}".lower()
+                ).strip("-")
+                self.conn.execute(
+                    "INSERT OR IGNORE INTO committees (id, chamber, name) VALUES (?, ?, ?)",
+                    (committee_id, chamber, committee_name),
+                )
         agenda_bills = []
         for item in event.get("agenda", []):
             for entity in item.get("related_entities", []):
@@ -340,8 +375,15 @@ class Importer:
         )
 
 
-def run_import(scrape_dir: Path, db_path: Path, people_dir: Path) -> None:
+def run_import(
+    scrape_dir: Path, db_path: Path, people_dir: Path, committees_dir: Path
+) -> None:
     roster = load_roster(people_dir)
+    committee_index = CommitteeIndex(load_committees(committees_dir))
+    if not committee_index.committees:
+        raise RuntimeError(
+            f"no committees in {committees_dir}; run: python -m scraper.fetch_committees"
+        )
     bills = load_json_files(scrape_dir, "bill")
     votes = load_json_files(scrape_dir, "vote_event")
     events = load_json_files(scrape_dir, "event")
@@ -354,10 +396,11 @@ def run_import(scrape_dir: Path, db_path: Path, people_dir: Path) -> None:
     conn = sqlite3.connect(db_path)
     conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
 
-    importer = Importer(conn, roster)
+    importer = Importer(conn, roster, committee_index)
     with conn:
         importer.import_sessions(scrape_dir, {b["legislative_session"] for b in bills})
         importer.import_people()
+        importer.import_committees()
         for bill in bills:
             importer.import_bill(bill)
         for vote in votes:
@@ -386,8 +429,13 @@ def main(argv: list[str]) -> int:
         type=Path,
         default=Path(__file__).resolve().parents[1] / "_data" / "people" / "wi",
     )
+    parser.add_argument(
+        "--committees-dir",
+        type=Path,
+        default=Path(__file__).resolve().parents[1] / "_data" / "people" / "wi-committees",
+    )
     ns = parser.parse_args(argv)
-    run_import(ns.scrape_dir, ns.db_path, ns.people_dir)
+    run_import(ns.scrape_dir, ns.db_path, ns.people_dir, ns.committees_dir)
     return 0
 
 
