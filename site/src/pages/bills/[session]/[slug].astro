@@ -161,36 +161,4 @@ const chairId = personIdByName(bill.committee_chair_at_death);
       </ol>
     </section>
   </article>
-
-  <script>
-    // Pin the saved district's reps in every roll call on this page.
-    const saved = localStorage.getItem("bp-district");
-    if (saved) {
-      const { ad, sd } = JSON.parse(saved);
-      document.querySelectorAll("[data-rollcall]").forEach((block) => {
-        const wanted =
-          block.getAttribute("data-chamber") === "upper" ? String(sd) : String(ad);
-        const names: string[] = [];
-        block.querySelectorAll("[data-vote-row]").forEach((row) => {
-          if (row.getAttribute("data-district") === wanted) {
-            row.classList.remove("border-transparent");
-            row.classList.add("bg-gold-100", "font-semibold", "border-gold-600");
-            const a = row.querySelector("a");
-            if (a) {
-              names.push(`${a.textContent!.trim()} voted ${row.getAttribute("data-option")}`);
-              const sr = document.createElement("span");
-              sr.className = "sr-only";
-              sr.textContent = "Your representative: ";
-              a.prepend(sr);
-            }
-          }
-        });
-        const note = block.querySelector("[data-your-reps-note]");
-        if (note && names.length) {
-          note.textContent = `Your rep: ${names.join("; ")}`;
-          note.classList.remove("hidden");
-        }
-      });
-    }
-  </script>
 </Base>
