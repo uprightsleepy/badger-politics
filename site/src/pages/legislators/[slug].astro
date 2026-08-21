@@ -13,6 +13,7 @@ import {
   partyAgreement,
   electionHistoryFor,
   moneyFor,
+  personIdByName,
 } from "../../lib/db";
 import {
   COMPENSATION,
@@ -121,7 +122,20 @@ const tally = TALLY_ORDER.map((status) => ({
             {opponents.length > 0 && (
               <p class="mt-1">
                 {election.on_ballot === 0 ? "Candidates" : "Challengers"}:{" "}
-                {opponents.map((o) => `${o.name} (${o.party[0] ?? "?"})`).join(", ")}
+                {opponents.map((o, i) => {
+                  const pid = personIdByName(o.name);
+                  return (
+                    <>
+                      {i > 0 && ", "}
+                      {pid ? (
+                        <a href={`/legislators/${personSlug(pid)}/`} class="underline">{o.name}</a>
+                      ) : (
+                        o.name
+                      )}
+                      {` (${o.party[0] ?? "?"})`}
+                    </>
+                  );
+                })}
               </p>
             )}
             {election.on_ballot === 1 && opponents.length === 0 && (
@@ -156,9 +170,15 @@ const tally = TALLY_ORDER.map((status) => ({
                 {h.candidates.map((c) => {
                   const isThem = c.candidate.toLowerCase().includes(surname);
                   const pct = h.total ? ((c.votes / h.total) * 100).toFixed(1) : "0";
+                  const pid = personIdByName(c.candidate);
                   return (
                     <p class={isThem ? "font-bold" : ""}>
-                      {c.candidate} {c.party && `(${c.party[0]})`}: {pct}%
+                      {pid && pid !== person.id ? (
+                        <a href={`/legislators/${personSlug(pid)}/`} class="underline">{c.candidate}</a>
+                      ) : (
+                        c.candidate
+                      )}
+                      {c.party && ` (${c.party[0]})`}: {pct}%
                       <span class="text-xs text-navy-600"> · {c.votes.toLocaleString()}</span>
                     </p>
                   );

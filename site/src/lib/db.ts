@@ -214,7 +214,7 @@ export const graveyardBills = (sessionId: string, committee: string | null) =>
     .all(sessionId, committee) as { id: string; identifier: string; title: string | null }[];
 
 const HEARING_SELECT = `SELECT h.*, c.name AS committee_name, c.chamber AS committee_chamber,
-       p.name AS chair_name
+       p.name AS chair_name, c.chair_person_id AS chair_person_id
        FROM hearings h LEFT JOIN committees c ON c.id = h.committee_id
        LEFT JOIN people p ON p.id = c.chair_person_id`;
 
@@ -261,7 +261,22 @@ export interface Hearing {
   committee_name: string | null;
   committee_chamber: string | null;
   chair_name: string | null;
+  chair_person_id: string | null;
 }
+
+/** Exact-name profile resolver: returns a person id only when exactly one
+ * person carries the name; ambiguity or no match stays unlinked. */
+let _nameToId: Map<string, string | null> | null = null;
+export const personIdByName = (name: string | null): string | null => {
+  if (!name) return null;
+  if (!_nameToId) {
+    _nameToId = new Map();
+    for (const p of db.prepare("SELECT id, name FROM people").all() as { id: string; name: string }[]) {
+      _nameToId.set(p.name, _nameToId.has(p.name) ? null : p.id);
+    }
+  }
+  return _nameToId.get(name) ?? null;
+};
 
 export const recentlyActedBills = (sessionIds: string[], limit = 8) =>
   db

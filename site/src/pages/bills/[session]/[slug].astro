@@ -11,6 +11,7 @@ import {
   sponsorsFor,
   votesFor,
   lobbyingFor,
+  personIdByName,
 } from "../../../lib/db";
 import { billSlug, fmtDate, personSlug, chamberName } from "../../../lib/format";
 
@@ -30,6 +31,7 @@ const votes = votesFor(bill.id);
 const lobbying = lobbyingFor(bill.id);
 const primary = sponsors.filter((s) => s.is_primary);
 const cosponsors = sponsors.filter((s) => !s.is_primary);
+const chairId = personIdByName(bill.committee_chair_at_death);
 ---
 
 <Base title={`${bill.identifier} (${sessionName})`} description={bill.title ?? undefined}>
@@ -58,7 +60,16 @@ const cosponsors = sponsors.filter((s) => !s.is_primary);
         <p class="mt-1 text-sm">
           This bill died at the end of the session without ever receiving a public
           hearing. It sat in the <strong>{bill.committee_at_death}</strong> committee
-          {bill.committee_chair_at_death && <span> (chair: {bill.committee_chair_at_death})</span>}.
+          {bill.committee_chair_at_death && (
+            <span>
+              {" "}(chair:{" "}
+              {chairId ? (
+                <a href={`/legislators/${personSlug(chairId)}/`} class="underline">{bill.committee_chair_at_death}</a>
+              ) : (
+                bill.committee_chair_at_death
+              )})
+            </span>
+          )}.
           <a href={`/hearing-none/${bill.session_id}/`} class="underline">
             See every bill that died this way
           </a>

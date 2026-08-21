@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import PartyChip from "../../components/PartyChip.astro";
-import { sittingPeople, electionFor } from "../../lib/db";
+import { sittingPeople, electionFor, personIdByName } from "../../lib/db";
 import { personSlug } from "../../lib/format";
 const seats = sittingPeople()
   .map((p) => ({ person: p, election: electionFor(p.id) }))
@@ -45,7 +45,20 @@ const assembly = seats.filter((s) => s.person.chamber === "lower");
               {opponents.length > 0 && (
                 <span class="min-w-0 flex-1 truncate text-navy-700">
                   {election!.on_ballot === 0 ? "Candidates: " : "Challengers: "}
-                  {opponents.map((o) => `${o.name} (${o.party?.[0] ?? "?"})`).join(", ")}
+                  {opponents.map((o, i) => {
+                    const pid = personIdByName(o.name);
+                    return (
+                      <>
+                        {i > 0 && ", "}
+                        {pid ? (
+                          <a href={`/legislators/${personSlug(pid)}/`} class="underline">{o.name}</a>
+                        ) : (
+                          o.name
+                        )}
+                        {` (${o.party?.[0] ?? "?"})`}
+                      </>
+                    );
+                  })}
                 </span>
               )}
             </li>

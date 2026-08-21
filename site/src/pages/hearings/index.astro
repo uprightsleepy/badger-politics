@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { upcomingHearings, recentHearings, findBillByIdentifier } from "../../lib/db";
-import { fmtDate, fmtTime, chamberName, billSlug } from "../../lib/format";
+import { fmtDate, fmtTime, chamberName, billSlug, personSlug } from "../../lib/format";
 const today = new Date().toISOString().slice(0, 10);
 const upcoming = upcomingHearings(today);
 const recent = recentHearings(30);
@@ -36,7 +36,14 @@ const heading = upcoming.length ? "Upcoming committee hearings" : "Recent commit
             </span>
           </div>
           {h.chair_name && (
-            <p class="mt-0.5 text-xs text-navy-600">Chair: {h.chair_name}</p>
+            <p class="mt-0.5 text-xs text-navy-600">
+              Chair:{" "}
+              {h.chair_person_id ? (
+                <a href={`/legislators/${personSlug(h.chair_person_id)}/`} class="underline">{h.chair_name}</a>
+              ) : (
+                h.chair_name
+              )}
+            </p>
           )}
           {agendaBills.length > 0 && (
             <p class="mt-1 text-navy-700">
