@@ -39,13 +39,13 @@ def api_key() -> str:
     return key
 
 
-def fetch_cycle(cycle: int) -> list[dict]:
-    """Candidate totals for both chambers, cache-first to respect quota."""
+def fetch_cycle(cycle: int, offices: dict | None = None) -> list[dict]:
+    """Candidate totals per chamber, cache-first to respect quota."""
     http = requests.Session()
     http.headers["User-Agent"] = USER_AGENT
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     records, fetched = [], 0
-    for office in OFFICES:
+    for office in (offices or OFFICES):
         page = 0
         while True:
             cached = DATA_DIR / f"ftm-{cycle}-{office}-p{page}.json"
