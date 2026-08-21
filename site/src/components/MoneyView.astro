@@ -1,0 +1,144 @@
+---
+import OrgLogo from "./OrgLogo.astro";
+import PartyChip from "./PartyChip.astro";
+import { fmtMoney, personSlug } from "../lib/format";
+import type { moneyOverview } from "../lib/db";
+
+interface Props {
+  m: ReturnType<typeof moneyOverview>;
+  cycle?: string;
+}
+const { m, cycle } = Astro.props;
+const pctIndividual = m.total ? Math.round((m.individualTotal / m.total) * 100) : 0;
+const pctSmall = m.individualTotal ? Math.round((m.smallDollarTotal / m.individualTotal) * 100) : 0;
+const roleAbbr = (chamber: string | null) => (chamber === "upper" ? "SD" : "AD");
+const scope = cycle
+  ? `receipts to today's members during the ${cycle} cycle, while in office`
+  : "receipts since each member took office";
+---
+
+<div class="mt-4 grid gap-3 sm:grid-cols-3">
+  <div class="rounded-lg border border-navy-100 bg-white p-4">
+    <p class="text-2xl font-bold">{fmtMoney(m.total)}</p>
+    <p class="text-sm text-navy-600">
+      raised across {m.n.toLocaleString()} reported receipts{cycle ? ` in the ${cycle} cycle,` : ","} while in office
+    </p>
+  </div>
+  <div class="rounded-lg border border-navy-100 bg-white p-4">
+    <p class="text-2xl font-bold">{pctIndividual}%</p>
+    <p class="text-sm text-navy-600">
+      from individual donors ({fmtMoney(m.individualTotal)}); committees gave {fmtMoney(m.committeeTotal)}
+    </p>
+  </div>
+  <div class="rounded-lg border border-navy-100 bg-white p-4">
+    <p class="text-2xl font-bold">{pctSmall}%</p>
+    <p class="text-sm text-navy-600">
+      of individual money arrived in small receipts (under $200)
+    </p>
+  </div>
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <section>
+    <h2 class="text-xl font-bold">Top contributing committees</h2>
+    <p class="mt-1 text-sm text-navy-600">
+      PACs, party and other political committees, ranked by {scope}. Wisconsin
+      law bars corporations from giving to candidates directly.
+    </p>
+    <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
+      {m.topCommittees.map((c, i) => (
+        <li class="flex items-center gap-2 py-0.5">
+          <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
+          <OrgLogo entityId={c.entityId} name={c.name} />
+          <span class="min-w-0 flex-1 truncate">{c.name}</span>
+          <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">
+            {c.recipients} legislator{c.recipients > 1 ? "s" : ""}
+          </span>
+          <span class="shrink-0 font-semibold">{fmtMoney(c.total)}</span>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section>
+    <h2 class="text-xl font-bold">Top fundraising legislators</h2>
+    <p class="mt-1 text-sm text-navy-600">
+      {cycle
+        ? `Each member's ${cycle}-cycle receipts, counted only while in office.`
+        : "Each legislator's rolling total since they took office, including any runs for other offices. Long tenure and statewide runs both push members up this list."}
+    </p>
+    <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
+      {m.topLegislators.map((p, i) => (
+        <li class="flex items-center gap-2 py-0.5">
+          <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
+          <PartyChip party={p.party} size="sm" />
+          <a href={`/legislators/${personSlug(p.id)}/`} class="min-w-0 flex-1 truncate py-1 underline">
+            {p.name}
+          </a>
+          <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">
+            {roleAbbr(p.chamber)} {p.district}
+          </span>
+          <span class="shrink-0 font-semibold">{fmtMoney(p.total)}</span>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section>
+    <h2 class="text-xl font-bold">Money by party</h2>
+    <p class="mt-1 text-sm text-navy-600">
+      Grouped by the recipient's party. Totals follow the person, so a few
+      members running for statewide or federal office can dominate their
+      party's number. This is not a measure of party strength in
+      legislative races.
+    </p>
+    <ul class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
+      {m.byParty.map((p) => (
+        <li class="flex items-center gap-2 py-0.5">
+          <PartyChip party={p.party} size="sm" />
+          <span class="min-w-0 flex-1 truncate">{p.party ?? "Unknown"}</span>
+          <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">
+            {p.legislators} legislator{p.legislators > 1 ? "s" : ""}
+          </span>
+          <span class="shrink-0 font-semibold">{fmtMoney(p.total)}</span>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section>
+    <h2 class="text-xl font-bold">Top occupations of individual donors</h2>
+    <p class="mt-1 text-sm text-navy-600">
+      As reported by donors on their filings. Blank occupations are left out.
+    </p>
+    <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
+      {m.topOccupations.map((o, i) => (
+        <li class="flex items-center gap-2 py-0.5">
+          <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
+          <span class="min-w-0 flex-1 truncate">{o.occupation}</span>
+          <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">{o.n.toLocaleString()} receipts</span>
+          <span class="shrink-0 font-semibold">{fmtMoney(o.total)}</span>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section>
+    <h2 class="text-xl font-bold">Widest reach</h2>
+    <p class="mt-1 text-sm text-navy-600">
+      Committees ranked by how many members they fund, not by dollars.
+      Breadth says something totals miss.
+    </p>
+    <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
+      {m.widestCommittees.map((c, i) => (
+        <li class="flex items-center gap-2 py-0.5">
+          <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
+          <OrgLogo entityId={c.entityId} name={c.name} />
+          <span class="min-w-0 flex-1 truncate">{c.name}</span>
+          <span class="shrink-0 text-xs text-navy-600">{c.recipients} of {m.sitting}</span>
+          <span class="shrink-0 font-semibold">{fmtMoney(c.total)}</span>
+        </li>
+      ))}
+    </ol>
+  </section>
+</div>

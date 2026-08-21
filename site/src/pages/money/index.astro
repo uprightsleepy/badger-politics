@@ -1,144 +1,86 @@
 ---
 import Base from "../../layouts/Base.astro";
-import OrgLogo from "../../components/OrgLogo.astro";
-import PartyChip from "../../components/PartyChip.astro";
+import MoneyView from "../../components/MoneyView.astro";
 import { moneyOverview } from "../../lib/db";
-import { fmtMoney, fmtDate, chamberName, personSlug } from "../../lib/format";
+import { fmtDate } from "../../lib/format";
 
-const m = moneyOverview();
-const pctIndividual = m.total ? Math.round((m.individualTotal / m.total) * 100) : 0;
-const roleAbbr = (chamber: string | null) => (chamber === "upper" ? "SD" : "AD");
+const all = moneyOverview();
+const newestYear = Number((all.last ?? "2026").slice(0, 4));
+const currentCycle = newestYear % 2 ? newestYear + 1 : newestYear;
+const cycles: number[] = [];
+for (let y = currentCycle; y >= 2008; y -= 2) cycles.push(y);
+const views = [
+  { key: "all", label: "All time", m: all, cycle: undefined as string | undefined },
+  ...cycles.map((y) => ({
+    key: String(y),
+    label: y === currentCycle ? `${y} (current)` : String(y),
+    m: moneyOverview({ start: `${y - 1}-01-01`, end: `${y}-12-31` }),
+    cycle: String(y),
+  })),
+];
 ---
 
 <Base
   title="Campaign money"
-  description="Who funds Wisconsin legislators: top contributing committees, top fundraisers, and where the money comes from, straight from state filings."
+  description="Who funds Wisconsin legislators: top committees, top fundraisers, and small-dollar shares, filterable by election cycle."
 >
   <h1 class="text-2xl font-bold">Campaign money</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
     The money invested in Wisconsin's sitting legislators: every
     contribution reported to each member's campaign committees since they
     took office, from Wisconsin Ethics Commission filings
-    {m.last && ` through ${fmtDate(m.last)}`}. Electronic records begin in
+    {all.last && ` through ${fmtDate(all.last)}`}. Electronic records begin in
     2008. <a href="/about/#money" class="underline">How this data works</a>
   </p>
   <p class="mt-2 max-w-3xl rounded-lg border border-gold-500 bg-gold-100 px-3 py-2 text-sm">
-    Coverage note: {m.covered} of {m.sitting} sitting legislators are linked to
-    their campaign committee so far. Totals and rankings cover only those
-    {m.covered}. The rest are a coverage gap, not zero fundraising.
+    Coverage note: {all.covered} of {all.sitting} sitting legislators are
+    linked to their campaign committee so far. Totals and rankings cover only
+    those {all.covered}. The rest are a coverage gap, not zero fundraising.
   </p>
 
-  <div class="mt-4 grid gap-3 sm:grid-cols-3">
-    <div class="rounded-lg border border-navy-100 bg-white p-4">
-      <p class="text-2xl font-bold">{fmtMoney(m.total)}</p>
-      <p class="text-sm text-navy-600">
-        raised across {m.n.toLocaleString()} reported receipts while in office
-      </p>
-    </div>
-    <div class="rounded-lg border border-navy-100 bg-white p-4">
-      <p class="text-2xl font-bold">{pctIndividual}%</p>
-      <p class="text-sm text-navy-600">
-        from individual donors ({fmtMoney(m.individualTotal)}); committees gave {fmtMoney(m.committeeTotal)}
-      </p>
-    </div>
-    <div class="rounded-lg border border-navy-100 bg-white p-4">
-      <p class="text-2xl font-bold">{m.covered}</p>
-      <p class="text-sm text-navy-600">legislators with linked committees, of {m.sitting} sitting</p>
-    </div>
+  <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label="Filter by election cycle">
+    {views.map((v) => (
+      <button
+        type="button"
+        data-cycle-btn={v.key}
+        aria-pressed={v.key === "all" ? "true" : "false"}
+        class="rounded-full border border-navy-100 bg-white px-3 py-1 text-sm font-semibold
+               hover:ring-2 hover:ring-navy-600 focus-visible:ring-2 focus-visible:ring-navy-600
+               aria-pressed:border-navy-800 aria-pressed:bg-navy-800 aria-pressed:text-white"
+      >
+        {v.label}
+      </button>
+    ))}
   </div>
+  <p id="cycle-status" role="status" class="sr-only"></p>
 
-  <div class="mt-6 grid gap-6 lg:grid-cols-2">
-    <section>
-      <h2 class="text-xl font-bold">Top contributing committees</h2>
-      <p class="mt-1 text-sm text-navy-600">
-        PACs, party and other political committees, ranked by total given to
-        legislators' committees. Wisconsin law bars corporations from giving
-        to candidates directly.
-      </p>
-      <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
-        {m.topCommittees.map((c, i) => (
-          <li class="flex items-center gap-2 py-0.5">
-            <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
-            <OrgLogo entityId={c.entityId} name={c.name} />
-            <span class="min-w-0 flex-1 truncate">{c.name}</span>
-            <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">
-              {c.recipients} legislator{c.recipients > 1 ? "s" : ""}
-            </span>
-            <span class="shrink-0 font-semibold">{fmtMoney(c.total)}</span>
-          </li>
-        ))}
-      </ol>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-bold">Top fundraising legislators</h2>
-      <p class="mt-1 text-sm text-navy-600">
-        Each legislator's rolling total since they took office, including
-        any runs for other offices. Long tenure and statewide runs both
-        push members up this list.
-      </p>
-      <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
-        {m.topLegislators.map((p, i) => (
-          <li class="flex items-center gap-2 py-0.5">
-            <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
-            <PartyChip party={p.party} size="sm" />
-            <a href={`/legislators/${personSlug(p.id)}/`} class="min-w-0 flex-1 truncate py-1 underline">
-              {p.name}
-            </a>
-            <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">
-              {roleAbbr(p.chamber)} {p.district}
-            </span>
-            <span class="shrink-0 font-semibold">{fmtMoney(p.total)}</span>
-          </li>
-        ))}
-      </ol>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-bold">Money by party</h2>
-      <p class="mt-1 text-sm text-navy-600">
-        Receipts to covered legislators, grouped by the recipient's party.
-        Totals follow the person, so a few members running for statewide or
-        federal office can dominate their party's number. This is not a
-        measure of party strength in legislative races.
-      </p>
-      <ul class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
-        {m.byParty.map((p) => (
-          <li class="flex items-center gap-2 py-0.5">
-            <PartyChip party={p.party} size="sm" />
-            <span class="min-w-0 flex-1 truncate">{p.party ?? "Unknown"}</span>
-            <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">
-              {p.legislators} legislator{p.legislators > 1 ? "s" : ""}
-            </span>
-            <span class="shrink-0 font-semibold">{fmtMoney(p.total)}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-
-    <section>
-      <h2 class="text-xl font-bold">Top occupations of individual donors</h2>
-      <p class="mt-1 text-sm text-navy-600">
-        As reported by donors on their filings. Blank occupations are left out.
-      </p>
-      <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
-        {m.topOccupations.map((o, i) => (
-          <li class="flex items-center gap-2 py-0.5">
-            <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
-            <span class="min-w-0 flex-1 truncate">{o.occupation}</span>
-            <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">{o.n.toLocaleString()} receipts</span>
-            <span class="shrink-0 font-semibold">{fmtMoney(o.total)}</span>
-          </li>
-        ))}
-      </ol>
-    </section>
-  </div>
+  {views.map((v) => (
+    <div data-money-view={v.key} hidden={v.key !== "all"}>
+      <MoneyView m={v.m} cycle={v.cycle} />
+    </div>
+  ))}
 
   <p class="mt-6 max-w-3xl text-xs text-navy-600">
     Source: Wisconsin Ethics Commission campaign finance filings
-    (campaignfinance.wi.gov), refreshed nightly. Committee donors are grouped
-    by their registered CFIS entity id, never by name matching. Individual
-    donors are shown only in aggregate.
-    <a href="/about/#money" class="underline">Full methodology</a>
+    (campaignfinance.wi.gov), refreshed nightly. Cycle views count a member's
+    receipts only after they took office; the campaign that first elected
+    them is not included. Committee donors are grouped by their registered
+    CFIS entity id, never by name matching. Individual donors are shown only
+    in aggregate.
+    <a href="/about/#money" class="underline"> Full methodology</a>
   </p>
+
+  <script>
+    const buttons = document.querySelectorAll<HTMLButtonElement>("[data-cycle-btn]");
+    const status = document.getElementById("cycle-status")!;
+    buttons.forEach((b) =>
+      b.addEventListener("click", () => {
+        buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+        document.querySelectorAll<HTMLElement>("[data-money-view]").forEach((v) => {
+          v.hidden = v.dataset.moneyView !== b.dataset.cycleBtn;
+        });
+        status.textContent = `Showing ${b.textContent!.trim()}`;
+      }),
+    );
+  </script>
 </Base>
