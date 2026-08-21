@@ -7,6 +7,15 @@ interface Props {
 }
 const { title, description = "Free, independent tracking of the Wisconsin Legislature. Every bill, every vote, and every committee graveyard." } = Astro.props;
 const dataThrough = meta().data_through;
+const NAV = [
+  ["/bills/", "Bills"],
+  ["/legislators/", "Legislators"],
+  ["/hearing-none/", "Hearing None"],
+  ["/hearings/", "Hearings"],
+  ["/money/", "Money"],
+  ["/calendar/", "Calendar"],
+  ["/elections/2026/", "2026 Ballot"],
+];
 ---
 
 <!doctype html>
@@ -26,21 +35,40 @@ const dataThrough = meta().data_through;
       Skip to content
     </a>
     <header class="border-b border-navy-100 bg-navy-900 text-white">
-      <nav class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 text-sm">
-        <a href="/" class="mr-auto flex items-center gap-2 text-base font-bold tracking-tight">
-          <img src="/wisconsin.svg" alt="" width="22" height="22" />
-          Badger Politics
-        </a>
-        <a href="/bills/" class="hover:text-gold-500">Bills</a>
-        <a href="/legislators/" class="hover:text-gold-500">Legislators</a>
-        <a href="/hearing-none/" class="hover:text-gold-500">Hearing None</a>
-        <a href="/hearings/" class="hover:text-gold-500">Hearings</a>
-        <a href="/money/" class="hover:text-gold-500">Money</a>
-        <a href="/calendar/" class="hover:text-gold-500">Calendar</a>
-        <a href="/elections/2026/" class="hover:text-gold-500">2026 Ballot</a>
-        <a href="/my-reps/" id="nav-my-reps" class="rounded-full bg-navy-700 px-3 py-1 hover:bg-navy-600">
-          Find my legislators
-        </a>
+      <nav class="mx-auto max-w-5xl px-4 py-3 text-sm">
+        <div class="flex items-center justify-between gap-4">
+          <a href="/" class="flex items-center gap-2 text-base font-bold tracking-tight">
+            <img src="/wisconsin.svg" alt="" width="22" height="22" />
+            Badger Politics
+          </a>
+          <!-- phones and small tablets get a native disclosure menu -->
+          <details class="relative md:hidden">
+            <summary class="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-navy-600 px-3 py-2 font-semibold [&::-webkit-details-marker]:hidden">
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M2 4h12M2 8h12M2 12h12" />
+              </svg>
+              Menu
+            </summary>
+            <ul class="absolute right-0 top-full z-50 mt-2 w-60 space-y-1 rounded-lg border border-navy-700 bg-navy-900 p-2 shadow-lg">
+              {NAV.map(([href, label]) => (
+                <li><a href={href} class="block rounded px-3 py-2 hover:bg-navy-800">{label}</a></li>
+              ))}
+              <li>
+                <a href="/my-reps/" data-nav-my-reps class="block rounded bg-navy-700 px-3 py-2 font-semibold hover:bg-navy-600">
+                  Find my legislators
+                </a>
+              </li>
+            </ul>
+          </details>
+          <div class="hidden flex-wrap items-center gap-x-6 gap-y-2 md:flex">
+            {NAV.map(([href, label]) => (
+              <a href={href} class="hover:text-gold-500">{label}</a>
+            ))}
+            <a href="/my-reps/" data-nav-my-reps class="rounded-full bg-navy-700 px-3 py-1 hover:bg-navy-600">
+              Find my legislators
+            </a>
+          </div>
+        </div>
       </nav>
     </header>
 
@@ -78,11 +106,10 @@ const dataThrough = meta().data_through;
       }
       if (saved) {
         const { ad, sd } = saved;
-        const link = document.getElementById("nav-my-reps");
-        if (link) {
+        document.querySelectorAll("[data-nav-my-reps]").forEach((link) => {
           link.textContent = `Your reps · AD ${ad} / SD ${sd}`;
           link.setAttribute("aria-label", `Your legislators: Assembly District ${ad}, Senate District ${sd}`);
-        }
+        });
       }
       // external links (docs.legis sources, GitHub, ...) open in a new tab
       document.querySelectorAll<HTMLAnchorElement>("a[href^='http']").forEach((a) => {
