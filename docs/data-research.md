@@ -4,6 +4,46 @@ Researched 2026-08-20. Each source is rated for cost, access mechanism,
 reuse terms, and fit with the hard rules (free, keyless where possible,
 static-servable, provenance-clean).
 
+## Access terms audit (2026-08-21)
+
+robots.txt and license verification for every source in use or planned.
+None of the state sites impose click-through terms on their public data;
+all serve Wisconsin public records with no authentication.
+
+- **docs.legis.wisconsin.gov** — robots disallows only internal mechanisms
+  (/frame, /scroll, /feed, search endpoints). Our paths (/proposals,
+  /related/fe, /related/subject_index) are permitted. Statutory
+  publication site for the Legislature's own records.
+- **campaignfinance.wi.gov** — robots ALLOWS general agents on / with
+  Cloudflare Content-Signals `search=yes, ai-train=no, use=reference`.
+  Our use is exactly "reference": collecting public filings for display
+  with source links, no model training. The blocked user agents are AI
+  training crawlers (GPTBot, ClaudeBot, CCBot, etc.), which we are not;
+  our honest BadgerPolitics UA falls under the general allow. tRPC API
+  paths are not disallowed (only /admin, dashboards, /browse-data/report/).
+- **lobbying.wi.gov** — robots is a blanket `Disallow: /`, the one gray
+  spot. Reading: this is default anti-crawler config on a site whose
+  statutory purpose is public disclosure (the same agency's CFIS site
+  explicitly allows collection), robots.txt is a crawler convention and
+  not terms of service, and the data is open records. Our retrieval is
+  low-volume, nightly, honest-UA. Mitigation: ask the Ethics Commission
+  for explicit blessing in the planned records-request email; they
+  administer both sites.
+- **elections.wi.gov** — standard Drupal robots (admin paths only);
+  published reports are fair game.
+- **wiseye.org** — robots allows everything with `Crawl-delay: 10`; the
+  wp-json REST API is publicly exposed. Planned fetcher honors a 10s
+  interval. We link to their pages and store metadata only (date, title,
+  URL); no content is republished.
+- **openstates/people** (committee rosters, legislator YAML) — public
+  domain, CC0 dedication stated in the repo.
+- **openstates-scrapers** — GPL-3.0, subprocess-only per mandate 7.
+- **FollowTheMoney** — explicit terms accepted (CC BY-NC-SA, research
+  use, 1,000 records/year); verification-only, never redistributed.
+- **logo.dev** — commercial API used with our own key on their free tier.
+- **Census geocoder** — documented public API; addresses sent for
+  coordinates only.
+
 ## Tier 1: free, machine-readable, automatable
 
 ### Lobbying activity — Eye on Lobbying (lobbying.wi.gov)
