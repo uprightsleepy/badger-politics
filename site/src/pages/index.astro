@@ -72,21 +72,29 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
   </section>
 
   <script is:inline type="module">
-    // Thin custom UI over the Pagefind API. Pagefind's default behavior chops
-    // unmatched terms down to fragments (a search for a word not in the corpus
-    // can end up highlighting a middle initial); we reject any result whose
-    // only highlighted terms are shorter than 3 characters.
+    // Thin custom UI over the Pagefind API.
     const input = document.getElementById("q");
     const box = document.getElementById("search-results");
     const status = document.getElementById("search-status");
     let pagefind;
     let timer;
 
-    const degenerate = (excerpt) => {
+    // Pagefind fuzzes unmatched terms down to fragments ("pedophiles" can
+    // highlight "P." or even "PEOs"). A highlight only validates a result
+    // if it shares a real stem with some query word.
+    const degenerate = (excerpt, query) => {
+      const words = query.toLowerCase().split(/\s+/).map((w) => w.replace(/[^a-z0-9]/g, ""));
       const marks = [...excerpt.matchAll(/<mark>(.*?)<\/mark>/g)].map((m) =>
-        m[1].replace(/[^A-Za-z0-9]/g, ""),
+        m[1].replace(/[^A-Za-z0-9]/g, "").toLowerCase(),
       );
-      return marks.length > 0 && marks.every((m) => m.length < 3);
+      const shared = (a, b) => {
+        let n = 0;
+        while (n < a.length && n < b.length && a[n] === b[n]) n++;
+        return n;
+      };
+      const valid = (m) =>
+        m.length >= 3 && words.some((w) => shared(m, w) >= Math.min(4, m.length, w.length));
+      return marks.length > 0 && !marks.some(valid);
     };
 
     async function run() {
@@ -100,7 +108,7 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
       const search = await pagefind.debouncedSearch(q);
       if (search === null) return; // superseded by newer keystroke
       const loaded = await Promise.all(search.results.slice(0, 12).map((r) => r.data()));
-      const good = loaded.filter((r) => !degenerate(r.excerpt)).slice(0, 8);
+      const good = loaded.filter((r) => !degenerate(r.excerpt, q)).slice(0, 8);
       box.innerHTML = good.length
         ? good
             .map(
