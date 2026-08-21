@@ -42,6 +42,12 @@ const groups = [
       some older sessions record totals only.
     </p>
   ) : (
+    <div
+      class="max-h-96 overflow-y-auto"
+      role="region"
+      tabindex="0"
+      aria-label={`${chamberName(event.chamber)} roll call, every member`}
+    >
     <div class="grid gap-3 sm:grid-cols-3">
       {groups.filter((g) => g.rows.length).map((group) => (
         <div>
@@ -67,6 +73,7 @@ const groups = [
           </ul>
         </div>
       ))}
+    </div>
     </div>
   )}
 </div>

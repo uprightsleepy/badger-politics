@@ -54,7 +54,13 @@ const { recipients, byParty } = donorCommitteeFor(committee.entityId);
 
   <section class="mt-6 max-w-3xl">
     <h2 class="text-xl font-bold">Recipients</h2>
-    <ol class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+    <div
+      class="mt-2 max-h-96 overflow-y-auto rounded-lg border border-navy-100 bg-white"
+      role="region"
+      tabindex="0"
+      aria-label="All recipients"
+    >
+    <ol class="divide-y divide-navy-100 text-sm">
       {recipients.map((r, i) => (
         <li class="flex items-center gap-2 px-4 py-1.5">
           <span class="w-6 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
@@ -72,6 +78,7 @@ const { recipients, byParty } = donorCommitteeFor(committee.entityId);
         </li>
       ))}
     </ol>
+    </div>
   </section>
 
   <p class="mt-6 max-w-3xl text-xs text-navy-600">

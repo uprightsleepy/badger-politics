@@ -10,7 +10,7 @@ const currentCycle = newestYear % 2 ? newestYear + 1 : newestYear;
 const cycles: number[] = [];
 for (let y = currentCycle; y >= 2008; y -= 2) cycles.push(y);
 const views = [
-  { key: "all", label: "All time", m: all, cycle: undefined as string | undefined },
+  { key: "all", label: "Lifetime", m: all, cycle: undefined as string | undefined },
   ...cycles.map((y) => ({
     key: String(y),
     label: y === currentCycle ? `${y} (current)` : String(y),
@@ -18,6 +18,9 @@ const views = [
     cycle: String(y),
   })),
 ];
+// recent money is what most readers came for; lifetime is one tap away
+const DEFAULT_KEY = String(currentCycle);
+const defaultView = views.find((v) => v.key === DEFAULT_KEY)!;
 ---
 
 <Base
@@ -26,11 +29,11 @@ const views = [
 >
   <h1 class="text-2xl font-bold">Campaign money</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    The money invested in Wisconsin's sitting legislators: every
-    contribution reported to each member's campaign committees since they
-    took office, from Wisconsin Ethics Commission filings
-    {all.last && ` through ${fmtDate(all.last)}`}. Electronic records begin in
-    2008. <a href="/money/committees/" class="underline">Browse all contributing committees</a> ·
+    The money invested in Wisconsin's sitting legislators, from Wisconsin
+    Ethics Commission filings{all.last && ` through ${fmtDate(all.last)}`}.
+    Showing the current election cycle by default; Lifetime covers
+    everything since each member took office (electronic records begin in
+    2008). <a href="/money/committees/" class="underline">Browse all contributing committees</a> ·
     <a href="/about/#money" class="underline">How this data works</a>
   </p>
   <p class="mt-2 max-w-3xl rounded-lg border border-gold-500 bg-gold-100 px-3 py-2 text-sm">
@@ -44,7 +47,7 @@ const views = [
       <button
         type="button"
         data-cycle-btn={v.key}
-        aria-pressed={v.key === "all" ? "true" : "false"}
+        aria-pressed={v.key === DEFAULT_KEY ? "true" : "false"}
         class="rounded-full border border-navy-600 bg-white px-3 py-2 text-sm font-semibold
                hover:ring-2 hover:ring-navy-600 focus-visible:ring-2 focus-visible:ring-navy-600
                aria-pressed:border-navy-800 aria-pressed:bg-navy-800 aria-pressed:text-white"
@@ -62,12 +65,11 @@ const views = [
       class="rounded-lg border border-navy-600 bg-white px-4 py-2 font-bold
              focus-visible:ring-2 focus-visible:ring-navy-600 disabled:opacity-40"
     >←</button>
-    <span id="cycle-label" class="min-w-28 text-center text-sm font-semibold">All time</span>
+    <span id="cycle-label" class="min-w-28 text-center text-sm font-semibold">{defaultView.label}</span>
     <button
       type="button"
       id="cycle-newer"
       aria-label="Newer cycle"
-      disabled
       class="rounded-lg border border-navy-600 bg-white px-4 py-2 font-bold
              focus-visible:ring-2 focus-visible:ring-navy-600 disabled:opacity-40"
     >→</button>
@@ -75,7 +77,7 @@ const views = [
   <p id="cycle-status" role="status" class="sr-only"></p>
 
   {views.map((v) => (
-    <div data-money-view={v.key} hidden={v.key !== "all"}>
+    <div data-money-view={v.key} hidden={v.key !== DEFAULT_KEY}>
       <MoneyView m={v.m} cycle={v.cycle} />
     </div>
   ))}
@@ -98,7 +100,7 @@ const views = [
     const label = document.getElementById("cycle-label")!;
     const older = document.getElementById("cycle-older") as HTMLButtonElement;
     const newer = document.getElementById("cycle-newer") as HTMLButtonElement;
-    let index = 0;
+    let index = buttons.findIndex((b) => b.getAttribute("aria-pressed") === "true");
 
     function select(i: number) {
       index = i;

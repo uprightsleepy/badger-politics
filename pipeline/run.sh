@@ -40,7 +40,9 @@ python -m importer.checks ../data/wi.sqlite   # hard gate: abort deploy on failu
 python -m dataproducts.build ../data/wi.sqlite ../site/public/
 
 # --- Phase 5+: site build, deploy ---
-# (cd ../site && npm run build)               # astro reads data/wi.sqlite
+# BUILD_SESSIONS=all: every session gets pages so profile links to
+# historical bills and votes always resolve (dev builds default partial)
+# (cd ../site && BUILD_SESSIONS=all npm run build)
 # npx pagefind --site ../site/dist
 # firebase deploy --only hosting --project "$FB_PROJECT" --non-interactive
 # gsutil cp ../data/wi.sqlite "gs://$BUCKET/snapshots/wi-$(date +%F).sqlite"
