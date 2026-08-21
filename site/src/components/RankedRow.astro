@@ -10,6 +10,6 @@ const { rank, meta, amount } = Astro.props;
     <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{rank}.</span>
   )}
   <slot />
-  {meta && <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">{meta}</span>}
+  {meta && <span class="sr-only shrink-0 text-xs text-navy-600 sm:not-sr-only sm:inline">{meta}</span>}
   <span class="shrink-0 font-semibold">{fmtMoney(amount)}</span>
 </li>

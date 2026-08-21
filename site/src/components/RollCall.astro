@@ -74,9 +74,14 @@ const groups = [
 <script>
   // Pin the saved district's reps in every roll call on the page. Lives in
   // the component so bill pages and standalone vote pages both get it.
-  const saved = localStorage.getItem("bp-district");
+  let saved: { ad: number; sd: number } | null = null;
+  try {
+    saved = JSON.parse(localStorage.getItem("bp-district") ?? "null");
+  } catch {
+    localStorage.removeItem("bp-district");
+  }
   if (saved) {
-    const { ad, sd } = JSON.parse(saved);
+    const { ad, sd } = saved;
     document.querySelectorAll("[data-rollcall]").forEach((block) => {
       const wanted =
         block.getAttribute("data-chamber") === "upper" ? String(sd) : String(ad);
@@ -87,7 +92,9 @@ const groups = [
           row.classList.add("bg-gold-100", "font-semibold", "border-gold-600");
           const a = row.querySelector("a");
           if (a) {
-            names.push(`${a.textContent!.trim()} voted ${row.getAttribute("data-option")}`);
+            const option = row.getAttribute("data-option");
+            const name = a.textContent!.trim();
+            names.push(option === "Not voting" ? `${name} did not vote` : `${name} voted ${option}`);
             const sr = document.createElement("span");
             sr.className = "sr-only";
             sr.textContent = "Your representative: ";

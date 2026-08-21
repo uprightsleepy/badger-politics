@@ -69,7 +69,7 @@ const monthCols = months.map((label, m) => ({
 ---
 <div class="overflow-x-auto" tabindex="0" role="img" aria-label={summaryLabel}>
   <div class="inline-block" aria-hidden="true">
-    <div class="relative mb-0.5 h-4 text-[10px] text-navy-600" style="margin-left: 0;">
+    <div class="relative mb-0.5 h-4 text-[0.625rem] text-navy-600" style="margin-left: 0;">
       {monthCols.map((m) => (
         <span class="absolute" style={`left: ${m.col * 13}px`}>{m.label}</span>
       ))}

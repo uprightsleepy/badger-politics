@@ -23,7 +23,7 @@ const { steps, reached, failed } = stepperState(status, chamber);
           </span>
           <div class={`h-0.5 flex-1 ${i === steps.length - 1 ? "invisible" : i < reached - 1 ? "bg-navy-700" : "bg-navy-300"}`} />
         </div>
-        <span class={`mt-1.5 px-1 text-[11px] leading-tight sm:text-xs ${done ? "font-semibold text-ink" : "text-navy-600"}`}>
+        <span class={`mt-1.5 px-1 text-[0.6875rem] leading-tight sm:text-xs ${done ? "font-semibold text-ink" : "text-navy-600"}`}>
           {step.label}<span class="sr-only">, {state}</span>
         </span>
       </li>

@@ -1,11 +1,14 @@
 ---
 import { partyStyle, partyLetter } from "../lib/format";
-interface Props { party: string | null; size?: "sm" | "md" }
-const { party, size = "md" } = Astro.props;
-const dims = size === "sm" ? "h-4 w-4 text-[10px]" : "h-5 w-5 text-xs";
+// decorative: hide from screen readers where the party name sits in text
+// right beside the chip and would otherwise be announced twice
+interface Props { party: string | null; size?: "sm" | "md"; decorative?: boolean }
+const { party, size = "md", decorative = false } = Astro.props;
+const dims = size === "sm" ? "h-4 w-4 text-[0.625rem]" : "h-5 w-5 text-xs";
 ---
 <span
   class={`inline-flex ${dims} shrink-0 items-center justify-center rounded-full font-bold ${partyStyle(party)}`}
-  role="img"
-  aria-label={party ?? "party unknown"}
+  role={decorative ? undefined : "img"}
+  aria-label={decorative ? undefined : (party ?? "party unknown")}
+  aria-hidden={decorative ? "true" : undefined}
 ><span aria-hidden="true">{partyLetter(party)}</span></span>

@@ -1,0 +1,25 @@
+---
+/** One row of a legislator's vote history. */
+import { fmtDate } from "../lib/format";
+interface Props {
+  v: {
+    option: string; vote_event_id: string; identifier: string;
+    motion: string | null; title: string | null; date: string | null;
+  };
+}
+const { v } = Astro.props;
+---
+<li class="flex items-baseline gap-2">
+  <span
+    class={`w-14 shrink-0 text-xs font-bold uppercase ${
+      v.option === "yes" ? "text-moss-600" : v.option === "no" ? "text-badger-700" : "text-navy-600"
+    }`}
+  >
+    {v.option === "yes" ? "Aye" : v.option === "no" ? "Nay" : "NV"}
+  </span>
+  <a href={`/votes/${v.vote_event_id}/`} class="shrink-0 py-1 font-semibold underline">
+    {v.identifier}
+  </a>
+  <span class="truncate">{v.motion ?? v.title}</span>
+  <span class="ml-auto shrink-0 text-xs text-navy-600">{fmtDate(v.date)}</span>
+</li>

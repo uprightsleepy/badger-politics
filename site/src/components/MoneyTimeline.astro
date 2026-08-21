@@ -1,7 +1,9 @@
 ---
 /** Quarterly fundraising bars since taking office, rendered as static
- * SVG at build time. Gold bars are election quarters (Q4 of even
- * years), when money predictably surges. */
+ * SVG at build time. Bar width adapts to the span so the drawing keeps
+ * its aspect ratio; a tick marks election quarters alongside the gold
+ * fill, and a details table carries the per-quarter numbers for
+ * keyboard, touch, and screen reader use. */
 import { fmtMoney, monthYear } from "../lib/format";
 
 interface Props {
@@ -27,56 +29,39 @@ for (let y = startYear; y <= endYear; y++) {
 const max = Math.max(...series.map((d) => d.total), 1);
 const peak = series.reduce((a, b) => (b.total > a.total ? b : a), series[0]);
 
-const BAR = 6, GAP = 2, H = 96, PAD_TOP = 6, PAD_BOTTOM = 18;
+const GAP = 2, H = 96, PAD_TOP = 6, PAD_BOTTOM = 18;
+// aim for a stable drawing width so short careers don't stretch
+const BAR = Math.max(3, Math.round(560 / series.length) - GAP);
 const width = series.length * (BAR + GAP) + GAP;
 const height = H + PAD_TOP + PAD_BOTTOM;
 const x = (i: number) => GAP + i * (BAR + GAP);
 const barH = (v: number) => Math.max(v > 0 ? 1.5 : 0, (v / max) * H);
 const isElectionQ = (d: { year: number; qn: number }) => d.year % 2 === 0 && d.qn === 4;
-
-// alternating two-year cycle bands, odd-year January onward
-const bands: { from: number; to: number }[] = [];
-for (let i = 0; i < series.length; i++) {
-  const cycleStart = series[i].year % 2 === 1 && series[i].qn === 1;
-  if (i === 0 || cycleStart) bands.push({ from: i, to: i });
-  bands[bands.length - 1].to = i;
-}
-const label =
-  `Quarterly fundraising since taking office, ${monthYear(entry)}: ` +
-  `peak ${fmtMoney(peak.total)} in ${peak.q.replace("-", " ")}`;
+const label = `Quarterly fundraising since taking office, ${monthYear(entry)}: ${series.length} quarters`;
 ---
 
 {series.length > 1 && (
   <figure class="mt-3">
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      class="h-28 w-full max-w-2xl"
+      class="w-full max-w-2xl"
       role="img"
       aria-label={label}
-      preserveAspectRatio="none"
     >
-      {bands.map((b, bi) =>
-        bi % 2 === 1 ? (
-          <rect
-            x={x(b.from) - GAP / 2}
-            y="0"
-            width={(b.to - b.from + 1) * (BAR + GAP)}
-            height={PAD_TOP + H}
-            fill="#eef2f7"
-          />
-        ) : null,
-      )}
       <line x1="0" y1={PAD_TOP + H} x2={width} y2={PAD_TOP + H} stroke="#d9e2ee" stroke-width="1" />
       {series.map((d, i) => (
-        <rect
-          x={x(i)}
-          y={PAD_TOP + H - barH(d.total)}
-          width={BAR}
-          height={barH(d.total)}
-          fill={isElectionQ(d) ? "#a87a1e" : "#2d4a73"}
-        >
-          <title>{d.q.replace("-", " ")}: {fmtMoney(d.total)}</title>
-        </rect>
+        <>
+          <rect
+            x={x(i)}
+            y={PAD_TOP + H - barH(d.total)}
+            width={BAR}
+            height={barH(d.total)}
+            fill={isElectionQ(d) ? "#a87a1e" : "#2d4a73"}
+          />
+          {isElectionQ(d) && (
+            <rect x={x(i)} y={PAD_TOP + H + 2} width={BAR} height="3" fill="#a87a1e" />
+          )}
+        </>
       ))}
       {series.map((d, i) =>
         d.qn === 1 && d.year % 2 === 1 ? (
@@ -85,8 +70,16 @@ const label =
       )}
     </svg>
     <figcaption class="mt-1 text-xs text-navy-600">
-      Receipts by quarter since taking office. Gold bars are election
-      quarters; peak {fmtMoney(peak.total)} in {peak.q.replace("-", " ")}.
+      Receipts by quarter since taking office. Gold bars with a tick under
+      them are election quarters; peak {fmtMoney(peak.total)} in {peak.q.replace("-", " ")}.
     </figcaption>
+    <details class="mt-1 text-xs text-navy-700">
+      <summary class="cursor-pointer text-navy-600">Quarter by quarter</summary>
+      <ul class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
+        {quarters.map((d) => (
+          <li>{d.q.replace("-", " ")}: {fmtMoney(d.total)}</li>
+        ))}
+      </ul>
+    </details>
   </figure>
 )}

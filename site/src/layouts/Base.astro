@@ -58,21 +58,26 @@ const dataThrough = meta().data_through;
           {dataThrough && <span> and is current through <strong>{dataThrough}</strong></span>}.
           Every page links to the <a href="https://docs.legis.wisconsin.gov" class="underline">official source</a> so you can check our work.
         </p>
-        <p class="flex flex-wrap gap-x-4">
-          <a href="/data/" class="underline">Data &amp; API</a>
-          <a href="/about/" class="underline">About &amp; corrections</a>
-          <a href="/feeds/weekly.xml" class="underline">This week (Atom)</a>
-          <a href="/calendar/hearings.ics" class="underline">Hearings calendar</a>
-          <a href="https://github.com/uprightsleepy/badger-politics" class="underline">Source code</a>
+        <p class="flex flex-wrap gap-x-4 gap-y-1">
+          <a href="/data/" class="py-1 underline">Data &amp; API</a>
+          <a href="/about/" class="py-1 underline">About &amp; corrections</a>
+          <a href="/feeds/weekly.xml" class="py-1 underline">This week (Atom)</a>
+          <a href="/calendar/hearings.ics" class="py-1 underline">Hearings calendar</a>
+          <a href="https://github.com/uprightsleepy/badger-politics" class="py-1 underline">Source code</a>
         </p>
       </div>
     </footer>
 
     <script>
       // "Your reps" chip: district saved by /my-reps lives in localStorage only
-      const saved = localStorage.getItem("bp-district");
+      let saved: { ad: number; sd: number } | null = null;
+      try {
+        saved = JSON.parse(localStorage.getItem("bp-district") ?? "null");
+      } catch {
+        localStorage.removeItem("bp-district");
+      }
       if (saved) {
-        const { ad, sd } = JSON.parse(saved);
+        const { ad, sd } = saved;
         const link = document.getElementById("nav-my-reps");
         if (link) {
           link.textContent = `Your reps · AD ${ad} / SD ${sd}`;

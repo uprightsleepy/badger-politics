@@ -13,17 +13,20 @@ import Base from "../layouts/Base.astro";
       This page doesn't exist. If you followed a link here, the bill or
       legislator may have moved when a new session started.
     </p>
-    <div class="mx-auto mt-6 max-w-md text-left">
+    <form action="/" method="get" class="mx-auto mt-6 flex max-w-md gap-2 text-left">
       <label class="sr-only" for="q404">Search bills</label>
       <input
         id="q404"
+        name="q"
         type="search"
         placeholder="Search bills. Try “child marriage” or “AB 656”"
-        class="w-full rounded-lg border border-navy-100 bg-white px-4 py-3 shadow-sm"
+        class="min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-4 py-3 shadow-sm"
         autocomplete="off"
       />
-      <p class="mt-1 text-xs text-navy-600">Press Enter to search from the home page.</p>
-    </div>
+      <button type="submit" class="rounded-lg bg-navy-800 px-4 py-2 font-semibold text-white hover:bg-navy-700">
+        Search
+      </button>
+    </form>
     <p class="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm font-semibold">
       <a href="/" class="underline">Home</a>
       <a href="/bills/" class="underline">Bills</a>
@@ -34,13 +37,4 @@ import Base from "../layouts/Base.astro";
     </p>
   </div>
 
-  <script>
-    // hand the query to the home page search
-    const input = document.getElementById("q404") as HTMLInputElement;
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && input.value.trim()) {
-        location.href = "/?q=" + encodeURIComponent(input.value.trim());
-      }
-    });
-  </script>
 </Base>

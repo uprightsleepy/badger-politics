@@ -20,14 +20,14 @@ const initials = name
 {hasLogo ? (
   <img
     src={`/logos/${entityId}.png`}
-    alt={`${entry.org} logo`}
+    alt=""
     width="20"
     height="20"
     loading="lazy"
     class="h-5 w-5 shrink-0 rounded bg-white object-contain"
   />
 ) : (
-  <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-navy-100 text-[9px] font-bold text-navy-700" aria-hidden="true">
+  <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-navy-100 text-[0.5625rem] font-bold text-navy-700" aria-hidden="true">
     {initials}
   </span>
 )}
