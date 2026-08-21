@@ -1,0 +1,92 @@
+---
+import Base from "../../layouts/Base.astro";
+import PartyChip from "../../components/PartyChip.astro";
+import { allCommittees, committeeFor } from "../../lib/db";
+import { chamberName, personSlug, fmtDate, fmtTime, roleAbbr } from "../../lib/format";
+
+export function getStaticPaths() {
+  return allCommittees().map((c) => ({
+    params: { id: c.id.split("/").pop() },
+    props: { committeeId: c.id },
+  }));
+}
+const { committeeId } = Astro.props;
+const { committee, members, hearings, graveyard } = committeeFor(committeeId);
+const today = new Date().toISOString().slice(0, 10);
+const upcoming = hearings.filter((h) => (h.date ?? "") >= today).reverse();
+const recent = hearings.filter((h) => (h.date ?? "") < today);
+const roleLabel = (role: string) =>
+  role === "member" ? null : role.replace(/\b\w/g, (c) => c.toUpperCase());
+---
+
+<Base
+  title={committee.name}
+  description={`${chamberName(committee.chamber) || "Joint"} committee: members, hearings, and bills that died here without a hearing.`}
+>
+  <p class="text-sm text-navy-600"><a href="/committees/" class="underline">Committees</a></p>
+  <h1 class="mt-1 text-2xl font-bold">
+    {committee.chamber ? `${chamberName(committee.chamber)} ` : ""}{committee.name}
+  </h1>
+
+  <div class="mt-4 grid gap-6 lg:grid-cols-2">
+    <section class="min-w-0">
+      <h2 class="text-xl font-bold">Members · {members.length}</h2>
+      <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+        {members.map((m) => (
+          <li class="flex items-center gap-2 px-4 py-1.5">
+            <PartyChip party={m.party} size="sm" />
+            <a href={`/legislators/${personSlug(m.id)}/`} class="min-w-0 flex-1 truncate py-1 underline">
+              {m.name}
+            </a>
+            {roleLabel(m.role) && (
+              <span class="shrink-0 rounded-full bg-gold-100 px-2 py-0.5 text-xs font-semibold">
+                {roleLabel(m.role)}
+              </span>
+            )}
+            <span class="sr-only shrink-0 text-xs text-navy-600 sm:not-sr-only sm:inline">
+              {roleAbbr(m.chamber)} {m.district}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <section class="min-w-0">
+      <h2 class="text-xl font-bold">Hearing None record</h2>
+      <p class="mt-1 text-sm text-navy-600">
+        Bills referred here that died at session's end without a public hearing.
+      </p>
+      {graveyard.length > 0 ? (
+        <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+          {graveyard.map((g) => (
+            <li class="flex items-center gap-3 px-4 py-2">
+              <span class="w-16 shrink-0 font-semibold">{g.session_id}</span>
+              <span class="min-w-0 flex-1">{g.n} bill{g.n > 1 ? "s" : ""} died without a hearing</span>
+              <a href={`/hearing-none/${g.session_id}/`} class="shrink-0 py-1 text-xs underline">details</a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p class="mt-2 rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600">
+          No bills on record died in this committee without a hearing.
+        </p>
+      )}
+
+      {(upcoming.length > 0 || recent.length > 0) && (
+        <h2 class="mt-6 text-xl font-bold">
+          {upcoming.length > 0 ? "Upcoming hearings" : "Recent hearings"}
+        </h2>
+      )}
+      {(upcoming.length > 0 ? upcoming : recent.slice(0, 6)).map((h) => (
+        <p class="mt-2 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
+          <span class="font-semibold">{fmtDate(h.date)}</span>
+          {h.time && ` · ${fmtTime(h.time)}`}
+          {h.location && ` · ${h.location}`}
+          {h.source_url && (
+            <a href={h.source_url} class="ml-2 underline">official notice</a>
+          )}
+        </p>
+      ))}
+    </section>
+  </div>
+</Base>

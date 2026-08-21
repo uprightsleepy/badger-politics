@@ -122,6 +122,18 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             "SELECT COUNT(*) FROM committees c LEFT JOIN people p ON p.id = c.chair_person_id"
             " WHERE c.chair_person_id IS NOT NULL AND p.id IS NULL"
         ),
+        "bill_documents -> bills": (
+            "SELECT COUNT(*) FROM bill_documents d"
+            " LEFT JOIN bills b ON b.id = d.bill_id WHERE b.id IS NULL"
+        ),
+        "committee_members -> committees": (
+            "SELECT COUNT(*) FROM committee_members m"
+            " LEFT JOIN committees c ON c.id = m.committee_id WHERE c.id IS NULL"
+        ),
+        "committee_members -> people": (
+            "SELECT COUNT(*) FROM committee_members m"
+            " LEFT JOIN people p ON p.id = m.person_id WHERE p.id IS NULL"
+        ),
     }
     failures = []
     for label, query in queries.items():

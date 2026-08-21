@@ -11,6 +11,7 @@ import {
   sponsorsFor,
   votesFor,
   lobbyingFor,
+  documentsFor,
   personIdByName,
 } from "../../../lib/db";
 import { billSlug, fmtDate, personSlug, chamberName } from "../../../lib/format";
@@ -32,6 +33,11 @@ const lobbying = lobbyingFor(bill.id);
 const primary = sponsors.filter((s) => s.is_primary);
 const cosponsors = sponsors.filter((s) => !s.is_primary);
 const chairId = personIdByName(bill.committee_chair_at_death);
+const fiscalEstimates = documentsFor(bill.id).filter((d) =>
+  d.note.toLowerCase().includes("fiscal estimate"),
+);
+// "AB 12: Fiscal Estimate From DOA" -> "Fiscal Estimate From DOA"
+const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
 ---
 
 <Base title={`${bill.identifier} (${sessionName})`} description={bill.title ?? undefined}>
@@ -93,6 +99,22 @@ const chairId = personIdByName(bill.committee_chair_at_death);
             {bill.lrb_analysis.split(/\n+/).slice(0, 40).map((para) => <p>{para}</p>)}
           </div>
         </div>
+      </section>
+    )}
+
+    {fiscalEstimates.length > 0 && (
+      <section class="mt-4">
+        <h2 class="text-lg font-bold">What it would cost</h2>
+        <p class="text-xs text-navy-600">
+          Fiscal estimates filed by state agencies, as official PDFs
+        </p>
+        <ul class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+          {fiscalEstimates.map((d) => (
+            <li>
+              <a href={d.url} class="py-1 underline">{fiscalLabel(d.note)}</a>
+            </li>
+          ))}
+        </ul>
       </section>
     )}
 

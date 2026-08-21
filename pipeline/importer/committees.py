@@ -9,7 +9,7 @@ same row. A chair is the first member whose role is chair/co-chair.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -24,6 +24,7 @@ class Committee:
     chamber: str | None  # None = joint/legislature-wide
     chair_person_id: str | None
     chair_name: str | None
+    members: list[dict] = field(default_factory=list)  # {name, role, person_id}
 
 
 def normalize_name(name: str) -> str:
@@ -56,6 +57,12 @@ def load_committees(committees_dir: Path) -> list[Committee]:
                 chamber=CHAMBER_MAP.get(raw.get("chamber"), None),
                 chair_person_id=chair.get("person_id") if chair else None,
                 chair_name=chair.get("name") if chair else None,
+                members=[
+                    {"name": m["name"], "role": m.get("role") or "member",
+                     "person_id": m.get("person_id")}
+                    for m in raw.get("members", [])
+                    if m.get("person_id")
+                ],
             )
         )
     return committees

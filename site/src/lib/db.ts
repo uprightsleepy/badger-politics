@@ -614,6 +614,87 @@ export const donorCommitteeFor = (entityId: number) => ({
   byParty: partyTotals("WHERE c.from_entity_id = @entityId", { entityId }),
 });
 
+/** Committees with member counts, for the index. */
+export const allCommittees = () =>
+  db
+    .prepare(
+      `SELECT c.id, c.name, c.chamber, c.chair_person_id, p.name AS chair_name,
+              COUNT(m.person_id) AS member_count
+       FROM committees c
+       LEFT JOIN committee_members m ON m.committee_id = c.id
+       LEFT JOIN people p ON p.id = c.chair_person_id
+       GROUP BY c.id HAVING member_count > 0 ORDER BY c.name`,
+    )
+    .all() as {
+      id: string; name: string; chamber: string | null;
+      chair_person_id: string | null; chair_name: string | null; member_count: number;
+    }[];
+
+// mirror of importer/committees.py normalize_name, for matching the
+// graveyard's committee_at_death names to committee pages
+const normalizeCommitteeName = (name: string): string => {
+  let key = name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  for (;;) {
+    const stripped = key.replace(/^(joint |committee on )/, "");
+    if (stripped === key) return key;
+    key = stripped;
+  }
+};
+
+/** One committee: members, hearings, and its Hearing None record.
+ * Graveyard rows attach only on exact normalized-name + chamber match. */
+export const committeeFor = (committeeId: string) => {
+  const members = db
+    .prepare(
+      `SELECT m.person_id AS id, m.role, p.name, p.party, p.chamber, p.district,
+              p.current_role
+       FROM committee_members m JOIN people p ON p.id = m.person_id
+       WHERE m.committee_id = ?
+       ORDER BY CASE WHEN m.role LIKE '%chair%' THEN 0 ELSE 1 END, p.name`,
+    )
+    .all(committeeId) as {
+      id: string; role: string; name: string; party: string | null;
+      chamber: string | null; district: number | null; current_role: string | null;
+    }[];
+  const committee = db
+    .prepare("SELECT id, name, chamber FROM committees WHERE id = ?")
+    .get(committeeId) as { id: string; name: string; chamber: string | null };
+  const hearings = db
+    .prepare(`${HEARING_SELECT} WHERE h.committee_id = ? ORDER BY h.date DESC LIMIT 15`)
+    .all(committeeId) as Hearing[];
+  const key = normalizeCommitteeName(committee.name);
+  // chamber committees require the referral's chamber to match; joint
+  // committees require the referral text to say Joint. Same-named
+  // committees in different chambers can never merge.
+  const graveyard = (
+    db
+      .prepare(
+        `SELECT session_id, committee_at_death,
+                committee_chamber_at_death AS chamber, COUNT(*) AS n
+         FROM bills WHERE died_without_hearing = 1 AND committee_at_death IS NOT NULL
+         GROUP BY session_id, committee_at_death, chamber
+         ORDER BY session_id DESC`,
+      )
+      .all() as {
+        session_id: string; committee_at_death: string;
+        chamber: string | null; n: number;
+      }[]
+  ).filter((g) => {
+    if (normalizeCommitteeName(g.committee_at_death) !== key) return false;
+    const referralIsJoint = /^joint\b/i.test(g.committee_at_death);
+    if (committee.chamber == null) return referralIsJoint;
+    return !referralIsJoint && g.chamber === committee.chamber;
+  });
+  return { committee, members, hearings, graveyard };
+};
+
+/** Official documents attached to a bill; note text is docs.legis's own,
+ * displayed verbatim. */
+export const documentsFor = (billId: string) =>
+  db
+    .prepare("SELECT note, url FROM bill_documents WHERE bill_id = ? ORDER BY note")
+    .all(billId) as { note: string; url: string }[];
+
 /** Organizations registered as lobbying on a bill (an interest
  * registration, not a for/against position). */
 export const lobbyingFor = (billId: string) =>

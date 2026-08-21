@@ -1,0 +1,49 @@
+---
+import Base from "../../layouts/Base.astro";
+import { allCommittees } from "../../lib/db";
+import { personSlug } from "../../lib/format";
+
+const committees = allCommittees();
+const groups = [
+  { label: "Assembly", rows: committees.filter((c) => c.chamber === "lower") },
+  { label: "Senate", rows: committees.filter((c) => c.chamber === "upper") },
+  { label: "Joint and legislative", rows: committees.filter((c) => c.chamber == null) },
+];
+---
+
+<Base
+  title="Committees"
+  description="Every Wisconsin Legislature committee: members, chairs, hearings, and the bills that died there without a hearing."
+>
+  <h1 class="text-2xl font-bold">Committees</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    Committees decide which bills get hearings. A chair alone decides whether
+    a bill is heard, which makes these small rooms the most consequential
+    places in the Capitol.
+  </p>
+  {groups.map((g) => (
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">{g.label}</h2>
+      <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+        {g.rows.map((c) => (
+          <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2">
+            <a href={`/committees/${c.id.split("/").pop()}/`} class="min-w-0 flex-1 truncate py-1 font-semibold underline">
+              {c.name}
+            </a>
+            {c.chair_name && (
+              <span class="text-xs text-navy-600">
+                Chair:{" "}
+                {c.chair_person_id ? (
+                  <a href={`/legislators/${personSlug(c.chair_person_id)}/`} class="underline">{c.chair_name}</a>
+                ) : (
+                  c.chair_name
+                )}
+              </span>
+            )}
+            <span class="shrink-0 text-xs text-navy-600">{c.member_count} members</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+</Base>

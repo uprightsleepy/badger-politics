@@ -1,12 +1,14 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { upcomingHearings, recentHearings, findBillByIdentifier } from "../../lib/db";
+import { upcomingHearings, recentHearings, findBillByIdentifier, allCommittees } from "../../lib/db";
 import { fmtDate, fmtTime, chamberName, billSlug, personSlug } from "../../lib/format";
 const today = new Date().toISOString().slice(0, 10);
 const upcoming = upcomingHearings(today);
 const recent = recentHearings(30);
 const shown = upcoming.length ? upcoming : recent;
 const heading = upcoming.length ? "Upcoming committee hearings" : "Recent committee hearings";
+// schedule-feed committees without a roster have no page; don't link them
+const committeePages = new Set(allCommittees().map((c) => c.id));
 ---
 
 <Base title="Committee hearings" description="Upcoming Wisconsin Legislature committee hearings, with add-to-calendar files.">
@@ -27,7 +29,11 @@ const heading = upcoming.length ? "Upcoming committee hearings" : "Recent commit
       return (
         <li class="rounded-lg border border-navy-100 bg-white px-4 py-3 text-sm">
           <div class="flex flex-wrap items-baseline gap-x-3">
-            <span class="font-bold">{name}</span>
+            {h.committee_id && committeePages.has(h.committee_id) ? (
+              <a href={`/committees/${h.committee_id.split("/").pop()}/`} class="py-1 font-bold underline">{name}</a>
+            ) : (
+              <span class="font-bold">{name}</span>
+            )}
             <span class="text-navy-600">{fmtDate(h.date)} {h.time && `· ${fmtTime(h.time)}`}</span>
             {h.location && <span class="text-navy-600">{h.location}</span>}
             <span class="ml-auto flex gap-3">

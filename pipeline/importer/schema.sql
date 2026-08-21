@@ -40,8 +40,9 @@ CREATE TABLE bills (
     lrb_analysis             TEXT,
     -- the graveyard flag: referred, never heard, then failed pursuant to SJR 1
     died_without_hearing     INTEGER NOT NULL DEFAULT 0 CHECK (died_without_hearing IN (0, 1)),
-    committee_at_death       TEXT,
-    committee_chair_at_death TEXT,
+    committee_at_death         TEXT,
+    committee_chamber_at_death TEXT,
+    committee_chair_at_death   TEXT,
     source                   TEXT CHECK (source IN ('openstates', 'legiscan', 'manual'))
 );
 
@@ -61,6 +62,24 @@ CREATE TABLE actions (
     description    TEXT,
     classification TEXT
 );
+
+-- official documents attached to a bill (fiscal estimates, memos), with
+-- the docs.legis note text verbatim and the official URL
+CREATE TABLE bill_documents (
+    bill_id TEXT NOT NULL REFERENCES bills (id),
+    note    TEXT NOT NULL,
+    url     TEXT NOT NULL
+);
+CREATE INDEX idx_bill_documents_bill ON bill_documents (bill_id);
+
+-- current committee rosters from the openstates people files; person ids
+-- are exact, so membership inherits roster precision
+CREATE TABLE committee_members (
+    committee_id TEXT NOT NULL REFERENCES committees (id),
+    person_id    TEXT NOT NULL REFERENCES people (id),
+    role         TEXT NOT NULL
+);
+CREATE INDEX idx_committee_members_committee ON committee_members (committee_id);
 
 CREATE TABLE vote_events (
     id         TEXT PRIMARY KEY,

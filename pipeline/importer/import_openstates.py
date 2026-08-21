@@ -217,6 +217,12 @@ class Importer:
                 " VALUES (?, ?, ?, ?)",
                 (c.id, c.chamber, c.name, c.chair_person_id),
             )
+            for m in c.members:
+                self.conn.execute(
+                    "INSERT INTO committee_members (committee_id, person_id, role)"
+                    " VALUES (?, ?, ?)",
+                    (c.id, m["person_id"], m["role"]),
+                )
 
     def import_people(self) -> None:
         """Union of every session roster; sitting members keep live titles."""
@@ -286,8 +292,9 @@ class Importer:
             "INSERT INTO bills (id, session_id, identifier, title, chamber,"
             " classification, status, latest_action_date, latest_action_desc,"
             " text_url, died_without_hearing, committee_at_death,"
+            " committee_chamber_at_death,"
             " committee_chair_at_death, source)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'openstates')",
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'openstates')",
             (
                 pk,
                 key,
@@ -301,6 +308,7 @@ class Importer:
                 text_url,
                 died,
                 committee if died else None,
+                committee_chamber if died else None,
                 chair_name if died else None,
             ),
         )
@@ -317,6 +325,13 @@ class Importer:
                     ",".join(action.get("classification") or []),
                 ),
             )
+        for doc in bill.get("documents", []):
+            url = doc["links"][0]["url"] if doc.get("links") else None
+            if url and doc.get("note"):
+                self.conn.execute(
+                    "INSERT INTO bill_documents (bill_id, note, url) VALUES (?, ?, ?)",
+                    (pk, doc["note"], url),
+                )
         for sp in bill.get("sponsorships", []):
             person_id = None
             if sp.get("entity_type") == "person":
@@ -568,7 +583,8 @@ def run_import(
     stats = {
         table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]  # noqa: S608
         for table in ("sessions", "people", "bills", "actions", "sponsorships",
-                      "vote_events", "vote_records", "committees", "hearings")
+                      "bill_documents", "vote_events", "vote_records", "committees",
+                      "hearings")
     }
     quality = conn.execute(
         "SELECT id, data_quality FROM sessions ORDER BY id"
