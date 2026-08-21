@@ -48,6 +48,13 @@ export const fmtTime = (t: string | null): string => {
 export const fmtMoney = (v: number): string =>
   "$" + Math.round(v).toLocaleString("en-US");
 
+export const monthYear = (iso: string): string =>
+  new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
 export const fmtDate = (iso: string | null): string => {
   if (!iso) return "";
   const [y, m, d] = iso.split("-").map(Number);

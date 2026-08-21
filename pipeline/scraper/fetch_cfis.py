@@ -209,17 +209,12 @@ def fetch_transactions(since: str) -> None:
     http = requests.Session()
     http.headers["User-Agent"] = USER_AGENT
 
-    windows = month_windows(since)
-    for label, first, last in windows:
-        out = DATA_DIR / f"tx-{label}.json"
-        # immutable once past; always refresh the two newest months
-        if out.exists() and label not in {w[0] for w in windows[-2:]}:
-            continue
+    def fetch_month(first: str, last: str) -> tuple[list[dict], int, object, set]:
         expected = call(
             http, "publicFrontendApi.getTransactionsTotalCount",
             {"dateFrom": first, "dateTo": last},
         )
-        rows, skip = [], 0
+        rows, skip, seen_ids = [], 0, set()
         while True:
             page = call(
                 http, "publicFrontendApi.getTransactions",
@@ -228,6 +223,7 @@ def fetch_transactions(since: str) -> None:
             )
             results = page.get("results", [])
             for t in results:
+                seen_ids.add(t["id"])
                 committee_id = t.get("createdByEntityId")
                 person_id = committee_ids.get(committee_id)
                 if not person_id:
@@ -254,7 +250,49 @@ def fetch_transactions(since: str) -> None:
             if len(results) < PAGE:
                 break
             time.sleep(DELAY)
-        if isinstance(expected, (int, float)) and skip != expected:
+        return rows, skip, expected, seen_ids
+
+    windows = month_windows(since)
+    for label, first, last in windows:
+        out = DATA_DIR / f"tx-{label}.json"
+        # immutable once past; always refresh the two newest months
+        if out.exists() and label not in {w[0] for w in windows[-2:]}:
+            continue
+        # the newest month is a moving target: filings land while we page,
+        # so retake the whole snapshot until count and pages agree exactly
+        attempts = 3 if label == windows[-1][0] else 1
+        for attempt in range(attempts):
+            rows, skip, expected, seen_ids = fetch_month(first, last)
+            matched = not isinstance(expected, (int, float)) or skip == expected
+            if matched:
+                break
+            if attempt < attempts - 1:
+                print(f"{label}: count moved during fetch ({skip} vs {expected}), retaking")
+                time.sleep(5)
+        diffable = (label == windows[-1][0]
+                    and isinstance(expected, (int, float)) and expected <= PAGE)
+        if not matched and diffable:
+            # the date-sorted view can briefly omit freshly amended rows that
+            # the unsorted view still returns. Accept only if every omitted
+            # row is one our data can never contain (not an incoming receipt
+            # to a mapped committee); anything else stays a hard failure.
+            plain = call(
+                http, "publicFrontendApi.getTransactions",
+                {"take": PAGE, "skip": 0, "dateFrom": first, "dateTo": last},
+            ).get("results", [])
+            omitted = [t for t in plain if t["id"] not in seen_ids]
+            relevant = [
+                t for t in omitted
+                if (t.get("transactionType") or {}).get("direction") == "INCOMING"
+                and t.get("createdByEntityId") in committee_ids
+            ]
+            if len(plain) == expected and not relevant:
+                print(
+                    f"WARNING: {label} date-sorted view omitted {len(omitted)} "
+                    "non-receipt rows; accepted, refreshes nightly"
+                )
+                matched = True
+        if not matched:
             raise RuntimeError(
                 f"CFIS drift: {label} paged {skip} rows but count said {expected}"
             )

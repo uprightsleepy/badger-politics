@@ -16,10 +16,11 @@ const roleAbbr = (chamber: string | null) => (chamber === "upper" ? "SD" : "AD")
 >
   <h1 class="text-2xl font-bold">Campaign money</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Contributions reported to sitting legislators' campaign committees,
-    {m.first && ` ${fmtDate(m.first)} to ${fmtDate(m.last)},`}
-    from Wisconsin Ethics Commission filings.
-    <a href="/about/#money" class="underline">How this data works</a>
+    The money invested in Wisconsin's sitting legislators: every
+    contribution reported to each member's campaign committees since they
+    took office, from Wisconsin Ethics Commission filings
+    {m.last && ` through ${fmtDate(m.last)}`}. Electronic records begin in
+    2008. <a href="/about/#money" class="underline">How this data works</a>
   </p>
   <p class="mt-2 max-w-3xl rounded-lg border border-gold-500 bg-gold-100 px-3 py-2 text-sm">
     Coverage note: {m.covered} of {m.sitting} sitting legislators are linked to
@@ -30,7 +31,9 @@ const roleAbbr = (chamber: string | null) => (chamber === "upper" ? "SD" : "AD")
   <div class="mt-4 grid gap-3 sm:grid-cols-3">
     <div class="rounded-lg border border-navy-100 bg-white p-4">
       <p class="text-2xl font-bold">{fmtMoney(m.total)}</p>
-      <p class="text-sm text-navy-600">raised across {m.n.toLocaleString()} reported receipts</p>
+      <p class="text-sm text-navy-600">
+        raised across {m.n.toLocaleString()} reported receipts while in office
+      </p>
     </div>
     <div class="rounded-lg border border-navy-100 bg-white p-4">
       <p class="text-2xl font-bold">{pctIndividual}%</p>
@@ -70,9 +73,9 @@ const roleAbbr = (chamber: string | null) => (chamber === "upper" ? "SD" : "AD")
     <section>
       <h2 class="text-xl font-bold">Top fundraising legislators</h2>
       <p class="mt-1 text-sm text-navy-600">
-        Total reported receipts to each legislator's candidate committees,
-        including any runs for other offices. The largest totals here are
-        usually members running statewide, not legislative-race money.
+        Each legislator's rolling total since they took office, including
+        any runs for other offices. Long tenure and statewide runs both
+        push members up this list.
       </p>
       <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
         {m.topLegislators.map((p, i) => (

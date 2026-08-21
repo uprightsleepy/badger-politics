@@ -1,14 +1,14 @@
 # Curation worklist
 
-Generated 2026-08-20 from live CFIS searches. Nothing here is imported;
-these are leads for human verification only.
+Generated 2026-08-21 from live CFIS searches. Nothing here is imported;
+these are leads for human verification only. Confirm candidate, office and
+district on campaignfinance.wi.gov before accepting; a same-surname
+committee for another office is the trap.
 
-## 1. Candidate committees (34 legislators)
-
-For each legislator, confirm which committee (if any) is theirs on
-campaignfinance.wi.gov, then add to pipeline/importer/candidate_committees.json as:
+Add confirmed entries to pipeline/importer/candidate_committees.json as
 `"<person_id>": {"entity_id": <id>, "committee": "<exact name>"}` or `{"skip": true}`.
-Watch for same-surname candidates for other offices.
+
+## 1. Never mapped (34 legislators)
 
 ### Representative D4 - David Steffen (R)
 `ocd-person/2a067a93-dffc-4ce7-8975-d37fb67b4512`
@@ -337,7 +337,7 @@ Watch for same-surname candidates for other offices.
 
 ### Senator D8 - Jodi Habush Sinykin (D)
 `ocd-person/225f946c-4812-435d-83f1-dad22a2fb0d6`
-- no CFIS committee hits at all; likely `{"skip": true}` (never filed, or registered under a different name)
+- no CFIS hits; search the site by surname or nickname, or skip
 
 ### Senator D10 - Rob Stafsholt (R)
 `ocd-person/a1407176-afc6-45ce-ad6c-d7f69b5b3b78`
@@ -346,7 +346,7 @@ Watch for same-surname candidates for other offices.
 
 ### Senator D12 - Mary Felzkowski (R)
 `ocd-person/c67b7b29-0932-4667-bb92-63f46cdfaef0`
-- no CFIS committee hits at all; likely `{"skip": true}` (never filed, or registered under a different name)
+- no CFIS hits; search the site by surname or nickname, or skip
 
 ### Senator D14 - Sarah Keyeski (D)
 `ocd-person/c7bbb253-91be-4cf1-ab53-ab7c1d902b48`
@@ -368,7 +368,7 @@ Watch for same-surname candidates for other offices.
 
 ### Senator D29 - Cory Tomczyk (R)
 `ocd-person/365aa5a9-3584-4baa-86b5-51f096764f69`
-- no CFIS committee hits at all; likely `{"skip": true}` (never filed, or registered under a different name)
+- no CFIS hits; search the site by surname or nickname, or skip
 
 ### Senator D30 - Jamie Wall (D)
 `ocd-person/5d4675a4-34f3-47ea-8821-69669a2a8d05`
@@ -409,31 +409,501 @@ Watch for same-surname candidates for other offices.
 - [ ] 6725230 - Dave Pfaff for Alderman  (other office)
 - [ ] 918289 - Friends of Zach Pfaffenbach  <- likely
 
-## 2. org-domains.json candidates (top committee donors without a logo)
+## 2. Linked committee has zero receipts ever (35 legislators)
 
-For each: find the org's official domain, verify the homepage identifies the org
-and the committee-to-org link is self-evident, then add an entry with a basis string.
-Skip any where the link needs inference.
+These members are linked to a committee that has never filed a receipt,
+which almost always means their active committee (often named
+"Surname for Office", which never auto-matches) is missing. Pick the
+active committee from the hits below.
 
-- [ ] 234 - Assembly Democratic Camp Comm - $1,018,524 across 4 receipts to 2 legislators
-- [ ] 16330 - State Senate Democratic Committee - $349,530 across 17 receipts to 4 legislators
-- [ ] 12386406 - Republican Assembly Campaign Committee - $30,000 across 2 receipts to 2 legislators
-- [ ] 651925 - Concerned Realtors Committee - $16,500 across 16 receipts to 16 legislators
-- [ ] 663989 - RANW PAC - $14,000 across 12 receipts to 11 legislators
-- [ ] 651856 - Wisconsin Beer Distributors PAC - $13,000 across 14 receipts to 13 legislators
-- [ ] 664292 - Northwestern Wisconsin REALTORS PAC - $12,500 across 11 receipts to 11 legislators
-- [ ] 613283 - Plumbers Local 75 PAC - $12,250 across 12 receipts to 12 legislators
-- [ ] 34817 - WI Pipe Trades Assn PAC - $11,950 across 10 receipts to 10 legislators
-- [ ] 651763 - Tavern Industry PAC - $11,750 across 12 receipts to 11 legislators
-- [ ] 664067 - REALTORS Assn of SC WI PAC - $11,000 across 11 receipts to 11 legislators
-- [ ] 1146150 - Eau Claire County Democratic Party - $9,000 across 1 receipts to 1 legislators
-- [ ] 664116 - WI Soc Anesthesiologists PAC - $9,000 across 8 receipts to 8 legislators
-- [ ] 651770 - Operating Engineers 139 PAC - $9,000 across 6 receipts to 6 legislators
-- [ ] 15850 - Wisconsin Hospitals PAC - $8,910 across 23 receipts to 18 legislators
-- [ ] 664126 - ABCPAC-WIS - $8,550 across 15 receipts to 13 legislators
-- [ ] 653764 - WEAC Region 6 Political Action Committee - $8,500 across 2 receipts to 2 legislators
-- [ ] 1674829 - Bell Ambulance, Inc. Employees PAC - $8,250 across 16 receipts to 14 legislators
-- [ ] 12395052 - Republican Party of Wisconsin - $7,780 across 1 receipts to 1 legislators
-- [ ] 664426 - WIA PAC - $7,750 across 13 receipts to 12 legislators
-- [ ] 664167 - Alliant Energy WI Gov Act Cte - $7,500 across 10 receipts to 7 legislators
-- [ ] 664095 - WALA PAC - $7,500 across 17 receipts to 13 legislators
+### Representative D2 - Shae Sortwell (R)
+`ocd-person/82745ad9-d4b8-48e7-bbb9-3c5d73535c30`
+- already linked (no receipts found): 1986235 Shae Sortwell, 6622977 Friends of Shae Sortwell, 1968794 Shae Sortwell for Assembly, 1717449 Taxpayers For Shae Sortwell
+- [ ] 663883 - Taxpayers for Sortwell  <- likely
+- [ ] 6473553 - Sortwell for Assembly  <- likely
+- [ ] 6473567 - Sortwell for Assembly  <- likely
+
+### Representative D10 - Darrin Madison (D)
+`ocd-person/d9f84b91-88ac-4abc-8d47-0672e2de5970`
+- already linked (no receipts found): 9636586 Darrin Madison, Jr., 1700054 Friends of Darrin Madison, 11388780 Friends of Darrin Madison, 10037459 Friends of Darrin Madison Jr., 6668967 Friends of Darrin Madison Jr.
+- [ ] 9991662 - Message to Madison  <- likely
+- [ ] 11294557 - Madison  <- likely
+- [ ] 9044846 - Progressive Madison  <- likely
+- [ ] 10100920 - The Madison Project  <- likely
+- [ ] 651913 - Madison Teachers Inc  <- likely
+- [ ] 1827478 - Madison Teachers Inc   <- likely
+- [ ] 7083181 - WRA Madison Chapter PAC  <- likely
+- [ ] 1914210 - Madison Gas & Electric Co  <- likely
+- [ ] 1012263 - WRA Madison Area Chapter  <- likely
+- [ ] 9681603 - MADISON WOMENS MED. & FAMILY  <- likely
+- [ ] 1914212 - Madison Gas & Electric PAC  <- likely
+- [ ] 2132314 - Madison Educators PAC WEPAC  <- likely
+- [ ] 9621634 - Madison Area Ref Stop Hwy  <- likely
+- [ ] 2827096 - Citizens Party of Madison  <- likely
+- [ ] 9081931 - Madison Area Apartment Assn   <- likely
+- [ ] 5563510 - Weber to Madison Committee  <- likely
+- [ ] 653721 - Madison Prof Police Officers  <- likely
+- [ ] 7053877 - Mrs. Findlay goes to Madison  <- likely
+- [ ] 1161104 - UAW Janesville-Madison PAC  <- likely
+- [ ] 1162186 - Ellis to Madison Committee  <- likely
+
+### Representative D14 - Angelito Tenorio (D)
+`ocd-person/fc8fe4ef-dfff-465c-92db-a369ac888afe`
+- already linked (no receipts found): 8363463 friends of angelito tenorio
+- [ ] 1147110 - Angelito for Assembly
+- [ ] 1145734 - Tenorio for West Allis  <- likely
+
+### Representative D17 - Supreme Moore Omokunde (D)
+`ocd-person/bf0fa47b-889e-49fb-8fab-059452acdbf9`
+- already linked (no receipts found): 1914188 SUPREME MOORE OMOKUNDE FOR STATE HOUSE
+
+### Representative D19 - Ryan Clancy (D)
+`ocd-person/91423371-a92c-4006-ad7d-e21f2f7e666b`
+- already linked (no receipts found): 1147155 Friends of Ryan Clancy, 2771867 Friends of Ryan Clancy, 1914187 RYAN CLANCY FOR STATE HOUSE
+- [ ] 999244 - Clancy for Assembly  <- likely
+- [ ] 8455043 - Charne Clancy & Taitelman  <- likely
+- [ ] 8455041 - Charne Clancy & Taitelman SC  <- likely
+- [ ] 1699989 - Clancy for Assembly  <- likely
+
+### Representative D21 - Jessie Rodriguez (R)
+`ocd-person/1dd290f4-6504-4967-9566-55cb3340d303`
+- already linked (no receipts found): 1968755 Jessie Rodriguez for Assembly
+- [ ] 11455638 - Rodriguez  <- likely
+- [ ] 16403 - Sara Rodriguez For Wisconsin  <- likely
+- [ ] 3946548 - Ruben Rodriguez  <- likely
+- [ ] 11681805 - Zach Rodriguez  <- likely
+- [ ] 11468656 - A Greener Wisconsin
+- [ ] 30652 - Zachary Rodriguez  <- likely
+- [ ] 30371 - Rodriguez for Kenosha  <- likely
+- [ ] 30435 - Friends of Zach Rodriguez  <- likely
+- [ ] 7991873 - Friends of Zach Rodriguez  <- likely
+- [ ] 10037447 - Friends of Sara Rodriguez  <- likely
+- [ ] 1150677 - Friends of Sara Rodriguez  <- likely
+- [ ] 7555937 - Ciro Rodriguez For Congress  (other office)
+- [ ] 1145738 - Friends of Andrea Rodriguez  <- likely
+- [ ] 613164 - Sara Rodriguez for Wisconsin  <- likely
+- [ ] 1914197 - SARA RODRIGUEZ FOR LT GOVERNOR  (other office)
+- [ ] 30367 - Zach Rodriguez for County Board  (other office)
+- [ ] 7991780 - Zach Rodriguez for County Supervisor  (other office)
+- [ ] 5294770 - Steve Rodriguez for Randolph School Board  (other office)
+- [ ] 5294773 - Steve Rodriguez for Randolph School Board  (other office)
+
+### Representative D26 - Joe Sheehan (D)
+`ocd-person/28a7f0c8-0d9c-4436-bfe2-f92ae3871ee2`
+- already linked (no receipts found): 9154940 Joe Sheehan
+- [ ] 16434 - Sheehan for 26th Assembly  <- likely
+- [ ] 6707170 - Friends for Sheehan Donoghue  <- likely
+- [ ] 7200972 - COMM TO ELECT SHEEHAN JUDGE  (other office)
+- [ ] 1674582 - OMG WTF Wisconsin PAC
+- [ ] 613325 - Sheehan for 26th Assembly  <- likely
+
+### Representative D28 - Rob Kreibich (R)
+`ocd-person/a5d9287a-c3e7-4457-8faf-31024e0e9ac6`
+- already linked (no receipts found): 613373 Rob Kreibich For Assembly
+- [ ] 663805 - Kreibich for Assembly  <- likely
+
+### Representative D31 - Tyler August (R)
+`ocd-person/b4554989-ede4-44a0-a541-c2aea2659d39`
+- already linked (no receipts found): 1162182 Tyler August For State Assembly
+- [ ] 652030 - Citizens for Lothian
+- [ ] 1145816 - August for Assembly  <- likely
+- [ ] 16263 - Citizens for August  <- likely
+- [ ] 3112030 - Augustine for State Assembly  <- likely
+- [ ] 7975429 - Committee To Elect Augustine  <- likely
+- [ ] 5301372 - WOLFGANG FOR ASSEMBLY COMM
+- [ ] 5172708 - Joe Hisrich for State Assembly
+- [ ] 12228349 - Bruce Stabenow for Assembly District 91
+- [ ] 1795159 - Comm for G L Smith
+- [ ] 971012 - Citizens for Cathleen Cotter
+- [ ] 1717617 - Dornan for President
+- [ ] 16341 - Yee For WI
+- [ ] 9376687 - Republican Liberty Caucus-WI
+- [ ] 11262593 - Game Theory Masters
+- [ ] 11664456 - Augusta Lions  <- likely
+- [ ] 9549101 - Augustine Vega  <- likely
+- [ ] 7885701 - Citizensfor August  <- likely
+- [ ] 1968784 - August for Assembly  <- likely
+- [ ] 10381703 - Augusta Lions Club  <- likely
+
+### Representative D35 - Calvin Callahan (R)
+`ocd-person/23c03244-880a-4263-8e2f-18c0c5556b45`
+- already linked (no receipts found): 11937149 Friends of Calvin Callahan, 1968785 Friends of Calvin Callahan, 613258 Friends of Calvin Callahan
+- [ ] 16222 - Callahan For Wisconsin  <- likely
+- [ ] 11646479 - Bull Moose PAC
+- [ ] 7935625 - Callahan for Judge  (other office)
+
+### Representative D36 - Jeff Mursau (R)
+`ocd-person/5254db79-a23b-4496-ad9b-cc0e7a9b7f3a`
+- already linked (no receipts found): 2738963 Jeff Mursau, 2840310 Jeffrey Mursau Campaign
+- [ ] 15735 - Mursau for Assembly  <- likely
+- [ ] 1021514 - Mursau  <- likely
+- [ ] 3100733 - Mursau for Assembly  <- likely
+- [ ] 1021454 - Mursau for Assembly  <- likely
+- [ ] 953343 - Mursau for Assembly  <- likely
+
+### Representative D37 - Mark Born (R)
+`ocd-person/b6559841-9e69-4435-8788-0d8bc087baed`
+- already linked (no receipts found): 2117737 Mark Born for Assembly, 613207 Mark Born for WI Assembly
+- [ ] 16575 - Born For Assembly  <- likely
+- [ ] 1021516 - Born  <- likely
+- [ ] 7941536 - Born  <- likely
+- [ ] 8410679 - Bridget Schoenborn for Judge  (other office)
+- [ ] 10199482 - Erlenborn for State Senate  <- likely
+- [ ] 8998378 - William Osborne Hart Committee  <- likely
+- [ ] 11561600 - Brian Juech for DA
+- [ ] 9096025 - Bruce Freeberg for Judge  (other office)
+- [ ] 9570631 - Repeal 55 PAC - WI
+- [ ] 6623564 - Repeal 55 PAC - National
+- [ ] 8738386 - NARI-PAC
+- [ ] 2771093 - Recreational Vehicle PAC
+- [ ] 9570813 - St Mary's Cement
+- [ ] 1804613 - Friends of Reasbeck for Assm
+- [ ] 2771095 - WI Motorcycle Dealers
+- [ ] 6623566 - Natl Motorists Association
+- [ ] 11802230 - Fletcher for Assembly
+- [ ] 1674634 - Automobile Club of Michigan Political Action Committee
+- [ ] 918288 - Charles Knipp for Assembly
+- [ ] 5605683 - Masterson For St. Sen. Comm.
+
+### Representative D38 - Will Penterman (R)
+`ocd-person/790447a2-d03d-4bc7-b15c-a72b25689eb3`
+- already linked (no receipts found): 1160656 William Penterman
+- [ ] 16045 - Penterman for Assembly  <- likely
+- [ ] 7941538 - Penterman Assembly  <- likely
+- [ ] 6949829 - Friends of Tony Penterman  <- likely
+- [ ] 6725116 - Tony Penterman for District 4 Alderman  (other office)
+
+### Representative D41 - Tony Kurtz (R)
+`ocd-person/5967b2fb-a060-4262-b10d-6fd27d81bf3f`
+- already linked (no receipts found): 613316 Tony Kurtz for Assembly, 1974142 Tony Kurtz for 50th Assembly District
+- [ ] 1021486 - Kurtz  <- likely
+- [ ] 2091642 - Anthony M. Kurtz  <- likely
+- [ ] 1935483 - Kurtz for Assembly  <- likely
+- [ ] 16281 - Kurtz for Assembly  <- likely
+- [ ] 2711943 - Bill Kurtz for Assembly  <- likely
+- [ ] 847937 - Kurtze for Assemb. Comm.  <- likely
+- [ ] 11635787 - Dylan Kurtz for State Assembly  <- likely
+- [ ] 1676412 - Baumgartner for Congress  (other office)
+- [ ] 11663111 - Kurtz For Assembly  <- likely
+- [ ] 8742003 - Kurtz for Congress  (other office)
+- [ ] 6968288 - Kurtz for Congress  (other office)
+- [ ] 7748634 - Kurtz for Congress  (other office)
+- [ ] 16838 - Kurtz for Congress  (other office)
+- [ ] 8110555 - Kurtz for Assembly  <- likely
+- [ ] 1021465 - Kurtz for Assembly  <- likely
+- [ ] 12238239 - Kurtz for Assembly  <- likely
+
+### Representative D42 - Maureen McCarville (D)
+`ocd-person/0af151f7-2d0c-48d1-8560-f17d8bacc5a2`
+- already linked (no receipts found): 1991419 Friends of Maureen McCarville, 1804525 Friends of Maureen McCarville
+- [ ] 16847 - McCarville for Assembly  <- likely
+- [ ] 10752575 - McCarville  <- likely
+- [ ] 6725111 - Friends of McCarville  <- likely
+- [ ] 1149515 - Friends of McCarville  <- likely
+- [ ] 3777272 - McCarville for Assembly  <- likely
+- [ ] 613171 - McCarville for Aassembly  <- likely
+
+### Representative D43 - Brienne Brown (D)
+`ocd-person/f8f3683e-3615-4a4b-bafe-d4d042f291d0`
+- already linked (no receipts found): 11948605 Friends of Brienne Brown
+- [ ] 9570799 - Brown PAC  <- likely
+- [ ] 7888001 - Brown Deer Dem Unit  <- likely
+- [ ] 7082701 - Brown for Justice  <- likely
+- [ ] 6665028 - Brown-Forman Corp  <- likely
+- [ ] 7985163 - Brown for Assembly  <- likely
+- [ ] 5205778 - Brown for Assembly  <- likely
+- [ ] 1914220 - Brown for Assembly  <- likely
+- [ ] 7073492 - Friends of Al Brown  <- likely
+- [ ] 7917474 - Brown for President  <- likely
+- [ ] 7006456 - Brown for Assem Comm  <- likely
+- [ ] 11959734 - Brown County Strong  (other office)
+- [ ] 5343210 - Ward G. Brown for D.A.  <- likely
+- [ ] 1147683 - Friends Of Matt Brown  <- likely
+- [ ] 9128851 - Friends of James Brown  <- likely
+- [ ] 9629521 - Friends of Terry Brown  <- likely
+- [ ] 9875777 - Tim Brown for Assembly  <- likely
+- [ ] 2132355 - Ron Brown for State Senate  <- likely
+- [ ] 9144700 - Brown Co American Party  <- likely
+- [ ] 613549 - Citizens for Alex Brown  <- likely
+- [ ] 5327715 - Russ Brown for Assembly  <- likely
+
+### Representative D49 - Travis Tranel (R)
+`ocd-person/97dae592-4e4a-4cf2-9d56-069d7432b8d9`
+- already linked (no receipts found): 2094265 Friends of Travis Tranel
+- [ ] 15899 - Tranel for Assembly  <- likely
+- [ ] 1927631 - Tranel for Assembly  <- likely
+- [ ] 1723400 - Tranel For Assembly  <- likely
+
+### Representative D51 - Todd Novak (R)
+`ocd-person/c1e8d1c1-380d-4f59-893e-a18f77be21dd`
+- already linked (no receipts found): 613249 Todd Novak for Assembly, 5553259 NOVAK, TODD CANDIDATE CMTE
+- [ ] 17280 - Novak For Assembly  <- likely
+- [ ] 7620840 - Novak-Rest the Amer Fam & Pros  <- likely
+- [ ] 5531885 - WI Ready Mixed Concrete Association Conduit 
+- [ ] 5531887 - WI Ready Mixed Concrete Assn.
+- [ ] 9140914 - Novak for Assembly  <- likely
+- [ ] 10714060 - Novak for Assembly  <- likely
+- [ ] 1015356 - Novak for Assembly  <- likely
+- [ ] 1986229 - Novak for Assembly  <- likely
+
+### Representative D52 - Lee Snodgrass (D)
+`ocd-person/54a3a633-bff9-47f1-9951-ae3a82d012a8`
+- already linked (no receipts found): 1935565 Friends of Lee Snodgrass, 7073309 Lee Snodgrass for State Senate
+- [ ] 16130 - Snodgrass for Assembly  <- likely
+- [ ] 9681472 - SNODGRASS  <- likely
+- [ ] 1700044 - Snodgrass for Senate  <- likely
+- [ ] 12231500 - Snodgrass for Assembly  <- likely
+- [ ] 613292 - Snodgrass for Assembly  <- likely
+- [ ] 1914182 - SNODGRASS FOR STATE HOUSE  <- likely
+
+### Representative D54 - Lori Palmeri (D)
+`ocd-person/aef40b88-72b7-4001-b336-9210a55a2bde`
+- already linked (no receipts found): 1146544 Lori Palmeri, 1146458 Committee for Lori Palmeri
+- [ ] 3112034 - Palmeri for Assembly  <- likely
+- [ ] 15530 - Palmeri for Assembly  <- likely
+- [ ] 2118029 - Palmeri for Oshkosh  <- likely
+- [ ] 8920257 - Palmeri for Assembly  <- likely
+- [ ] 3777271 - Palmeri for Assembly  <- likely
+- [ ] 3777250 - Palmeri for Assembly  <- likely
+- [ ] 11832175 - Palmeri for Assembly  <- likely
+
+### Representative D61 - Bob Donovan (R)
+`ocd-person/54522ac6-81ad-4b83-929f-b94e94b8acb4`
+- already linked (no receipts found): 613369 Friends of Bob Donovan
+- [ ] 16667 - Bob Donovan for Mayor  (other office)
+- [ ] 16491 - Donovan for Assembly  <- likely
+- [ ] 9152552 - Joseph Donovan for Assem  <- likely
+- [ ] 2818226 - Vol for Donovan/Assembly  <- likely
+- [ ] 9111409 - William M. Donovan Committee  <- likely
+- [ ] 1161147 - Donovan Riley for State Senate  <- likely
+- [ ] 1021502 - Donovan for Assembly  <- likely
+- [ ] 1150549 - Joe Donovan For State Chair  <- likely
+- [ ] 2112032 - Friends of Robert Donovan  <- likely
+- [ ] 845608 - Robert Donovan for Alderman  (other office)
+
+### Representative D64 - Tip McGuire (D)
+`ocd-person/c66ed13a-e5a7-49e0-9cce-02d677c5da15`
+- already linked (no receipts found): 7492881 Tip McGuire, 1968783 TIP McGuire For Wisconsin
+- [ ] 1021519 - McGuire  <- likely
+- [ ] 7938193 - McGuire for Assembly  <- likely
+- [ ] 2818162 - McGuireWoods Federal PAC  <- likely
+- [ ] 16509 - Friends of Robert W. Wirch
+- [ ] 3946519 - Dylan McGuire  <- likely
+- [ ] 8294617 - Allan McGuire  <- likely
+- [ ] 8110012 - Allen McGuire  <- likely
+- [ ] 1914193 - MCGUIRE FOR STATE HOUSE  <- likely
+- [ ] 1147311 - Dylan McGuire for School Board  (other office)
+- [ ] 8294532 - Allen McGuire for School Board  (other office)
+- [ ] 1674611 - McGuireWoods Federal PAC Fund  <- likely
+
+### Representative D67 - Dave Armstrong (R)
+`ocd-person/28caa8bd-605b-4755-85a0-52434a9be02f`
+- already linked (no receipts found): 9643514 Dave Armstrong for Assembly, 9643519 David Armstrong For Assembly
+- [ ] 7082697 - Armstrong for Assembly  <- likely
+- [ ] 7193621 - Armstrong for Assembly  <- likely
+- [ ] 1021521 - Armstrong  <- likely
+- [ ] 16037 - Armstrong for State Assembly  <- likely
+- [ ] 6517410 - Comm. to Elect Linda Armstrong  <- likely
+- [ ] 3946462 - Eric Armstrong  <- likely
+- [ ] 2736083 - Kelly Armstrong  <- likely
+- [ ] 2150265 - Schwartz for Assembly
+- [ ] 8589225 - Friends of Aaron Armstrong  <- likely
+- [ ] 1021470 - Armstrong for State Assembly  <- likely
+- [ ] 1717456 - Armstrong for State Assembly  <- likely
+
+### Representative D72 - Scott Krug (R)
+`ocd-person/77257644-eb9a-447d-bcd8-f3e3de7e49e4`
+- already linked (no receipts found): 858409 Scott Krug
+- [ ] 16180 - Krug for Assembly  <- likely
+- [ ] 1674603 - Friends of Shirley Krug  <- likely
+- [ ] 8454069 - Krug for Judge Committee  (other office)
+- [ ] 7156465 - Republicans of Northern WI
+- [ ] 6995547 - Kruger  <- likely
+- [ ] 10155939 - Fahrenkrug  <- likely
+- [ ] 1147338 - Friends of Kelly Fahrenkrug  <- likely
+- [ ] 1147266 - Candidate Committee For Kelly Fahrenkrug  <- likely
+- [ ] 1149054 - Candidate Committee of Harold Bruce Kruger  <- likely
+
+### Representative D81 - Alex Joers (D)
+`ocd-person/1638f0f9-1d5a-4790-aee2-63cad736b137`
+- already linked (no receipts found): 1145731 Friends of Alex Joers, 7739715 Friends of Alex Joers, 10731190 Friends of Alex Joers, 1968803 Friends of Alex Joers, 7872661 Friends of Alex Joers, 1914169 ALEX JOERS FOR STATE HOUSE
+- [ ] 11801863 - Joers  <- likely
+- [ ] 6725297 - Friends of Noelle Joers-Yanisch  <- likely
+
+### Representative D86 - John Spiros (R)
+`ocd-person/38070b4e-d50c-4bc1-86ad-6739c5edc60a`
+- already linked (no receipts found): 613179 John Spiros For Assembly, 8110552 John Spiros Campaign Account, 1937128 John Spiros Campaign Account
+- [ ] 16730 - Spiros for Assembly  <- likely
+- [ ] 11937147 - Spiros for Assembly  <- likely
+- [ ] 1968775 - Spiros For Assembly  <- likely
+- [ ] 664213 - Rebecca Spiros for Mayor  (other office)
+
+### Representative D91 - Jodi Emerson (D)
+`ocd-person/71d596fa-95f2-4411-9b7c-9e250380b701`
+- already linked (no receipts found): 1914179 JODI EMERSON FOR STATE HOUSE
+- [ ] 15871 - Emerson for Assembly  <- likely
+- [ ] 10417351 - Coalition for American Values Committee
+- [ ] 845573 - Team Emerson  <- likely
+- [ ] 8311185 - Team Emerson  <- likely
+- [ ] 10337120 - De Forest for Assembly
+- [ ] 8867669 - Team Emerson for Jo Ann Emerson  <- likely
+- [ ] 3946545 - Missy Henderson For School Board  (other office)
+- [ ] 1804577 - Kilmer for Dane
+- [ ] 10731164 - Friends of Richard Kilmer
+- [ ] 8363480 - Richard Kilmer for Dane County  (other office)
+- [ ] 10879942 - Rosenberg for Wausau
+- [ ] 1146001 - Rosenberg for Wausau
+- [ ] 7890050 - Rosenburg for Wasau
+- [ ] 1148931 - Rosenberg for Wausau
+- [ ] 10063930 - Rosenberg for Wausau
+- [ ] 8362453 - Shelly Cronin for School Board  (other office)
+- [ ] 1149918 - Katie Rosenberg for Wausau
+- [ ] 5212809 - Rosenberg for Wisconsin
+- [ ] 3946505 - Shelly Cronin for Beloit School Board  (other office)
+
+### Representative D95 - Jill Billings (D)
+`ocd-person/7da63875-0a3c-4b03-aaa8-fe48c718eb45`
+- already linked (no receipts found): 11630266 Jill Billings for Assembly, 7143382 Jill Billings for Assembly
+- [ ] 15842 - Billings for Assembly  <- likely
+- [ ] 7143392 - Billings  <- likely
+- [ ] 1700061 - Ralph E. Binger for D.A.
+- [ ] 15763 - Mary Williams for 87th District Assembly
+- [ ] 5315921 - Friends of Michael Bub for Assembly
+- [ ] 1149282 - Billings for Assembly  <- likely
+- [ ] 1986242 - Billings for Assembly  <- likely
+- [ ] 613155 - Billings For Assembly  <- likely
+- [ ] 3100732 - Mary Williams for Assembly
+- [ ] 10328710 - Mary Williams for Assembly
+- [ ] 8867333 - Montanans for Tester
+
+### Representative D96 - Tara Johnson (D)
+`ocd-person/17b43cb0-9999-42ee-a5b4-c68aebc129b6`
+- already linked (no receipts found): 9630742 Friends of Tara Johnson
+- [ ] 6690906 - Tara for Wisconsin
+- [ ] 1146115 - Johnson & Johnson  <- likely
+- [ ] 8410583 - Johnson, Gary  <- likely
+- [ ] 10418689 - Nathan Johnson  <- likely
+- [ ] 5605636 - Johnson for Judge  (other office)
+- [ ] 10239662 - Dauntless Johnson  <- likely
+- [ ] 6968227 - Johnson  <- likely
+- [ ] 10393646 - JOHNSON  <- likely
+- [ ] 10683979 - Johnson  <- likely
+- [ ] 6995456 - Johnson  <- likely
+- [ ] 2831115 - Re-Elect Johnson D.A.  <- likely
+- [ ] 2112008 - Johnson for Assembly  <- likely
+- [ ] 2711861 - Johnson for Assembly  <- likely
+- [ ] 6812439 - You Can Call Me Johnson  <- likely
+- [ ] 18365 - Johnson Controls, Inc  <- likely
+- [ ] 6475268 - Oswald H. Johnson Comm..  <- likely
+- [ ] 1148364 - Johnson for Wisconsin  <- likely
+- [ ] 663910 - Elect Scott L. Johnson  <- likely
+- [ ] 2132071 - Friend of Norm Johnson  <- likely
+- [ ] 847753 - Johnson for Lt Governor  (other office)
+- [ ] 1704969 - Friends of Pam Johnson  <- likely
+
+### Representative D98 - Jim Piwowarczyk (R)
+`ocd-person/61dfe0c1-631f-401a-a4db-6641547db7ef`
+- already linked (no receipts found): 12225942 Jim Piwowarczyk
+
+### Representative D99 - Barbara Dittrich (R)
+`ocd-person/0580ebef-0cfa-40ae-a4ea-d960e0ea30ee`
+- already linked (no receipts found): 1160657 Barb Dittrich for 38th Assembly District
+- [ ] 16176 - Dittrich for WI  <- likely
+
+### Senator D6 - LaTonya Johnson (D)
+`ocd-person/eba6f26b-65c9-42fe-a8a5-09e11c8d089a`
+- already linked (no receipts found): 613352 Friends of LaTonya Johnson, 1935402 Friends of LaTonya Johnson
+- [ ] 17203 - Friends of La Tonya Johnson  <- likely
+- [ ] 1146115 - Johnson & Johnson  <- likely
+- [ ] 8410583 - Johnson, Gary  <- likely
+- [ ] 10418689 - Nathan Johnson  <- likely
+- [ ] 5605636 - Johnson for Judge  (other office)
+- [ ] 10239662 - Dauntless Johnson  <- likely
+- [ ] 6968227 - Johnson  <- likely
+- [ ] 10393646 - JOHNSON  <- likely
+- [ ] 10683979 - Johnson  <- likely
+- [ ] 6995456 - Johnson  <- likely
+- [ ] 2831115 - Re-Elect Johnson D.A.  <- likely
+- [ ] 2112008 - Johnson for Assembly  <- likely
+- [ ] 2711861 - Johnson for Assembly  <- likely
+- [ ] 6812439 - You Can Call Me Johnson  <- likely
+- [ ] 18365 - Johnson Controls, Inc  <- likely
+- [ ] 6475268 - Oswald H. Johnson Comm..  <- likely
+- [ ] 1148364 - Johnson for Wisconsin  <- likely
+- [ ] 663910 - Elect Scott L. Johnson  <- likely
+- [ ] 2132071 - Friend of Norm Johnson  <- likely
+- [ ] 847753 - Johnson for Lt Governor  (other office)
+- [ ] 1704969 - Friends of Pam Johnson  <- likely
+
+### Senator D24 - Patrick Testin (R)
+`ocd-person/13416c83-b50d-4578-b721-83ff5c1486ad`
+- already linked (no receipts found): 999254 Friends of Patrick Testin
+- [ ] 15879 - Testin for Senate  <- likely
+- [ ] 15909 - Testin for Wisconsin  <- likely
+- [ ] 11459136 - Testing the water  <- likely
+- [ ] 10795942 - Friends of Dylan Testin  <- likely
+- [ ] 8845272 - Delayne I. Green for Assembly
+- [ ] 12416694 - Testin for Senate  <- likely
+- [ ] 8411058 - Scott Walker Testing the Waters Inc  <- likely
+
+### Senator D25 - Romaine Quinn (R)
+`ocd-person/003644e8-cb82-45c6-b875-e52bc28424bb`
+- already linked (no receipts found): 2157822 Romaine Quinn for Assembly
+- [ ] 11874429 - Quinn  <- likely
+- [ ] 7584755 - QUINN  <- likely
+- [ ] 17271 - Quinn for Senate  <- likely
+- [ ] 653652 - QUINN FOR ASSEMBLY  <- likely
+- [ ] 1914216 - Friends of Tom Quinn  <- likely
+- [ ] 5294809 - J. Quinn Brisben for President  <- likely
+- [ ] 613237 - Quinn for Senate  <- likely
+- [ ] 7885715 - Quinn for Senate  <- likely
+- [ ] 9146630 - Quinn for Assembly  <- likely
+- [ ] 5207865 - Quinn For Assembly  <- likely
+- [ ] 1717471 - Quinn for Assembly  <- likely
+- [ ] 1149319 - Candidate Committee of Tom Quinn  <- likely
+
+### Senator D33 - Chris Kapenga (R)
+`ocd-person/8d93f6ba-19eb-4684-a47d-6de08e009741`
+- already linked (no receipts found): 12225944 Friends of Chris Kapenga
+- [ ] 15522 - Taxpayers for Kapenga  <- likely
+- [ ] 9910104 - KAPENGA  <- likely
+- [ ] 7492870 - KAPENGA FOR ASSEMBLY  <- likely
+- [ ] 6664479 - Kapenga for Assembly  <- likely
+- [ ] 10710589 - Taxpayers For Kapenga  <- likely
+- [ ] 11622442 - Taxpayers for Kapenga  <- likely
+- [ ] 1986252 - Taxpayers for Kapenga  <- likely
+
+## 3. org-domains.json candidates (top committee donors without a logo)
+
+- [ ] 234 - Assembly Democratic Camp Comm - $4,982,744 across 137 receipts to 16 legislators
+- [ ] 15921 - Democratic Party of Wisconsin - $3,528,844 across 438 receipts to 32 legislators
+- [ ] 16968 - Rep Assembly Campaign Com RACC - $1,902,330 across 86 receipts to 21 legislators
+- [ ] 16330 - State Senate Democratic Committee - $1,339,164 across 78 receipts to 8 legislators
+- [ ] 16069 - Committee to Elect a Republican Senate - $970,178 across 51 receipts to 8 legislators
+- [ ] 651770 - Operating Engineers 139 PAC - $97,600 across 106 receipts to 44 legislators
+- [ ] 9053309 - EMILY'S List - $84,493 across 4 receipts to 1 legislators
+- [ ] 651900 - Wisconsin Credit Union Legislative Action Fund - $79,528 across 127 receipts to 42 legislators
+- [ ] 651763 - Tavern Industry PAC - $78,500 across 97 receipts to 36 legislators
+- [ ] 663891 - Volunteers for Agriculture VFA - $74,000 across 97 receipts to 42 legislators
+- [ ] 651925 - Concerned Realtors Committee - $73,000 across 69 receipts to 37 legislators
+- [ ] 613283 - Plumbers Local 75 PAC - $68,000 across 93 receipts to 34 legislators
+- [ ] 34817 - WI Pipe Trades Assn PAC - $67,200 across 76 receipts to 40 legislators
+- [ ] 30409 - Republican Party of Brown Co - $63,018 across 14 receipts to 4 legislators
+- [ ] 664126 - ABCPAC-WIS - $62,400 across 104 receipts to 36 legislators
+- [ ] 664067 - REALTORS Assn of SC WI PAC - $61,050 across 66 receipts to 34 legislators
+- [ ] 15850 - Wisconsin Hospitals PAC - $53,262 across 110 receipts to 47 legislators
+- [ ] 664167 - Alliant Energy WI Gov Act Cte - $51,500 across 88 receipts to 29 legislators
+- [ ] 664116 - WI Soc Anesthesiologists PAC - $48,750 across 69 receipts to 28 legislators
+- [ ] 651758 - Northwestern Mutual PAC - $48,000 across 68 receipts to 27 legislators
+- [ ] 1150574 - Wisconsin Carpenters PAC - $47,250 across 50 receipts to 26 legislators
+- [ ] 653502 - Wisconsin's Electric Cooperatives PAC - $46,100 across 72 receipts to 26 legislators
+- [ ] 652047 - Council of Auto & Truck Retail Political Action Committee - $46,030 across 50 receipts to 27 legislators
+- [ ] 664274 - Milwaukee Police Association Political Action Committee - $43,500 across 80 receipts to 24 legislators
+- [ ] 651921 - WI Dental Assn PAC - $41,900 across 64 receipts to 29 legislators
+- [ ] 10037337 - check Deposit - $40,335 across 69 receipts to 1 legislators
+- [ ] 653496 - WI PEOPLE Conference - $38,950 across 47 receipts to 26 legislators
+- [ ] 651893 - WI Bankers Assn PAC - $38,708 across 94 receipts to 37 legislators
+- [ ] 613264 - Local 400 COPE Fund - $37,750 across 52 receipts to 25 legislators
+- [ ] 664467 - Charter Communications, Inc. Wisconsin Political Action Committee - $35,750 across 36 receipts to 24 legislators
+- [ ] 664426 - WIA PAC - $35,650 across 68 receipts to 32 legislators
+- [ ] 663978 - WI Institute of CPA's PAC - $35,600 across 79 receipts to 31 legislators

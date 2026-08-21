@@ -22,6 +22,7 @@ import {
   chamberName,
   fmtDate,
   fmtMoney,
+  monthYear,
   billSlug,
   STATUS_LABELS,
   STATUS_STYLES,
@@ -262,15 +263,16 @@ const tally = TALLY_ORDER.map((status) => ({
           ) : money.total === 0 ? (
             <p class="mt-2 rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-700">
               No contributions reported to this legislator's committee since
-              January 2025. <a href="/about/#money" class="underline">How this data works</a>
+              they took office ({monthYear(money.entry)}).
+              <a href="/about/#money" class="underline"> How this data works</a>
             </p>
           ) : (
             <div class="mt-2 rounded-lg border border-navy-100 bg-white p-4 text-sm">
               <p>
                 <span class="text-2xl font-bold">{fmtMoney(money.total)}</span>
                 <span class="text-navy-600">
-                  {" "}raised across {money.n.toLocaleString()} reported receipts,
-                  Jan 2025 to {fmtDate(money.last)}
+                  {" "}raised across {money.n.toLocaleString()} reported receipts
+                  since taking office, {monthYear(money.entry)} to {fmtDate(money.last)}
                 </span>
               </p>
               <div class="mt-3 grid gap-4 sm:grid-cols-2">
@@ -311,8 +313,10 @@ const tally = TALLY_ORDER.map((status) => ({
                 (campaignfinance.wi.gov), refreshed nightly. Wisconsin law bars
                 corporations from contributing to candidates; money comes from
                 individuals and political committees.
-                Totals cover this legislator's candidate committees, including
-                any runs for other offices.
+                Totals cover this legislator's candidate committees while in
+                office, including any runs for other offices. Electronic
+                records begin in 2008, so the longest-serving members' totals
+                start there.
                 <a href="/about/#money" class="underline"> Full methodology</a>
               </p>
             </div>
