@@ -1,7 +1,9 @@
 ---
 import OrgLogo from "./OrgLogo.astro";
 import PartyChip from "./PartyChip.astro";
-import { fmtMoney, personSlug } from "../lib/format";
+import MaybeLink from "./MaybeLink.astro";
+import RankedRow from "./RankedRow.astro";
+import { fmtMoney, personSlug, roleAbbr } from "../lib/format";
 import { hasDonorPage } from "../lib/db";
 import type { moneyOverview } from "../lib/db";
 
@@ -12,7 +14,8 @@ interface Props {
 const { m, cycle } = Astro.props;
 const pctIndividual = m.total ? Math.round((m.individualTotal / m.total) * 100) : 0;
 const pctSmall = m.individualTotal ? Math.round((m.smallDollarTotal / m.individualTotal) * 100) : 0;
-const roleAbbr = (chamber: string | null) => (chamber === "upper" ? "SD" : "AD");
+const donorHref = (entityId: number) =>
+  hasDonorPage(entityId) ? `/money/committees/${entityId}/` : null;
 const scope = cycle
   ? `receipts to today's members during the ${cycle} cycle, while in office`
   : "receipts since each member took office";
@@ -48,19 +51,10 @@ const scope = cycle
     </p>
     <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
       {m.topCommittees.map((c, i) => (
-        <li class="flex items-center gap-2 py-0.5">
-          <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
+        <RankedRow rank={i + 1} meta={`${c.recipients} legislator${c.recipients > 1 ? "s" : ""}`} amount={c.total}>
           <OrgLogo entityId={c.entityId} name={c.name} />
-          {hasDonorPage(c.entityId) ? (
-            <a href={`/money/committees/${c.entityId}/`} class="min-w-0 flex-1 truncate py-1 underline">{c.name}</a>
-          ) : (
-            <span class="min-w-0 flex-1 truncate">{c.name}</span>
-          )}
-          <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">
-            {c.recipients} legislator{c.recipients > 1 ? "s" : ""}
-          </span>
-          <span class="shrink-0 font-semibold">{fmtMoney(c.total)}</span>
-        </li>
+          <MaybeLink href={donorHref(c.entityId)}>{c.name}</MaybeLink>
+        </RankedRow>
       ))}
     </ol>
   </section>
@@ -74,17 +68,10 @@ const scope = cycle
     </p>
     <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
       {m.topLegislators.map((p, i) => (
-        <li class="flex items-center gap-2 py-0.5">
-          <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
+        <RankedRow rank={i + 1} meta={`${roleAbbr(p.chamber)} ${p.district}`} amount={p.total}>
           <PartyChip party={p.party} size="sm" />
-          <a href={`/legislators/${personSlug(p.id)}/`} class="min-w-0 flex-1 truncate py-1 underline">
-            {p.name}
-          </a>
-          <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">
-            {roleAbbr(p.chamber)} {p.district}
-          </span>
-          <span class="shrink-0 font-semibold">{fmtMoney(p.total)}</span>
-        </li>
+          <MaybeLink href={`/legislators/${personSlug(p.id)}/`}>{p.name}</MaybeLink>
+        </RankedRow>
       ))}
     </ol>
   </section>
@@ -99,14 +86,10 @@ const scope = cycle
     </p>
     <ul class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
       {m.byParty.map((p) => (
-        <li class="flex items-center gap-2 py-0.5">
+        <RankedRow meta={`${p.legislators} legislator${p.legislators > 1 ? "s" : ""}`} amount={p.total}>
           <PartyChip party={p.party} size="sm" />
           <span class="min-w-0 flex-1 truncate">{p.party ?? "Unknown"}</span>
-          <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">
-            {p.legislators} legislator{p.legislators > 1 ? "s" : ""}
-          </span>
-          <span class="shrink-0 font-semibold">{fmtMoney(p.total)}</span>
-        </li>
+        </RankedRow>
       ))}
     </ul>
   </section>
@@ -118,12 +101,9 @@ const scope = cycle
     </p>
     <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
       {m.topOccupations.map((o, i) => (
-        <li class="flex items-center gap-2 py-0.5">
-          <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
+        <RankedRow rank={i + 1} meta={`${o.n.toLocaleString()} receipts`} amount={o.total}>
           <span class="min-w-0 flex-1 truncate">{o.occupation}</span>
-          <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">{o.n.toLocaleString()} receipts</span>
-          <span class="shrink-0 font-semibold">{fmtMoney(o.total)}</span>
-        </li>
+        </RankedRow>
       ))}
     </ol>
   </section>
@@ -136,17 +116,10 @@ const scope = cycle
     </p>
     <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
       {m.widestCommittees.map((c, i) => (
-        <li class="flex items-center gap-2 py-0.5">
-          <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
+        <RankedRow rank={i + 1} meta={`${c.recipients} of ${m.sitting}`} amount={c.total}>
           <OrgLogo entityId={c.entityId} name={c.name} />
-          {hasDonorPage(c.entityId) ? (
-            <a href={`/money/committees/${c.entityId}/`} class="min-w-0 flex-1 truncate py-1 underline">{c.name}</a>
-          ) : (
-            <span class="min-w-0 flex-1 truncate">{c.name}</span>
-          )}
-          <span class="shrink-0 text-xs text-navy-600">{c.recipients} of {m.sitting}</span>
-          <span class="shrink-0 font-semibold">{fmtMoney(c.total)}</span>
-        </li>
+          <MaybeLink href={donorHref(c.entityId)}>{c.name}</MaybeLink>
+        </RankedRow>
       ))}
     </ol>
   </section>

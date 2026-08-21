@@ -402,33 +402,38 @@ const deShout = (s: string): string => {
  * recorded floor vote. Vote records begin 2009, CFIS records 2008, so
  * long-serving members' windows start at the records floor, not their
  * real swearing-in. Members seated too recently to have voted fall back
- * to the newest session's start. */
-const _sessionStart = () =>
-  ((db.prepare("SELECT MAX(substr(id, 1, 4)) AS y FROM sessions").get() as { y: string }).y ?? "2025")
-  + "-01-01";
-export const officeEntryFor = (personId: string): string => {
-  const row = db
-    .prepare(
-      `SELECT substr(MIN(e.date), 1, 7) || '-01' AS since
-       FROM vote_records r JOIN vote_events e ON e.id = r.vote_event_id
-       WHERE r.person_id = ?`,
-    )
-    .get(personId) as { since: string | null };
-  return row?.since ?? _sessionStart();
-};
+ * to the newest session's start. This rule is written exactly once. */
+const ENTRY_SINCE = (personRef: string) =>
+  `COALESCE(
+    (SELECT substr(MIN(e.date), 1, 7) || '-01'
+     FROM vote_records r JOIN vote_events e ON e.id = r.vote_event_id
+     WHERE r.person_id = ${personRef}), @fb)`;
+
+let _fb: string | undefined;
+const fb = () =>
+  (_fb ??=
+    ((db.prepare("SELECT MAX(substr(id, 1, 4)) AS y FROM sessions").get() as { y: string }).y
+      ?? "2025") + "-01-01");
+
+const officeEntryFor = (personId: string): string =>
+  (db.prepare(`SELECT ${ENTRY_SINCE("@person")} AS since`).get({ person: personId, fb: fb() }) as {
+    since: string;
+  }).since;
 
 // windows every contribution row to the recipient's time in office;
 // MATERIALIZED so the per-person subquery runs once per query, not once
 // per contribution row
 const ENTRY_CTE = `WITH entry AS MATERIALIZED (
-  SELECT p.id AS id, COALESCE(
-    (SELECT substr(MIN(e.date), 1, 7) || '-01'
-     FROM vote_records r JOIN vote_events e ON e.id = r.vote_event_id
-     WHERE r.person_id = p.id), @fb) AS since
-  FROM people p
+  SELECT p.id AS id, ${ENTRY_SINCE("p.id")} AS since FROM people p
 )`;
 const WINDOWED = `contributions c JOIN entry ON entry.id = c.person_id AND c.date >= entry.since
   AND c.date >= @start AND c.date <= @end`;
+const NO_BOUNDS = { start: "0000", end: "9999" };
+
+const windowedAll = <T>(sql: string, extra: Record<string, unknown> = {}): T[] =>
+  db.prepare(`${ENTRY_CTE} ${sql}`).all({ fb: fb(), ...NO_BOUNDS, ...extra }) as T[];
+const windowedGet = <T>(sql: string, extra: Record<string, unknown> = {}): T =>
+  db.prepare(`${ENTRY_CTE} ${sql}`).get({ fb: fb(), ...NO_BOUNDS, ...extra }) as T;
 
 /** Campaign money summary for one legislator, windowed to their time in
  * office. Three honest states: null = no committee mapped (say "not
@@ -442,219 +447,172 @@ export const moneyFor = (personId: string) => {
     .get(personId) as { n: number };
   if (mapped.n === 0) return null;
   const entry = officeEntryFor(personId);
+  const P = { person: personId, entry };
   const summary = db
     .prepare(
       `SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total,
+              COALESCE(SUM(CASE WHEN from_type = 'Individual' THEN amount ELSE 0 END), 0)
+                AS individualTotal,
               MIN(date) AS first, MAX(date) AS last
-       FROM contributions WHERE person_id = ? AND date >= ?`,
+       FROM contributions WHERE person_id = @person AND date >= @entry`,
     )
-    .get(personId, entry) as { n: number; total: number; first: string | null; last: string | null };
+    .get(P) as {
+      n: number; total: number; individualTotal: number;
+      first: string | null; last: string | null;
+    };
   // committee donors grouped by CFIS entity id (collision-proof), never name
   const committees = db
     .prepare(
       `SELECT from_entity_id AS entityId, MAX(from_name) AS name,
               SUM(amount) AS total, COUNT(*) AS n
        FROM contributions
-       WHERE person_id = ? AND date >= ? AND from_type = 'Registrant' AND from_entity_id IS NOT NULL
+       WHERE person_id = @person AND date >= @entry
+       AND from_type = 'Registrant' AND from_entity_id IS NOT NULL
        GROUP BY from_entity_id ORDER BY total DESC LIMIT 5`,
     )
-    .all(personId, entry) as { entityId: number; name: string; total: number; n: number }[];
+    .all(P) as { entityId: number; name: string; total: number; n: number }[];
   const occupations = db
     .prepare(
       `SELECT occupation, SUM(amount) AS total, COUNT(*) AS n
        FROM contributions
-       WHERE person_id = ? AND date >= ? AND from_type = 'Individual'
+       WHERE person_id = @person AND date >= @entry AND from_type = 'Individual'
        AND occupation IS NOT NULL AND TRIM(occupation) != ''
        GROUP BY LOWER(TRIM(occupation)) ORDER BY total DESC LIMIT 5`,
     )
-    .all(personId, entry) as { occupation: string; total: number; n: number }[];
+    .all(P) as { occupation: string; total: number; n: number }[];
   for (const o of occupations) o.occupation = deShout(o.occupation);
-  const individualTotal = db
-    .prepare(
-      "SELECT COALESCE(SUM(amount), 0) AS t FROM contributions"
-      + " WHERE person_id = ? AND date >= ? AND from_type = 'Individual'",
-    )
-    .get(personId, entry) as { t: number };
   const quarters = db
     .prepare(
       `SELECT substr(date, 1, 4) || '-Q' ||
               ((CAST(substr(date, 6, 2) AS INTEGER) + 2) / 3) AS q,
               SUM(amount) AS total
-       FROM contributions WHERE person_id = ? AND date >= ? AND date != ''
+       FROM contributions WHERE person_id = @person AND date >= @entry AND date != ''
        GROUP BY q ORDER BY q`,
     )
-    .all(personId, entry) as { q: string; total: number }[];
-  return {
-    ...summary, entry, committees, occupations,
-    individualTotal: individualTotal.t, quarters,
-  };
+    .all(P) as { q: string; total: number }[];
+  return { ...summary, entry, committees, occupations, quarters };
 };
+
+interface CommitteeAgg {
+  entityId: number; name: string; total: number; n: number;
+  recipients: number; first: string; last: string;
+}
+// one committee aggregate serves the dollar ranking, the breadth
+// ranking, and the donor pages; callers sort and slice
+const COMMITTEE_AGG = `
+  SELECT c.from_entity_id AS entityId, MAX(c.from_name) AS name,
+         SUM(c.amount) AS total, COUNT(*) AS n,
+         COUNT(DISTINCT c.person_id) AS recipients,
+         MIN(c.date) AS first, MAX(c.date) AS last
+  FROM ${WINDOWED}
+  WHERE c.from_type = 'Registrant' AND c.from_entity_id IS NOT NULL
+  GROUP BY c.from_entity_id`;
+
+const partyTotals = (where: string, extra: Record<string, unknown> = {}) =>
+  windowedAll<{ party: string | null; total: number; legislators: number }>(
+    `SELECT p.party, COALESCE(SUM(c.amount), 0) AS total,
+            COUNT(DISTINCT c.person_id) AS legislators
+     FROM ${WINDOWED} JOIN people p ON p.id = c.person_id ${where}
+     GROUP BY p.party ORDER BY total DESC`,
+    extra,
+  );
+
+// covered = members whose linked committees actually carry receipts; a
+// receipt-less mapping is an incomplete link, not coverage
+let _coverage: { covered: number; sitting: number } | undefined;
+const coverage = () =>
+  (_coverage ??= {
+    covered: (db.prepare("SELECT COUNT(DISTINCT person_id) AS n FROM contributions").get() as { n: number }).n,
+    sitting: (db
+      .prepare("SELECT COUNT(*) AS n FROM people WHERE current_role IN ('Representative', 'Senator')")
+      .get() as { n: number }).n,
+  });
 
 /** Statewide rollup of the same contribution data shown on profiles,
  * each member's receipts windowed to their time in office, optionally
  * intersected with an election-cycle date range. Covers only
  * legislators with a linked committee; rankings compare within that
  * covered set, never beyond it. */
-export const moneyOverview = (bounds?: { start: string; end: string }) => {
-  const P = {
-    fb: _sessionStart(),
-    start: bounds?.start ?? "0000",
-    end: bounds?.end ?? "9999",
-  };
-  const summary = db
-    .prepare(
-      `${ENTRY_CTE}
-       SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total,
-              MIN(c.date) AS first, MAX(c.date) AS last
-       FROM ${WINDOWED}`,
-    )
-    .get(P) as { n: number; total: number; first: string | null; last: string | null };
-  // covered = members whose linked committees actually carry receipts; a
-  // receipt-less mapping is an incomplete link, not coverage
-  const covered = db
-    .prepare("SELECT COUNT(DISTINCT person_id) AS n FROM contributions")
-    .get() as { n: number };
-  const sitting = db
-    .prepare(
-      "SELECT COUNT(*) AS n FROM people WHERE current_role IN ('Representative', 'Senator')",
-    )
-    .get() as { n: number };
-  const individuals = db
-    .prepare(
-      `${ENTRY_CTE}
-       SELECT COALESCE(SUM(amount), 0) AS t,
-              COALESCE(SUM(CASE WHEN amount < 200 THEN amount ELSE 0 END), 0) AS small
-       FROM ${WINDOWED} WHERE c.from_type = 'Individual'`,
-    )
-    .get(P) as { t: number; small: number };
-  const committeeTotal = (
-    db
-      .prepare(
-        `${ENTRY_CTE} SELECT COALESCE(SUM(amount), 0) AS t FROM ${WINDOWED}
-         WHERE c.from_type = 'Registrant'`,
-      )
-      .get(P) as { t: number }
+export const moneyOverview = (bounds: Record<string, string> = {}) => {
+  const summary = windowedGet<{
+    n: number; total: number; first: string | null; last: string | null;
+  }>(
+    `SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total,
+            MIN(c.date) AS first, MAX(c.date) AS last
+     FROM ${WINDOWED}`,
+    bounds,
+  );
+  const individuals = windowedGet<{ t: number; small: number }>(
+    `SELECT COALESCE(SUM(amount), 0) AS t,
+            COALESCE(SUM(CASE WHEN amount < 200 THEN amount ELSE 0 END), 0) AS small
+     FROM ${WINDOWED} WHERE c.from_type = 'Individual'`,
+    bounds,
+  );
+  const committeeTotal = windowedGet<{ t: number }>(
+    `SELECT COALESCE(SUM(amount), 0) AS t FROM ${WINDOWED}
+     WHERE c.from_type = 'Registrant'`,
+    bounds,
   ).t;
-  const topCommittees = db
-    .prepare(
-      `${ENTRY_CTE}
-       SELECT c.from_entity_id AS entityId, MAX(c.from_name) AS name,
-              SUM(c.amount) AS total, COUNT(*) AS n,
-              COUNT(DISTINCT c.person_id) AS recipients
-       FROM ${WINDOWED}
-       WHERE c.from_type = 'Registrant' AND c.from_entity_id IS NOT NULL
-       GROUP BY c.from_entity_id ORDER BY total DESC LIMIT 15`,
-    )
-    .all(P) as { entityId: number; name: string; total: number; n: number; recipients: number }[];
-  // breadth: who reaches the most members, regardless of dollar size
-  const widestCommittees = db
-    .prepare(
-      `${ENTRY_CTE}
-       SELECT c.from_entity_id AS entityId, MAX(c.from_name) AS name,
-              SUM(c.amount) AS total, COUNT(DISTINCT c.person_id) AS recipients
-       FROM ${WINDOWED}
-       WHERE c.from_type = 'Registrant' AND c.from_entity_id IS NOT NULL
-       GROUP BY c.from_entity_id ORDER BY recipients DESC, total DESC LIMIT 10`,
-    )
-    .all(P) as { entityId: number; name: string; total: number; recipients: number }[];
-  const topLegislators = db
-    .prepare(
-      `${ENTRY_CTE}
-       SELECT c.person_id AS id, p.name, p.party, p.chamber, p.district,
-              SUM(c.amount) AS total, COUNT(*) AS n
-       FROM ${WINDOWED} JOIN people p ON p.id = c.person_id
-       GROUP BY c.person_id ORDER BY total DESC LIMIT 15`,
-    )
-    .all(P) as {
-      id: string; name: string; party: string | null; chamber: string | null;
-      district: string | null; total: number; n: number;
-    }[];
-  const byParty = db
-    .prepare(
-      `${ENTRY_CTE}
-       SELECT p.party, COALESCE(SUM(c.amount), 0) AS total,
-              COUNT(DISTINCT c.person_id) AS legislators
-       FROM ${WINDOWED} JOIN people p ON p.id = c.person_id
-       GROUP BY p.party ORDER BY total DESC`,
-    )
-    .all(P) as { party: string | null; total: number; legislators: number }[];
-  const topOccupations = db
-    .prepare(
-      `${ENTRY_CTE}
-       SELECT c.occupation AS occupation, SUM(c.amount) AS total, COUNT(*) AS n
-       FROM ${WINDOWED}
-       WHERE c.from_type = 'Individual'
-       AND c.occupation IS NOT NULL AND TRIM(c.occupation) != ''
-       GROUP BY LOWER(TRIM(c.occupation)) ORDER BY total DESC LIMIT 10`,
-    )
-    .all(P) as { occupation: string; total: number; n: number }[];
+  const agg = windowedAll<CommitteeAgg>(COMMITTEE_AGG, bounds);
+  const topCommittees = [...agg].sort((a, b) => b.total - a.total).slice(0, 15);
+  const widestCommittees = [...agg]
+    .sort((a, b) => b.recipients - a.recipients || b.total - a.total)
+    .slice(0, 10);
+  const topLegislators = windowedAll<{
+    id: string; name: string; party: string | null; chamber: string | null;
+    district: number | null; total: number; n: number;
+  }>(
+    `SELECT c.person_id AS id, p.name, p.party, p.chamber, p.district,
+            SUM(c.amount) AS total, COUNT(*) AS n
+     FROM ${WINDOWED} JOIN people p ON p.id = c.person_id
+     GROUP BY c.person_id ORDER BY total DESC LIMIT 15`,
+    bounds,
+  );
+  const topOccupations = windowedAll<{ occupation: string; total: number; n: number }>(
+    `SELECT c.occupation AS occupation, SUM(c.amount) AS total, COUNT(*) AS n
+     FROM ${WINDOWED}
+     WHERE c.from_type = 'Individual'
+     AND c.occupation IS NOT NULL AND TRIM(c.occupation) != ''
+     GROUP BY LOWER(TRIM(c.occupation)) ORDER BY total DESC LIMIT 10`,
+    bounds,
+  );
   for (const o of topOccupations) o.occupation = deShout(o.occupation);
   return {
-    ...summary, covered: covered.n, sitting: sitting.n,
+    ...summary, ...coverage(),
     individualTotal: individuals.t, smallDollarTotal: individuals.small,
     committeeTotal,
-    topCommittees, widestCommittees, topLegislators, byParty, topOccupations,
+    topCommittees, widestCommittees, topLegislators,
+    byParty: partyTotals("", bounds), topOccupations,
   };
 };
-
-const NO_BOUNDS = { start: "0000", end: "9999" };
 
 /** Committee donors that get their own page: at least $1,000 given to
  * sitting legislators while in office. */
+let _donorCommittees: CommitteeAgg[] | undefined;
 export const donorCommittees = () =>
-  db
-    .prepare(
-      `${ENTRY_CTE}
-       SELECT c.from_entity_id AS entityId, MAX(c.from_name) AS name,
-              SUM(c.amount) AS total, COUNT(*) AS n,
-              COUNT(DISTINCT c.person_id) AS recipients,
-              MIN(c.date) AS first, MAX(c.date) AS last
-       FROM ${WINDOWED}
-       WHERE c.from_type = 'Registrant' AND c.from_entity_id IS NOT NULL
-       GROUP BY c.from_entity_id HAVING SUM(c.amount) >= 1000
-       ORDER BY total DESC`,
-    )
-    .all({ fb: _sessionStart(), ...NO_BOUNDS }) as {
-      entityId: number; name: string; total: number; n: number;
-      recipients: number; first: string; last: string;
-    }[];
+  (_donorCommittees ??= windowedAll<CommitteeAgg>(COMMITTEE_AGG)
+    .filter((c) => c.total >= 1000)
+    .sort((a, b) => b.total - a.total));
 
-let _donorPageIds: Set<number> | null = null;
-export const hasDonorPage = (entityId: number | null): boolean => {
-  if (entityId == null) return false;
-  _donorPageIds ??= new Set(donorCommittees().map((c) => c.entityId));
-  return _donorPageIds.has(entityId);
-};
+export const hasDonorPage = (entityId: number | null): boolean =>
+  entityId != null && donorCommittees().some((c) => c.entityId === entityId);
 
 /** One committee donor's giving to sitting legislators, in-office windowed. */
-export const donorCommitteeFor = (entityId: number) => {
-  const P = { fb: _sessionStart(), entityId, ...NO_BOUNDS };
-  const recipients = db
-    .prepare(
-      `${ENTRY_CTE}
-       SELECT c.person_id AS id, p.name, p.party, p.chamber, p.district,
-              SUM(c.amount) AS total, COUNT(*) AS n,
-              MIN(c.date) AS first, MAX(c.date) AS last
-       FROM ${WINDOWED} JOIN people p ON p.id = c.person_id
-       WHERE c.from_entity_id = @entityId
-       GROUP BY c.person_id ORDER BY total DESC`,
-    )
-    .all(P) as {
-      id: string; name: string; party: string | null; chamber: string | null;
-      district: string | null; total: number; n: number; first: string; last: string;
-    }[];
-  const byParty = db
-    .prepare(
-      `${ENTRY_CTE}
-       SELECT p.party, COALESCE(SUM(c.amount), 0) AS total,
-              COUNT(DISTINCT c.person_id) AS legislators
-       FROM ${WINDOWED} JOIN people p ON p.id = c.person_id
-       WHERE c.from_entity_id = @entityId
-       GROUP BY p.party ORDER BY total DESC`,
-    )
-    .all(P) as { party: string | null; total: number; legislators: number }[];
-  return { recipients, byParty };
-};
+export const donorCommitteeFor = (entityId: number) => ({
+  recipients: windowedAll<{
+    id: string; name: string; party: string | null; chamber: string | null;
+    district: number | null; total: number; n: number; first: string; last: string;
+  }>(
+    `SELECT c.person_id AS id, p.name, p.party, p.chamber, p.district,
+            SUM(c.amount) AS total, COUNT(*) AS n,
+            MIN(c.date) AS first, MAX(c.date) AS last
+     FROM ${WINDOWED} JOIN people p ON p.id = c.person_id
+     WHERE c.from_entity_id = @entityId
+     GROUP BY c.person_id ORDER BY total DESC`,
+    { entityId },
+  ),
+  byParty: partyTotals("WHERE c.from_entity_id = @entityId", { entityId }),
+});
 
 /** Organizations registered as lobbying on a bill (an interest
  * registration, not a for/against position). */

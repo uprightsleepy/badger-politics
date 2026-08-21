@@ -28,6 +28,9 @@ export const partyStyle = (party: string | null): string =>
 export const partyLetter = (party: string | null): string =>
   party ? party[0] : "?";
 
+export const roleAbbr = (chamber: string | null): string =>
+  chamber === "upper" ? "SD" : "AD";
+
 export const chamberName = (chamber: string | null): string =>
   chamber === "lower" ? "Assembly" : chamber === "upper" ? "Senate" : "Legislature";
 

@@ -50,34 +50,23 @@ const bills = billsFor(session.id);
   </ul>
   <p id="no-match" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600"></p>
   <script>
-    // the tiny filter helper: free text + ?status= from stat-card links
-    const input = document.getElementById("bill-filter") as HTMLInputElement;
-    const filterStatus = document.getElementById("filter-status")!;
-    const noMatch = document.getElementById("no-match")!;
+    import { initRowFilter } from "../../../scripts/rowFilter";
+    // free text + ?status= from stat-card links
     const statusFilter = new URLSearchParams(location.search).get("status");
-    function apply() {
-      const q = input.value.toLowerCase();
-      const rows = document.querySelectorAll<HTMLElement>("[data-bill-row]");
-      let shown = 0;
-      rows.forEach((row) => {
-        const hide =
-          !row.dataset.text!.includes(q) ||
-          (statusFilter !== null && row.dataset.status !== statusFilter);
-        row.classList.toggle("sorted-hidden", hide);
-        if (!hide) shown++;
-      });
-      const filtering = q !== "" || statusFilter !== null;
-      filterStatus.textContent = filtering ? `${shown} of ${rows.length} bills shown` : "";
-      noMatch.textContent = shown === 0 ? `No bills match "${input.value}".` : "";
-      noMatch.classList.toggle("hidden", shown > 0);
-    }
+    const apply = initRowFilter({
+      input: "bill-filter",
+      rows: "[data-bill-row]",
+      status: "filter-status",
+      noMatch: "no-match",
+      noun: "bills",
+      extra: statusFilter === null ? undefined : (row) => row.dataset.status === statusFilter,
+    });
     if (statusFilter) {
       const note = document.createElement("p");
       note.className = "mt-2 text-sm text-navy-700";
       note.innerHTML = `Showing only bills with status “${statusFilter.replace(/_/g, " ")}”. <a class="underline" href="?">Show all</a>`;
-      input.parentElement!.appendChild(note);
+      document.getElementById("bill-filter")!.parentElement!.appendChild(note);
       apply();
     }
-    input?.addEventListener("input", apply);
   </script>
 </Base>

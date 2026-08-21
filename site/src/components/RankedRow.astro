@@ -1,0 +1,15 @@
+---
+/** One row of a ranked money list: rank, lead content (slot), optional
+ * meta text, amount. */
+import { fmtMoney } from "../lib/format";
+interface Props { rank?: number; meta?: string; amount: number }
+const { rank, meta, amount } = Astro.props;
+---
+<li class="flex items-center gap-2 py-0.5">
+  {rank != null && (
+    <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{rank}.</span>
+  )}
+  <slot />
+  {meta && <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">{meta}</span>}
+  <span class="shrink-0 font-semibold">{fmtMoney(amount)}</span>
+</li>

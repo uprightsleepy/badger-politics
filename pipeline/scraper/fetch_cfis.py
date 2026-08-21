@@ -210,11 +210,12 @@ def load_committee_ids() -> dict:
 
 def fetch_window(
     http: requests.Session, committee_ids: dict, first: str, last: str,
-) -> tuple[list[dict], int, object, set]:
-    expected = call(
+) -> tuple[list[dict], int, int | None, set]:
+    count = call(
         http, "publicFrontendApi.getTransactionsTotalCount",
         {"dateFrom": first, "dateTo": last},
     )
+    expected = int(count) if isinstance(count, (int, float)) else None
     rows, skip, seen_ids = [], 0, set()
     while True:
         page = call(
@@ -254,51 +255,67 @@ def fetch_window(
     return rows, skip, expected, seen_ids
 
 
+def _fetch_with_retries(
+    http: requests.Session, committee_ids: dict, first: str, last: str,
+    label: str, attempts: int,
+) -> tuple[list[dict], int, int | None, set, bool]:
+    """Retake the snapshot until count and pages agree exactly; the newest
+    month is a moving target while filings land."""
+    for attempt in range(attempts):
+        rows, skip, expected, seen_ids = fetch_window(http, committee_ids, first, last)
+        if expected is None or skip == expected:
+            return rows, skip, expected, seen_ids, True
+        if attempt < attempts - 1:
+            print(f"{label}: count moved during fetch ({skip} vs {expected}), retaking")
+            time.sleep(5)
+    return rows, skip, expected, seen_ids, False
+
+
+def _drift_is_benign(
+    http: requests.Session, committee_ids: dict, first: str, last: str,
+    seen_ids: set, expected: int, label: str,
+) -> bool:
+    """The date-sorted view can briefly omit freshly amended rows that the
+    unsorted view still returns. Benign only if every omitted row is one
+    our data can never contain (not an incoming receipt to a mapped
+    committee); anything else stays a hard failure."""
+    plain = call(
+        http, "publicFrontendApi.getTransactions",
+        {"take": PAGE, "skip": 0, "dateFrom": first, "dateTo": last},
+    ).get("results", [])
+    omitted = [t for t in plain if t["id"] not in seen_ids]
+    relevant = [
+        t for t in omitted
+        if (t.get("transactionType") or {}).get("direction") == "INCOMING"
+        and t.get("createdByEntityId") in committee_ids
+    ]
+    if len(plain) != expected or relevant:
+        return False
+    print(
+        f"WARNING: {label} date-sorted view omitted {len(omitted)} "
+        "non-receipt rows; accepted, refreshes nightly"
+    )
+    return True
+
+
 def fetch_transactions(since: str) -> None:
     committee_ids = load_committee_ids()
     http = requests.Session()
     http.headers["User-Agent"] = USER_AGENT
 
     windows = month_windows(since)
+    # immutable once past; always refresh the two newest months
+    refresh = {w[0] for w in windows[-2:]}
+    latest = windows[-1][0]
     for label, first, last in windows:
         out = DATA_DIR / f"tx-{label}.json"
-        # immutable once past; always refresh the two newest months
-        if out.exists() and label not in {w[0] for w in windows[-2:]}:
+        if out.exists() and label not in refresh:
             continue
-        # the newest month is a moving target: filings land while we page,
-        # so retake the whole snapshot until count and pages agree exactly
-        attempts = 3 if label == windows[-1][0] else 1
-        for attempt in range(attempts):
-            rows, skip, expected, seen_ids = fetch_window(http, committee_ids, first, last)
-            matched = not isinstance(expected, (int, float)) or skip == expected
-            if matched:
-                break
-            if attempt < attempts - 1:
-                print(f"{label}: count moved during fetch ({skip} vs {expected}), retaking")
-                time.sleep(5)
-        diffable = (label == windows[-1][0]
-                    and isinstance(expected, (int, float)) and expected <= PAGE)
-        if not matched and diffable:
-            # the date-sorted view can briefly omit freshly amended rows that
-            # the unsorted view still returns. Accept only if every omitted
-            # row is one our data can never contain (not an incoming receipt
-            # to a mapped committee); anything else stays a hard failure.
-            plain = call(
-                http, "publicFrontendApi.getTransactions",
-                {"take": PAGE, "skip": 0, "dateFrom": first, "dateTo": last},
-            ).get("results", [])
-            omitted = [t for t in plain if t["id"] not in seen_ids]
-            relevant = [
-                t for t in omitted
-                if (t.get("transactionType") or {}).get("direction") == "INCOMING"
-                and t.get("createdByEntityId") in committee_ids
-            ]
-            if len(plain) == expected and not relevant:
-                print(
-                    f"WARNING: {label} date-sorted view omitted {len(omitted)} "
-                    "non-receipt rows; accepted, refreshes nightly"
-                )
-                matched = True
+        rows, skip, expected, seen_ids, matched = _fetch_with_retries(
+            http, committee_ids, first, last, label, attempts=3 if label == latest else 1,
+        )
+        if not matched and label == latest and expected is not None and expected <= PAGE:
+            matched = _drift_is_benign(http, committee_ids, first, last, seen_ids, expected, label)
         if not matched:
             raise RuntimeError(
                 f"CFIS drift: {label} paged {skip} rows but count said {expected}"
@@ -328,7 +345,7 @@ def audit_archives(sample: int) -> None:
     drifted = 0
     for label, first, last in picks:
         rows, skip, expected, _ = fetch_window(http, committee_ids, first, last)
-        if isinstance(expected, (int, float)) and skip != expected:
+        if expected is not None and skip != expected:
             raise RuntimeError(
                 f"CFIS drift: audit {label} paged {skip} rows but count said {expected}"
             )

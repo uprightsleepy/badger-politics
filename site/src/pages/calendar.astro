@@ -28,7 +28,11 @@ import Base from "../layouts/Base.astro";
   </section>
 
   <script>
-    let events: Record<string, { type: string; label: string; detail?: string; url?: string }[]> = {};
+    let events: Record<
+      string,
+      { type: string; label: string; detail?: string; url?: string;
+        links?: { label: string; url: string }[] }[]
+    > = {};
     let year = 0;
     let month = 0; // 0-based
 
@@ -40,6 +44,22 @@ import Base from "../layouts/Base.astro";
 
     function iso(y: number, m: number, d: number) {
       return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+
+    function pollingBlock(): string {
+      const place = localStorage.getItem("bp-polling");
+      if (!place) {
+        return `<p class="mt-1 text-xs text-navy-700">Look up your polling place once on MyVote, then <a class="underline" href="/my-reps/#polling">save it here</a> to see it on every election day.</p>`;
+      }
+      return `<p class="mt-1 text-sm">📍 Your saved polling place: <strong>${place.replace(/[<>&]/g, "")}</strong> <a class="text-xs underline" href="/my-reps/#polling">change</a></p>`
+        + `<p class="mt-0.5 text-xs text-navy-700">Double-check on MyVote before voting. Locations can change.</p>`;
+    }
+
+    function linksBlock(links: { label: string; url: string }[]): string {
+      const anchors = links
+        .map((l) => `<a class="font-semibold underline" target="_blank" rel="noopener" href="${l.url}">${l.label} ↗</a>`)
+        .join("");
+      return `<p class="mt-1 flex flex-wrap gap-x-4">${anchors}</p>` + pollingBlock();
     }
 
     function showDay(date: string) {
@@ -55,18 +75,7 @@ import Base from "../layouts/Base.astro";
           <span class="font-semibold">${e.type === "election" ? '<span aria-hidden="true">🗳️ </span>' : ""}${e.label}</span>
           ${e.detail ? `<span class="text-navy-600"> · ${e.detail}</span>` : ""}
           ${e.url ? ` <a class="underline" target="_blank" rel="noopener" href="${e.url}">official notice</a>` : ""}
-          ${
-            e.links?.length
-              ? `<p class="mt-1 flex flex-wrap gap-x-4">${e.links
-                  .map((l) => `<a class="font-semibold underline" target="_blank" rel="noopener" href="${l.url}">${l.label} ↗</a>`)
-                  .join("")}</p>` +
-                (localStorage.getItem("bp-polling")
-                  ? `<p class="mt-1 text-sm">📍 Your saved polling place: <strong>${localStorage
-                      .getItem("bp-polling")!
-                      .replace(/[<>&]/g, "")}</strong> <a class="text-xs underline" href="/my-reps/#polling">change</a></p><p class="mt-0.5 text-xs text-navy-700">Double-check on MyVote before voting. Locations can change.</p>`
-                  : `<p class="mt-1 text-xs text-navy-700">Look up your polling place once on MyVote, then <a class="underline" href="/my-reps/#polling">save it here</a> to see it on every election day.</p>`)
-              : ""
-          }
+          ${e.links?.length ? linksBlock(e.links) : ""}
           ${e.type === "hearing" ? `<p class="mt-1 text-xs text-navy-600">Confirm against the official notice before attending.</p>` : ""}
         </li>`,
             )

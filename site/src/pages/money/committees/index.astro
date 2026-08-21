@@ -45,21 +45,13 @@ const committees = donorCommittees();
   <p id="committee-no-match" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600"></p>
 
   <script>
-    const input = document.getElementById("committee-filter") as HTMLInputElement;
-    const status = document.getElementById("committee-filter-status")!;
-    const noMatch = document.getElementById("committee-no-match")!;
-    input.addEventListener("input", () => {
-      const q = input.value.toLowerCase();
-      const rows = document.querySelectorAll<HTMLElement>("[data-committee-row]");
-      let shown = 0;
-      rows.forEach((row) => {
-        const hide = !row.dataset.text!.includes(q);
-        row.classList.toggle("sorted-hidden", hide);
-        if (!hide) shown++;
-      });
-      status.textContent = q ? `${shown} of ${rows.length} committees shown` : "";
-      noMatch.textContent = shown === 0 ? `No committees match "${input.value}".` : "";
-      noMatch.classList.toggle("hidden", shown > 0);
+    import { initRowFilter } from "../../../scripts/rowFilter";
+    initRowFilter({
+      input: "committee-filter",
+      rows: "[data-committee-row]",
+      status: "committee-filter-status",
+      noMatch: "committee-no-match",
+      noun: "committees",
     });
   </script>
 </Base>

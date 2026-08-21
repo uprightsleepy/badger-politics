@@ -10,22 +10,27 @@ cached under _data/ftm/ (CC BY-NC-SA, research use, quota-limited).
 """
 
 import argparse
-import json
 import re
 import sqlite3
 import sys
-import time
 from pathlib import Path
 
 import requests
 
-from scraper.crosscheck_ftm import BASE, DATA_DIR, USER_AGENT, api_key, fetch_cycle, norm
+from scraper.crosscheck_ftm import (
+    USER_AGENT,
+    fetch_cycle,
+    ftm_get,
+    ftm_total,
+    norm,
+    report_quota,
+)
 
 WORKLIST = Path(__file__).resolve().parents[2] / "docs" / "curation-worklist.md"
 
 
 def candidate_index(records: list[dict]) -> dict[str, list[tuple[int, int, str]]]:
-    """normalized 'first last' -> [(ftm candidate id, cycle, raw name)]; None on collision."""
+    """normalized 'first last' -> [(ftm candidate id, cycle, raw name)]."""
     index: dict[str, list] = {}
     for cycle, recs in records:
         for rec in recs:
@@ -42,25 +47,16 @@ def candidate_index(records: list[dict]) -> dict[str, list[tuple[int, int, str]]
 
 
 def filers_for(http: requests.Session, cid: int, cycle: int) -> list[tuple[str, float]]:
-    cached = DATA_DIR / f"ftm-filers-{cycle}-{cid}.json"
-    if cached.exists():
-        d = json.loads(cached.read_text(encoding="utf-8"))
-    else:
-        url = (f"{BASE}?dt=1&y={cycle}&s=WI&c-t-id={cid}"
-               f"&gro=f-eid&APIKey={api_key()}&mode=json")
-        d = http.get(url, timeout=60).json()
-        if "records" not in d:
-            raise RuntimeError(f"FTM drift: unexpected response {str(d)[:200]}")
-        cached.write_text(json.dumps(d), encoding="utf-8")
-        time.sleep(1)
-    out = []
-    for rec in d.get("records", []):
-        filer = rec.get("Filer", {})
-        name = filer.get("Filer", "")
-        total = float(rec.get("Total_$", {}).get("Total_$", 0) or 0)
-        if name:
-            out.append((name, total))
-    return out
+    d = ftm_get(
+        http,
+        f"dt=1&y={cycle}&s=WI&c-t-id={cid}&gro=f-eid",
+        f"ftm-filers-{cycle}-{cid}.json",
+    )
+    return [
+        (rec["Filer"]["Filer"], ftm_total(rec))
+        for rec in d.get("records", [])
+        if rec.get("Filer", {}).get("Filer")
+    ]
 
 
 def main() -> int:
@@ -84,7 +80,7 @@ def main() -> int:
     # assembly seats were all on the 2024 ballot; odd senate seats on 2022
     cycles = [(2024, fetch_cycle(2024))]
     if any(ch == "upper" for _, ch in people.values()):
-        cycles.append((2022, fetch_cycle(2022, {"S00": "Senate"})))
+        cycles.append((2022, fetch_cycle(2022, ("S00",))))
     index = candidate_index(cycles)
 
     http = requests.Session()
@@ -127,6 +123,7 @@ def main() -> int:
             i += 1
     WORKLIST.write_text("\n".join(out), encoding="utf-8")
     print(f"annotated {annotated} leads across {len(people)} members -> {WORKLIST}")
+    report_quota()
     return 0
 
 

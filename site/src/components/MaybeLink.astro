@@ -1,0 +1,10 @@
+---
+/** Renders a link when there is somewhere to go, plain text otherwise. */
+interface Props { href: string | null }
+const { href } = Astro.props;
+---
+{href ? (
+  <a href={href} class="min-w-0 flex-1 truncate py-1 underline"><slot /></a>
+) : (
+  <span class="min-w-0 flex-1 truncate"><slot /></span>
+)}

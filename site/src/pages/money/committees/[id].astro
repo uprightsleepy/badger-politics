@@ -3,7 +3,7 @@ import Base from "../../../layouts/Base.astro";
 import OrgLogo from "../../../components/OrgLogo.astro";
 import PartyChip from "../../../components/PartyChip.astro";
 import { donorCommittees, donorCommitteeFor } from "../../../lib/db";
-import { fmtMoney, fmtDate, personSlug } from "../../../lib/format";
+import { fmtMoney, fmtDate, personSlug, roleAbbr } from "../../../lib/format";
 
 export function getStaticPaths() {
   return donorCommittees().map((c) => ({
@@ -13,7 +13,6 @@ export function getStaticPaths() {
 }
 const { committee } = Astro.props;
 const { recipients, byParty } = donorCommitteeFor(committee.entityId);
-const roleAbbr = (chamber: string | null) => (chamber === "upper" ? "SD" : "AD");
 ---
 
 <Base

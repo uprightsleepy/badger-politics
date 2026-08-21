@@ -24,7 +24,9 @@ import requests
 BASE = "https://api.followthemoney.org/"
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "ftm"
 USER_AGENT = "BadgerPolitics/1.0 (badgerpolitics.org; hphil.work@gmail.com)"
-OFFICES = {"R01": "Assembly", "S00": "Senate"}
+OFFICES = ("R01", "S00")  # Assembly, Senate
+
+_quota_fetched = 0
 
 
 def api_key() -> str:
@@ -39,35 +41,29 @@ def api_key() -> str:
     return key
 
 
-def fetch_cycle(cycle: int, offices: dict | None = None) -> list[dict]:
-    """Candidate totals per chamber, cache-first to respect quota."""
-    http = requests.Session()
-    http.headers["User-Agent"] = USER_AGENT
+def ftm_get(http: requests.Session, query: str, cache_name: str) -> dict:
+    """Cache-first FTM request; only cache misses spend quota."""
+    global _quota_fetched
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    records, fetched = [], 0
-    for office in (offices or OFFICES):
-        page = 0
-        while True:
-            cached = DATA_DIR / f"ftm-{cycle}-{office}-p{page}.json"
-            if cached.exists():
-                d = json.loads(cached.read_text(encoding="utf-8"))
-            else:
-                url = (f"{BASE}?dt=1&y={cycle}&s=WI&c-r-oc={office}"
-                       f"&gro=c-t-id&p={page}&APIKey={api_key()}&mode=json")
-                d = http.get(url, timeout=60).json()
-                if "records" not in d:
-                    raise RuntimeError(f"FTM drift: unexpected response {str(d)[:200]}")
-                cached.write_text(json.dumps(d), encoding="utf-8")
-                fetched += len(d["records"])
-                time.sleep(1)
-            records.extend(d["records"])
-            paging = d["metaInfo"]["paging"]
-            if paging["currentPage"] >= paging["maxPage"]:
-                break
-            page += 1
-    if fetched:
-        print(f"quota: fetched {fetched} new records from FTM this run")
-    return records
+    cached = DATA_DIR / cache_name
+    if cached.exists():
+        return json.loads(cached.read_text(encoding="utf-8"))
+    d = http.get(f"{BASE}?{query}&APIKey={api_key()}&mode=json", timeout=60).json()
+    if "records" not in d:
+        raise RuntimeError(f"FTM drift: unexpected response {str(d)[:200]}")
+    cached.write_text(json.dumps(d), encoding="utf-8")
+    _quota_fetched += len(d["records"])
+    time.sleep(1)
+    return d
+
+
+def report_quota() -> None:
+    if _quota_fetched:
+        print(f"quota: fetched {_quota_fetched} new records from FTM this run")
+
+
+def ftm_total(rec: dict) -> float:
+    return float(rec.get("Total_$", {}).get("Total_$", 0) or 0)
 
 
 def norm(name: str) -> str:
@@ -75,8 +71,38 @@ def norm(name: str) -> str:
     return " ".join(folded.lower().replace(".", " ").replace(",", " ").split())
 
 
+def ftm_key(raw: str) -> str:
+    """FTM 'LAST, FIRST M' -> 'first last'."""
+    last, _, rest = raw.partition(",")
+    tokens = norm(f"{rest} {last}").split()
+    return f"{tokens[0]} {tokens[-1]}" if tokens else ""
+
+
+def fetch_cycle(cycle: int, offices: tuple[str, ...] = OFFICES) -> list[dict]:
+    """Candidate totals per chamber, cache-first to respect quota."""
+    http = requests.Session()
+    http.headers["User-Agent"] = USER_AGENT
+    records = []
+    for office in offices:
+        page = 0
+        while True:
+            d = ftm_get(
+                http,
+                f"dt=1&y={cycle}&s=WI&c-r-oc={office}&gro=c-t-id&p={page}",
+                f"ftm-{cycle}-{office}-p{page}.json",
+            )
+            records.extend(d["records"])
+            paging = d["metaInfo"]["paging"]
+            if paging["currentPage"] >= paging["maxPage"]:
+                break
+            page += 1
+    return records
+
+
 def match_people(records: list[dict], db: sqlite3.Connection) -> tuple[list, list]:
-    """FTM 'LAST, FIRST M' -> our people, exact-unique only; no guesses."""
+    """FTM candidates -> our people, exact-unique only; no guesses. One
+    person can have several FTM candidacies (e.g. Assembly + Senate runs
+    in the same cycle), so totals aggregate to the person."""
     people = db.execute(
         "SELECT id, name FROM people WHERE current_role IN ('Representative', 'Senator')"
     ).fetchall()
@@ -88,30 +114,19 @@ def match_people(records: list[dict], db: sqlite3.Connection) -> tuple[list, lis
         tokens = n.split()
         fl = f"{tokens[0]} {tokens[-1]}"
         by_firstlast[fl] = None if fl in by_firstlast else pid
-    matched, unmatched = [], []
+    totals: dict[str, float] = {}
+    unmatched = []
     for rec in records:
-        cand = rec.get("Candidate", {})
-        raw = cand.get("Candidate", "")
-        total = float(rec.get("Total_$", {}).get("Total_$", 0) or 0)
+        raw = rec.get("Candidate", {}).get("Candidate", "")
         last, _, rest = raw.partition(",")
         n = norm(f"{rest} {last}")
-        tokens = n.split()
-        pid = by_full.get(n)
-        if pid is None and tokens:
-            pid = by_firstlast.get(f"{tokens[0]} {tokens[-1]}")
+        pid = by_full.get(n) or by_firstlast.get(ftm_key(raw))
         if pid:
-            matched.append({"person_id": pid, "ftm_name": raw, "ftm_total": total})
+            totals[pid] = totals.get(pid, 0.0) + ftm_total(rec)
         else:
-            unmatched.append({"ftm_name": raw, "ftm_total": total})
-    # one person can have several FTM candidacies (e.g. Assembly + Senate
-    # runs in the same cycle); compare the person, not the candidacy
-    by_person: dict[str, dict] = {}
-    for m in matched:
-        agg = by_person.setdefault(
-            m["person_id"], {"person_id": m["person_id"], "ftm_total": 0.0}
-        )
-        agg["ftm_total"] += m["ftm_total"]
-    return list(by_person.values()), unmatched
+            unmatched.append({"ftm_name": raw, "ftm_total": ftm_total(rec)})
+    matched = [{"person_id": k, "ftm_total": v} for k, v in totals.items()]
+    return matched, unmatched
 
 
 def main() -> int:
@@ -172,6 +187,7 @@ def main() -> int:
     out = Path(__file__).resolve().parents[2] / "docs" / f"crosscheck-ftm-{args.cycle}.md"
     out.write_text("\n".join(lines), encoding="utf-8")
     print(f"{len(rows)} compared, {flagged} flagged -> {out}")
+    report_quota()
     return 0
 
 
