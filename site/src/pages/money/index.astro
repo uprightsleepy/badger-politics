@@ -39,7 +39,7 @@ const views = [
     those {all.covered}. The rest are a coverage gap, not zero fundraising.
   </p>
 
-  <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label="Filter by election cycle">
+  <div class="mt-4 hidden flex-wrap gap-2 sm:flex" role="group" aria-label="Filter by election cycle">
     {views.map((v) => (
       <button
         type="button"
@@ -52,6 +52,25 @@ const views = [
         {v.label}
       </button>
     ))}
+  </div>
+  <!-- phones get a stepper instead of eleven wrapping pills -->
+  <div class="mt-4 flex items-center gap-3 sm:hidden" role="group" aria-label="Filter by election cycle">
+    <button
+      type="button"
+      id="cycle-older"
+      aria-label="Older cycle"
+      class="rounded-lg border border-navy-600 bg-white px-4 py-2 font-bold
+             focus-visible:ring-2 focus-visible:ring-navy-600 disabled:opacity-40"
+    >←</button>
+    <span id="cycle-label" class="min-w-28 text-center text-sm font-semibold">All time</span>
+    <button
+      type="button"
+      id="cycle-newer"
+      aria-label="Newer cycle"
+      disabled
+      class="rounded-lg border border-navy-600 bg-white px-4 py-2 font-bold
+             focus-visible:ring-2 focus-visible:ring-navy-600 disabled:opacity-40"
+    >→</button>
   </div>
   <p id="cycle-status" role="status" class="sr-only"></p>
 
@@ -72,16 +91,30 @@ const views = [
   </p>
 
   <script>
-    const buttons = document.querySelectorAll<HTMLButtonElement>("[data-cycle-btn]");
+    // one selection model drives both the pill row (sm+) and the stepper
+    // (phones): views ordered newest-first, "All time" at the newest end
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>("[data-cycle-btn]")];
     const status = document.getElementById("cycle-status")!;
-    buttons.forEach((b) =>
-      b.addEventListener("click", () => {
-        buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-        document.querySelectorAll<HTMLElement>("[data-money-view]").forEach((v) => {
-          v.hidden = v.dataset.moneyView !== b.dataset.cycleBtn;
-        });
-        status.textContent = `Showing ${b.textContent!.trim()}`;
-      }),
-    );
+    const label = document.getElementById("cycle-label")!;
+    const older = document.getElementById("cycle-older") as HTMLButtonElement;
+    const newer = document.getElementById("cycle-newer") as HTMLButtonElement;
+    let index = 0;
+
+    function select(i: number) {
+      index = i;
+      const key = buttons[i].dataset.cycleBtn!;
+      const name = buttons[i].textContent!.trim();
+      buttons.forEach((x, xi) => x.setAttribute("aria-pressed", String(xi === i)));
+      document.querySelectorAll<HTMLElement>("[data-money-view]").forEach((v) => {
+        v.hidden = v.dataset.moneyView !== key;
+      });
+      label.textContent = name;
+      older.disabled = i === buttons.length - 1;
+      newer.disabled = i === 0;
+      status.textContent = `Showing ${name}`;
+    }
+    buttons.forEach((b, i) => b.addEventListener("click", () => select(i)));
+    older.addEventListener("click", () => select(index + 1));
+    newer.addEventListener("click", () => select(index - 1));
   </script>
 </Base>

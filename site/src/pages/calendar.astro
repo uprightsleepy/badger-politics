@@ -110,11 +110,17 @@ import Base from "../layouts/Base.astro";
           (dayList.length ? "hover:bg-navy-50" : "");
         const hearings = dayList.filter((e) => e.type === "hearing").length;
         const elections = dayList.filter((e) => e.type === "election").length;
+        // phones get dot markers (text chips don't fit 45px cells); the
+        // aria-label carries the counts either way
+        const dots =
+          (elections ? `<span class="h-2 w-2 rounded-full bg-gold-500"></span>` : "") +
+          `<span class="h-1.5 w-1.5 rounded-full bg-navy-600"></span>`.repeat(Math.min(hearings, 3));
         cell.innerHTML =
           `<span class="font-semibold">${d}</span>` +
-          (elections ? `<span class="mt-0.5 block truncate rounded bg-gold-100 px-1 font-semibold">🗳️ Election day</span>` : "") +
+          (dots ? `<span class="mt-0.5 flex items-center gap-0.5 sm:hidden" aria-hidden="true">${dots}</span>` : "") +
+          (elections ? `<span class="mt-0.5 hidden truncate rounded bg-gold-100 px-1 font-semibold sm:block">🗳️ Election day</span>` : "") +
           (hearings
-            ? `<span class="mt-0.5 block truncate rounded bg-navy-50 px-1">${hearings} hearing${hearings > 1 ? "s" : ""}</span>`
+            ? `<span class="mt-0.5 hidden truncate rounded bg-navy-50 px-1 sm:block">${hearings} hearing${hearings > 1 ? "s" : ""}</span>`
             : "");
         if (dayList.length) {
           cell.setAttribute("type", "button");
