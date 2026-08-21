@@ -371,6 +371,18 @@ export const electionHistoryFor = (chamber: string | null, district: number | nu
   });
 };
 
+// donors report occupations in arbitrary casing; de-shout long all-caps
+// words but keep short ones (CEO, RN, CPA) as likely acronyms
+const deShout = (s: string): string => {
+  const trimmed = s.trim();
+  return /^not employed$/i.test(trimmed)
+    ? "Not employed"
+    : trimmed
+        .split(/\s+/)
+        .map((w) => (w.length > 3 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w))
+        .join(" ");
+};
+
 /** Campaign money summary for one legislator. Three honest states:
  * null = no committee mapped (say "not linked", never "$0");
  * {total: 0} = mapped but no receipts in the window; else the data. */
@@ -405,17 +417,7 @@ export const moneyFor = (personId: string) => {
        GROUP BY LOWER(TRIM(occupation)) ORDER BY total DESC LIMIT 5`,
     )
     .all(personId) as { occupation: string; total: number; n: number }[];
-  // donors report these in arbitrary casing; de-shout long all-caps words
-  // but keep short ones (CEO, RN, CPA) as likely acronyms
-  for (const o of occupations) {
-    const trimmed = o.occupation.trim();
-    o.occupation = /^not employed$/i.test(trimmed)
-      ? "Not employed"
-      : trimmed
-          .split(/\s+/)
-          .map((w) => (w.length > 3 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w))
-          .join(" ");
-  }
+  for (const o of occupations) o.occupation = deShout(o.occupation);
   const individualTotal = db
     .prepare(
       "SELECT COALESCE(SUM(amount), 0) AS t FROM contributions"
@@ -423,6 +425,85 @@ export const moneyFor = (personId: string) => {
     )
     .get(personId) as { t: number };
   return { ...summary, committees, occupations, individualTotal: individualTotal.t };
+};
+
+/** Statewide rollup of the same contribution data shown on profiles.
+ * Covers only legislators with a linked committee; rankings compare
+ * within that covered set, never beyond it. */
+export const moneyOverview = () => {
+  const summary = db
+    .prepare(
+      `SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total,
+              MIN(date) AS first, MAX(date) AS last
+       FROM contributions`,
+    )
+    .get() as { n: number; total: number; first: string | null; last: string | null };
+  const covered = db
+    .prepare("SELECT COUNT(DISTINCT person_id) AS n FROM cfis_committees")
+    .get() as { n: number };
+  const sitting = db
+    .prepare(
+      "SELECT COUNT(*) AS n FROM people WHERE current_role IN ('Representative', 'Senator')",
+    )
+    .get() as { n: number };
+  const individualTotal = (
+    db
+      .prepare(
+        "SELECT COALESCE(SUM(amount), 0) AS t FROM contributions WHERE from_type = 'Individual'",
+      )
+      .get() as { t: number }
+  ).t;
+  const committeeTotal = (
+    db
+      .prepare(
+        "SELECT COALESCE(SUM(amount), 0) AS t FROM contributions WHERE from_type = 'Registrant'",
+      )
+      .get() as { t: number }
+  ).t;
+  const topCommittees = db
+    .prepare(
+      `SELECT from_entity_id AS entityId, MAX(from_name) AS name,
+              SUM(amount) AS total, COUNT(*) AS n,
+              COUNT(DISTINCT person_id) AS recipients
+       FROM contributions
+       WHERE from_type = 'Registrant' AND from_entity_id IS NOT NULL
+       GROUP BY from_entity_id ORDER BY total DESC LIMIT 15`,
+    )
+    .all() as { entityId: number; name: string; total: number; n: number; recipients: number }[];
+  const topLegislators = db
+    .prepare(
+      `SELECT c.person_id AS id, p.name, p.party, p.chamber, p.district,
+              SUM(c.amount) AS total, COUNT(*) AS n
+       FROM contributions c JOIN people p ON p.id = c.person_id
+       GROUP BY c.person_id ORDER BY total DESC LIMIT 15`,
+    )
+    .all() as {
+      id: string; name: string; party: string | null; chamber: string | null;
+      district: string | null; total: number; n: number;
+    }[];
+  const byParty = db
+    .prepare(
+      `SELECT p.party, COALESCE(SUM(c.amount), 0) AS total,
+              COUNT(DISTINCT c.person_id) AS legislators
+       FROM contributions c JOIN people p ON p.id = c.person_id
+       GROUP BY p.party ORDER BY total DESC`,
+    )
+    .all() as { party: string | null; total: number; legislators: number }[];
+  const topOccupations = db
+    .prepare(
+      `SELECT occupation, SUM(amount) AS total, COUNT(*) AS n
+       FROM contributions
+       WHERE from_type = 'Individual'
+       AND occupation IS NOT NULL AND TRIM(occupation) != ''
+       GROUP BY LOWER(TRIM(occupation)) ORDER BY total DESC LIMIT 10`,
+    )
+    .all() as { occupation: string; total: number; n: number }[];
+  for (const o of topOccupations) o.occupation = deShout(o.occupation);
+  return {
+    ...summary, covered: covered.n, sitting: sitting.n,
+    individualTotal, committeeTotal,
+    topCommittees, topLegislators, byParty, topOccupations,
+  };
 };
 
 /** Organizations registered as lobbying on a bill (an interest

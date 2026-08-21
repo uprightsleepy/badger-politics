@@ -20,6 +20,7 @@ import {
   partyStyle,
   chamberName,
   fmtDate,
+  fmtMoney,
   billSlug,
   STATUS_LABELS,
   STATUS_STYLES,
@@ -69,8 +70,6 @@ const votesTotal = heatDays.reduce((s, d) => s + d.total, 0);
 // live statuses every nightly rebuild, so they track bills through stages.
 const agreement = partyAgreement(person.id, person.party);
 const money = sitting ? moneyFor(person.id) : null;
-const fmtMoney = (v: number) =>
-  "$" + Math.round(v).toLocaleString("en-US");
 const history = sitting ? electionHistoryFor(person.chamber, person.district) : [];
 const surname = person.name.split(" ").pop()!.toLowerCase();
 const primarySponsored = sponsorships.filter((s) => s.is_primary);

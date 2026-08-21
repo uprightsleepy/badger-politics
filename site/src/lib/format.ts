@@ -45,6 +45,9 @@ export const fmtTime = (t: string | null): string => {
   return `${h12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"} CT`;
 };
 
+export const fmtMoney = (v: number): string =>
+  "$" + Math.round(v).toLocaleString("en-US");
+
 export const fmtDate = (iso: string | null): string => {
   if (!iso) return "";
   const [y, m, d] = iso.split("-").map(Number);
