@@ -99,6 +99,29 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             "SELECT COUNT(*) FROM sponsorships sp LEFT JOIN people p ON p.id = sp.person_id"
             " WHERE sp.person_id IS NOT NULL AND p.id IS NULL"
         ),
+        "contributions -> people": (
+            "SELECT COUNT(*) FROM contributions c"
+            " LEFT JOIN people p ON p.id = c.person_id WHERE p.id IS NULL"
+        ),
+        # every receipt must trace to a live (committee, person) mapping;
+        # a stale archive after a map change is a misattribution risk
+        "contributions -> committee mapping": (
+            "SELECT COUNT(*) FROM contributions c LEFT JOIN cfis_committees m"
+            " ON m.entity_id = c.committee_entity_id AND m.person_id = c.person_id"
+            " WHERE m.entity_id IS NULL"
+        ),
+        "one committee mapped to two people": (
+            "SELECT COUNT(*) FROM (SELECT entity_id FROM cfis_committees"
+            " GROUP BY entity_id HAVING COUNT(DISTINCT person_id) > 1)"
+        ),
+        "same person twice on one roll call": (
+            "SELECT COUNT(*) FROM (SELECT vote_event_id, person_id FROM vote_records"
+            " GROUP BY vote_event_id, person_id HAVING COUNT(*) > 1)"
+        ),
+        "hearing chairs -> people": (
+            "SELECT COUNT(*) FROM committees c LEFT JOIN people p ON p.id = c.chair_person_id"
+            " WHERE c.chair_person_id IS NOT NULL AND p.id IS NULL"
+        ),
     }
     failures = []
     for label, query in queries.items():

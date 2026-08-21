@@ -16,7 +16,7 @@ Data: National Institute on Money in State Politics (followthemoney.org), CC BY-
 | Sequanna Taylor | $28,012 | $23,512 | 16.1% |
 | Clint Moses ⚠ | $520,298 | $439,239 | 15.6% |
 | Robin Vos ⚠ | $940,516 | $806,667 | 14.2% |
-| Melissa Ratcliff ⚠ | $135,414 | $120,086 | 11.3% |
+| Melissa Ratcliff ⚠ | $135,444 | $120,086 | 11.3% |
 | Randy Udell ⚠ | $111,508 | $102,761 | 7.8% |
 | Dora Drake ⚠ | $134,229 | $143,690 | 6.6% |
 | Francesca Hong ⚠ | $86,932 | $81,632 | 6.1% |

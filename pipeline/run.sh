@@ -11,7 +11,9 @@ python -m scraper.scrape bills            # os-update wi bills --scrape --fastmo
 python -m scraper.scrape events           # os-update wi events --scrape
 python -m scraper.fetch_people            # openstates/people WI roster (YAML)
 python -m scraper.fetch_committees        # committee rosters + chairs (YAML)
-python -m importer.import_openstates _data/wi ../data/wi.sqlite
+# cumulative: current biennium plus every archived session, or the
+# import wipes history and the bill-count gate kills the run
+python -m importer.import_openstates _data/wi _data/sessions/*/ ../data/wi.sqlite
 
 # --- Phase 2: derived features + elections (CYCLE = active election year) ---
 CYCLE="${CYCLE:-2026}"

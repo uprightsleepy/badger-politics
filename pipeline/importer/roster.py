@@ -292,11 +292,16 @@ class Roster:
             first = words[0]
             forms.add(f"{m.family_name}, {first[0]}.")
             forms.add(f"{m.family_name}, {first}")
+            # sponsor lines print initial-first ('C. Taylor') to split
+            # same-surname members; two members sharing surname and initial
+            # would collide into one bucket and stay ambiguous
+            forms.add(f"{first[0]}. {m.family_name}")
             if len(words) >= 3:
                 # compound surnames print as the last two words
                 compound = " ".join(words[-2:])
                 forms.add(compound)
                 forms.add(f"{compound}, {first[0]}.")
+                forms.add(f"{first[0]}. {compound}")
             for form in forms:
                 key = (m.chamber, _normalize(form))
                 bucket = self._index.setdefault(key, [])

@@ -186,7 +186,11 @@ def build_map(db_path: Path) -> None:
 
 
 def month_windows(since: str) -> list[tuple[str, str, str]]:
-    """(label, first_day, last_day) for each month from `since` to now."""
+    """(label, first_day, last_day) for each month from `since` to now.
+
+    dateTo carries an end-of-day time: some CFIS rows hold timezone
+    artifacts like T05:00:00Z, and a bare date bound parses as midnight,
+    silently dropping last-day rows into the crack between months."""
     year, month = int(since[:4]), int(since[5:7])
     today = date.today()
     windows = []
@@ -195,7 +199,7 @@ def month_windows(since: str) -> list[tuple[str, str, str]]:
         last = date(nxt_y, nxt_m, 1).toordinal() - 1
         windows.append(
             (f"{year:04d}-{month:02d}", f"{year:04d}-{month:02d}-01",
-             date.fromordinal(last).isoformat())
+             date.fromordinal(last).isoformat() + "T23:59:59")
         )
         year, month = nxt_y, nxt_m
     return windows
