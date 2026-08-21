@@ -1,0 +1,92 @@
+---
+/** Quarterly fundraising bars since taking office, rendered as static
+ * SVG at build time. Gold bars are election quarters (Q4 of even
+ * years), when money predictably surges. */
+import { fmtMoney, monthYear } from "../lib/format";
+
+interface Props {
+  quarters: { q: string; total: number }[];
+  entry: string;
+}
+const { quarters, entry } = Astro.props;
+
+const byQ = new Map(quarters.map((d) => [d.q, d.total]));
+const startYear = Number(entry.slice(0, 4));
+const startQ = Math.floor((Number(entry.slice(5, 7)) + 2) / 3);
+const last = quarters[quarters.length - 1]?.q ?? `${startYear}-Q${startQ}`;
+const endYear = Number(last.slice(0, 4));
+const endQ = Number(last.slice(6));
+
+const series: { q: string; year: number; qn: number; total: number }[] = [];
+for (let y = startYear; y <= endYear; y++) {
+  for (let qn = y === startYear ? startQ : 1; qn <= (y === endYear ? endQ : 4); qn++) {
+    const q = `${y}-Q${qn}`;
+    series.push({ q, year: y, qn, total: byQ.get(q) ?? 0 });
+  }
+}
+const max = Math.max(...series.map((d) => d.total), 1);
+const peak = series.reduce((a, b) => (b.total > a.total ? b : a), series[0]);
+
+const BAR = 6, GAP = 2, H = 96, PAD_TOP = 6, PAD_BOTTOM = 18;
+const width = series.length * (BAR + GAP) + GAP;
+const height = H + PAD_TOP + PAD_BOTTOM;
+const x = (i: number) => GAP + i * (BAR + GAP);
+const barH = (v: number) => Math.max(v > 0 ? 1.5 : 0, (v / max) * H);
+const isElectionQ = (d: { year: number; qn: number }) => d.year % 2 === 0 && d.qn === 4;
+
+// alternating two-year cycle bands, odd-year January onward
+const bands: { from: number; to: number }[] = [];
+for (let i = 0; i < series.length; i++) {
+  const cycleStart = series[i].year % 2 === 1 && series[i].qn === 1;
+  if (i === 0 || cycleStart) bands.push({ from: i, to: i });
+  bands[bands.length - 1].to = i;
+}
+const label =
+  `Quarterly fundraising since taking office, ${monthYear(entry)}: ` +
+  `peak ${fmtMoney(peak.total)} in ${peak.q.replace("-", " ")}`;
+---
+
+{series.length > 1 && (
+  <figure class="mt-3">
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      class="h-28 w-full max-w-2xl"
+      role="img"
+      aria-label={label}
+      preserveAspectRatio="none"
+    >
+      {bands.map((b, bi) =>
+        bi % 2 === 1 ? (
+          <rect
+            x={x(b.from) - GAP / 2}
+            y="0"
+            width={(b.to - b.from + 1) * (BAR + GAP)}
+            height={PAD_TOP + H}
+            fill="#eef2f7"
+          />
+        ) : null,
+      )}
+      <line x1="0" y1={PAD_TOP + H} x2={width} y2={PAD_TOP + H} stroke="#d9e2ee" stroke-width="1" />
+      {series.map((d, i) => (
+        <rect
+          x={x(i)}
+          y={PAD_TOP + H - barH(d.total)}
+          width={BAR}
+          height={barH(d.total)}
+          fill={isElectionQ(d) ? "#a87a1e" : "#2d4a73"}
+        >
+          <title>{d.q.replace("-", " ")}: {fmtMoney(d.total)}</title>
+        </rect>
+      ))}
+      {series.map((d, i) =>
+        d.qn === 1 && d.year % 2 === 1 ? (
+          <text x={x(i)} y={height - 4} font-size="9" fill="#2d4a73">{d.year}</text>
+        ) : null,
+      )}
+    </svg>
+    <figcaption class="mt-1 text-xs text-navy-600">
+      Receipts by quarter since taking office. Gold bars are election
+      quarters; peak {fmtMoney(peak.total)} in {peak.q.replace("-", " ")}.
+    </figcaption>
+  </figure>
+)}

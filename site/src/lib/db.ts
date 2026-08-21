@@ -475,7 +475,19 @@ export const moneyFor = (personId: string) => {
       + " WHERE person_id = ? AND date >= ? AND from_type = 'Individual'",
     )
     .get(personId, entry) as { t: number };
-  return { ...summary, entry, committees, occupations, individualTotal: individualTotal.t };
+  const quarters = db
+    .prepare(
+      `SELECT substr(date, 1, 4) || '-Q' ||
+              ((CAST(substr(date, 6, 2) AS INTEGER) + 2) / 3) AS q,
+              SUM(amount) AS total
+       FROM contributions WHERE person_id = ? AND date >= ? AND date != ''
+       GROUP BY q ORDER BY q`,
+    )
+    .all(personId, entry) as { q: string; total: number }[];
+  return {
+    ...summary, entry, committees, occupations,
+    individualTotal: individualTotal.t, quarters,
+  };
 };
 
 /** Statewide rollup of the same contribution data shown on profiles,
