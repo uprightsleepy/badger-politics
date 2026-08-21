@@ -115,3 +115,25 @@ Per-matter scraping is ~one request per bill with a lobbying registration
 
 Total: roughly four to five working sessions for the full vision, each
 independently shippable, all free and keyless.
+
+## Cross-checking the data
+
+Sources evaluated against the project's API requirements (free,
+keyless or free-key, machine-readable, clear reuse terms):
+
+- **CFIS itself (in use).** Every fetched month reconciles exactly
+  against the server's own transaction counts. A nightly rotating audit
+  re-fetches three archived months and refreshes any that upstream
+  amendments changed, so history never goes silently stale. Filed-report
+  cover sheets would be a stronger check but are not in the public API.
+- **FollowTheMoney API (qualifies, needs free key).** State legislative
+  per-candidate totals from an independent pipeline over the same WEC
+  filings. Same free-key model we accepted for the Census API. Once a
+  key exists (FTM_API_KEY), a comparison harness can flag per-member
+  divergence beyond a tolerance. Expect close-not-exact: cycle windows,
+  refunds, transfers and unitemized lumps differ by methodology.
+- **Wisconsin Democracy Campaign (excluded).** Their summaries are their
+  work product, not free data (same call as the lobbying section above).
+- **TransparencyUSA, Ballotpedia (manual only).** No API or no free API,
+  no stated reuse terms. Fine for eyeballing a single legislator.
+- **OpenSecrets API (not applicable).** Federal races only.

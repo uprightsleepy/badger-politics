@@ -201,56 +201,63 @@ def month_windows(since: str) -> list[tuple[str, str, str]]:
     return windows
 
 
-def fetch_transactions(since: str) -> None:
-    committee_ids = {
+def load_committee_ids() -> dict:
+    return {
         m["entity_id"]: m["person_id"]
         for m in json.loads(MAP_PATH.read_text(encoding="utf-8"))
     }
+
+
+def fetch_window(
+    http: requests.Session, committee_ids: dict, first: str, last: str,
+) -> tuple[list[dict], int, object, set]:
+    expected = call(
+        http, "publicFrontendApi.getTransactionsTotalCount",
+        {"dateFrom": first, "dateTo": last},
+    )
+    rows, skip, seen_ids = [], 0, set()
+    while True:
+        page = call(
+            http, "publicFrontendApi.getTransactions",
+            {"take": PAGE, "skip": skip, "sortBy": "date",
+             "sortDirection": "asc", "dateFrom": first, "dateTo": last},
+        )
+        results = page.get("results", [])
+        for t in results:
+            seen_ids.add(t["id"])
+            committee_id = t.get("createdByEntityId")
+            person_id = committee_ids.get(committee_id)
+            if not person_id:
+                continue
+            if (t.get("transactionType") or {}).get("direction") != "INCOMING":
+                continue
+            from_entity = t.get("from_entity") or {}
+            rows.append(
+                {
+                    "id": t["id"],
+                    "person_id": person_id,
+                    "committee_entity_id": committee_id,
+                    "date": (t.get("date") or "")[:10],
+                    "amount": t.get("amount"),
+                    # CFIS's own entity id: collision-proof donor identity
+                    "from_entity_id": from_entity.get("id"),
+                    "from_name": from_entity.get("name"),
+                    "from_type": (from_entity.get("entityType") or {}).get("name"),
+                    "occupation": t.get("fromOccupationTitle"),
+                    "category": (t.get("transactionCategory") or {}).get("label"),
+                }
+            )
+        skip += len(results)
+        if len(results) < PAGE:
+            break
+        time.sleep(DELAY)
+    return rows, skip, expected, seen_ids
+
+
+def fetch_transactions(since: str) -> None:
+    committee_ids = load_committee_ids()
     http = requests.Session()
     http.headers["User-Agent"] = USER_AGENT
-
-    def fetch_month(first: str, last: str) -> tuple[list[dict], int, object, set]:
-        expected = call(
-            http, "publicFrontendApi.getTransactionsTotalCount",
-            {"dateFrom": first, "dateTo": last},
-        )
-        rows, skip, seen_ids = [], 0, set()
-        while True:
-            page = call(
-                http, "publicFrontendApi.getTransactions",
-                {"take": PAGE, "skip": skip, "sortBy": "date",
-                 "sortDirection": "asc", "dateFrom": first, "dateTo": last},
-            )
-            results = page.get("results", [])
-            for t in results:
-                seen_ids.add(t["id"])
-                committee_id = t.get("createdByEntityId")
-                person_id = committee_ids.get(committee_id)
-                if not person_id:
-                    continue
-                if (t.get("transactionType") or {}).get("direction") != "INCOMING":
-                    continue
-                from_entity = t.get("from_entity") or {}
-                rows.append(
-                    {
-                        "id": t["id"],
-                        "person_id": person_id,
-                        "committee_entity_id": committee_id,
-                        "date": (t.get("date") or "")[:10],
-                        "amount": t.get("amount"),
-                        # CFIS's own entity id: collision-proof donor identity
-                        "from_entity_id": from_entity.get("id"),
-                        "from_name": from_entity.get("name"),
-                        "from_type": (from_entity.get("entityType") or {}).get("name"),
-                        "occupation": t.get("fromOccupationTitle"),
-                        "category": (t.get("transactionCategory") or {}).get("label"),
-                    }
-                )
-            skip += len(results)
-            if len(results) < PAGE:
-                break
-            time.sleep(DELAY)
-        return rows, skip, expected, seen_ids
 
     windows = month_windows(since)
     for label, first, last in windows:
@@ -262,7 +269,7 @@ def fetch_transactions(since: str) -> None:
         # so retake the whole snapshot until count and pages agree exactly
         attempts = 3 if label == windows[-1][0] else 1
         for attempt in range(attempts):
-            rows, skip, expected, seen_ids = fetch_month(first, last)
+            rows, skip, expected, seen_ids = fetch_window(http, committee_ids, first, last)
             matched = not isinstance(expected, (int, float)) or skip == expected
             if matched:
                 break
@@ -301,6 +308,48 @@ def fetch_transactions(since: str) -> None:
         time.sleep(DELAY)
 
 
+def audit_archives(sample: int) -> None:
+    """Re-fetch a rotating sample of archived past months and reconcile
+    against the archive. Amendments legitimately rewrite filed history, so
+    a drifted month is refreshed in place and reported, never left stale."""
+    committee_ids = load_committee_ids()
+    http = requests.Session()
+    http.headers["User-Agent"] = USER_AGENT
+    windows = month_windows("2008-01")
+    newest = {w[0] for w in windows[-2:]}
+    archived = [w for w in windows
+                if w[0] not in newest and (DATA_DIR / f"tx-{w[0]}.json").exists()]
+    if not archived:
+        print("audit: no archived months to sample")
+        return
+    # deterministic rotation: full history gets covered over successive days
+    offset = date.today().toordinal() * sample
+    picks = [archived[(offset + i) % len(archived)] for i in range(min(sample, len(archived)))]
+    drifted = 0
+    for label, first, last in picks:
+        rows, skip, expected, _ = fetch_window(http, committee_ids, first, last)
+        if isinstance(expected, (int, float)) and skip != expected:
+            raise RuntimeError(
+                f"CFIS drift: audit {label} paged {skip} rows but count said {expected}"
+            )
+        out = DATA_DIR / f"tx-{label}.json"
+        old = json.loads(out.read_text(encoding="utf-8"))
+        if old == rows:
+            print(f"audit {label}: unchanged ({len(rows)} receipts)")
+            continue
+        drifted += 1
+        old_ids = {r["id"] for r in old}
+        new_ids = {r["id"] for r in rows}
+        print(
+            f"audit {label}: AMENDED upstream ({len(old)} -> {len(rows)} receipts, "
+            f"+{len(new_ids - old_ids)} added, -{len(old_ids - new_ids)} removed); "
+            "archive refreshed"
+        )
+        out.write_text(json.dumps(rows, indent=0), encoding="utf-8")
+        time.sleep(DELAY)
+    print(f"audit: {len(picks)} months sampled, {drifted} refreshed")
+
+
 def main(argv: list[str]) -> int:
     if not argv:
         print(__doc__, file=sys.stderr)
@@ -311,6 +360,10 @@ def main(argv: list[str]) -> int:
     if argv[0] == "transactions":
         since = argv[argv.index("--since") + 1] if "--since" in argv else "2025-01"
         fetch_transactions(since)
+        return 0
+    if argv[0] == "audit":
+        sample = int(argv[argv.index("--sample") + 1]) if "--sample" in argv else 3
+        audit_archives(sample)
         return 0
     print(f"unknown command {argv[0]!r}", file=sys.stderr)
     return 2

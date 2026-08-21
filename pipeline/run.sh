@@ -25,6 +25,7 @@ python -m importer.import_wec_results _data/wec-results ../data/wi.sqlite
 
 python -m scraper.fetch_cfis map ../data/wi.sqlite
 python -m scraper.fetch_cfis transactions     # nightly delta (past months cached)
+python -m scraper.fetch_cfis audit --sample 3 # rotating amendment check on history
 python -m importer.import_cfis _data/cfis ../data/wi.sqlite
 
 python -m scraper.fetch_lobbying --refresh    # per-bill registered principals
