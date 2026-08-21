@@ -585,6 +585,65 @@ export const moneyOverview = (bounds?: { start: string; end: string }) => {
   };
 };
 
+const NO_BOUNDS = { start: "0000", end: "9999" };
+
+/** Committee donors that get their own page: at least $1,000 given to
+ * sitting legislators while in office. */
+export const donorCommittees = () =>
+  db
+    .prepare(
+      `${ENTRY_CTE}
+       SELECT c.from_entity_id AS entityId, MAX(c.from_name) AS name,
+              SUM(c.amount) AS total, COUNT(*) AS n,
+              COUNT(DISTINCT c.person_id) AS recipients,
+              MIN(c.date) AS first, MAX(c.date) AS last
+       FROM ${WINDOWED}
+       WHERE c.from_type = 'Registrant' AND c.from_entity_id IS NOT NULL
+       GROUP BY c.from_entity_id HAVING SUM(c.amount) >= 1000
+       ORDER BY total DESC`,
+    )
+    .all({ fb: _sessionStart(), ...NO_BOUNDS }) as {
+      entityId: number; name: string; total: number; n: number;
+      recipients: number; first: string; last: string;
+    }[];
+
+let _donorPageIds: Set<number> | null = null;
+export const hasDonorPage = (entityId: number | null): boolean => {
+  if (entityId == null) return false;
+  _donorPageIds ??= new Set(donorCommittees().map((c) => c.entityId));
+  return _donorPageIds.has(entityId);
+};
+
+/** One committee donor's giving to sitting legislators, in-office windowed. */
+export const donorCommitteeFor = (entityId: number) => {
+  const P = { fb: _sessionStart(), entityId, ...NO_BOUNDS };
+  const recipients = db
+    .prepare(
+      `${ENTRY_CTE}
+       SELECT c.person_id AS id, p.name, p.party, p.chamber, p.district,
+              SUM(c.amount) AS total, COUNT(*) AS n,
+              MIN(c.date) AS first, MAX(c.date) AS last
+       FROM ${WINDOWED} JOIN people p ON p.id = c.person_id
+       WHERE c.from_entity_id = @entityId
+       GROUP BY c.person_id ORDER BY total DESC`,
+    )
+    .all(P) as {
+      id: string; name: string; party: string | null; chamber: string | null;
+      district: string | null; total: number; n: number; first: string; last: string;
+    }[];
+  const byParty = db
+    .prepare(
+      `${ENTRY_CTE}
+       SELECT p.party, COALESCE(SUM(c.amount), 0) AS total,
+              COUNT(DISTINCT c.person_id) AS legislators
+       FROM ${WINDOWED} JOIN people p ON p.id = c.person_id
+       WHERE c.from_entity_id = @entityId
+       GROUP BY p.party ORDER BY total DESC`,
+    )
+    .all(P) as { party: string | null; total: number; legislators: number }[];
+  return { recipients, byParty };
+};
+
 /** Organizations registered as lobbying on a bill (an interest
  * registration, not a for/against position). */
 export const lobbyingFor = (billId: string) =>

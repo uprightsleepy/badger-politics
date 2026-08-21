@@ -14,6 +14,7 @@ import {
   electionHistoryFor,
   moneyFor,
   personIdByName,
+  hasDonorPage,
 } from "../../lib/db";
 import {
   COMPENSATION,
@@ -284,7 +285,11 @@ const tally = TALLY_ORDER.map((status) => ({
                       {money.committees.map((c) => (
                         <li class="flex items-center gap-2">
                           <OrgLogo entityId={c.entityId} name={c.name} />
-                          <span class="min-w-0 flex-1 truncate">{c.name}</span>
+                          {hasDonorPage(c.entityId) ? (
+                            <a href={`/money/committees/${c.entityId}/`} class="min-w-0 flex-1 truncate py-1 underline">{c.name}</a>
+                          ) : (
+                            <span class="min-w-0 flex-1 truncate">{c.name}</span>
+                          )}
                           <span class="shrink-0 font-semibold">{fmtMoney(c.total)}</span>
                         </li>
                       ))}

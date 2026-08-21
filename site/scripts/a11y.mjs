@@ -27,6 +27,7 @@ const PAGES = [
   "/bills/2025/sb23/", "/votes/2025-av0001-ar1/", "/legislators/",
   "/hearing-none/", "/hearing-none/2025/", "/hearings/", "/calendar/",
   "/my-reps/", "/elections/2026/", "/data/", "/about/", "/money/", "/404.html",
+  "/money/committees/", "/money/committees/651839/",
 ];
 
 const axeSource = await readFile(

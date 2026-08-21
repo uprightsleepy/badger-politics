@@ -2,6 +2,7 @@
 import OrgLogo from "./OrgLogo.astro";
 import PartyChip from "./PartyChip.astro";
 import { fmtMoney, personSlug } from "../lib/format";
+import { hasDonorPage } from "../lib/db";
 import type { moneyOverview } from "../lib/db";
 
 interface Props {
@@ -50,7 +51,11 @@ const scope = cycle
         <li class="flex items-center gap-2 py-0.5">
           <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
           <OrgLogo entityId={c.entityId} name={c.name} />
-          <span class="min-w-0 flex-1 truncate">{c.name}</span>
+          {hasDonorPage(c.entityId) ? (
+            <a href={`/money/committees/${c.entityId}/`} class="min-w-0 flex-1 truncate py-1 underline">{c.name}</a>
+          ) : (
+            <span class="min-w-0 flex-1 truncate">{c.name}</span>
+          )}
           <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">
             {c.recipients} legislator{c.recipients > 1 ? "s" : ""}
           </span>
@@ -134,7 +139,11 @@ const scope = cycle
         <li class="flex items-center gap-2 py-0.5">
           <span class="w-5 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
           <OrgLogo entityId={c.entityId} name={c.name} />
-          <span class="min-w-0 flex-1 truncate">{c.name}</span>
+          {hasDonorPage(c.entityId) ? (
+            <a href={`/money/committees/${c.entityId}/`} class="min-w-0 flex-1 truncate py-1 underline">{c.name}</a>
+          ) : (
+            <span class="min-w-0 flex-1 truncate">{c.name}</span>
+          )}
           <span class="shrink-0 text-xs text-navy-600">{c.recipients} of {m.sitting}</span>
           <span class="shrink-0 font-semibold">{fmtMoney(c.total)}</span>
         </li>
