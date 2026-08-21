@@ -127,6 +127,13 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
       clearTimeout(timer);
       timer = setTimeout(run, 150);
     });
+    // ?q= lets other pages (404, external links) hand off a search
+    const q = new URLSearchParams(location.search).get("q");
+    if (q) {
+      input.value = q;
+      input.focus();
+      run();
+    }
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         box.querySelector("a")?.click();

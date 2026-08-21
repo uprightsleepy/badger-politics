@@ -1,0 +1,46 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Page not found"
+  description="That page doesn't exist. Find bills, legislators, and hearings from here."
+>
+  <div class="mx-auto max-w-xl py-8 text-center">
+    <img src="/wisconsin.svg" alt="" width="96" height="96" class="mx-auto opacity-40" />
+    <h1 class="mt-4 text-3xl font-bold">Page not found</h1>
+    <p class="mt-2 text-navy-700">
+      This page doesn't exist. If you followed a link here, the bill or
+      legislator may have moved when a new session started.
+    </p>
+    <div class="mx-auto mt-6 max-w-md text-left">
+      <label class="sr-only" for="q404">Search bills</label>
+      <input
+        id="q404"
+        type="search"
+        placeholder="Search bills. Try “child marriage” or “AB 656”"
+        class="w-full rounded-lg border border-navy-100 bg-white px-4 py-3 shadow-sm"
+        autocomplete="off"
+      />
+      <p class="mt-1 text-xs text-navy-600">Press Enter to search from the home page.</p>
+    </div>
+    <p class="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm font-semibold">
+      <a href="/" class="underline">Home</a>
+      <a href="/bills/" class="underline">Bills</a>
+      <a href="/legislators/" class="underline">Legislators</a>
+      <a href="/hearings/" class="underline">Hearings</a>
+      <a href="/money/" class="underline">Money</a>
+      <a href="/my-reps/" class="underline">Find my legislators</a>
+    </p>
+  </div>
+
+  <script>
+    // hand the query to the home page search
+    const input = document.getElementById("q404") as HTMLInputElement;
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && input.value.trim()) {
+        location.href = "/?q=" + encodeURIComponent(input.value.trim());
+      }
+    });
+  </script>
+</Base>
