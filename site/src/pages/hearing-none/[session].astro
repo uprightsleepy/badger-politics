@@ -34,24 +34,23 @@ const stats = sessionStats(session.id);
           <summary class="flex cursor-pointer flex-wrap items-baseline gap-x-3 px-4 py-3">
             <span class="font-bold">{c.committee_at_death ?? "(no committee recorded)"}</span>
             {c.committee_chair_at_death && (
-              <span class="text-sm text-navy-600">
-                Chair:{" "}
-                {personIdByName(c.committee_chair_at_death) ? (
-                  <a
-                    href={`/legislators/${personSlug(personIdByName(c.committee_chair_at_death)!)}/`}
-                    class="underline"
-                  >
-                    {c.committee_chair_at_death}
-                  </a>
-                ) : (
-                  c.committee_chair_at_death
-                )}
-              </span>
+              <span class="text-sm text-navy-600">Chair: {c.committee_chair_at_death}</span>
             )}
             <span class="ml-auto rounded-full bg-badger-50 px-2.5 py-0.5 text-sm font-bold text-badger-700">
               {c.n} bills, 0 hearings
             </span>
           </summary>
+          {c.committee_chair_at_death && personIdByName(c.committee_chair_at_death) && (
+            <p class="border-t border-navy-100 px-4 py-2 text-sm text-navy-600">
+              Chair:{" "}
+              <a
+                href={`/legislators/${personSlug(personIdByName(c.committee_chair_at_death)!)}/`}
+                class="underline"
+              >
+                {c.committee_chair_at_death}
+              </a>
+            </p>
+          )}
           <ul class="space-y-1 border-t border-navy-100 px-4 py-3 text-sm">
             {bills.map((b) => (
               <li class="flex items-baseline gap-2">
