@@ -71,7 +71,8 @@ const roleAbbr = (chamber: string | null) => (chamber === "upper" ? "SD" : "AD")
       <h2 class="text-xl font-bold">Top fundraising legislators</h2>
       <p class="mt-1 text-sm text-navy-600">
         Total reported receipts to each legislator's candidate committees,
-        including any runs for other offices.
+        including any runs for other offices. The largest totals here are
+        usually members running statewide, not legislative-race money.
       </p>
       <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
         {m.topLegislators.map((p, i) => (
@@ -94,6 +95,9 @@ const roleAbbr = (chamber: string | null) => (chamber === "upper" ? "SD" : "AD")
       <h2 class="text-xl font-bold">Money by party</h2>
       <p class="mt-1 text-sm text-navy-600">
         Receipts to covered legislators, grouped by the recipient's party.
+        Totals follow the person, so a few members running for statewide or
+        federal office can dominate their party's number. This is not a
+        measure of party strength in legislative races.
       </p>
       <ul class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
         {m.byParty.map((p) => (
