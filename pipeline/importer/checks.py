@@ -127,7 +127,7 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             " JOIN vote_events e ON e.id = r.vote_event_id"
             " WHERE e.date IS NOT NULL AND NOT EXISTS ("
             "   SELECT 1 FROM person_terms t WHERE t.person_id = r.person_id"
-            "   AND e.date >= t.start AND e.date <= COALESCE(t.end, '9999'))"
+            "   AND e.date >= t.start AND e.date <= COALESCE(t.end, '9999'))"  # roster.OPEN_END
         ),
         "person_terms -> people": (
             "SELECT COUNT(*) FROM person_terms t"

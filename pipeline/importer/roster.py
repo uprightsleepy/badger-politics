@@ -11,6 +11,10 @@ from pathlib import Path
 
 import yaml
 
+# sorts after any real date: an endless term is still being served
+# (checks.py inlines the same value in SQL — keep them in step)
+OPEN_END = "9999"
+
 MERGES_PATH = Path(__file__).resolve().parent / "person_merges.json"
 ALIASES_PATH = Path(__file__).resolve().parent / "person_aliases.json"
 TERMS_PATH = Path(__file__).resolve().parent / "person_terms.json"
@@ -220,7 +224,7 @@ def load_legacy_terms(legacy_dir: Path, people: list[Person]) -> list[Person]:
         # legacy rows only fill bienniums the modern file doesn't touch
         covered = any(
             t.chamber == term.chamber and t.start < term.end and
-            term.start < (t.end or "9999")
+            term.start < (t.end or OPEN_END)
             for t in person.terms
         )
         if not covered:

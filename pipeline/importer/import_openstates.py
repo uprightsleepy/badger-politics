@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 
 from importer.committees import CommitteeIndex, load_committees
 from importer.roster import (
+    OPEN_END,
     Person,
     Roster,
     load_legacy_terms,
@@ -99,9 +100,13 @@ def normalize_identifier(raw: str) -> str:
     return f"{m.group(1).upper()} {m.group(2)}"
 
 
+def _pk(key: str, identifier: str) -> str:
+    return f"{key}-{identifier.replace(' ', '').lower()}"
+
+
 def bill_key(session: str, identifier: str) -> str:
     """Deterministic, URL-friendly PK: ('2025', 'AB 656') -> '2025-ab656'."""
-    return f"{session_key(session)}-{identifier.replace(' ', '').lower()}"
+    return _pk(session_key(session), identifier)
 
 
 def pseudo_chamber(pseudo_id: str | None) -> str | None:
@@ -202,6 +207,7 @@ class Importer:
         self.current_sessions = current_sessions  # keys of the active biennium
         self.used_vote_fixes: set[tuple[str, str]] = set()
         self.bill_ids: dict[str, str] = {}  # scraper _id uuid -> our bill PK
+        self.bill_pks: set[str] = set()  # every PK inserted into bills
         self.warnings: list[str] = []
 
     def import_sessions(self, session_defs: dict[str, dict], seen: set[str]) -> None:
@@ -255,7 +261,7 @@ class Importer:
                      event["label"] if event else None,
                      event.get("url") if event else None),
                 )
-                coverage.append((person.id, term.chamber, term.start, end or "9999"))
+                coverage.append((person.id, term.chamber, term.start, end or OPEN_END))
         dangling = set(events) - used
         if dangling:
             raise RuntimeError(f"term_events entries match no imported term: {dangling}")
@@ -308,6 +314,8 @@ class Importer:
                 if not is_current:
                     title = f"Former {title}"
                 previous = seen.get(m.id)
+                # unreachable under chronological key order (current sessions
+                # sort last); kept as a guard should ordering ever change
                 if previous and previous["is_current"] and not is_current:
                     continue
                 seen[m.id] = {
@@ -327,8 +335,9 @@ class Importer:
         key = session_key(session)
         roster = self.rosters[key]
         identifier = normalize_identifier(bill["identifier"])
-        pk = bill_key(session, identifier)
+        pk = _pk(key, identifier)
         self.bill_ids[bill["_id"]] = pk
+        self.bill_pks.add(pk)
 
         actions = [
             {**a, "chamber": pseudo_chamber(a.get("organization_id"))}
@@ -436,9 +445,10 @@ class Importer:
         roster = self.rosters[key]
         bill_pk = self.bill_ids.get(vote.get("bill") or "")
         if bill_pk is None and vote.get("bill_identifier"):
-            bill_pk = bill_key(session, normalize_identifier(vote["bill_identifier"]))
-        row = self.conn.execute("SELECT 1 FROM bills WHERE id = ?", (bill_pk,)).fetchone()
-        if row is None:
+            bill_pk = _pk(key, normalize_identifier(vote["bill_identifier"]))
+        # bills are all imported before any votes, so the in-memory PK set
+        # is exactly the bills table
+        if bill_pk not in self.bill_pks:
             raise RuntimeError(f"vote event references unknown bill: {vote.get('_id')}")
 
         vote_id = f"{key}-{vote.get('dedupe_key') or vote['_id']}".lower()
