@@ -134,7 +134,7 @@ def build_feeds(conn: sqlite3.Connection, out: Path) -> int:
         rows = conn.execute(
             f"""SELECT a.date, a.description, b.id, b.identifier, b.title, b.session_id
                 FROM actions a JOIN bills b ON b.id = a.bill_id
-                WHERE a.date >= ? AND {queries.EXPORTABLE.replace('source', 'b.source')}
+                WHERE a.date >= ? AND {queries.exportable("b.")}
                 ORDER BY a.date DESC LIMIT 200""",
             (cutoff,),
         ).fetchall()

@@ -21,21 +21,21 @@ CSV_TABLES = {
     "bills": f"SELECT * FROM bills WHERE {queries.EXPORTABLE} AND session_id = ?",
     "actions": (
         "SELECT a.* FROM actions a JOIN bills b ON b.id = a.bill_id"
-        f" WHERE {queries.EXPORTABLE.replace('source', 'b.source')} AND b.session_id = ?"
+        f" WHERE {queries.exportable('b.')} AND b.session_id = ?"
     ),
     "sponsorships": (
         "SELECT s.* FROM sponsorships s JOIN bills b ON b.id = s.bill_id"
-        f" WHERE {queries.EXPORTABLE.replace('source', 'b.source')} AND b.session_id = ?"
+        f" WHERE {queries.exportable('b.')} AND b.session_id = ?"
     ),
     "vote_events": (
         "SELECT e.* FROM vote_events e JOIN bills b ON b.id = e.bill_id"
-        f" WHERE {queries.EXPORTABLE.replace('source', 'e.source')} AND b.session_id = ?"
+        f" WHERE {queries.exportable('e.')} AND b.session_id = ?"
     ),
     "vote_records": (
         "SELECT r.* FROM vote_records r"
         " JOIN vote_events e ON e.id = r.vote_event_id"
         " JOIN bills b ON b.id = e.bill_id"
-        f" WHERE {queries.EXPORTABLE.replace('source', 'e.source')} AND b.session_id = ?"
+        f" WHERE {queries.exportable('e.')} AND b.session_id = ?"
     ),
 }
 

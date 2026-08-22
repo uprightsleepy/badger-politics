@@ -11,7 +11,13 @@ import json
 import sqlite3
 from pathlib import Path
 
-EXPORTABLE = "COALESCE(source, 'openstates') != 'legiscan'"
+
+def exportable(alias: str = "") -> str:
+    """The provenance filter, optionally table-qualified: exportable('b.')."""
+    return f"COALESCE({alias}source, 'openstates') != 'legiscan'"
+
+
+EXPORTABLE = exportable()
 
 
 def connect(db_path: Path) -> sqlite3.Connection:
@@ -87,14 +93,13 @@ def vote_records_for(conn: sqlite3.Connection, vote_event_id: str) -> list[dict]
 
 
 def votes_by_person(conn: sqlite3.Connection, person_id: str) -> list[dict]:
-    exportable = EXPORTABLE.replace("source", "e.source")
     return [
         dict(r)
         for r in conn.execute(
             f"""SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result,
                        e.bill_id, b.identifier, b.title
                 FROM vote_records r
-                JOIN vote_events e ON e.id = r.vote_event_id AND {exportable}
+                JOIN vote_events e ON e.id = r.vote_event_id AND {exportable("e.")}
                 JOIN bills b ON b.id = e.bill_id
                 WHERE r.person_id = ? ORDER BY e.date DESC, e.id""",
             (person_id,),
@@ -109,7 +114,7 @@ def sponsorships_by_person(conn: sqlite3.Connection, person_id: str) -> list[dic
             f"""SELECT s.classification, s.is_primary, b.id AS bill_id, b.identifier,
                        b.title, b.status, b.session_id
                 FROM sponsorships s
-                JOIN bills b ON b.id = s.bill_id AND {EXPORTABLE.replace('source', 'b.source')}
+                JOIN bills b ON b.id = s.bill_id AND {exportable("b.")}
                 WHERE s.person_id = ? ORDER BY b.id""",
             (person_id,),
         )
