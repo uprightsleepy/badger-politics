@@ -13,14 +13,11 @@ from dataproducts.bulk import build_bulk
 from dataproducts.feeds import build_feeds
 from dataproducts.ical import build_ical
 
-SCHEMA_PATH = Path(__file__).resolve().parents[1] / "importer" / "schema.sql"
-
 
 @pytest.fixture()
-def db_path(tmp_path: Path) -> Path:
+def db_path(tmp_path: Path, make_db) -> Path:
     path = tmp_path / "wi.sqlite"
-    conn = sqlite3.connect(path)
-    conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+    conn = make_db(path)
     conn.executescript(
         """
         INSERT INTO sessions (id, identifier, name) VALUES ('2025', '2025', '2025-26');

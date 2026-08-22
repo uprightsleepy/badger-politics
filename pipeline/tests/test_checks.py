@@ -8,14 +8,11 @@ import pytest
 
 from importer.checks import run_checks
 
-SCHEMA_PATH = Path(__file__).resolve().parents[1] / "importer" / "schema.sql"
-
 
 @pytest.fixture()
-def db_path(tmp_path: Path) -> Path:
+def db_path(tmp_path: Path, make_db) -> Path:
     path = tmp_path / "wi.sqlite"
-    conn = sqlite3.connect(path)
-    conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+    conn = make_db(path)
     conn.execute("INSERT INTO sessions (id, identifier) VALUES ('2025', '2025')")
     conn.execute(
         "INSERT INTO bills (id, session_id, identifier, source)"

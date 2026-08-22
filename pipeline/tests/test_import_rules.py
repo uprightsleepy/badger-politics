@@ -2,12 +2,18 @@
 
 import pytest
 
+from importer.committees import Committee, CommitteeIndex
 from importer.import_openstates import (
+    TITLE_VOTERS,
+    biennium,
     bill_key,
     committee_from_referral,
     derive_graveyard,
     normalize_identifier,
+    session_key,
+    to_local,
 )
+from importer.roster import Person, Term, load_people, roster_for
 
 
 def action(
@@ -98,7 +104,6 @@ def test_sjr1_without_referral_is_not_graveyard() -> None:
 
 
 def test_session_key_normalizes_all_formats() -> None:
-    from importer.import_openstates import session_key
 
     assert session_key("2025") == "2025"
     assert session_key("2026S1") == "2026s1"
@@ -109,7 +114,6 @@ def test_session_key_normalizes_all_formats() -> None:
 
 
 def test_roster_for_windows_by_term() -> None:
-    from importer.roster import Person, Term, roster_for
 
     veteran = Person(
         id="p-old", name="Old Timer", family_name="Timer", party="T", image_url=None,
@@ -138,7 +142,6 @@ def test_roster_for_windows_by_term() -> None:
 
 
 def test_startless_role_assumes_one_term(tmp_path) -> None:
-    from importer.roster import load_people
 
     (tmp_path / "exec.yml").write_text(
         """
@@ -164,7 +167,6 @@ roles:
 
 
 def test_hearing_times_convert_utc_to_central() -> None:
-    from importer.import_openstates import to_local
 
     assert to_local("2025-01-07T15:00:00+00:00") == ("2025-01-07", "09:00")  # CST
     assert to_local("2025-06-03T15:00:00+00:00") == ("2025-06-03", "10:00")  # CDT
@@ -174,7 +176,6 @@ def test_hearing_times_convert_utc_to_central() -> None:
 
 
 def test_committee_index_is_chamber_scoped() -> None:
-    from importer.committees import Committee, CommitteeIndex
 
     index = CommitteeIndex(
         [
@@ -190,7 +191,6 @@ def test_committee_index_is_chamber_scoped() -> None:
 
 
 def test_biennium_covers_special_sessions() -> None:
-    from importer.import_openstates import TITLE_VOTERS, biennium
 
     assert biennium("2025") == "2025"
     assert biennium("2026S1") == "2025"

@@ -1,11 +1,8 @@
 """Phase 0: the schema applies cleanly and its constraints hold."""
 
 import sqlite3
-from pathlib import Path
 
 import pytest
-
-SCHEMA_PATH = Path(__file__).resolve().parents[1] / "importer" / "schema.sql"
 
 EXPECTED_TABLES = {
     "sessions",
@@ -24,9 +21,8 @@ EXPECTED_TABLES = {
 
 
 @pytest.fixture()
-def db() -> sqlite3.Connection:
-    conn = sqlite3.connect(":memory:")
-    conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+def db(make_db) -> sqlite3.Connection:
+    conn = make_db(":memory:")
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 

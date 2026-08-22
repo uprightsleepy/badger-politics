@@ -1,15 +1,12 @@
 """CFIS committee matching never guesses; archive import stays referential."""
 
 import json
-import sqlite3
 from pathlib import Path
 
 import pytest
 
 from importer.import_cfis import run as import_run
 from scraper.fetch_cfis import match_committees
-
-SCHEMA_PATH = Path(__file__).resolve().parents[1] / "importer" / "schema.sql"
 
 
 def hit(name: str, committee_type: str = "State Candidate", entity_id: int = 1) -> dict:
@@ -64,10 +61,9 @@ def test_bare_surname_alias_carries_no_identity() -> None:
     assert "Robert Wittke" in name_variants("Bob Wittke", "Wittke", ["Robert Wittke"])
 
 
-def test_import_rejects_unknown_person(tmp_path: Path) -> None:
+def test_import_rejects_unknown_person(tmp_path: Path, make_db) -> None:
     db = tmp_path / "wi.sqlite"
-    conn = sqlite3.connect(db)
-    conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+    conn = make_db(db)
     conn.execute("INSERT INTO people (id, name) VALUES ('p1', 'A')")
     conn.commit()
     conn.close()
