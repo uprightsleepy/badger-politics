@@ -54,14 +54,15 @@ check(
   JSON.stringify(hits.map((h) => h.text?.slice(0, 30))),
 );
 
-// 1b. degenerate query must NOT dredge up initial-letter matches
+// 1b. degenerate query must NOT dredge up initial-letter matches. Wait
+// for THIS query's outcome (the no-match message), not leftover results
+// from the previous search; the assertion itself is unchanged.
 await page.$eval("#q", (el) => (el.value = ""));
 await page.type("#q", "pedophiles");
 await page.waitForFunction(
-  () => document.getElementById("search-results").textContent.length > 0,
+  () => document.getElementById("search-results").textContent.includes("No bills match"),
   { timeout: 10000 },
-);
-await new Promise((r) => setTimeout(r, 600));
+).catch(() => {});
 const degenerateLinks = await page.$$eval("#search-results a", (as) => as.length);
 check("search 'pedophiles' returns no junk matches", degenerateLinks === 0, `${degenerateLinks} links`);
 

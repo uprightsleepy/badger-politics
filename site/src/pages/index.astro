@@ -97,7 +97,9 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
       return marks.length > 0 && !marks.some(valid);
     };
 
+    let seq = 0;
     async function run() {
+      const mySeq = ++seq;
       const q = input.value.trim();
       if (q.length < 2) {
         box.innerHTML = "";
@@ -106,9 +108,17 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
       }
       pagefind ??= await import("/pagefind/pagefind.js");
       const search = await pagefind.debouncedSearch(q);
-      if (search === null) return; // superseded by newer keystroke
-      const loaded = await Promise.all(search.results.slice(0, 12).map((r) => r.data()));
-      const good = loaded.filter((r) => !degenerate(r.excerpt, q)).slice(0, 8);
+      if (search === null || mySeq !== seq) return; // superseded
+      // load excerpts lazily: 8 first, top up only if the junk filter bites
+      const loaded = await Promise.all(search.results.slice(0, 8).map((r) => r.data()));
+      if (mySeq !== seq) return;
+      let good = loaded.filter((r) => !degenerate(r.excerpt, q));
+      if (good.length < 8 && search.results.length > 8) {
+        const extra = await Promise.all(search.results.slice(8, 12).map((r) => r.data()));
+        if (mySeq !== seq) return;
+        good = good.concat(extra.filter((r) => !degenerate(r.excerpt, q)));
+      }
+      good = good.slice(0, 8);
       box.innerHTML = good.length
         ? good
             .map(
@@ -127,7 +137,7 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
 
     input.addEventListener("input", () => {
       clearTimeout(timer);
-      timer = setTimeout(run, 150);
+      timer = setTimeout(run, 300);
     });
     // ?q= lets other pages (404, external links) hand off a search
     const q = new URLSearchParams(location.search).get("q");
