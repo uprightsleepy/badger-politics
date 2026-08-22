@@ -302,6 +302,9 @@ class Roster:
 
     def __init__(self, members: list[Member]):
         self.members = members
+        # the index never changes after init, so resolutions can't either;
+        # only successes are cached (failures raise and abort the run)
+        self._resolved: dict[tuple[str, str], Member] = {}
         self._index: dict[tuple[str, str], list[Member]] = {}
         for m in members:
             forms = {m.name, m.family_name, *m.aliases}
@@ -327,6 +330,9 @@ class Roster:
 
     def resolve(self, name: str, chamber: str) -> Member:
         key = _normalize(name)
+        cached = self._resolved.get((chamber, key))
+        if cached is not None:
+            return cached
         candidates = self._index.get((chamber, key), [])
         if not candidates and len(key) >= self.TRUNCATION_MIN:
             prefix_hits = {
@@ -337,6 +343,7 @@ class Roster:
             }
             candidates = list(prefix_hits.values())
         if len(candidates) == 1:
+            self._resolved[(chamber, key)] = candidates[0]
             return candidates[0]
         if not candidates:
             raise UnmatchedNameError(f"{name!r} ({chamber}) matches no roster member")
