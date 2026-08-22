@@ -1,27 +1,11 @@
 /** Responsive smoke test: every scanned page at seven device widths,
  * asserting the page never scrolls horizontally (the classic mobile
  * degradation). Usage: node scripts/responsive.mjs [--shots DIR] */
-import { createServer } from "node:http";
-import { readFile, readdir, mkdir } from "node:fs/promises";
-import { extname, join } from "node:path";
-import puppeteer from "puppeteer-core";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { serveDist, launchBrowser, moneyLegislatorHref } from "./lib/serve.mjs";
 
-const DIST = new URL("../dist", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1");
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
-  ".json": "application/json", ".geojson": "application/json", ".svg": "image/svg+xml",
-  ".png": "image/png", ".wasm": "application/wasm" };
-const server = createServer(async (req, res) => {
-  let path = decodeURIComponent(new URL(req.url, "http://x").pathname);
-  if (path.endsWith("/")) path += "index.html";
-  try {
-    const data = await readFile(join(DIST, path));
-    res.writeHead(200, { "Content-Type": TYPES[extname(path)] ?? "application/octet-stream" });
-    res.end(data);
-  } catch {
-    res.writeHead(404).end();
-  }
-});
-await new Promise((r) => server.listen(8935, "127.0.0.1", r));
+const server = await serveDist(8935);
 
 const PAGES = [
   "/", "/bills/", "/bills/2025/", "/bills/2025/ab656/", "/votes/2025-av0001-ar1/",
@@ -29,13 +13,8 @@ const PAGES = [
   "/elections/2026/", "/data/", "/about/", "/money/", "/money/committees/",
   "/money/committees/651839/", "/404.html",
 ];
-for (const dir of await readdir(join(DIST, "legislators")).catch(() => [])) {
-  const html = await readFile(join(DIST, "legislators", dir, "index.html"), "utf-8").catch(() => "");
-  if (html.includes("Receipts by quarter")) {
-    PAGES.push(`/legislators/${dir}/`);
-    break;
-  }
-}
+const moneyHref = await moneyLegislatorHref();
+if (moneyHref) PAGES.push(moneyHref);
 
 // fold cover screen, small phone, phone, foldable half, tablet portrait,
 // laptop, widescreen
@@ -46,10 +25,7 @@ const shotsDir = process.argv.includes("--shots")
   : null;
 if (shotsDir) await mkdir(shotsDir, { recursive: true });
 
-const browser = await puppeteer.launch({
-  executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-  headless: true,
-});
+const browser = await launchBrowser();
 const page = await browser.newPage();
 let failures = 0;
 for (const width of WIDTHS) {

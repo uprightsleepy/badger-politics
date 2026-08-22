@@ -1,26 +1,12 @@
 /** axe-core accessibility scan over the built site in headless Edge.
  * Usage: node scripts/a11y.mjs  (serves dist/ on :8933) */
-import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { extname, join } from "node:path";
-import puppeteer from "puppeteer-core";
+import { join } from "node:path";
+import {
+  DIST, serveDist, launchBrowser, firstLegislatorHref, moneyLegislatorHref,
+} from "./lib/serve.mjs";
 
-const DIST = new URL("../dist", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1");
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
-  ".json": "application/json", ".geojson": "application/json", ".svg": "image/svg+xml",
-  ".png": "image/png", ".wasm": "application/wasm" };
-const server = createServer(async (req, res) => {
-  let path = decodeURIComponent(new URL(req.url, "http://x").pathname);
-  if (path.endsWith("/")) path += "index.html";
-  try {
-    const data = await readFile(join(DIST, path));
-    res.writeHead(200, { "Content-Type": TYPES[extname(path)] ?? "application/octet-stream" });
-    res.end(data);
-  } catch {
-    res.writeHead(404).end();
-  }
-});
-await new Promise((r) => server.listen(8933, "127.0.0.1", r));
+const server = await serveDist(8933);
 
 const PAGES = [
   "/", "/bills/", "/bills/2025/", "/bills/2025/ab656/", "/bills/2025/ab1/",
@@ -44,24 +30,14 @@ const PAGES = [
 const axeSource = await readFile(
   new URL("../node_modules/axe-core/axe.min.js", import.meta.url), "utf-8",
 );
-const browser = await puppeteer.launch({
-  executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-  headless: true,
-});
+const browser = await launchBrowser();
 const page = await browser.newPage();
 // include one legislator page with full cards, and one whose money card
 // carries the timeline chart (coverage differs between the two)
-const legIndex = await readFile(join(DIST, "legislators/index.html"), "utf-8").catch(() => "");
-const legMatch = legIndex.match(/href="(\/legislators\/[^"]+\/)"/);
-if (legMatch) PAGES.push(legMatch[1]);
-const { readdir } = await import("node:fs/promises");
-for (const dir of await readdir(join(DIST, "legislators")).catch(() => [])) {
-  const html = await readFile(join(DIST, "legislators", dir, "index.html"), "utf-8").catch(() => "");
-  if (html.includes("Receipts by quarter")) {
-    PAGES.push(`/legislators/${dir}/`);
-    break;
-  }
-}
+const legHref = await firstLegislatorHref();
+if (legHref) PAGES.push(legHref);
+const moneyHref = await moneyLegislatorHref();
+if (moneyHref) PAGES.push(moneyHref);
 
 // phone width catches target-size and hidden-metadata issues that the
 // desktop pass structurally cannot see

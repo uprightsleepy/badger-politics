@@ -3,17 +3,19 @@
  * dist/. External links are deduplicated and probed with polite, per-host
  * rate-limited requests when --external is passed.
  * Usage: node scripts/links.mjs [--external] [--external-limit N] */
-import { readFile, readdir, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { DIST } from "./lib/serve.mjs";
 
-const DIST = new URL("../dist", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1");
-
+// one walk records every path (files AND directories — a bare directory
+// href counts as resolvable, as it always has) and yields the html files
+const fsPaths = new Set();
 async function* htmlFiles(dir) {
-  for (const name of await readdir(dir)) {
-    const path = join(dir, name);
-    if ((await stat(path)).isDirectory()) yield* htmlFiles(path);
-    else if (name.endsWith(".html")) yield path;
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    fsPaths.add(path);
+    if (entry.isDirectory()) yield* htmlFiles(path);
+    else if (entry.name.endsWith(".html")) yield path;
   }
 }
 
@@ -58,21 +60,22 @@ const toFile = (p) => {
 };
 for (const [path, seenOn] of internal) {
   const f = toFile(path);
-  if (!existsSync(f) && !existsSync(f + ".html") && !existsSync(join(DIST, path, "index.html"))) {
+  if (!fsPaths.has(f) && !fsPaths.has(f + ".html") && !fsPaths.has(join(DIST, path, "index.html"))) {
     failures++;
     console.log(`BROKEN internal ${path} (linked from ${seenOn})`);
   }
 }
 
-// fragment targets must exist as an id on the target page
-const dynamicFragments = new Set(); // ids created by client-side JS
+// fragment targets must exist as an id on the target page; the target is
+// read raw (scripts included), exactly as the old per-fragment regex saw it
 for (const [target, frags] of fragments) {
-  const f = toFile(target.endsWith(".html") ? target : target);
-  const file = existsSync(f) ? f : toFile(target + "/");
-  if (!existsSync(file)) continue; // already reported as broken path
+  const f = toFile(target);
+  const file = fsPaths.has(f) ? f : toFile(target + "/");
+  if (!fsPaths.has(file)) continue; // already reported as broken path
   const html = await readFile(file, "utf-8");
+  const ids = new Set([...html.matchAll(/id="([^"]*)"/g)].map((m) => m[1]));
   for (const [frag, seenOn] of frags) {
-    if (!new RegExp(`id="${frag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`).test(html)) {
+    if (!ids.has(frag)) {
       failures++;
       console.log(`BROKEN fragment ${target}#${frag} (linked from ${seenOn})`);
     }
@@ -94,40 +97,48 @@ if (process.argv.includes("--external")) {
   }
   console.log(`checking ${urls.length} external urls across ${byHost.size} hosts...`);
   let extFailures = 0;
-  await Promise.all(
-    [...byHost.entries()].map(async ([host, list]) => {
-      const UA = { "User-Agent": "BadgerPolitics link check (badgerpolitics.org; hphil.work@gmail.com)" };
-      const probe = async (url) => {
-        let res = await fetch(url, { method: "HEAD", redirect: "follow",
+  const hosts = [...byHost.values()];
+  let nextHost = 0;
+  const checkHost = async (list) => {
+    const UA = { "User-Agent": "BadgerPolitics link check (badgerpolitics.org; hphil.work@gmail.com)" };
+    const probe = async (url) => {
+      let res = await fetch(url, { method: "HEAD", redirect: "follow",
+        signal: AbortSignal.timeout(20000), headers: UA });
+      if (res.status === 405 || res.status === 404 || res.status === 403) {
+        res = await fetch(url, { method: "GET", redirect: "follow",
           signal: AbortSignal.timeout(20000), headers: UA });
-        if (res.status === 405 || res.status === 404 || res.status === 403) {
-          res = await fetch(url, { method: "GET", redirect: "follow",
-            signal: AbortSignal.timeout(20000), headers: UA });
-        }
-        return res;
-      };
-      for (const [url, seenOn] of list) {
-        // one retry so transient timeouts on hours-long runs don't record
-        let verdict = null;
-        for (let attempt = 0; attempt < 2 && verdict === null; attempt++) {
-          try {
-            const res = await probe(url);
-            if (res.ok) verdict = "ok";
-            else if (attempt === 1) verdict = String(res.status);
-            else await new Promise((r) => setTimeout(r, 5000));
-          } catch (e) {
-            if (attempt === 1) verdict = e.name;
-            else await new Promise((r) => setTimeout(r, 5000));
-          }
-        }
-        if (verdict !== "ok") {
-          extFailures++;
-          console.log(`BROKEN external ${verdict} ${url} (linked from ${seenOn})`);
-        }
-        await new Promise((r) => setTimeout(r, 500));
       }
-    }),
-  );
+      return res;
+    };
+    for (const [i, [url, seenOn]] of list.entries()) {
+      // one retry so transient timeouts on hours-long runs don't record
+      let verdict = null;
+      for (let attempt = 0; attempt < 2 && verdict === null; attempt++) {
+        try {
+          const res = await probe(url);
+          if (res.ok) verdict = "ok";
+          else if (attempt === 1) verdict = String(res.status);
+          else await new Promise((r) => setTimeout(r, 5000));
+        } catch (e) {
+          if (attempt === 1) verdict = e.name;
+          else await new Promise((r) => setTimeout(r, 5000));
+        }
+      }
+      if (verdict !== "ok") {
+        extFailures++;
+        console.log(`BROKEN external ${verdict} ${url} (linked from ${seenOn})`);
+      }
+      // per-host politeness pause; the host's last URL needs none
+      if (i < list.length - 1) await new Promise((r) => setTimeout(r, 500));
+    }
+  };
+  // bounded worker pool: per-host pacing is unchanged, but thousands of
+  // hosts no longer open sockets all at once
+  const POOL = 64;
+  const worker = async () => {
+    while (nextHost < hosts.length) await checkHost(hosts[nextHost++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(POOL, hosts.length) }, worker));
   failures += extFailures;
   console.log(`external check done: ${extFailures} failures`);
 }

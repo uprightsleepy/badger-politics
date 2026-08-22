@@ -1,33 +1,10 @@
 /** Phase 5 acceptance verification: drives the built site in headless Edge.
  * Usage: node scripts/verify.mjs  (serves dist/ itself on :8931) */
-import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
-import { extname, join } from "node:path";
-import puppeteer from "puppeteer-core";
+import { serveDist, launchBrowser } from "./lib/serve.mjs";
 
-const DIST = new URL("../dist", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1");
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
-  ".json": "application/json", ".geojson": "application/json", ".svg": "image/svg+xml",
-  ".wasm": "application/wasm", ".pf_meta": "application/octet-stream",
-  ".pf_index": "application/octet-stream", ".pf_fragment": "application/octet-stream" };
+const server = await serveDist(8931);
 
-const server = createServer(async (req, res) => {
-  let path = decodeURIComponent(new URL(req.url, "http://x").pathname);
-  if (path.endsWith("/")) path += "index.html";
-  try {
-    const data = await readFile(join(DIST, path));
-    res.writeHead(200, { "Content-Type": TYPES[extname(path)] ?? "application/octet-stream" });
-    res.end(data);
-  } catch {
-    res.writeHead(404).end("nope");
-  }
-});
-await new Promise((r) => server.listen(8931, "127.0.0.1", r));
-
-const browser = await puppeteer.launch({
-  executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-  headless: true,
-});
+const browser = await launchBrowser();
 const page = await browser.newPage();
 const results = [];
 const check = (name, ok, detail = "") =>
