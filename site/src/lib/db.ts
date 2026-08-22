@@ -214,9 +214,11 @@ export const graveyardBills = (sessionId: string, committee: string | null) =>
     .all(sessionId, committee) as { id: string; identifier: string; title: string | null }[];
 
 const HEARING_SELECT = `SELECT h.*, c.name AS committee_name, c.chamber AS committee_chamber,
-       p.name AS chair_name, c.chair_person_id AS chair_person_id
+       p.name AS chair_name, c.chair_person_id AS chair_person_id,
+       v.url AS video_url
        FROM hearings h LEFT JOIN committees c ON c.id = h.committee_id
-       LEFT JOIN people p ON p.id = c.chair_person_id`;
+       LEFT JOIN people p ON p.id = c.chair_person_id
+       LEFT JOIN hearing_videos v ON v.hearing_id = h.id`;
 
 export const upcomingHearings = (since: string) =>
   db
@@ -262,6 +264,7 @@ export interface Hearing {
   committee_chamber: string | null;
   chair_name: string | null;
   chair_person_id: string | null;
+  video_url: string | null;
 }
 
 /** Exact-name profile resolver: returns a person id only when exactly one

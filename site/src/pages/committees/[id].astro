@@ -85,6 +85,9 @@ const roleLabel = (role: string) =>
           {h.source_url && (
             <a href={h.source_url} class="ml-2 underline">official notice</a>
           )}
+          {h.video_url && (
+            <a href={h.video_url} class="ml-2 font-semibold underline">watch on WisconsinEye</a>
+          )}
         </p>
       ))}
     </section>

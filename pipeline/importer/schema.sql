@@ -72,6 +72,14 @@ CREATE TABLE bill_documents (
 );
 CREATE INDEX idx_bill_documents_bill ON bill_documents (bill_id);
 
+-- WisconsinEye recordings matched to hearings by exact date + committee
+-- title; metadata only, linking to their site
+CREATE TABLE hearing_videos (
+    hearing_id TEXT PRIMARY KEY REFERENCES hearings (id),
+    url        TEXT NOT NULL,
+    title      TEXT NOT NULL
+);
+
 -- the state's own subject index terms per bill, matched by exact
 -- session + identifier only
 CREATE TABLE bill_subjects (

@@ -36,9 +36,14 @@ const committeePages = new Set(allCommittees().map((c) => c.id));
             )}
             <span class="text-navy-600">{fmtDate(h.date)} {h.time && `· ${fmtTime(h.time)}`}</span>
             {h.location && <span class="text-navy-600">{h.location}</span>}
-            <span class="ml-auto flex gap-3">
-              <a href={`/calendar/hearings/${uid}.ics`} class="underline" aria-label={`Add ${name} hearing on ${fmtDate(h.date)} to calendar`}>Add to calendar</a>
-              {h.source_url && <a href={h.source_url} class="underline" aria-label={`Official notice for ${name} hearing on ${fmtDate(h.date)}`}>Official notice</a>}
+            <span class="ml-auto flex flex-wrap gap-x-3 gap-y-1">
+              {h.video_url && (
+                <a href={h.video_url} class="py-1 font-semibold underline" aria-label={`Watch ${name} hearing from ${fmtDate(h.date)} on WisconsinEye`}>
+                  Watch on WisconsinEye
+                </a>
+              )}
+              <a href={`/calendar/hearings/${uid}.ics`} class="py-1 underline" aria-label={`Add ${name} hearing on ${fmtDate(h.date)} to calendar`}>Add to calendar</a>
+              {h.source_url && <a href={h.source_url} class="py-1 underline" aria-label={`Official notice for ${name} hearing on ${fmtDate(h.date)}`}>Official notice</a>}
             </span>
           </div>
           {h.chair_name && (
