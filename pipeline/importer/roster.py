@@ -63,6 +63,9 @@ class Member:
     district: int | None
     image_url: str | None
     aliases: list[str] = field(default_factory=list)
+    # True when a docs.legis membership listing (authoritative for who
+    # served) added this member beyond the term-windowed roster
+    from_listing: bool = False
 
     @classmethod
     def from_person(cls, person: Person, chamber: str, district: int | None) -> Member:
@@ -289,7 +292,9 @@ def merge_listing(roster: Roster, listing: list[dict], people: list[Person]) -> 
         person = find_person(people, entry["name"])
         key = (person.id, entry["chamber"])
         if key not in members:
-            members[key] = Member.from_person(person, entry["chamber"], entry.get("district"))
+            member = Member.from_person(person, entry["chamber"], entry.get("district"))
+            member.from_listing = True
+            members[key] = member
     return Roster(list(members.values()))
 
 

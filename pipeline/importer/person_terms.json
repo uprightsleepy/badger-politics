@@ -1,5 +1,5 @@
 {
-  "_comment": "Manually verified service terms missing from every automated source (openstates people files, docs.legis listings, legacy CSV). Each entry cites its basis. Never inferred.",
+  "_comment": "Manually verified service terms missing from every automated source (openstates people files, docs.legis listings, legacy CSV). Each entry cites its basis. Never inferred. An entry with \"exclusive\": true declares the complete verified service for that person+chamber: the importer then skips roster supplements for that chamber, so any service the curation misses fails the vote-coverage gate loudly.",
   "ocd-person/82c2d686-98d3-4dc9-8655-4e61057c0922": [
     {
       "chamber": "lower",
@@ -7,6 +7,41 @@
       "start": "2011-01-03",
       "end": "2012-07-01",
       "basis": "Jerry Petrowski represented AD 86 until winning the SD 29 special election of June 5, 2012 (vacancy from Pam Galloway's resignation); the legacy CSV records his whole 2011-2012 term as Senate only."
+    },
+    {
+      "chamber": "upper",
+      "district": 29,
+      "start": "2012-07-17",
+      "end": "2013-01-01",
+      "basis": "Petrowski assumed the SD 29 seat on July 17, 2012 (Ballotpedia; special election of June 5, 2012). Ends at the biennium boundary where roster supplements take over; blocks the phantom Jan 2011-Jul 2012 Senate coverage the legacy CSV implied."
+    }
+  ],
+  "ocd-person/2e0e6bb3-bb92-4b34-90bc-a22ffe76ee3e": [
+    {
+      "chamber": "upper",
+      "district": 1,
+      "start": "2018-06-28",
+      "end": "2019-01-07",
+      "exclusive": true,
+      "basis": "Caleb Frostman's complete Senate service: sworn in June 28, 2018 after winning the June 12 special election (vacancy from Frank Lasee's resignation), served until Jan 7, 2019 after losing the November 2018 general. His openstates role is startless, and the one-constitutional-term guess would fabricate 2015-2018 presence."
+    }
+  ],
+  "ocd-person/5e70f623-ae29-4013-ac58-b86c2616a9eb": [
+    {
+      "chamber": "lower",
+      "district": 64,
+      "start": "2019-01-07",
+      "end": "2019-01-08",
+      "basis": "Peter Barca was sworn into the 2019 Assembly on Jan 7, took the oath as Revenue Secretary the same day, and resigned the seat (in office at DOR from Jan 8, 2019 per WisPolitics/Wikipedia). This one-day term blocks the whole-biennium 2019 supplement his startless role would otherwise earn."
+    }
+  ],
+  "ocd-person/798979da-9683-41b4-b663-d5c73ec93364": [
+    {
+      "chamber": "upper",
+      "district": 4,
+      "start": "2024-12-19",
+      "end": "2025-01-06",
+      "basis": "Dora Drake assumed the SD 4 seat on Dec 19, 2024 (Ballotpedia; July 30, 2024 special election for Lena Taylor's vacancy). Adjacent to her regular-term start Jan 6, 2025; blocks the phantom Jan 2023-Dec 2024 Senate coverage a 2023-session supplement would grant."
     }
   ],
   "ocd-person/e127b754-c756-4017-a414-83cff1bb30f5": [

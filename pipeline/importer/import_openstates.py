@@ -230,7 +230,8 @@ class Importer:
     ) -> None:
         events_path = Path(__file__).resolve().parent / "term_events.json"
         # entries match a term by "matches" (the source's end date) when the
-        # source end is a verified artifact; "end" is what gets persisted
+        # source end is a verified artifact; "end" is what gets persisted.
+        # "chamber" narrows the match when both chambers share an end date
         events = {
             (pid, e.get("matches", e["end"])): e
             for pid, entries in json.loads(events_path.read_text(encoding="utf-8")).items()
@@ -249,6 +250,8 @@ class Importer:
                 if term.synthetic:
                     continue
                 event = events.get((person.id, term.end)) if term.end else None
+                if event and event.get("chamber") not in (None, term.chamber):
+                    event = None
                 end = term.end
                 if event:
                     used.add((person.id, term.end))
@@ -271,11 +274,38 @@ class Importer:
         # biennium (Jan 1 odd year to Jan 1 odd+2, exactly adjacent like WI
         # terms ending on inauguration day) is used, not the session metadata
         # window: floor votes run past sine-die dates
+        terms_by_person = {p.id: p.terms for p in people}
+        # curation marked "exclusive" is the complete verified service for
+        # that person+chamber; supplements stay out of its way (a curation
+        # gap then orphans votes and fails the coverage gate loudly)
+        curated_path = Path(__file__).resolve().parent / "person_terms.json"
+        exclusive = {
+            (pid, t["chamber"])
+            for pid, entries in json.loads(curated_path.read_text(encoding="utf-8")).items()
+            if not pid.startswith("_")
+            for t in entries
+            if t.get("exclusive")
+        }
         for key in sorted(session_windows, key=lambda k: session_windows[k][0]):
             by = int(biennium(key))
             start, end = f"{by}-01-01", f"{by + 2}-01-01"
             for m in self.rosters[key].members:
                 if m.id not in known:
+                    continue
+                if (m.id, m.chamber) in exclusive:
+                    continue
+                # session metadata windows run to the NEXT inauguration, so
+                # a Jan-5 legacy start guess lands incoming freshmen on the
+                # outgoing session's roster (the 2013 class on 2011's); a
+                # supplement also needs the member's own recorded service
+                # (guessed dates included) to touch this biennium — unless
+                # the session's docs.legis listing itself seated them
+                touches = m.from_listing or any(
+                    t.chamber == m.chamber and t.start < end
+                    and start < (t.end or OPEN_END)
+                    for t in terms_by_person.get(m.id, [])
+                )
+                if not touches:
                     continue
                 covered = any(
                     pid == m.id and ch == m.chamber and ts < end and start < te

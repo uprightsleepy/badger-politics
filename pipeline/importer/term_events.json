@@ -36,6 +36,50 @@
       "basis": "verified 2026-08-22: Scott Gunderson resigned effective Jan 4, 2011 to become a DNR executive assistant; Assembly Journal Jan 3, 2011 p. 12 records the resignation honors; openstates end 2012-12-31 is a year-boundary artifact"
     }
   ],
+  "ocd-person/5e70f623-ae29-4013-ac58-b86c2616a9eb": [
+    {
+      "end": "2019-01-08",
+      "label": "Resigned to become Secretary of the Wisconsin Department of Revenue",
+      "url": "https://www.wispolitics.com/2019/revenue-nominee-barca-resigns-assembly-seat/",
+      "basis": "verified 2026-08-24: Peter Barca took the DOR oath Jan 7, 2019 and resigned his Assembly seat the same day, in office at DOR from Jan 8; matches the curated one-day 2019 term"
+    }
+  ],
+  "ocd-person/2e0e6bb3-bb92-4b34-90bc-a22ffe76ee3e": [
+    {
+      "end": "2019-01-07",
+      "label": "Lost the November 2018 election",
+      "url": "https://ballotpedia.org/Caleb_Frostman",
+      "basis": "verified 2026-08-24: Caleb Frostman lost the SD 1 general election to Andre Jacque in November 2018; his short term ended at the Jan 7, 2019 inauguration"
+    }
+  ],
+  "ocd-person/798979da-9683-41b4-b663-d5c73ec93364": [
+    {
+      "matches": "2025-01-06",
+      "chamber": "lower",
+      "end": "2024-12-19",
+      "label": "Won the July 2024 special election for Senate District 4",
+      "url": "https://ballotpedia.org/Dora_Drake",
+      "basis": "verified 2026-08-24: Dora Drake left her AD 11 seat when she assumed the SD 4 seat on Dec 19, 2024; the openstates Assembly end 2025-01-06 is a regular-term-boundary artifact"
+    }
+  ],
+  "ocd-person/5e1693b6-c85f-4a65-af09-6f7d110f31b6": [
+    {
+      "matches": "2016-12-31",
+      "end": "2017-12-29",
+      "label": "Resigned to join the Department of Agriculture, Trade and Consumer Protection under Governor Walker",
+      "url": "https://ballotpedia.org/Keith_Ripp",
+      "basis": "verified 2026-08-24: Keith Ripp resigned effective Dec 29, 2017 to become DATCP Assistant Deputy Secretary (started Jan 1, 2018); his last recorded floor vote is Nov 9, 2017; the openstates end 2016-12-31 is a year-boundary artifact (he was re-elected Nov 2016 and served through 2017)"
+    }
+  ],
+  "ocd-person/6ed73b80-5a79-4731-a085-78a76772ab05": [
+    {
+      "matches": "2016-12-31",
+      "end": "2017-12-29",
+      "label": "Resigned to join the Department of Workforce Development under Governor Walker",
+      "url": "https://ballotpedia.org/Frank_Lasee",
+      "basis": "verified 2026-08-24: Frank Lasee resigned effective Dec 29, 2017 to lead DWD's Worker's Compensation division; his last recorded floor vote is Nov 7, 2017; the openstates end 2016-12-31 is a year-boundary artifact (he was re-elected Nov 2016 and served through 2017)"
+    }
+  ],
   "ocd-person/b2ad4345-9408-4238-a1f9-13e747f599b3": [
     {
       "end": "2012-07-11",
