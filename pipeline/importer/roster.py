@@ -201,7 +201,10 @@ def load_legacy_terms(legacy_dir: Path, people: list[Person]) -> list[Person]:
                 name=name,
                 family_name=meta.get("last_name") or name.split()[-1],
                 party=row.get("party") or meta.get("party") or None,
-                image_url=meta.get("photo_url") or None,
+                # legacy photo urls point at long-dead legis.wisconsin.gov
+                # paths (verified 404 in the 2026-08 link audit); no photo
+                # beats a broken one
+                image_url=None,
                 legacy_ids=[row["leg_id"]],
             )
             synthesized[row["leg_id"]] = person

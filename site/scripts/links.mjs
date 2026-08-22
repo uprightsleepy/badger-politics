@@ -96,23 +96,33 @@ if (process.argv.includes("--external")) {
   let extFailures = 0;
   await Promise.all(
     [...byHost.entries()].map(async ([host, list]) => {
+      const UA = { "User-Agent": "BadgerPolitics link check (badgerpolitics.org; hphil.work@gmail.com)" };
+      const probe = async (url) => {
+        let res = await fetch(url, { method: "HEAD", redirect: "follow",
+          signal: AbortSignal.timeout(20000), headers: UA });
+        if (res.status === 405 || res.status === 404 || res.status === 403) {
+          res = await fetch(url, { method: "GET", redirect: "follow",
+            signal: AbortSignal.timeout(20000), headers: UA });
+        }
+        return res;
+      };
       for (const [url, seenOn] of list) {
-        try {
-          let res = await fetch(url, { method: "HEAD", redirect: "follow",
-            signal: AbortSignal.timeout(20000),
-            headers: { "User-Agent": "BadgerPolitics link check (badgerpolitics.org; hphil.work@gmail.com)" } });
-          if (res.status === 405 || res.status === 404 || res.status === 403) {
-            res = await fetch(url, { method: "GET", redirect: "follow",
-              signal: AbortSignal.timeout(20000),
-              headers: { "User-Agent": "BadgerPolitics link check (badgerpolitics.org; hphil.work@gmail.com)" } });
+        // one retry so transient timeouts on hours-long runs don't record
+        let verdict = null;
+        for (let attempt = 0; attempt < 2 && verdict === null; attempt++) {
+          try {
+            const res = await probe(url);
+            if (res.ok) verdict = "ok";
+            else if (attempt === 1) verdict = String(res.status);
+            else await new Promise((r) => setTimeout(r, 5000));
+          } catch (e) {
+            if (attempt === 1) verdict = e.name;
+            else await new Promise((r) => setTimeout(r, 5000));
           }
-          if (!res.ok) {
-            extFailures++;
-            console.log(`BROKEN external ${res.status} ${url} (linked from ${seenOn})`);
-          }
-        } catch (e) {
+        }
+        if (verdict !== "ok") {
           extFailures++;
-          console.log(`BROKEN external ${e.name} ${url} (linked from ${seenOn})`);
+          console.log(`BROKEN external ${verdict} ${url} (linked from ${seenOn})`);
         }
         await new Promise((r) => setTimeout(r, 500));
       }

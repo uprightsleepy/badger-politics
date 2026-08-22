@@ -25,7 +25,7 @@ await new Promise((r) => server.listen(8935, "127.0.0.1", r));
 
 const PAGES = [
   "/", "/bills/", "/bills/2025/", "/bills/2025/ab656/", "/votes/2025-av0001-ar1/",
-  "/legislators/", "/hearing-none/2025/", "/hearings/", "/calendar/", "/my-reps/",
+  "/legislators/", "/hearing-none/2025/", "/calendar/", "/my-reps/",
   "/elections/2026/", "/data/", "/about/", "/money/", "/money/committees/",
   "/money/committees/651839/", "/404.html",
 ];

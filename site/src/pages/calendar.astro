@@ -1,8 +1,9 @@
 ---
 import Base from "../layouts/Base.astro";
+import HearingsList from "../components/HearingsList.astro";
 ---
 
-<Base title="Civic calendar" description="Interactive calendar of Wisconsin Legislature hearings and statewide election days.">
+<Base title="Civic calendar" description="Interactive calendar of Wisconsin Legislature hearings and election days, with the full upcoming hearings list.">
   <h1 class="text-2xl font-bold">Civic calendar</h1>
   <p class="mt-1 text-sm text-navy-700">
     Committee hearings and election days.
@@ -26,6 +27,10 @@ import Base from "../layouts/Base.astro";
     <h2 id="day-label" class="font-bold"></h2>
     <ul id="day-events" class="mt-2 space-y-2 text-sm"></ul>
   </section>
+
+  <div class="mt-8">
+    <HearingsList />
+  </div>
 
   <script>
     let events: Record<
@@ -158,7 +163,7 @@ import Base from "../layouts/Base.astro";
         label.textContent = "Calendar unavailable";
         grid.innerHTML =
           `<p class="col-span-7 bg-white p-4 text-sm">Couldn't load the calendar. ` +
-          `Try the <a class="underline" href="/hearings/">hearings list</a> instead.</p>`;
+          `Try the <a class="underline" href="/calendar/#hearings">hearings list</a> instead.</p>`;
       });
   </script>
 </Base>
