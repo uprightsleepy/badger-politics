@@ -18,7 +18,6 @@ def run(archives_dir: Path, db_path: Path) -> int:
         raise RuntimeError(f"no CFIS archives in {archives_dir}; run scraper.fetch_cfis")
     conn = sqlite3.connect(db_path)
     known_people = {r[0] for r in conn.execute("SELECT id FROM people")}
-    total = 0
     with conn:
         conn.execute("DELETE FROM cfis_committees")
         map_path = archives_dir / "committee_map.json"
@@ -33,22 +32,25 @@ def run(archives_dir: Path, db_path: Path) -> int:
         conn.execute("DELETE FROM contributions")
         for path in files:
             rows = json.loads(path.read_text(encoding="utf-8"))
+            batch = []
             for r in rows:
                 if r["person_id"] not in known_people:
                     raise RuntimeError(
                         f"{path.name}: contribution mapped to unknown person"
                         f" {r['person_id']} — refresh the committee map"
                     )
-                conn.execute(
-                    "INSERT OR REPLACE INTO contributions (id, person_id,"
-                    " committee_entity_id, date, amount, from_entity_id, from_name,"
-                    " from_type, occupation, category)"
-                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                batch.append(
                     (r["id"], r["person_id"], r["committee_entity_id"], r["date"],
                      r["amount"] or 0, r.get("from_entity_id"), r["from_name"],
-                     r["from_type"], r["occupation"], r["category"]),
+                     r["from_type"], r["occupation"], r["category"])
                 )
-                total += 1
+            conn.executemany(
+                "INSERT OR REPLACE INTO contributions (id, person_id,"
+                " committee_entity_id, date, amount, from_entity_id, from_name,"
+                " from_type, occupation, category)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                batch,
+            )
     count, people = conn.execute(
         "SELECT COUNT(*), COUNT(DISTINCT person_id) FROM contributions"
     ).fetchone()

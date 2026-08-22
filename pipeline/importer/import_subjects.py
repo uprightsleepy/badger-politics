@@ -34,17 +34,18 @@ def run(archives_dir: Path, db_path: Path) -> int:
                     "SELECT id, identifier FROM bills WHERE session_id = ?", (year,)
                 )
             }
+            batch = []
             for subject, identifiers in json.loads(path.read_text(encoding="utf-8")).items():
                 for identifier in identifiers:
                     bill_id = known.get(identifier)
                     if bill_id is None:
                         unmatched += 1
                         continue
-                    conn.execute(
-                        "INSERT INTO bill_subjects (bill_id, subject) VALUES (?, ?)",
-                        (bill_id, subject),
-                    )
-                    total += 1
+                    batch.append((bill_id, subject))
+            conn.executemany(
+                "INSERT INTO bill_subjects (bill_id, subject) VALUES (?, ?)", batch
+            )
+            total += len(batch)
     subjects = conn.execute("SELECT COUNT(DISTINCT subject) FROM bill_subjects").fetchone()[0]
     conn.close()
     print(

@@ -86,6 +86,18 @@ def enrich(db_path: Path, limit: int | None, only: str | None, delay: float) -> 
     http = requests.Session()
     http.headers["User-Agent"] = USER_AGENT
     done = missing = failed = 0
+    # batched commits: one fsync per ~500 rows, not per row; a crash redoes
+    # at most one batch, and the HTML cache makes that redo free
+    pending: list[tuple[str, str]] = []
+
+    def flush() -> None:
+        if pending:
+            with conn:
+                conn.executemany(
+                    "UPDATE bills SET lrb_analysis = ? WHERE id = ?", pending
+                )
+            pending.clear()
+
     for bill_id, url in rows:
         cached = cache_path(url).exists()
         try:
@@ -96,16 +108,16 @@ def enrich(db_path: Path, limit: int | None, only: str | None, delay: float) -> 
             continue
         analysis = extract_analysis(page)
         if analysis:
-            with conn:
-                conn.execute(
-                    "UPDATE bills SET lrb_analysis = ? WHERE id = ?", (analysis, bill_id)
-                )
+            pending.append((analysis, bill_id))
+            if len(pending) >= 500:
+                flush()
             done += 1
         else:
             missing += 1
             print(f"NO ANALYSIS SECTION {bill_id}: {url}", file=sys.stderr)
         if not cached and delay:
             time.sleep(delay)
+    flush()
     conn.close()
     print(f"lrb: {done} extracted, {missing} without analysis section, {failed} fetch failures")
     return 1 if failed else 0

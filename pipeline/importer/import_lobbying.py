@@ -28,6 +28,7 @@ def run(archives_dir: Path, db_path: Path) -> int:
             m = SESSION_RE.search(path.name)
             session_year = m.group(1) if m else ""
             lob_session = path.stem.split("-", 1)[1]
+            batch = []
             for item in json.loads(path.read_text(encoding="utf-8")):
                 bill_id = f"{session_year}-{item['identifier'].replace(' ', '').lower()}"
                 if bill_id not in known_bills:
@@ -37,13 +38,13 @@ def run(archives_dir: Path, db_path: Path) -> int:
                     "https://lobbying.wi.gov/What/BillInformation/"
                     f"{lob_session}/Information/{item['info_id']}"
                 )
-                for p in item["principals"]:
-                    conn.execute(
-                        "INSERT INTO lobbying_interests (bill_id, principal_id,"
-                        " principal, source_url) VALUES (?, ?, ?, ?)",
-                        (bill_id, p["id"], p["name"], url),
-                    )
-                    total += 1
+                batch.extend((bill_id, p["id"], p["name"], url) for p in item["principals"])
+            conn.executemany(
+                "INSERT INTO lobbying_interests (bill_id, principal_id,"
+                " principal, source_url) VALUES (?, ?, ?, ?)",
+                batch,
+            )
+            total += len(batch)
     bills = conn.execute(
         "SELECT COUNT(DISTINCT bill_id) FROM lobbying_interests"
     ).fetchone()[0]

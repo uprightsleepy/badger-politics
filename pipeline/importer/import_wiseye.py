@@ -35,13 +35,15 @@ def parse_title(title: str) -> tuple[str | None, str]:
 
 def run(videos_path: Path, db_path: Path) -> int:
     videos = json.loads(videos_path.read_text(encoding="utf-8"))
-    by_date: dict[str, list[dict]] = defaultdict(list)
+    # parse each title once, not once per co-dated hearing
+    by_date: dict[str, list[tuple[str | None, str, dict]]] = defaultdict(list)
     for v in videos:
-        by_date[v["date"]].append(v)
+        hint, video_key = parse_title(v["title"])
+        by_date[v["date"]].append((hint, video_key, v))
 
     conn = sqlite3.connect(db_path)
     committees = {
-        row[0]: (row[1], row[2])
+        row[0]: (row[1], row[2], normalize_name(row[1]))
         for row in conn.execute("SELECT id, name, chamber FROM committees")
     }
     linked = ambiguous = 0
@@ -51,13 +53,11 @@ def run(videos_path: Path, db_path: Path) -> int:
             "SELECT id, date, committee_id FROM hearings"
             " WHERE date IS NOT NULL AND committee_id IS NOT NULL"
         ).fetchall():
-            name, chamber = committees.get(committee_id, (None, None))
+            name, chamber, key = committees.get(committee_id, (None, None, None))
             if name is None:
                 continue
-            key = normalize_name(name)
             candidates = []
-            for v in by_date.get(date, []):
-                hint, video_key = parse_title(v["title"])
+            for hint, video_key, v in by_date.get(date, []):
                 if video_key != key:
                     continue
                 if hint and chamber and hint != chamber:
