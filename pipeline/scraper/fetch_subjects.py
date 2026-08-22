@@ -35,9 +35,13 @@ BILL_RE = re.compile(r'href="/document/session/(\d+)/([A-Za-z0-9]+)/([A-Za-z]+)(
 DOWN_RE = re.compile(r"<a href='(/\d{4}/related/subject_index/[^']+\?down=1)'>\s*Down")
 
 
-def parse_page(html: str, year: int, subjects: dict, current: list, skipped: list) -> None:
+def parse_page(
+    html: str, year: int, subjects: dict, current: str | None, skipped: list
+) -> str | None:
     """Attribute each REG bill reference to the most recent preceding
-    subject heading, in document order."""
+    subject heading, in document order. Headings carry across page breaks:
+    takes the heading open at the top of this page, returns the one open
+    at the bottom."""
     events = []
     for m in SUBJECT_RE.finditer(html):
         name = m.group(1)
@@ -53,16 +57,17 @@ def parse_page(html: str, year: int, subjects: dict, current: list, skipped: lis
     events.sort()
     for _, kind, value in events:
         if kind == "subject":
-            current[0] = value
-        elif current[0]:
-            subjects.setdefault(current[0], [])
-            if value not in subjects[current[0]]:
-                subjects[current[0]].append(value)
+            current = value
+        elif current:
+            subjects.setdefault(current, [])
+            if value not in subjects[current]:
+                subjects[current].append(value)
+    return current
 
 
 def fetch_year(http: requests.Session, year: int) -> dict:
     subjects: dict[str, list[str]] = {}
-    current: list[str | None] = [None]
+    current: str | None = None
     skipped: list[str] = []
     url = f"{BASE}/{year}/related/subject_index/index"
     seen = set()
@@ -72,7 +77,7 @@ def fetch_year(http: requests.Session, year: int) -> dict:
         seen.add(url)
         response = http.get(url, timeout=60)
         response.raise_for_status()
-        parse_page(response.text, year, subjects, current, skipped)
+        current = parse_page(response.text, year, subjects, current, skipped)
         m = DOWN_RE.search(response.text)
         if not m:
             break
