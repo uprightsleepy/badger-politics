@@ -2,6 +2,7 @@
 import Base from "../../layouts/Base.astro";
 import VoteHeatmap from "../../components/VoteHeatmap.astro";
 import MoneyTimeline from "../../components/MoneyTimeline.astro";
+import FollowButton from "../../components/FollowButton.astro";
 import MaybeLink from "../../components/MaybeLink.astro";
 import OrgLogo from "../../components/OrgLogo.astro";
 import VoteRow from "../../components/VoteRow.astro";
@@ -94,7 +95,13 @@ const tally = TALLY_ORDER.map((status) => ({
 ---
 
 <Base title={person.name} description={`${person.current_role ?? "Legislator"}, ${chamberName(person.chamber)} District ${person.district}`}>
-  <h1 class="text-2xl font-bold">{person.name}</h1>
+  <div class="flex flex-wrap items-center gap-3">
+    <h1 class="text-2xl font-bold">{person.name}</h1>
+    <span class="ml-auto flex items-center gap-3">
+      <FollowButton kind="legislators" id={personSlug(person.id)} />
+      <a href={`/feeds/legislators/${personSlug(person.id)}.xml`} class="text-xs underline">Atom feed</a>
+    </span>
+  </div>
   <p class="mt-1 text-sm">
     <span class={`mr-1 rounded-full px-2 py-0.5 text-xs font-bold ${partyStyle(person.party)}`}>
       {person.party ?? "—"}

@@ -1,0 +1,57 @@
+---
+import Base from "../../layouts/Base.astro";
+import { allSubjects } from "../../lib/db";
+import { subjectDisplay, subjectSlug } from "../../lib/format";
+
+const subjects = allSubjects();
+---
+
+<Base
+  title="Subjects"
+  description="Browse Wisconsin legislation by the Legislature's own subject index: every topic, every session since 2009."
+>
+  <h1 class="text-2xl font-bold">Browse bills by subject</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    The Legislature's own subject index, covering every session since 2009.
+    Terms are the state's, verbatim.
+  </p>
+  <div class="mt-4">
+    <label class="mb-1 block text-sm font-semibold" for="subject-filter">Filter subjects</label>
+    <input
+      type="search"
+      id="subject-filter"
+      placeholder="e.g. housing, elections, taxation…"
+      class="w-full max-w-md rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm"
+    />
+    <p id="subject-filter-status" role="status" class="mt-2 text-sm text-navy-600"></p>
+  </div>
+  <ul class="mt-4 columns-1 gap-6 sm:columns-2 lg:columns-3">
+    {subjects.map((s) => (
+      <li
+        class="break-inside-avoid"
+        data-subject-row
+        data-text={subjectDisplay(s.subject).toLowerCase()}
+      >
+        <a
+          href={`/subjects/${subjectSlug(s.subject)}/`}
+          class="flex items-baseline gap-2 rounded px-1 py-1 text-sm hover:bg-navy-50"
+        >
+          <span class="min-w-0 flex-1 underline">{subjectDisplay(s.subject)}</span>
+          <span class="shrink-0 text-xs text-navy-600">{s.n}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+  <p id="subject-no-match" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600"></p>
+
+  <script>
+    import { initRowFilter } from "../../scripts/rowFilter";
+    initRowFilter({
+      input: "subject-filter",
+      rows: "[data-subject-row]",
+      status: "subject-filter-status",
+      noMatch: "subject-no-match",
+      noun: "subjects",
+    });
+  </script>
+</Base>

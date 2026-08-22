@@ -27,8 +27,14 @@ const PAGES = [
   "/bills/2025/sb23/", "/votes/2025-av0001-ar1/", "/legislators/",
   "/hearing-none/", "/hearing-none/2025/", "/hearings/", "/calendar/",
   "/my-reps/", "/elections/2026/", "/data/", "/about/", "/money/", "/404.html",
-  "/money/committees/", "/money/committees/651839/", "/committees/",
+  "/money/committees/", "/money/committees/651839/", "/committees/", "/subjects/",
+  "/following/",
 ];
+{
+  const idx = await readFile(join(DIST, "subjects/index.html"), "utf-8").catch(() => "");
+  const m = idx.match(/href="(\/subjects\/[^"]+\/)"/);
+  if (m) PAGES.push(m[1]);
+}
 {
   const idx = await readFile(join(DIST, "committees/index.html"), "utf-8").catch(() => "");
   const m = idx.match(/href="(\/committees\/[^"]+\/)"/);

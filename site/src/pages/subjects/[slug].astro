@@ -1,0 +1,49 @@
+---
+import Base from "../../layouts/Base.astro";
+import StatusBadge from "../../components/StatusBadge.astro";
+import { allSubjects, billsForSubject } from "../../lib/db";
+import { billSlug, fmtDate, subjectDisplay, subjectSlug } from "../../lib/format";
+
+export function getStaticPaths() {
+  // distinct index terms can slug identically; one page carries them all
+  const bySlug = new Map<string, string[]>();
+  for (const s of allSubjects()) {
+    const slug = subjectSlug(s.subject);
+    bySlug.set(slug, [...(bySlug.get(slug) ?? []), s.subject]);
+  }
+  return [...bySlug.entries()].map(([slug, subjects]) => ({
+    params: { slug },
+    props: { subjects },
+  }));
+}
+const { subjects } = Astro.props;
+const bills = subjects.flatMap((s) => billsForSubject(s));
+const seen = new Set<string>();
+const unique = bills.filter((b) => !seen.has(b.id) && seen.add(b.id));
+const title = subjectDisplay(subjects[0]);
+const sessions = [...new Set(unique.map((b) => b.session_id))];
+---
+
+<Base
+  title={title}
+  description={`${unique.length} Wisconsin bills indexed under ${title} across ${sessions.length} sessions.`}
+>
+  <p class="text-sm text-navy-600"><a href="/subjects/" class="underline">Subjects</a></p>
+  <h1 class="mt-1 text-2xl font-bold">{title}</h1>
+  <p class="mt-1 text-sm text-navy-600">
+    {unique.length} bill{unique.length > 1 ? "s" : ""} across {sessions.length} session{sessions.length > 1 ? "s" : ""},
+    from the Legislature's subject index.
+  </p>
+  <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white">
+    {unique.map((b) => (
+      <li class="text-sm">
+        <a href={`/bills/${b.session_id}/${billSlug(b.identifier)}/`} class="flex items-center gap-3 px-4 py-2.5 hover:bg-navy-50">
+          <span class="w-20 shrink-0 font-bold underline">{b.identifier}</span>
+          <span class="min-w-0 flex-1 truncate">{b.title}</span>
+          <StatusBadge status={b.status} />
+          <span class="hidden w-16 shrink-0 text-right text-xs text-navy-600 sm:block">{b.session_id}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</Base>

@@ -688,6 +688,33 @@ export const committeeFor = (committeeId: string) => {
   return { committee, members, hearings, graveyard };
 };
 
+/** The state's subject index, aggregated. */
+export const allSubjects = () =>
+  db
+    .prepare(
+      `SELECT subject, COUNT(*) AS n FROM bill_subjects
+       GROUP BY subject ORDER BY subject`,
+    )
+    .all() as { subject: string; n: number }[];
+
+export const billsForSubject = (subject: string) =>
+  db
+    .prepare(
+      `SELECT b.id, b.session_id, b.identifier, b.title, b.status
+       FROM bill_subjects s JOIN bills b ON b.id = s.bill_id
+       WHERE s.subject = ?
+       ORDER BY b.session_id DESC, LENGTH(b.identifier), b.identifier`,
+    )
+    .all(subject) as {
+      id: string; session_id: string; identifier: string;
+      title: string | null; status: string | null;
+    }[];
+
+export const subjectsForBill = (billId: string) =>
+  db
+    .prepare("SELECT subject FROM bill_subjects WHERE bill_id = ? ORDER BY subject")
+    .all(billId) as { subject: string }[];
+
 /** Official documents attached to a bill; note text is docs.legis's own,
  * displayed verbatim. */
 export const documentsFor = (billId: string) =>

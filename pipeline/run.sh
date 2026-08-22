@@ -33,6 +33,9 @@ python -m importer.import_cfis _data/cfis ../data/wi.sqlite
 python -m scraper.fetch_lobbying --refresh    # per-bill registered principals
 python -m importer.import_lobbying _data/lobbying ../data/wi.sqlite
 
+python -m scraper.fetch_subjects              # subject index (current refreshes)
+python -m importer.import_subjects _data/subjects ../data/wi.sqlite
+
 python -m importer.enrich_lrb ../data/wi.sqlite
 python -m importer.checks ../data/wi.sqlite   # hard gate: abort deploy on failure
 

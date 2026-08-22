@@ -1,5 +1,6 @@
 ---
 import Base from "../../../layouts/Base.astro";
+import FollowButton from "../../../components/FollowButton.astro";
 import StatusBadge from "../../../components/StatusBadge.astro";
 import Stepper from "../../../components/Stepper.astro";
 import RollCall from "../../../components/RollCall.astro";
@@ -12,9 +13,12 @@ import {
   votesFor,
   lobbyingFor,
   documentsFor,
+  subjectsForBill,
   personIdByName,
 } from "../../../lib/db";
-import { billSlug, fmtDate, personSlug, chamberName } from "../../../lib/format";
+import {
+  billSlug, fmtDate, personSlug, chamberName, subjectDisplay, subjectSlug,
+} from "../../../lib/format";
 
 export function getStaticPaths() {
   return builtSessions().flatMap((session) =>
@@ -36,6 +40,7 @@ const chairId = personIdByName(bill.committee_chair_at_death);
 const fiscalEstimates = documentsFor(bill.id).filter((d) =>
   d.note.toLowerCase().includes("fiscal estimate"),
 );
+const subjects = subjectsForBill(bill.id);
 // "AB 12: Fiscal Estimate From DOA" -> "Fiscal Estimate From DOA"
 const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
 ---
@@ -53,8 +58,24 @@ const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
           Official bill text
         </a>
       )}
+      <span class="ml-auto flex items-center gap-3" data-pagefind-ignore>
+        <FollowButton kind="bills" id={bill.id} />
+        <a href={`/feeds/bills/${bill.id}.xml`} class="text-xs underline">Atom feed</a>
+      </span>
     </div>
     <p class="mt-2 text-lg text-navy-700">{bill.title}</p>
+    {subjects.length > 0 && (
+      <p class="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs" data-pagefind-ignore>
+        {subjects.map((s) => (
+          <a
+            href={`/subjects/${subjectSlug(s.subject)}/`}
+            class="rounded-full bg-navy-50 px-2.5 py-1 text-navy-700 hover:bg-navy-100"
+          >
+            {subjectDisplay(s.subject)}
+          </a>
+        ))}
+      </p>
+    )}
 
     <div class="mt-6 rounded-lg border border-navy-100 bg-white p-4">
       <Stepper status={bill.status} chamber={bill.chamber} />

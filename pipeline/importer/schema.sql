@@ -72,6 +72,15 @@ CREATE TABLE bill_documents (
 );
 CREATE INDEX idx_bill_documents_bill ON bill_documents (bill_id);
 
+-- the state's own subject index terms per bill, matched by exact
+-- session + identifier only
+CREATE TABLE bill_subjects (
+    bill_id TEXT NOT NULL REFERENCES bills (id),
+    subject TEXT NOT NULL
+);
+CREATE INDEX idx_bill_subjects_bill ON bill_subjects (bill_id);
+CREATE INDEX idx_bill_subjects_subject ON bill_subjects (subject);
+
 -- current committee rosters from the openstates people files; person ids
 -- are exact, so membership inherits roster precision
 CREATE TABLE committee_members (
