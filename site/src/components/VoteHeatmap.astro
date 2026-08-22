@@ -1,8 +1,10 @@
 ---
-/** GitHub-style calendar of one legislator-year: each cell is a day the
- * chamber held floor votes. Navy = voted on everything; gold = present but
- * not voting on some; badger red = missed votes (no record while the
- * chamber voted). Pure static HTML — tooltips via title attributes. */
+/** One legislator-year of floor attendance, voting days only: every cell
+ * is a day the chamber held recorded floor votes (empty days don't
+ * render, so the strip stays dense). Navy-green = voted on everything;
+ * gold = present but not voting on some; badger red = missed votes;
+ * pale = out of office that day. Pure static HTML — details via title
+ * attributes and the screen-reader summary. */
 interface Day {
   date: string;
   total: number; // chamber floor votes that day
@@ -15,82 +17,66 @@ interface Props {
   days: Day[];
 }
 const { year, days } = Astro.props;
-const byDate = new Map(days.map((d) => [d.date, d]));
+const ordered = [...days].sort((a, b) => (a.date < b.date ? -1 : 1));
 const prettyDate = (date: string) =>
   new Date(date + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-const missedList = days
+const missedList = ordered
   .filter((d) => d.served !== false && d.total - d.cast - d.nv > 0)
   .map((d) => ({ label: prettyDate(d.date), missed: d.total - d.cast - d.nv, total: d.total }));
-const servedDays = days.filter((d) => d.served !== false).length;
+const servedDays = ordered.filter((d) => d.served !== false).length;
 const summaryLabel =
-  `${year} floor attendance calendar: ${servedDays} voting days in office` +
-  (servedDays < days.length ? `, out of office for ${days.length - servedDays}` : "") +
+  `${year} floor attendance: ${servedDays} voting days in office` +
+  (servedDays < ordered.length ? `, out of office for ${ordered.length - servedDays}` : "") +
   ", " +
   (missedList.length
     ? `missed votes on ${missedList.length} day${missedList.length > 1 ? "s" : ""}, listed below`
     : "no missed votes");
 
-const start = new Date(Date.UTC(year, 0, 1));
-const startDow = start.getUTCDay();
-const gridStart = new Date(start.getTime() - startDow * 86400000);
-const weeks: { date: string; inYear: boolean }[][] = [];
-for (let w = 0; w < 53; w++) {
-  const col: { date: string; inYear: boolean }[] = [];
-  for (let d = 0; d < 7; d++) {
-    const day = new Date(gridStart.getTime() + (w * 7 + d) * 86400000);
-    col.push({
-      date: day.toISOString().slice(0, 10),
-      inYear: day.getUTCFullYear() === year,
-    });
-  }
-  weeks.push(col);
-}
-
-function cellFor(date: string, inYear: boolean) {
-  if (!inYear) return { cls: "bg-transparent", title: "" };
-  const day = byDate.get(date);
-  if (!day) return { cls: "bg-gray-300", title: `${date}: no floor votes` };
+function cellFor(day: Day) {
+  const pretty = prettyDate(day.date);
   if (day.served === false) {
-    return { cls: "bg-navy-100", title: `${prettyDate(date)}: not in office` };
+    return { cls: "bg-navy-100 text-navy-600", title: `${pretty}: not in office` };
   }
   const missed = day.total - day.cast - day.nv;
-  const pretty = prettyDate(date);
   if (missed > 0)
     return {
-      cls: "hm-miss",
+      cls: "hm-miss text-white",
       title: `${pretty}: missed ${missed} of ${day.total} floor vote${day.total > 1 ? "s" : ""}`,
     };
   if (day.nv > 0)
     return {
-      cls: "bg-gold-600",
+      cls: "bg-gold-600 text-navy-900",
       title: `${pretty}: present, not voting on ${day.nv} of ${day.total}`,
     };
-  return { cls: "bg-moss-600", title: `${pretty}: voted in all ${day.total} floor vote${day.total > 1 ? "s" : ""}` };
+  return {
+    cls: "bg-moss-600 text-white",
+    title: `${pretty}: voted in all ${day.total} floor vote${day.total > 1 ? "s" : ""}`,
+  };
 }
 
-const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const monthCols = months.map((label, m) => ({
-  label,
-  col: Math.floor((Date.UTC(year, m, 1) - gridStart.getTime()) / 86400000 / 7),
-}));
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const byMonth: { label: string; cells: { dayNum: number; cls: string; title: string }[] }[] = [];
+for (const d of ordered) {
+  const label = MONTHS[Number(d.date.slice(5, 7)) - 1];
+  if (!byMonth.length || byMonth[byMonth.length - 1].label !== label) {
+    byMonth.push({ label, cells: [] });
+  }
+  const c = cellFor(d);
+  byMonth[byMonth.length - 1].cells.push({ dayNum: Number(d.date.slice(8, 10)), ...c });
+}
 ---
-<div class="overflow-x-auto" tabindex="0" role="img" aria-label={summaryLabel}>
-  <div class="inline-block" aria-hidden="true">
-    <div class="relative mb-0.5 h-4 text-[0.625rem] text-navy-600" style="margin-left: 0;">
-      {monthCols.map((m) => (
-        <span class="absolute" style={`left: ${m.col * 13}px`}>{m.label}</span>
-      ))}
-    </div>
-    <div class="flex gap-[3px]">
-      {weeks.map((col) => (
-        <div class="flex flex-col gap-[3px]">
-          {col.map((cell) => {
-            const c = cellFor(cell.date, cell.inYear);
-            return <div class={`hm-cell h-2.5 w-2.5 rounded-[2px] ${c.cls}`} title={c.title} />;
-          })}
+<div tabindex="0" role="img" aria-label={summaryLabel}>
+  <div class="flex flex-wrap gap-x-4 gap-y-2" aria-hidden="true">
+    {byMonth.map((m) => (
+      <div>
+        <div class="text-[0.625rem] font-semibold uppercase tracking-wide text-navy-600">{m.label}</div>
+        <div class="mt-0.5 flex flex-wrap gap-[3px]">
+          {m.cells.map((c) => (
+            <div class={`hm-cell flex h-5 w-5 items-center justify-center rounded-[3px] text-[0.5625rem] font-semibold tabular-nums ${c.cls}`} title={c.title}>{c.dayNum}</div>
+          ))}
         </div>
-      ))}
-    </div>
+      </div>
+    ))}
   </div>
 </div>
 {missedList.length > 0 && (
