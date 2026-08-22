@@ -8,6 +8,18 @@ import { fileURLToPath } from "node:url";
 const DB_PATH = fileURLToPath(new URL("../../../data/wi.sqlite", import.meta.url));
 const db = new Database(DB_PATH, { readonly: true, fileMustExist: true });
 
+// better-sqlite3 has no implicit statement cache: each prepare() is a full
+// SQL compile. One compiled statement per SQL string serves the whole build.
+const _stmts = new Map<string, Database.Statement>();
+const prep = (sql: string): Database.Statement => {
+  let s = _stmts.get(sql);
+  if (!s) {
+    s = db.prepare(sql);
+    _stmts.set(sql, s);
+  }
+  return s;
+};
+
 export interface Session {
   id: string;
   identifier: string;
@@ -41,38 +53,40 @@ export interface Person {
 }
 
 export const allSessions = (): Session[] =>
-  db.prepare("SELECT * FROM sessions ORDER BY id DESC").all() as Session[];
+  prep("SELECT * FROM sessions ORDER BY id DESC").all() as Session[];
 
+// BUILD_SESSIONS cannot change mid-build
+let _built: Session[] | undefined;
 export function builtSessions(): Session[] {
+  if (_built) return _built;
   const env = process.env.BUILD_SESSIONS ?? "2025,2026s1";
   const sessions = allSessions();
-  if (env === "all") return sessions;
+  if (env === "all") return (_built = sessions);
   const wanted = new Set(env.split(",").map((s) => s.trim()));
-  return sessions.filter((s) => wanted.has(s.id));
+  return (_built = sessions.filter((s) => wanted.has(s.id)));
 }
 
+// read-only DB: one query serves every page's layout
+let _meta: Record<string, string> | undefined;
 export const meta = (): Record<string, string> =>
-  Object.fromEntries(
-    (db.prepare("SELECT key, value FROM meta").all() as { key: string; value: string }[]).map(
+  (_meta ??= Object.fromEntries(
+    (prep("SELECT key, value FROM meta").all() as { key: string; value: string }[]).map(
       (r) => [r.key, r.value],
     ),
-  );
+  ));
 
 export const billsFor = (sessionId: string): Bill[] =>
-  db
-    .prepare("SELECT * FROM bills WHERE session_id = ? AND source != 'legiscan' ORDER BY id")
+  prep("SELECT * FROM bills WHERE session_id = ? AND source != 'legiscan' ORDER BY id")
     .all(sessionId) as Bill[];
 
 export const actionsFor = (billId: string) =>
-  db
-    .prepare(
+  prep(
       "SELECT date, chamber, description, classification FROM actions WHERE bill_id = ? ORDER BY date, id",
     )
     .all(billId) as { date: string; chamber: string | null; description: string; classification: string }[];
 
 export const sponsorsFor = (billId: string) =>
-  db
-    .prepare(
+  prep(
       `SELECT s.name, s.person_id, s.is_primary, p.party, p.district, p.chamber
        FROM sponsorships s LEFT JOIN people p ON p.id = s.person_id
        WHERE s.bill_id = ? ORDER BY s.is_primary DESC, s.name`,
@@ -87,8 +101,7 @@ export const sponsorsFor = (billId: string) =>
   }[];
 
 export const votesFor = (billId: string) =>
-  db
-    .prepare("SELECT * FROM vote_events WHERE bill_id = ? ORDER BY date, id")
+  prep("SELECT * FROM vote_events WHERE bill_id = ? ORDER BY date, id")
     .all(billId) as VoteEvent[];
 
 export interface VoteEvent {
@@ -105,8 +118,7 @@ export interface VoteEvent {
 }
 
 export const voteRecordsFor = (voteEventId: string) =>
-  db
-    .prepare(
+  prep(
       `SELECT r.option, p.id AS person_id, p.name, p.party, p.district, p.chamber
        FROM vote_records r JOIN people p ON p.id = r.person_id
        WHERE r.vote_event_id = ? ORDER BY p.name`,
@@ -121,18 +133,16 @@ export const voteRecordsFor = (voteEventId: string) =>
   }[];
 
 export const people = (): Person[] =>
-  db.prepare("SELECT * FROM people ORDER BY name").all() as Person[];
+  prep("SELECT * FROM people ORDER BY name").all() as Person[];
 
 export const sittingPeople = (): Person[] =>
-  db
-    .prepare(
+  prep(
       "SELECT * FROM people WHERE current_role IN ('Representative', 'Senator') ORDER BY chamber, district",
     )
     .all() as Person[];
 
 export const personVotes = (personId: string, limit: number) =>
-  db
-    .prepare(
+  prep(
       `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result,
               b.id AS bill_id, b.identifier, b.title, b.session_id
        FROM vote_records r
@@ -153,8 +163,7 @@ export const personVotes = (personId: string, limit: number) =>
   }[];
 
 export const personSponsorships = (personId: string) =>
-  db
-    .prepare(
+  prep(
       `SELECT s.is_primary, b.id AS bill_id, b.identifier, b.title, b.status, b.session_id
        FROM sponsorships s JOIN bills b ON b.id = s.bill_id
        WHERE s.person_id = ? AND b.source != 'legiscan' ORDER BY b.id DESC`,
@@ -168,9 +177,16 @@ export const personSponsorships = (personId: string) =>
     session_id: string;
   }[];
 
+const _elections = new Map<string, ReturnType<typeof queryElection>>();
 export const electionFor = (personId: string) => {
-  const row = db
-    .prepare("SELECT * FROM elections WHERE person_id = ?")
+  if (_elections.has(personId)) return _elections.get(personId);
+  const result = queryElection(personId);
+  _elections.set(personId, result);
+  return result;
+};
+
+const queryElection = (personId: string) => {
+  const row = prep("SELECT * FROM elections WHERE person_id = ?")
     .get(personId) as
     | {
         cycle_year: number;
@@ -192,8 +208,7 @@ export const electionFor = (personId: string) => {
 };
 
 export const graveyardFor = (sessionId: string) =>
-  db
-    .prepare(
+  prep(
       `SELECT committee_at_death, committee_chair_at_death, COUNT(*) AS n
        FROM bills WHERE session_id = ? AND died_without_hearing = 1
        GROUP BY committee_at_death, committee_chair_at_death ORDER BY n DESC`,
@@ -205,8 +220,7 @@ export const graveyardFor = (sessionId: string) =>
   }[];
 
 export const graveyardBills = (sessionId: string, committee: string | null) =>
-  db
-    .prepare(
+  prep(
       `SELECT id, identifier, title FROM bills
        WHERE session_id = ? AND died_without_hearing = 1
        AND committee_at_death IS ? ORDER BY id`,
@@ -221,17 +235,15 @@ const HEARING_SELECT = `SELECT h.*, c.name AS committee_name, c.chamber AS commi
        LEFT JOIN hearing_videos v ON v.hearing_id = h.id`;
 
 export const upcomingHearings = (since: string) =>
-  db
-    .prepare(`${HEARING_SELECT} WHERE h.date >= ? ORDER BY h.date, h.time`)
+  prep(`${HEARING_SELECT} WHERE h.date >= ? ORDER BY h.date, h.time`)
     .all(since) as Hearing[];
 
 export const recentHearings = (limit: number) =>
-  db
-    .prepare(`${HEARING_SELECT} ORDER BY h.date DESC, h.time DESC LIMIT ?`)
+  prep(`${HEARING_SELECT} ORDER BY h.date DESC, h.time DESC LIMIT ?`)
     .all(limit) as Hearing[];
 
 export const allHearings = () =>
-  db.prepare(`${HEARING_SELECT} ORDER BY h.date, h.time`).all() as Hearing[];
+  prep(`${HEARING_SELECT} ORDER BY h.date, h.time`).all() as Hearing[];
 
 /** 'AB 656' -> its bill row in the newest built session that has it. */
 const _billIdCache = new Map<string, { id: string; session_id: string } | null>();
@@ -239,8 +251,7 @@ export const findBillByIdentifier = (identifier: string) => {
   if (_billIdCache.has(identifier)) return _billIdCache.get(identifier);
   let found: { id: string; session_id: string } | null = null;
   for (const session of builtSessions()) {
-    const row = db
-      .prepare("SELECT id, session_id FROM bills WHERE session_id = ? AND identifier = ?")
+    const row = prep("SELECT id, session_id FROM bills WHERE session_id = ? AND identifier = ?")
       .get(session.id, identifier) as { id: string; session_id: string } | undefined;
     if (row) {
       found = row;
@@ -274,7 +285,7 @@ export const personIdByName = (name: string | null): string | null => {
   if (!name) return null;
   if (!_nameToId) {
     _nameToId = new Map();
-    for (const p of db.prepare("SELECT id, name FROM people").all() as { id: string; name: string }[]) {
+    for (const p of prep("SELECT id, name FROM people").all() as { id: string; name: string }[]) {
       _nameToId.set(p.name, _nameToId.has(p.name) ? null : p.id);
     }
   }
@@ -282,8 +293,7 @@ export const personIdByName = (name: string | null): string | null => {
 };
 
 export const recentlyActedBills = (sessionIds: string[], limit = 8) =>
-  db
-    .prepare(
+  prep(
       `SELECT * FROM bills WHERE session_id IN (${sessionIds.map(() => "?").join(",")})
        AND classification = 'bill' ORDER BY latest_action_date DESC LIMIT ?`,
     )
@@ -293,8 +303,7 @@ export const recentlyActedBills = (sessionIds: string[], limit = 8) =>
  * Memoized — one scan serves every legislator page in the build. */
 let _chamberDays: { chamber: string; date: string; n: number }[] | undefined;
 export const chamberVoteDays = () =>
-  (_chamberDays ??= db
-    .prepare(
+  (_chamberDays ??= prep(
       `SELECT chamber, date, COUNT(*) AS n FROM vote_events
        WHERE date IS NOT NULL AND chamber IN ('lower', 'upper')
        AND id IN (SELECT DISTINCT vote_event_id FROM vote_records)
@@ -304,8 +313,7 @@ export const chamberVoteDays = () =>
 
 /** One person's per-day participation: cast = aye/nay, nv = present-not-voting. */
 export const personVoteDays = (personId: string) =>
-  db
-    .prepare(
+  prep(
       `SELECT e.date, e.chamber,
               SUM(CASE WHEN r.option IN ('yes', 'no') THEN 1 ELSE 0 END) AS cast,
               SUM(CASE WHEN r.option NOT IN ('yes', 'no') THEN 1 ELSE 0 END) AS nv
@@ -319,8 +327,7 @@ export const personVoteDays = (personId: string) =>
 let _partyMajority: Map<string, string> | undefined;
 const partyMajorities = (): Map<string, string> => {
   if (_partyMajority) return _partyMajority;
-  const rows = db
-    .prepare(
+  const rows = prep(
       `SELECT r.vote_event_id, p.party, r.option, COUNT(*) AS n
        FROM vote_records r JOIN people p ON p.id = r.person_id
        WHERE r.option IN ('yes', 'no') AND p.party IN ('Democratic', 'Republican')
@@ -346,8 +353,7 @@ const partyMajorities = (): Map<string, string> => {
 export const partyAgreement = (personId: string, party: string | null) => {
   if (party !== "Democratic" && party !== "Republican") return [];
   const majorities = partyMajorities();
-  const votes = db
-    .prepare(
+  const votes = prep(
       `SELECT r.vote_event_id, r.option, b.session_id
        FROM vote_records r
        JOIN vote_events e ON e.id = r.vote_event_id
@@ -372,8 +378,7 @@ export const partyAgreement = (personId: string, party: string | null) => {
 /** Official WEC general-election results for one seat, newest first. */
 export const electionHistoryFor = (chamber: string | null, district: number | null) => {
   if (!chamber || district == null) return [];
-  const rows = db
-    .prepare(
+  const rows = prep(
       `SELECT year, candidate, party, votes FROM election_history
        WHERE chamber = ? AND district = ? ORDER BY year DESC, votes DESC`,
     )
@@ -406,8 +411,7 @@ const deShout = (s: string): string => {
  * resignations; out-of-office gaps never count for or against anyone.
  * This rule is written exactly once. */
 export const termsFor = (personId: string) =>
-  db
-    .prepare(
+  prep(
       "SELECT chamber, district, start, end, end_label, end_url FROM person_terms"
       + " WHERE person_id = ? ORDER BY start",
     )
@@ -416,9 +420,14 @@ export const termsFor = (personId: string) =>
       end_label: string | null; end_url: string | null;
     }[];
 
+/** Open-ended term sentinel: sorts after any real date (importer keeps
+ * the same convention in roster.OPEN_END). */
+export const OPEN_END = "9999";
+const OPEN_START = "0000";
+
 const officeEntryFor = (personId: string): string => {
   const terms = termsFor(personId);
-  return terms.length ? terms[0].start : "9999";
+  return terms.length ? terms[0].start : OPEN_END;
 };
 
 // windows every contribution row to a service term of its recipient;
@@ -426,19 +435,18 @@ const officeEntryFor = (personId: string): string => {
 const IN_TERM = `EXISTS (
   SELECT 1 FROM person_terms t
   WHERE t.person_id = c.person_id
-  AND c.date >= t.start AND c.date <= COALESCE(t.end, '9999')
+  AND c.date >= t.start AND c.date <= COALESCE(t.end, '${OPEN_END}')
 )`;
-const ENTRY_CTE = "";
 const WINDOWED = `(
   SELECT c.* FROM contributions c
   WHERE ${IN_TERM} AND c.date >= @start AND c.date <= @end
 ) c`;
-const NO_BOUNDS = { start: "0000", end: "9999" };
+const NO_BOUNDS = { start: OPEN_START, end: OPEN_END };
 
 const windowedAll = <T>(sql: string, extra: Record<string, unknown> = {}): T[] =>
-  db.prepare(`${ENTRY_CTE} ${sql}`).all({ ...NO_BOUNDS, ...extra }) as T[];
+  prep(sql).all({ ...NO_BOUNDS, ...extra }) as T[];
 const windowedGet = <T>(sql: string, extra: Record<string, unknown> = {}): T =>
-  db.prepare(`${ENTRY_CTE} ${sql}`).get({ ...NO_BOUNDS, ...extra }) as T;
+  prep(sql).get({ ...NO_BOUNDS, ...extra }) as T;
 
 /** Campaign money summary for one legislator, windowed to their time in
  * office. Three honest states: null = no committee mapped (say "not
@@ -447,14 +455,12 @@ export const moneyFor = (personId: string) => {
   // a mapping with zero receipts across all recorded history means the
   // member's active committee isn't linked yet (surname-only committee
   // names never auto-match); show the coverage gap, never a false $0
-  const mapped = db
-    .prepare("SELECT COUNT(*) AS n FROM contributions WHERE person_id = ?")
+  const mapped = prep("SELECT COUNT(*) AS n FROM contributions WHERE person_id = ?")
     .get(personId) as { n: number };
   if (mapped.n === 0) return null;
   const entry = officeEntryFor(personId);
   const P = { person: personId };
-  const summary = db
-    .prepare(
+  const summary = prep(
       `SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total,
               COALESCE(SUM(CASE WHEN from_type = 'Individual' THEN amount ELSE 0 END), 0)
                 AS individualTotal,
@@ -466,8 +472,7 @@ export const moneyFor = (personId: string) => {
       first: string | null; last: string | null;
     };
   // committee donors grouped by CFIS entity id (collision-proof), never name
-  const committees = db
-    .prepare(
+  const committees = prep(
       `SELECT from_entity_id AS entityId, MAX(from_name) AS name,
               SUM(amount) AS total, COUNT(*) AS n
        FROM contributions c
@@ -476,8 +481,7 @@ export const moneyFor = (personId: string) => {
        GROUP BY from_entity_id ORDER BY total DESC LIMIT 5`,
     )
     .all(P) as { entityId: number; name: string; total: number; n: number }[];
-  const occupations = db
-    .prepare(
+  const occupations = prep(
       `SELECT occupation, SUM(amount) AS total, COUNT(*) AS n
        FROM contributions c
        WHERE c.person_id = @person AND ${IN_TERM} AND from_type = 'Individual'
@@ -486,8 +490,7 @@ export const moneyFor = (personId: string) => {
     )
     .all(P) as { occupation: string; total: number; n: number }[];
   for (const o of occupations) o.occupation = deShout(o.occupation);
-  const quarters = db
-    .prepare(
+  const quarters = prep(
       `SELECT substr(date, 1, 4) || '-Q' ||
               ((CAST(substr(date, 6, 2) AS INTEGER) + 2) / 3) AS q,
               SUM(amount) AS total
@@ -528,9 +531,8 @@ const partyTotals = (where: string, extra: Record<string, unknown> = {}) =>
 let _coverage: { covered: number; sitting: number } | undefined;
 const coverage = () =>
   (_coverage ??= {
-    covered: (db.prepare("SELECT COUNT(DISTINCT person_id) AS n FROM contributions").get() as { n: number }).n,
-    sitting: (db
-      .prepare("SELECT COUNT(*) AS n FROM people WHERE current_role IN ('Representative', 'Senator')")
+    covered: (prep("SELECT COUNT(DISTINCT person_id) AS n FROM contributions").get() as { n: number }).n,
+    sitting: (prep("SELECT COUNT(*) AS n FROM people WHERE current_role IN ('Representative', 'Senator')")
       .get() as { n: number }).n,
   });
 
@@ -559,7 +561,9 @@ export const moneyOverview = (bounds: Record<string, string> = {}) => {
      WHERE c.from_type = 'Registrant'`,
     bounds,
   ).t;
-  const agg = windowedAll<CommitteeAgg>(COMMITTEE_AGG, bounds);
+  const agg = Object.keys(bounds).length
+    ? windowedAll<CommitteeAgg>(COMMITTEE_AGG, bounds)
+    : committeeAggAll();
   const topCommittees = [...agg].sort((a, b) => b.total - a.total).slice(0, 15);
   const widestCommittees = [...agg]
     .sort((a, b) => b.recipients - a.recipients || b.total - a.total)
@@ -592,16 +596,23 @@ export const moneyOverview = (bounds: Record<string, string> = {}) => {
   };
 };
 
+// the lifetime (no-bounds) aggregate is shared by the money overview's
+// Lifetime view and the donor-page set; callers never mutate it in place
+let _aggAll: CommitteeAgg[] | undefined;
+const committeeAggAll = () => (_aggAll ??= windowedAll<CommitteeAgg>(COMMITTEE_AGG));
+
 /** Committee donors that get their own page: at least $1,000 given to
  * sitting legislators while in office. */
 let _donorCommittees: CommitteeAgg[] | undefined;
 export const donorCommittees = () =>
-  (_donorCommittees ??= windowedAll<CommitteeAgg>(COMMITTEE_AGG)
+  (_donorCommittees ??= committeeAggAll()
     .filter((c) => c.total >= 1000)
     .sort((a, b) => b.total - a.total));
 
+let _donorIds: Set<number> | undefined;
 export const hasDonorPage = (entityId: number | null): boolean =>
-  entityId != null && donorCommittees().some((c) => c.entityId === entityId);
+  entityId != null &&
+  (_donorIds ??= new Set(donorCommittees().map((c) => c.entityId))).has(entityId);
 
 /** One committee donor's giving to sitting legislators, in-office windowed. */
 export const donorCommitteeFor = (entityId: number) => ({
@@ -622,8 +633,7 @@ export const donorCommitteeFor = (entityId: number) => ({
 
 /** Committees with member counts, for the index. */
 export const allCommittees = () =>
-  db
-    .prepare(
+  prep(
       `SELECT c.id, c.name, c.chamber, c.chair_person_id, p.name AS chair_name,
               COUNT(m.person_id) AS member_count
        FROM committees c
@@ -647,11 +657,36 @@ const normalizeCommitteeName = (name: string): string => {
   }
 };
 
+// the graveyard aggregate takes no parameters — one scan (with each
+// referral's normalized key precomputed) serves every committee page
+let _graveyardAgg:
+  | {
+      session_id: string; committee_at_death: string; chamber: string | null;
+      n: number; key: string; referralIsJoint: boolean;
+    }[]
+  | undefined;
+const graveyardAgg = () =>
+  (_graveyardAgg ??= (
+    prep(
+      `SELECT session_id, committee_at_death,
+              committee_chamber_at_death AS chamber, COUNT(*) AS n
+       FROM bills WHERE died_without_hearing = 1 AND committee_at_death IS NOT NULL
+       GROUP BY session_id, committee_at_death, chamber
+       ORDER BY session_id DESC`,
+    ).all() as {
+      session_id: string; committee_at_death: string;
+      chamber: string | null; n: number;
+    }[]
+  ).map((g) => ({
+    ...g,
+    key: normalizeCommitteeName(g.committee_at_death),
+    referralIsJoint: /^joint\b/i.test(g.committee_at_death),
+  })));
+
 /** One committee: members, hearings, and its Hearing None record.
  * Graveyard rows attach only on exact normalized-name + chamber match. */
 export const committeeFor = (committeeId: string) => {
-  const members = db
-    .prepare(
+  const members = prep(
       `SELECT m.person_id AS id, m.role, p.name, p.party, p.chamber, p.district,
               p.current_role
        FROM committee_members m JOIN people p ON p.id = m.person_id
@@ -662,50 +697,34 @@ export const committeeFor = (committeeId: string) => {
       id: string; role: string; name: string; party: string | null;
       chamber: string | null; district: number | null; current_role: string | null;
     }[];
-  const committee = db
-    .prepare("SELECT id, name, chamber FROM committees WHERE id = ?")
+  const committee = prep("SELECT id, name, chamber FROM committees WHERE id = ?")
     .get(committeeId) as { id: string; name: string; chamber: string | null };
-  const hearings = db
-    .prepare(`${HEARING_SELECT} WHERE h.committee_id = ? ORDER BY h.date DESC LIMIT 15`)
+  const hearings = prep(`${HEARING_SELECT} WHERE h.committee_id = ? ORDER BY h.date DESC LIMIT 15`)
     .all(committeeId) as Hearing[];
   const key = normalizeCommitteeName(committee.name);
   // chamber committees require the referral's chamber to match; joint
   // committees require the referral text to say Joint. Same-named
   // committees in different chambers can never merge.
-  const graveyard = (
-    db
-      .prepare(
-        `SELECT session_id, committee_at_death,
-                committee_chamber_at_death AS chamber, COUNT(*) AS n
-         FROM bills WHERE died_without_hearing = 1 AND committee_at_death IS NOT NULL
-         GROUP BY session_id, committee_at_death, chamber
-         ORDER BY session_id DESC`,
-      )
-      .all() as {
-        session_id: string; committee_at_death: string;
-        chamber: string | null; n: number;
-      }[]
-  ).filter((g) => {
-    if (normalizeCommitteeName(g.committee_at_death) !== key) return false;
-    const referralIsJoint = /^joint\b/i.test(g.committee_at_death);
-    if (committee.chamber == null) return referralIsJoint;
-    return !referralIsJoint && g.chamber === committee.chamber;
-  });
+  const graveyard = graveyardAgg()
+    .filter((g) => {
+      if (g.key !== key) return false;
+      if (committee.chamber == null) return g.referralIsJoint;
+      return !g.referralIsJoint && g.chamber === committee.chamber;
+    })
+    .map(({ key: _k, referralIsJoint: _j, ...row }) => row);
   return { committee, members, hearings, graveyard };
 };
 
 /** The state's subject index, aggregated. */
 export const allSubjects = () =>
-  db
-    .prepare(
+  prep(
       `SELECT subject, COUNT(*) AS n FROM bill_subjects
        GROUP BY subject ORDER BY subject`,
     )
     .all() as { subject: string; n: number }[];
 
 export const billsForSubject = (subject: string) =>
-  db
-    .prepare(
+  prep(
       `SELECT b.id, b.session_id, b.identifier, b.title, b.status
        FROM bill_subjects s JOIN bills b ON b.id = s.bill_id
        WHERE s.subject = ?
@@ -717,30 +736,26 @@ export const billsForSubject = (subject: string) =>
     }[];
 
 export const subjectsForBill = (billId: string) =>
-  db
-    .prepare("SELECT subject FROM bill_subjects WHERE bill_id = ? ORDER BY subject")
+  prep("SELECT subject FROM bill_subjects WHERE bill_id = ? ORDER BY subject")
     .all(billId) as { subject: string }[];
 
 /** Official documents attached to a bill; note text is docs.legis's own,
  * displayed verbatim. */
 export const documentsFor = (billId: string) =>
-  db
-    .prepare("SELECT note, url FROM bill_documents WHERE bill_id = ? ORDER BY note")
+  prep("SELECT note, url FROM bill_documents WHERE bill_id = ? ORDER BY note")
     .all(billId) as { note: string; url: string }[];
 
 /** Organizations registered as lobbying on a bill (an interest
  * registration, not a for/against position). */
 export const lobbyingFor = (billId: string) =>
-  db
-    .prepare(
+  prep(
       `SELECT principal_id, principal, source_url FROM lobbying_interests
        WHERE bill_id = ? ORDER BY principal`,
     )
     .all(billId) as { principal_id: number; principal: string; source_url: string | null }[];
 
 export const sessionStats = (sessionId: string) =>
-  db
-    .prepare(
+  prep(
       `SELECT COUNT(*) AS bills,
               SUM(CASE WHEN status = 'enacted' THEN 1 ELSE 0 END) AS enacted,
               SUM(CASE WHEN status = 'vetoed' THEN 1 ELSE 0 END) AS vetoed,
