@@ -59,8 +59,40 @@ const heatDays = buildHeatDays(terms, mine, chamberVoteDays());
 const heatYears = [...new Set(heatDays.map((d) => Number(d.date.slice(0, 4))))].sort(
   (a, b) => b - a,
 );
-const missedTotal = heatDays.reduce((s, d) => s + Math.max(0, d.total - d.cast - d.nv), 0);
-const votesTotal = heatDays.reduce((s, d) => s + d.total, 0);
+// header stats count only days in office; out-of-office days are never missed
+const servedHeatDays = heatDays.filter((d) => d.served !== false);
+const missedTotal = servedHeatDays.reduce((s, d) => s + Math.max(0, d.total - d.cast - d.nv), 0);
+const votesTotal = servedHeatDays.reduce((s, d) => s + d.total, 0);
+
+// years with any in-office voting day get a tile strip; runs of fully
+// out-of-office years collapse into one row that names the event that
+// opened the gap (a recall, a resignation) with its reference
+const servedYears = new Set(servedHeatDays.map((d) => Number(d.date.slice(0, 4))));
+type AttendanceBlock =
+  | { kind: "year"; year: number }
+  | { kind: "gap"; from: number; to: number; label: string | null; url: string | null };
+const attendanceBlocks: AttendanceBlock[] = [];
+for (const year of heatYears) {
+  if (servedYears.has(year)) {
+    attendanceBlocks.push({ kind: "year", year });
+    continue;
+  }
+  const prev = attendanceBlocks[attendanceBlocks.length - 1];
+  if (prev?.kind === "gap" && prev.from === year + 1) {
+    prev.from = year; // heatYears descends, so the run extends downward
+    continue;
+  }
+  const cause = [...serviceSpans]
+    .filter((s) => s.end && s.end <= `${year + 1}-01-01`)
+    .sort((a, b) => (a.end! < b.end! ? 1 : -1))[0];
+  attendanceBlocks.push({
+    kind: "gap", from: year, to: year,
+    label: cause?.end_label ?? null, url: cause?.end_url ?? null,
+  });
+}
+const openYears = new Set(
+  attendanceBlocks.filter((b) => b.kind === "year").slice(0, 2).map((b) => b.year),
+);
 
 // Running tally of their sponsored bills by stage; counts recompute from
 // live statuses every nightly rebuild, so they track bills through stages.
@@ -365,7 +397,7 @@ const tally = TALLY_ORDER.map((status) => ({
           <p class="mt-1 text-sm text-navy-600">
             Only days the chamber held recorded floor votes are shown — on
             every tile below, they either voted or missed:
-            {votesTotal.toLocaleString()} votes across {heatDays.length} voting days,
+            {votesTotal.toLocaleString()} votes across {servedHeatDays.length} voting days,
             {missedTotal > 0 ? `${missedTotal} missed` : "none missed"}.
           </p>
           <div class="mt-1 flex flex-wrap items-center gap-3 text-xs text-navy-600">
@@ -377,14 +409,35 @@ const tally = TALLY_ORDER.map((status) => ({
             )}
           </div>
           <div class="mt-3 space-y-2">
-            {heatYears.map((year, i) => (
-              <details class="rounded-lg border border-navy-100 bg-white px-3 py-2" open={i < 2}>
-                <summary class="cursor-pointer text-sm font-semibold">{year}</summary>
-                <div class="mt-2">
-                  <VoteHeatmap year={year} days={heatDays.filter((d) => d.date.startsWith(String(year)))} />
+            {attendanceBlocks.map((b) =>
+              b.kind === "year" ? (
+                <details class="rounded-lg border border-navy-100 bg-white px-3 py-2" open={openYears.has(b.year)}>
+                  <summary class="cursor-pointer text-sm font-semibold">{b.year}</summary>
+                  <div class="mt-2">
+                    <VoteHeatmap year={b.year} days={heatDays.filter((d) => d.date.startsWith(String(b.year)))} />
+                    {serviceSpans
+                      .filter((s) => s.end?.startsWith(String(b.year)) && s.end_label)
+                      .map((s) => (
+                        <p class="mt-2 text-xs text-navy-600">
+                          Out of office from {fmtDate(s.end!)} —{" "}
+                          {s.end_url ? <a href={s.end_url} class="underline">{s.end_label}</a> : s.end_label}
+                        </p>
+                      ))}
+                  </div>
+                </details>
+              ) : (
+                <div class="rounded-lg border border-navy-100 bg-navy-50 px-3 py-2 text-sm text-navy-700">
+                  <span class="font-semibold">{b.from === b.to ? b.from : `${b.from}–${b.to}`}</span>
+                  {" · "}Not in office
+                  {b.label && (
+                    <>
+                      {" — "}
+                      {b.url ? <a href={b.url} class="underline">{b.label}</a> : b.label}
+                    </>
+                  )}
                 </div>
-              </details>
-            ))}
+              ),
+            )}
           </div>
         </section>
       )}
