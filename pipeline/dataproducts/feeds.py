@@ -53,11 +53,14 @@ def _write(root: ET.Element, path: Path) -> None:
     ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
 
 
-def build_feeds(conn: sqlite3.Connection, out: Path) -> int:
+def build_feeds(
+    conn: sqlite3.Connection, out: Path, hearings: list[dict] | None = None
+) -> int:
     feeds_dir = out / "feeds"
     files = 0
 
-    for bill in queries.bills(conn):
+    bill_columns = "id, identifier, title, session_id, latest_action_date"
+    for bill in queries.bills(conn, columns=bill_columns):
         actions = queries.actions_for(conn, bill["id"])
         if not actions:
             continue
@@ -84,7 +87,7 @@ def build_feeds(conn: sqlite3.Connection, out: Path) -> int:
 
     for person in queries.people(conn):
         slug = person_slug(person["id"])
-        votes = queries.votes_by_person(conn, person["id"])[:100]
+        votes = queries.votes_by_person(conn, person["id"], limit=100)
         path = f"/feeds/legislators/{slug}.xml"
         updated = _stamp(votes[0]["date"] if votes else None)
         root = _feed(f"{person['name']} — votes", path, updated)
@@ -101,7 +104,8 @@ def build_feeds(conn: sqlite3.Connection, out: Path) -> int:
         _write(root, feeds_dir / "legislators" / f"{slug}.xml")
         files += 1
 
-    hearings = queries.hearings(conn)
+    if hearings is None:
+        hearings = queries.hearings(conn)
     by_committee: dict[str, list[dict]] = {}
     for hearing in hearings:
         if hearing["committee_id"]:

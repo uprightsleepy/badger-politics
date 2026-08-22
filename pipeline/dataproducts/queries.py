@@ -38,8 +38,10 @@ def people(conn: sqlite3.Connection) -> list[dict]:
     return [dict(r) for r in conn.execute("SELECT * FROM people ORDER BY chamber, district")]
 
 
-def bills(conn: sqlite3.Connection, session_id: str | None = None) -> list[dict]:
-    query = f"SELECT * FROM bills WHERE {EXPORTABLE}"
+def bills(
+    conn: sqlite3.Connection, session_id: str | None = None, columns: str = "*"
+) -> list[dict]:
+    query = f"SELECT {columns} FROM bills WHERE {EXPORTABLE}"  # noqa: S608 - callers pass literals
     params: tuple = ()
     if session_id:
         query += " AND session_id = ?"
@@ -92,7 +94,12 @@ def vote_records_for(conn: sqlite3.Connection, vote_event_id: str) -> list[dict]
     ]
 
 
-def votes_by_person(conn: sqlite3.Connection, person_id: str) -> list[dict]:
+def votes_by_person(
+    conn: sqlite3.Connection, person_id: str, limit: int | None = None
+) -> list[dict]:
+    # ORDER BY is deterministic, so LIMIT returns exactly the unlimited head
+    tail = " LIMIT ?" if limit is not None else ""
+    params = (person_id, limit) if limit is not None else (person_id,)
     return [
         dict(r)
         for r in conn.execute(
@@ -101,8 +108,8 @@ def votes_by_person(conn: sqlite3.Connection, person_id: str) -> list[dict]:
                 FROM vote_records r
                 JOIN vote_events e ON e.id = r.vote_event_id AND {exportable("e.")}
                 JOIN bills b ON b.id = e.bill_id
-                WHERE r.person_id = ? ORDER BY e.date DESC, e.id""",
-            (person_id,),
+                WHERE r.person_id = ? ORDER BY e.date DESC, e.id{tail}""",
+            params,
         )
     ]
 

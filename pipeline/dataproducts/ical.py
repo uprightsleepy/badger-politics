@@ -109,13 +109,15 @@ def _hearing_event(hearing: dict) -> list[str] | None:
     return event
 
 
-def build_ical(conn: sqlite3.Connection, out: Path) -> int:
+def build_ical(
+    conn: sqlite3.Connection, out: Path, hearings: list[dict] | None = None
+) -> int:
     calendar_dir = out / "calendar"
     (calendar_dir / "hearings").mkdir(parents=True, exist_ok=True)
     files = 0
 
     events = []
-    for hearing in queries.hearings(conn):
+    for hearing in hearings if hearings is not None else queries.hearings(conn):
         event = _hearing_event(hearing)
         if event is None:
             continue
