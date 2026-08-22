@@ -122,6 +122,23 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             "SELECT COUNT(*) FROM committees c LEFT JOIN people p ON p.id = c.chair_person_id"
             " WHERE c.chair_person_id IS NOT NULL AND p.id IS NULL"
         ),
+        "no vote outside a recorded term": (
+            "SELECT COUNT(*) FROM vote_records r"
+            " JOIN vote_events e ON e.id = r.vote_event_id"
+            " WHERE e.date IS NOT NULL AND NOT EXISTS ("
+            "   SELECT 1 FROM person_terms t WHERE t.person_id = r.person_id"
+            "   AND e.date >= t.start AND e.date <= COALESCE(t.end, '9999'))"
+        ),
+        "person_terms -> people": (
+            "SELECT COUNT(*) FROM person_terms t"
+            " LEFT JOIN people p ON p.id = t.person_id WHERE p.id IS NULL"
+        ),
+        "every sitting member has a live term": (
+            "SELECT COUNT(*) FROM people WHERE current_role IN"
+            " ('Representative', 'Senator') AND id NOT IN"
+            " (SELECT person_id FROM person_terms"
+            "  WHERE end IS NULL OR end >= date('now'))"
+        ),
         "hearing_videos -> hearings": (
             "SELECT COUNT(*) FROM hearing_videos v"
             " LEFT JOIN hearings h ON h.id = v.hearing_id WHERE h.id IS NULL"

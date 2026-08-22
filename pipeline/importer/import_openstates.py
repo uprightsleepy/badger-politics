@@ -30,6 +30,14 @@ from importer.status import SJR1_RE, derive_status
 
 CENTRAL = ZoneInfo("America/Chicago")
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
+VOTE_FIXES_PATH = Path(__file__).resolve().parent / "vote_corrections.json"
+
+# per-vote name re-attributions for defective source pages (see the JSON)
+VOTE_NAME_FIXES: dict[str, dict[str, str]] = {
+    src: entry["names"]
+    for src, entry in json.loads(VOTE_FIXES_PATH.read_text(encoding="utf-8")).items()
+    if not src.startswith("_")
+}
 
 # Presiding officers print as titles on roll calls. Each mapping is a
 # verified per-biennium fact; unmapped titles hard-fail (add, never infer).
@@ -192,6 +200,7 @@ class Importer:
         self.rosters = rosters  # session_key -> Roster
         self.committees = committees
         self.current_sessions = current_sessions  # keys of the active biennium
+        self.used_vote_fixes: set[tuple[str, str]] = set()
         self.bill_ids: dict[str, str] = {}  # scraper _id uuid -> our bill PK
         self.warnings: list[str] = []
 
@@ -209,6 +218,70 @@ class Importer:
                     meta.get("end_date"),
                 ),
             )
+
+    def import_terms(
+        self, people: list[Person], session_windows: dict[str, tuple[str, str]],
+    ) -> None:
+        events_path = Path(__file__).resolve().parent / "term_events.json"
+        # entries match a term by "matches" (the source's end date) when the
+        # source end is a verified artifact; "end" is what gets persisted
+        events = {
+            (pid, e.get("matches", e["end"])): e
+            for pid, entries in json.loads(events_path.read_text(encoding="utf-8")).items()
+            if not pid.startswith("_")
+            for e in entries
+        }
+        known = {row[0] for row in self.conn.execute("SELECT id FROM people")}
+        used = set()
+        coverage: list[tuple[str, str, str, str]] = []  # id, chamber, start, end
+        for person in people:
+            if person.id not in known:
+                continue
+            for term in person.terms:
+                # synthetic terms (guessed dates) build rosters but are never
+                # persisted; exact session windows replace them below
+                if term.synthetic:
+                    continue
+                event = events.get((person.id, term.end)) if term.end else None
+                end = term.end
+                if event:
+                    used.add((person.id, term.end))
+                    end = event["end"]
+                self.conn.execute(
+                    "INSERT INTO person_terms"
+                    " (person_id, chamber, district, start, end, end_label, end_url)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (person.id, term.chamber, term.district, term.start, end,
+                     event["label"] if event else None,
+                     event.get("url") if event else None),
+                )
+                coverage.append((person.id, term.chamber, term.start, end or "9999"))
+        dangling = set(events) - used
+        if dangling:
+            raise RuntimeError(f"term_events entries match no imported term: {dangling}")
+        # session rosters are the authority that attributes votes; a rostered
+        # member without a real dated term gets a biennium-bounded one, so
+        # service coverage and vote attribution share one authority. The
+        # biennium (Jan 1 odd year to Jan 1 odd+2, exactly adjacent like WI
+        # terms ending on inauguration day) is used, not the session metadata
+        # window: floor votes run past sine-die dates
+        for key in sorted(session_windows, key=lambda k: session_windows[k][0]):
+            by = int(biennium(key))
+            start, end = f"{by}-01-01", f"{by + 2}-01-01"
+            for m in self.rosters[key].members:
+                if m.id not in known:
+                    continue
+                covered = any(
+                    pid == m.id and ch == m.chamber and ts < end and start < te
+                    for pid, ch, ts, te in coverage
+                )
+                if not covered:
+                    self.conn.execute(
+                        "INSERT INTO person_terms (person_id, chamber, district, start, end)"
+                        " VALUES (?, ?, ?, ?, ?)",
+                        (m.id, m.chamber, m.district, start, end),
+                    )
+                    coverage.append((m.id, m.chamber, start, end))
 
     def import_committees(self) -> None:
         for c in self.committees.committees:
@@ -370,6 +443,7 @@ class Importer:
 
         vote_id = f"{key}-{vote.get('dedupe_key') or vote['_id']}".lower()
         chamber = pseudo_chamber(vote.get("organization"))
+        src_url = (vote.get("sources") or [{}])[0].get("url")
         counts = {option_bucket(c["option"]): 0 for c in vote.get("counts", [])}
         for c in vote.get("counts", []):
             counts[option_bucket(c["option"])] += c["value"]
@@ -388,13 +462,17 @@ class Importer:
                 counts.get("yes"),
                 counts.get("no"),
                 counts.get("other"),
-                (vote.get("sources") or [{}])[0].get("url"),
+                src_url,
             ),
         )
         titles = TITLE_VOTERS.get((biennium(key), chamber), {})
+        fixes = VOTE_NAME_FIXES.get(src_url or "", {})
         for record in vote.get("votes", []):
             voter_name = record["voter_name"].strip()
             voter_name = titles.get(voter_name.upper(), voter_name)
+            if voter_name.upper() in fixes:
+                self.used_vote_fixes.add((src_url, voter_name.upper()))
+                voter_name = fixes[voter_name.upper()]
             # resolve raises on ambiguity/no-match: never attribute by guess
             member = roster.resolve(voter_name, chamber)
             self.conn.execute(
@@ -493,8 +571,9 @@ def build_rosters(
     session_defs: dict[str, dict],
     seen: set[str],
     rosters_dir: Path,
-) -> dict[str, Roster]:
+) -> tuple[dict[str, Roster], dict[str, tuple[str, str]]]:
     rosters = {}
+    windows: dict[str, tuple[str, str]] = {}
     for identifier in seen:
         meta = session_defs.get(identifier)
         if not meta or not meta.get("start_date"):
@@ -513,7 +592,8 @@ def build_rosters(
             listing = json.loads(listing_path.read_text(encoding="utf-8"))
             roster = merge_listing(roster, listing, people)
         rosters[key] = roster
-    return rosters
+        windows[key] = (start, end)
+    return rosters, windows
 
 
 def current_session_keys(seen: set[str]) -> set[str]:
@@ -555,7 +635,7 @@ def run_import(
     session_defs = load_session_defs(scrape_dirs)
     seen_sessions = {b["legislative_session"] for b in bills}
     rosters_dir = people_dir.parents[1] / "rosters"
-    rosters = build_rosters(people, session_defs, seen_sessions, rosters_dir)
+    rosters, session_windows = build_rosters(people, session_defs, seen_sessions, rosters_dir)
     current = current_session_keys(seen_sessions)
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -568,6 +648,7 @@ def run_import(
     with conn:
         importer.import_sessions(session_defs, seen_sessions)
         importer.import_people()
+        importer.import_terms(people, session_windows)
         importer.import_committees()
         for bill in bills:
             importer.import_bill(bill)
@@ -575,6 +656,12 @@ def run_import(
             importer.import_vote_event(vote)
         for event in events:
             importer.import_event(event)
+        expected_fixes = {
+            (src, name) for src, names in VOTE_NAME_FIXES.items() for name in names
+        }
+        dangling_fixes = expected_fixes - importer.used_vote_fixes
+        if dangling_fixes:
+            raise RuntimeError(f"vote_corrections match no vote record: {dangling_fixes}")
         importer.tag_data_quality()
         importer.write_meta()
 

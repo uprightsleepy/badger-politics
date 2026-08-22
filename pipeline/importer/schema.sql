@@ -72,6 +72,20 @@ CREATE TABLE bill_documents (
 );
 CREATE INDEX idx_bill_documents_bill ON bill_documents (bill_id);
 
+-- service terms from the people files (recalls and resignations end
+-- terms mid-biennium); out-of-office gaps must never count against or
+-- toward a member
+CREATE TABLE person_terms (
+    person_id TEXT NOT NULL REFERENCES people (id),
+    chamber   TEXT NOT NULL,
+    district  INTEGER,
+    start     TEXT NOT NULL,
+    end       TEXT,
+    end_label TEXT,  -- curated: why the term ended (term_events.json)
+    end_url   TEXT   -- curated: a verified reference for that event
+);
+CREATE INDEX idx_person_terms_person ON person_terms (person_id);
+
 -- WisconsinEye recordings matched to hearings by exact date + committee
 -- title; metadata only, linking to their site
 CREATE TABLE hearing_videos (

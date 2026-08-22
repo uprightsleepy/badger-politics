@@ -30,6 +30,9 @@ class Term:
     district: int | None
     start: str
     end: str | None  # None = sitting
+    # synthetic terms (startless-role guesses, legacy Jan-5 boundaries)
+    # build rosters but are never persisted; session windows replace them
+    synthetic: bool = False
 
 
 @dataclass
@@ -119,11 +122,13 @@ def load_people(people_dirs: list[Path]) -> list[Person]:
                     continue
                 start = str(role["start_date"]) if role.get("start_date") else None
                 end = str(role["end_date"]) if role.get("end_date") else None
+                synthetic = False
                 if not start and end:
                     # startless role: assume one constitutional term; under-
                     # coverage fails loudly as unmatched, never misattributes
                     term_years = 2 if role["type"] == "lower" else 4
                     start = f"{int(end[:4]) - term_years}{end[4:]}"
+                    synthetic = True
                 if not start:
                     continue
                 terms.append(
@@ -136,6 +141,7 @@ def load_people(people_dirs: list[Path]) -> list[Person]:
                         ),
                         start=start,
                         end=end,
+                        synthetic=synthetic,
                     )
                 )
             if not terms:
@@ -191,6 +197,7 @@ def load_legacy_terms(legacy_dir: Path, people: list[Person]) -> list[Person]:
             district=int(row["district"]) if row["district"].isdigit() else None,
             start=f"{year}-01-05",
             end=f"{year + 2}-01-03",
+            synthetic=True,  # Jan-5 boundary is a guess; sessions convene Jan-3
         )
         person = by_legacy.get(row["leg_id"]) or synthesized.get(row["leg_id"])
         if person is None:
@@ -208,9 +215,12 @@ def load_legacy_terms(legacy_dir: Path, people: list[Person]) -> list[Person]:
                 legacy_ids=[row["leg_id"]],
             )
             synthesized[row["leg_id"]] = person
+        # any overlap defers to the modern file: it knows about recalls and
+        # resignations the legacy CSV predates (Wanggaard's 2012 recall);
+        # legacy rows only fill bienniums the modern file doesn't touch
         covered = any(
-            t.chamber == term.chamber and t.start <= term.start and
-            (t.end is None or t.end >= term.end)
+            t.chamber == term.chamber and t.start < term.end and
+            term.start < (t.end or "9999")
             for t in person.terms
         )
         if not covered:

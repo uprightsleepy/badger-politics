@@ -9,6 +9,33 @@
       "basis": "Jerry Petrowski represented AD 86 until winning the SD 29 special election of June 5, 2012 (vacancy from Pam Galloway's resignation); the legacy CSV records his whole 2011-2012 term as Senate only."
     }
   ],
+  "ocd-person/e127b754-c756-4017-a414-83cff1bb30f5": [
+    {
+      "chamber": "lower",
+      "district": 1,
+      "start": "2015-01-05",
+      "end": "2015-01-06",
+      "basis": "Joel Kitchens was sworn in Jan 5, 2015 (Assembly Journal opening day; he appears on the AR1/AR2/SJR1 roll calls of that date); the openstates start 2015-01-06 is a day late. Bridge term covers the verified first day."
+    }
+  ],
+  "ocd-person/2a067a93-dffc-4ce7-8975-d37fb67b4512": [
+    {
+      "chamber": "lower",
+      "district": 4,
+      "start": "2015-01-05",
+      "end": "2015-01-06",
+      "basis": "David Steffen was sworn in Jan 5, 2015 (Assembly Journal opening day; he appears on the AR1/AR2/SJR1 roll calls of that date); the openstates start 2015-01-06 is a day late. Bridge term covers the verified first day."
+    }
+  ],
+  "ocd-person/eed49381-7c5b-4890-bba3-d63b8681463d": [
+    {
+      "chamber": "lower",
+      "district": 78,
+      "start": "2015-01-05",
+      "end": "2015-01-07",
+      "basis": "Lisa Subeck was sworn in Jan 5, 2015 (Assembly Journal opening day; she appears on the AR1/AR2/SJR1 roll calls of that date); the openstates start 2015-01-07 is two days late. Bridge term covers the verified first days."
+    }
+  ],
   "ocd-person/2a532097-b605-4d3e-90ce-d8ae3121a706": [
     {
       "chamber": "lower",

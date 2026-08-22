@@ -401,42 +401,44 @@ const deShout = (s: string): string => {
         .join(" ");
 };
 
-/** "Since taking office": first day of the month of the member's first
- * recorded floor vote. Vote records begin 2009, CFIS records 2008, so
- * long-serving members' windows start at the records floor, not their
- * real swearing-in. Members seated too recently to have voted fall back
- * to the newest session's start. This rule is written exactly once. */
-const ENTRY_SINCE = (personRef: string) =>
-  `COALESCE(
-    (SELECT substr(MIN(e.date), 1, 7) || '-01'
-     FROM vote_records r JOIN vote_events e ON e.id = r.vote_event_id
-     WHERE r.person_id = ${personRef}), @fb)`;
+/** "While in office" means inside a recorded service term. Terms come
+ * from the people files and end mid-biennium on recalls and
+ * resignations; out-of-office gaps never count for or against anyone.
+ * This rule is written exactly once. */
+export const termsFor = (personId: string) =>
+  db
+    .prepare(
+      "SELECT chamber, district, start, end, end_label, end_url FROM person_terms"
+      + " WHERE person_id = ? ORDER BY start",
+    )
+    .all(personId) as {
+      chamber: string; district: number | null; start: string; end: string | null;
+      end_label: string | null; end_url: string | null;
+    }[];
 
-let _fb: string | undefined;
-const fb = () =>
-  (_fb ??=
-    ((db.prepare("SELECT MAX(substr(id, 1, 4)) AS y FROM sessions").get() as { y: string }).y
-      ?? "2025") + "-01-01");
+const officeEntryFor = (personId: string): string => {
+  const terms = termsFor(personId);
+  return terms.length ? terms[0].start : "9999";
+};
 
-const officeEntryFor = (personId: string): string =>
-  (db.prepare(`SELECT ${ENTRY_SINCE("@person")} AS since`).get({ person: personId, fb: fb() }) as {
-    since: string;
-  }).since;
-
-// windows every contribution row to the recipient's time in office;
-// MATERIALIZED so the per-person subquery runs once per query, not once
-// per contribution row
-const ENTRY_CTE = `WITH entry AS MATERIALIZED (
-  SELECT p.id AS id, ${ENTRY_SINCE("p.id")} AS since FROM people p
+// windows every contribution row to a service term of its recipient;
+// EXISTS so overlapping term records can never double-count a receipt
+const IN_TERM = `EXISTS (
+  SELECT 1 FROM person_terms t
+  WHERE t.person_id = c.person_id
+  AND c.date >= t.start AND c.date <= COALESCE(t.end, '9999')
 )`;
-const WINDOWED = `contributions c JOIN entry ON entry.id = c.person_id AND c.date >= entry.since
-  AND c.date >= @start AND c.date <= @end`;
+const ENTRY_CTE = "";
+const WINDOWED = `(
+  SELECT c.* FROM contributions c
+  WHERE ${IN_TERM} AND c.date >= @start AND c.date <= @end
+) c`;
 const NO_BOUNDS = { start: "0000", end: "9999" };
 
 const windowedAll = <T>(sql: string, extra: Record<string, unknown> = {}): T[] =>
-  db.prepare(`${ENTRY_CTE} ${sql}`).all({ fb: fb(), ...NO_BOUNDS, ...extra }) as T[];
+  db.prepare(`${ENTRY_CTE} ${sql}`).all({ ...NO_BOUNDS, ...extra }) as T[];
 const windowedGet = <T>(sql: string, extra: Record<string, unknown> = {}): T =>
-  db.prepare(`${ENTRY_CTE} ${sql}`).get({ fb: fb(), ...NO_BOUNDS, ...extra }) as T;
+  db.prepare(`${ENTRY_CTE} ${sql}`).get({ ...NO_BOUNDS, ...extra }) as T;
 
 /** Campaign money summary for one legislator, windowed to their time in
  * office. Three honest states: null = no committee mapped (say "not
@@ -450,14 +452,14 @@ export const moneyFor = (personId: string) => {
     .get(personId) as { n: number };
   if (mapped.n === 0) return null;
   const entry = officeEntryFor(personId);
-  const P = { person: personId, entry };
+  const P = { person: personId };
   const summary = db
     .prepare(
       `SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total,
               COALESCE(SUM(CASE WHEN from_type = 'Individual' THEN amount ELSE 0 END), 0)
                 AS individualTotal,
               MIN(date) AS first, MAX(date) AS last
-       FROM contributions WHERE person_id = @person AND date >= @entry`,
+       FROM contributions c WHERE c.person_id = @person AND ${IN_TERM}`,
     )
     .get(P) as {
       n: number; total: number; individualTotal: number;
@@ -468,8 +470,8 @@ export const moneyFor = (personId: string) => {
     .prepare(
       `SELECT from_entity_id AS entityId, MAX(from_name) AS name,
               SUM(amount) AS total, COUNT(*) AS n
-       FROM contributions
-       WHERE person_id = @person AND date >= @entry
+       FROM contributions c
+       WHERE c.person_id = @person AND ${IN_TERM}
        AND from_type = 'Registrant' AND from_entity_id IS NOT NULL
        GROUP BY from_entity_id ORDER BY total DESC LIMIT 5`,
     )
@@ -477,8 +479,8 @@ export const moneyFor = (personId: string) => {
   const occupations = db
     .prepare(
       `SELECT occupation, SUM(amount) AS total, COUNT(*) AS n
-       FROM contributions
-       WHERE person_id = @person AND date >= @entry AND from_type = 'Individual'
+       FROM contributions c
+       WHERE c.person_id = @person AND ${IN_TERM} AND from_type = 'Individual'
        AND occupation IS NOT NULL AND TRIM(occupation) != ''
        GROUP BY LOWER(TRIM(occupation)) ORDER BY total DESC LIMIT 5`,
     )
@@ -489,7 +491,8 @@ export const moneyFor = (personId: string) => {
       `SELECT substr(date, 1, 4) || '-Q' ||
               ((CAST(substr(date, 6, 2) AS INTEGER) + 2) / 3) AS q,
               SUM(amount) AS total
-       FROM contributions WHERE person_id = @person AND date >= @entry AND date != ''
+       FROM contributions c
+       WHERE c.person_id = @person AND ${IN_TERM} AND date != ''
        GROUP BY q ORDER BY q`,
     )
     .all(P) as { q: string; total: number }[];

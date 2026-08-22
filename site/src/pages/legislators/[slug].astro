@@ -13,6 +13,7 @@ import {
   electionFor,
   chamberVoteDays,
   personVoteDays,
+  termsFor,
   partyAgreement,
   electionHistoryFor,
   moneyFor,
@@ -45,25 +46,53 @@ const election = electionFor(person.id);
 const sitting = person.current_role === "Representative" || person.current_role === "Senator";
 const opponents = election?.opponents.filter((o) => o.ballot_status !== "Deny") ?? [];
 
-// Attendance heatmap: for each chamber this person served in, take the span
-// of their recorded votes (extended to today's data if they're sitting) and
-// line their participation up against every day the chamber voted.
+// Attendance heatmap: a chamber's voting day counts only when it falls
+// inside one of this person's recorded service terms for that chamber.
+// Recalls and resignations end terms mid-biennium; out-of-office gaps
+// (e.g. between a recall and a comeback) never show as missed votes.
+const terms = termsFor(person.id);
+// merge biennium-boundary term rows for display; real gaps (recalls,
+// comebacks) are months long and stay visible
+const serviceSpans: {
+  chamber: string; district: number | null; start: string; end: string | null;
+  end_label: string | null; end_url: string | null;
+}[] = [];
+for (const t of [...terms].sort((a, b) => a.start.localeCompare(b.start))) {
+  const prev = serviceSpans[serviceSpans.length - 1];
+  const gapDays =
+    prev?.end ? (Date.parse(t.start) - Date.parse(prev.end)) / 86400000 : Infinity;
+  if (prev && prev.chamber === t.chamber && prev.district === t.district && gapDays <= 45) {
+    prev.end = t.end;
+    prev.end_label = t.end_label;
+    prev.end_url = t.end_url;
+  } else {
+    serviceSpans.push({ ...t });
+  }
+}
+
 const mine = personVoteDays(person.id);
-const heatDays: { date: string; total: number; cast: number; nv: number }[] = [];
+const heatDays: { date: string; total: number; cast: number; nv: number; served: boolean }[] = [];
 for (const chamber of ["lower", "upper"] as const) {
-  const my = mine.filter((m) => m.chamber === chamber);
-  if (!my.length) continue;
-  const myByDate = new Map(my.map((m) => [m.date, m]));
-  const chamberAll = chamberVoteDays().filter((c) => c.chamber === chamber);
-  const first = my.reduce((a, b) => (a.date < b.date ? a : b)).date;
-  const last =
-    sitting && person.chamber === chamber
-      ? chamberAll.reduce((a, b) => (a.date > b.date ? a : b)).date
-      : my.reduce((a, b) => (a.date > b.date ? a : b)).date;
-  for (const day of chamberAll) {
-    if (day.date < first || day.date > last) continue;
+  const chamberTerms = terms.filter((t) => t.chamber === chamber);
+  if (!chamberTerms.length) continue;
+  const inTerm = (date: string) =>
+    chamberTerms.some((t) => date >= t.start && date <= (t.end ?? "9999"));
+  const spanStart = chamberTerms[0].start;
+  const spanEnd = chamberTerms.reduce(
+    (max, t) => ((t.end ?? "9999") > max ? (t.end ?? "9999") : max), "0");
+  const myByDate = new Map(
+    mine.filter((m) => m.chamber === chamber).map((m) => [m.date, m]),
+  );
+  // include out-of-office chamber days inside the overall span so a
+  // mid-year exit shows as "not in office", never as missed votes
+  for (const day of chamberVoteDays().filter((c) => c.chamber === chamber)) {
+    if (day.date < spanStart || day.date > spanEnd) continue;
+    const served = inTerm(day.date);
     const m = myByDate.get(day.date);
-    heatDays.push({ date: day.date, total: day.n, cast: m?.cast ?? 0, nv: m?.nv ?? 0 });
+    heatDays.push({
+      date: day.date, total: day.n,
+      cast: served ? (m?.cast ?? 0) : 0, nv: served ? (m?.nv ?? 0) : 0, served,
+    });
   }
 }
 const heatYears = [...new Set(heatDays.map((d) => Number(d.date.slice(0, 4))))].sort(
@@ -121,6 +150,31 @@ const tally = TALLY_ORDER.map((status) => ({
             loading="lazy"
             class="mb-3 rounded"
           />
+        )}
+        {serviceSpans.length > 0 && (
+          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
+            <h2 class="font-bold">Service</h2>
+            {serviceSpans.map((s) => (
+              <p class="mt-1">
+                {chamberName(s.chamber)}
+                {s.district != null && ` District ${s.district}`}:{" "}
+                {monthYear(s.start)} to {s.end ? monthYear(s.end) : "present"}
+                {s.end_label && (
+                  <span class="block text-xs text-navy-600">
+                    {s.end_url ? (
+                      <a href={s.end_url} class="underline">{s.end_label}</a>
+                    ) : (
+                      s.end_label
+                    )}
+                  </span>
+                )}
+              </p>
+            ))}
+            <p class="mt-1 text-xs text-navy-600">
+              From the Legislature's service records. Records begin 2009 for
+              the longest-serving members.
+            </p>
+          </div>
         )}
         {sitting && election && (
           <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
@@ -292,7 +346,7 @@ const tally = TALLY_ORDER.map((status) => ({
                   since taking office, {monthYear(money.entry)} to {fmtDate(money.last)}
                 </span>
               </p>
-              <MoneyTimeline quarters={money.quarters} entry={money.entry} />
+              <MoneyTimeline quarters={money.quarters} entry={money.entry} terms={terms} />
               <div class="mt-3 grid gap-4 sm:grid-cols-2">
                 {money.committees.length > 0 && (
                   <div class="min-w-0">
@@ -357,6 +411,9 @@ const tally = TALLY_ORDER.map((status) => ({
             <span class="flex items-center gap-1"><span class="hm-cell h-2.5 w-2.5 rounded-[2px] bg-gold-600"></span> present, not voting</span>
             <span class="flex items-center gap-1"><span class="hm-cell hm-miss h-2.5 w-2.5 rounded-[2px]"></span> missed votes (striped)</span>
             <span class="flex items-center gap-1"><span class="hm-cell h-2.5 w-2.5 rounded-[2px] bg-gray-300"></span> no floor votes</span>
+            {serviceSpans.length > 1 && (
+              <span class="flex items-center gap-1"><span class="hm-cell h-2.5 w-2.5 rounded-[2px] bg-navy-100"></span> not in office</span>
+            )}
           </div>
           <div class="mt-3 space-y-2">
             {heatYears.map((year, i) => (

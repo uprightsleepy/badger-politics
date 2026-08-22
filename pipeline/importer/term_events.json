@@ -1,0 +1,47 @@
+{
+  "_comment": "Curated explanations for terms that ended mid-biennium (recalls, resignations, deaths). Keyed by person_id; each entry matches a term by its end date ('matches' when the source's end date is a verified artifact; the corrected 'end' is what gets persisted) and carries a human-verified label and reference link. An entry whose (person_id, end) matches no imported term fails the import. Never inferred.",
+  "ocd-person/f38798d5-c1a0-4dd6-a55c-7309ad23999e": [
+    {
+      "matches": "2024-01-01",
+      "end": "2024-01-26",
+      "label": "Resigned after appointment as a Milwaukee County circuit judge",
+      "url": "https://wislawjournal.com/2024/01/26/taylor-resigns-from-senate-as-gov-evers-taps-the-senator-to-be-milwaukee-county-circuit-court-judge/",
+      "basis": "verified 2026-08-22: Lena Taylor resigned effective Jan 26, 2024 when Gov. Evers appointed her to Milwaukee County Circuit Court Branch 41; the openstates end 2024-01-01 is a year-boundary artifact (her last recorded floor vote is Jan 23, 2024)"
+    }
+  ],
+  "ocd-person/d5f588e5-d00f-4bdb-a64d-121afbde552e": [
+    {
+      "matches": "2012-12-31",
+      "end": "2011-01-03",
+      "label": "Resigned to lead the Department of Administration under Governor Walker",
+      "url": "https://en.wikipedia.org/wiki/Michael_Huebsch",
+      "basis": "verified 2026-08-22: Michael Huebsch was sworn in and voted on opening day Jan 3, 2011, then resigned to become Secretary of Administration; Assembly Journal Jan 3, 2011 p. 12 records the resignation honors; openstates end 2012-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/f348bfc6-8e52-4b6b-b118-30e6d897fe08": [
+    {
+      "matches": "2012-12-31",
+      "end": "2011-01-03",
+      "label": "Resigned to lead the Department of Transportation under Governor Walker",
+      "url": "https://ballotpedia.org/Mark_Gottlieb",
+      "basis": "verified 2026-08-22: Mark Gottlieb was sworn in and voted on opening day Jan 3, 2011, then resigned to become Secretary of Transportation (named Dec 30, 2010); Assembly Journal Jan 3, 2011 p. 12 records the resignation honors; openstates end 2012-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/ff574a03-985b-4a20-ad85-c38bace044c3": [
+    {
+      "matches": "2012-12-31",
+      "end": "2011-01-04",
+      "label": "Resigned to join the Department of Natural Resources under Governor Walker",
+      "url": "https://en.wikipedia.org/wiki/Scott_Gunderson",
+      "basis": "verified 2026-08-22: Scott Gunderson resigned effective Jan 4, 2011 to become a DNR executive assistant; Assembly Journal Jan 3, 2011 p. 12 records the resignation honors; openstates end 2012-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/b2ad4345-9408-4238-a1f9-13e747f599b3": [
+    {
+      "end": "2012-07-11",
+      "label": "Lost the June 2012 recall election",
+      "url": "https://ballotpedia.org/Van_Wanggaard_recall,_Wisconsin_State_Senate_(2011-2012)",
+      "basis": "verified 2026-08-22: recalled June 5, 2012, lost to John Lehman by 819 votes after recount; returned by winning the redrawn seat in Nov 2014"
+    }
+  ]
+}

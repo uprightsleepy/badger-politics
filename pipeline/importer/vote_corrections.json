@@ -1,0 +1,12 @@
+{
+  "_comment": "Roll-call pages docs.legis renders against the biennium's FINAL seat roster, printing later special-election winners in place of the members who actually voted. Keyed by vote source URL; names map printed surname -> actual voter per the Assembly Journal of that day. An entry that matches no imported vote record fails the import. Never inferred.",
+  "https://docs.legis.wisconsin.gov/document/votes/2011/av0001": {
+    "names": {
+      "DOYLE": "HUEBSCH",
+      "STROEBEL": "GOTTLIEB",
+      "CRAIG": "GUNDERSON"
+    },
+    "basis": "verified 2026-08-22: Assembly Journal Jan 3 2011 (pp. 5, 11-12) seats Huebsch (94th), Gottlieb (60th), Gunderson (83rd) and lists all three in the AR1 ayes; Doyle, Stroebel, Craig won those seats in the May 3 2011 specials and first appear on roll calls May 17 2011.",
+    "reference": "https://docs.legis.wisconsin.gov/2011/related/journals/assembly/20110103"
+  }
+}

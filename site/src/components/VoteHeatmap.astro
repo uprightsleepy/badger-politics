@@ -8,6 +8,7 @@ interface Day {
   total: number; // chamber floor votes that day
   cast: number; // this person's aye/nay
   nv: number; // this person's recorded not-voting/excused
+  served?: boolean; // false = out of office that day (recall, resignation)
 }
 interface Props {
   year: number;
@@ -18,10 +19,13 @@ const byDate = new Map(days.map((d) => [d.date, d]));
 const prettyDate = (date: string) =>
   new Date(date + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const missedList = days
-  .filter((d) => d.total - d.cast - d.nv > 0)
+  .filter((d) => d.served !== false && d.total - d.cast - d.nv > 0)
   .map((d) => ({ label: prettyDate(d.date), missed: d.total - d.cast - d.nv, total: d.total }));
+const servedDays = days.filter((d) => d.served !== false).length;
 const summaryLabel =
-  `${year} floor attendance calendar: ${days.length} voting days, ` +
+  `${year} floor attendance calendar: ${servedDays} voting days in office` +
+  (servedDays < days.length ? `, out of office for ${days.length - servedDays}` : "") +
+  ", " +
   (missedList.length
     ? `missed votes on ${missedList.length} day${missedList.length > 1 ? "s" : ""}, listed below`
     : "no missed votes");
@@ -46,6 +50,9 @@ function cellFor(date: string, inYear: boolean) {
   if (!inYear) return { cls: "bg-transparent", title: "" };
   const day = byDate.get(date);
   if (!day) return { cls: "bg-gray-300", title: `${date}: no floor votes` };
+  if (day.served === false) {
+    return { cls: "bg-navy-100", title: `${prettyDate(date)}: not in office` };
+  }
   const missed = day.total - day.cast - day.nv;
   const pretty = prettyDate(date);
   if (missed > 0)
