@@ -32,6 +32,7 @@ import {
   STATUS_LABELS,
   STATUS_STYLES,
 } from "../../lib/format";
+import { mergeServiceSpans, buildHeatDays } from "../../lib/service";
 
 export function getStaticPaths() {
   return people().map((p) => ({
@@ -51,50 +52,10 @@ const opponents = election?.opponents.filter((o) => o.ballot_status !== "Deny") 
 // Recalls and resignations end terms mid-biennium; out-of-office gaps
 // (e.g. between a recall and a comeback) never show as missed votes.
 const terms = termsFor(person.id);
-// merge biennium-boundary term rows for display; real gaps (recalls,
-// comebacks) are months long and stay visible
-const serviceSpans: {
-  chamber: string; district: number | null; start: string; end: string | null;
-  end_label: string | null; end_url: string | null;
-}[] = [];
-for (const t of [...terms].sort((a, b) => a.start.localeCompare(b.start))) {
-  const prev = serviceSpans[serviceSpans.length - 1];
-  const gapDays =
-    prev?.end ? (Date.parse(t.start) - Date.parse(prev.end)) / 86400000 : Infinity;
-  if (prev && prev.chamber === t.chamber && prev.district === t.district && gapDays <= 45) {
-    prev.end = t.end;
-    prev.end_label = t.end_label;
-    prev.end_url = t.end_url;
-  } else {
-    serviceSpans.push({ ...t });
-  }
-}
+const serviceSpans = mergeServiceSpans(terms);
 
 const mine = personVoteDays(person.id);
-const heatDays: { date: string; total: number; cast: number; nv: number; served: boolean }[] = [];
-for (const chamber of ["lower", "upper"] as const) {
-  const chamberTerms = terms.filter((t) => t.chamber === chamber);
-  if (!chamberTerms.length) continue;
-  const inTerm = (date: string) =>
-    chamberTerms.some((t) => date >= t.start && date <= (t.end ?? "9999"));
-  const spanStart = chamberTerms[0].start;
-  const spanEnd = chamberTerms.reduce(
-    (max, t) => ((t.end ?? "9999") > max ? (t.end ?? "9999") : max), "0");
-  const myByDate = new Map(
-    mine.filter((m) => m.chamber === chamber).map((m) => [m.date, m]),
-  );
-  // include out-of-office chamber days inside the overall span so a
-  // mid-year exit shows as "not in office", never as missed votes
-  for (const day of chamberVoteDays().filter((c) => c.chamber === chamber)) {
-    if (day.date < spanStart || day.date > spanEnd) continue;
-    const served = inTerm(day.date);
-    const m = myByDate.get(day.date);
-    heatDays.push({
-      date: day.date, total: day.n,
-      cast: served ? (m?.cast ?? 0) : 0, nv: served ? (m?.nv ?? 0) : 0, served,
-    });
-  }
-}
+const heatDays = buildHeatDays(terms, mine, chamberVoteDays());
 const heatYears = [...new Set(heatDays.map((d) => Number(d.date.slice(0, 4))))].sort(
   (a, b) => b - a,
 );

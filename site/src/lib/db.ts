@@ -420,10 +420,8 @@ export const termsFor = (personId: string) =>
       end_label: string | null; end_url: string | null;
     }[];
 
-/** Open-ended term sentinel: sorts after any real date (importer keeps
- * the same convention in roster.OPEN_END). */
-export const OPEN_END = "9999";
-const OPEN_START = "0000";
+import { OPEN_END, OPEN_START } from "./sentinels";
+export { OPEN_END };
 
 const officeEntryFor = (personId: string): string => {
   const terms = termsFor(personId);

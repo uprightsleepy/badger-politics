@@ -1,7 +1,7 @@
 /** All dated civic events (hearings + election days) for the calendar page. */
 import type { APIRoute } from "astro";
 import { allHearings } from "../../lib/db";
-import { chamberName, fmtTime } from "../../lib/format";
+import { hearingDisplayName, fmtTime } from "../../lib/format";
 import ELECTION_DAYS from "../../data/election-days.json";
 
 export const GET: APIRoute = () => {
@@ -17,9 +17,7 @@ export const GET: APIRoute = () => {
 
   for (const h of allHearings()) {
     if (!h.date) continue;
-    const name = h.committee_name
-      ? `${h.committee_chamber ? `${chamberName(h.committee_chamber)} ` : ""}${h.committee_name}`
-      : (h.title ?? "Committee hearing");
+    const name = hearingDisplayName(h);
     add(h.date, {
       type: "hearing",
       label: name,

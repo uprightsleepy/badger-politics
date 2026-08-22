@@ -34,6 +34,17 @@ export const roleAbbr = (chamber: string | null): string =>
 export const chamberName = (chamber: string | null): string =>
   chamber === "lower" ? "Assembly" : chamber === "upper" ? "Senate" : "Legislature";
 
+/** One display-name rule for a hearing, shared by the calendar JSON and
+ * the hearings list so the same event never shows two names. */
+export const hearingDisplayName = (h: {
+  committee_name: string | null;
+  committee_chamber: string | null;
+  title: string | null;
+}): string =>
+  h.committee_name
+    ? `${h.committee_chamber ? `${chamberName(h.committee_chamber)} ` : ""}${h.committee_name}`
+    : (h.title ?? "Committee hearing");
+
 export const billSlug = (identifier: string): string =>
   identifier.replace(/\s+/g, "").toLowerCase();
 

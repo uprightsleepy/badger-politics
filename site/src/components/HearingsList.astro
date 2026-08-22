@@ -1,7 +1,7 @@
 ---
 /** The hearings list section, shared by the calendar page. */
 import { upcomingHearings, recentHearings, findBillByIdentifier, allCommittees } from "../lib/db";
-import { fmtDate, fmtTime, chamberName, billSlug, personSlug } from "../lib/format";
+import { fmtDate, fmtTime, hearingDisplayName, billSlug, personSlug } from "../lib/format";
 const today = new Date().toISOString().slice(0, 10);
 const upcoming = upcomingHearings(today);
 const recent = recentHearings(30);
@@ -23,9 +23,7 @@ const committeePages = new Set(allCommittees().map((c) => c.id));
       const agendaBills = JSON.parse(h.agenda_bill_ids_json ?? "[]") as string[];
       // must match hearing_uid() in pipeline/dataproducts/ical.py
       const uid = h.id.split("/").pop()!.replace(/\s+/g, "-");
-      const name = h.committee_name
-        ? `${h.committee_chamber ? `${chamberName(h.committee_chamber)} ` : ""}${h.committee_name}`
-        : (h.title ?? "Committee hearing");
+      const name = hearingDisplayName(h);
       return (
         <li class="rounded-lg border border-navy-100 bg-white px-4 py-3 text-sm">
           <div class="flex flex-wrap items-baseline gap-x-3">
