@@ -113,7 +113,10 @@ def apply_merges(people: list[Person]) -> list[Person]:
         if person_id in by_id:
             by_id[person_id].terms.extend(
                 Term(t["chamber"], t.get("district"), t["start"], t.get("end"))
+                # a startless entry is a marker only (e.g. an "exclusive"
+                # chamber declaration); it adds no term of its own
                 for t in terms
+                if "start" in t
             )
     return list(by_id.values())
 

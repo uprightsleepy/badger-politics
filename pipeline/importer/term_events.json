@@ -36,6 +36,24 @@
       "basis": "verified 2026-08-22: Scott Gunderson resigned effective Jan 4, 2011 to become a DNR executive assistant; Assembly Journal Jan 3, 2011 p. 12 records the resignation honors; openstates end 2012-12-31 is a year-boundary artifact"
     }
   ],
+  "ocd-person/4dfeb3fb-39b7-49a5-8323-b1c3f933c28d": [
+    {
+      "end": "2013-01-01",
+      "chamber": "lower",
+      "label": "Lost the August 2012 Democratic primary to Mandela Barnes",
+      "url": "https://ballotpedia.org/Jason_Fields_(Wisconsin)",
+      "basis": "verified 2026-08-24: Jason Fields lost the AD 11 Democratic primary on Aug 14, 2012 (Barnes 2,596 to Fields 1,206) and left office at the January 2013 inauguration; he won the seat back in November 2016. Attaches to his 2011-biennium supplement end."
+    }
+  ],
+  "ocd-person/72aa0b66-48f0-41fd-8ac8-b33f610d97c7": [
+    {
+      "end": "2014-12-31",
+      "chamber": "lower",
+      "label": "Did not seek reelection after his election as Mayor of Neenah",
+      "url": "https://ballotpedia.org/Dean_Kaufert",
+      "basis": "verified 2026-08-24: Dean Kaufert was elected Mayor of Neenah in April 2014, did not seek Assembly reelection that November, and served as mayor 2014-2022 before returning to the Assembly in 2025. Annotates his openstates end date."
+    }
+  ],
   "ocd-person/5e70f623-ae29-4013-ac58-b86c2616a9eb": [
     {
       "end": "2019-01-08",

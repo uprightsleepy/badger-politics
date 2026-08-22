@@ -16,6 +16,13 @@
       "basis": "Petrowski assumed the SD 29 seat on July 17, 2012 (Ballotpedia; special election of June 5, 2012). Ends at the biennium boundary where roster supplements take over; blocks the phantom Jan 2011-Jul 2012 Senate coverage the legacy CSV implied."
     }
   ],
+  "ocd-person/7da63875-0a3c-4b03-aaa8-fe48c718eb45": [
+    {
+      "chamber": "lower",
+      "exclusive": true,
+      "basis": "Marker only: Jill Billings' real Assembly term (AD 95 from Jan 26, 2012, per her openstates file and Ballotpedia) is her complete service. The openstates legacy CSV wrongly credits her legacy id WIL000419 with the 2009-2010 AD 95 seat, which was Jennifer Shilling's; without this marker that row earns her a phantom 2009-2010 supplement."
+    }
+  ],
   "ocd-person/2e0e6bb3-bb92-4b34-90bc-a22ffe76ee3e": [
     {
       "chamber": "upper",

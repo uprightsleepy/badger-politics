@@ -265,9 +265,6 @@ class Importer:
                      event.get("url") if event else None),
                 )
                 coverage.append((person.id, term.chamber, term.start, end or OPEN_END))
-        dangling = set(events) - used
-        if dangling:
-            raise RuntimeError(f"term_events entries match no imported term: {dangling}")
         # session rosters are the authority that attributes votes; a rostered
         # member without a real dated term gets a biennium-bounded one, so
         # service coverage and vote attribution share one authority. The
@@ -312,12 +309,26 @@ class Importer:
                     for pid, ch, ts, te in coverage
                 )
                 if not covered:
+                    # curated departure events label supplement ends too
+                    # (legacy-era members have no real dated terms to carry
+                    # them), e.g. a lost primary before a comeback
+                    event = events.get((m.id, end))
+                    if event and event.get("chamber") not in (None, m.chamber):
+                        event = None
+                    if event:
+                        used.add((m.id, end))
                     self.conn.execute(
-                        "INSERT INTO person_terms (person_id, chamber, district, start, end)"
-                        " VALUES (?, ?, ?, ?, ?)",
-                        (m.id, m.chamber, m.district, start, end),
+                        "INSERT INTO person_terms"
+                        " (person_id, chamber, district, start, end, end_label, end_url)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (m.id, m.chamber, m.district, start, end,
+                         event["label"] if event else None,
+                         event.get("url") if event else None),
                     )
                     coverage.append((m.id, m.chamber, start, end))
+        dangling = set(events) - used
+        if dangling:
+            raise RuntimeError(f"term_events entries match no imported term: {dangling}")
 
     def import_committees(self) -> None:
         for c in self.committees.committees:
