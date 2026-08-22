@@ -74,16 +74,20 @@ import HearingsList from "../components/HearingsList.astro";
       });
       dayEvents.innerHTML = list.length
         ? list
-            .map(
-              (e) => `
+            .map((e) => {
+              const emoji = e.type === "election" ? '<span aria-hidden="true">🗳️ </span>' : "";
+              // the title carries the official-notice link itself
+              const title = e.url
+                ? `<a class="py-1 font-semibold underline" target="_blank" rel="noopener" href="${e.url}">${emoji}${e.label}<span class="sr-only"> official notice, opens in a new tab</span></a>`
+                : `<span class="font-semibold">${emoji}${e.label}</span>`;
+              return `
         <li class="rounded border ${e.type === "election" ? "border-gold-500 bg-gold-100" : "border-navy-100"} p-2">
-          <span class="font-semibold">${e.type === "election" ? '<span aria-hidden="true">🗳️ </span>' : ""}${e.label}</span>
+          ${title}
           ${e.detail ? `<span class="text-navy-600"> · ${e.detail}</span>` : ""}
-          ${e.url ? ` <a class="underline" target="_blank" rel="noopener" href="${e.url}">official notice</a>` : ""}
           ${e.links?.length ? linksBlock(e.links) : ""}
           ${e.type === "hearing" ? `<p class="mt-1 text-xs text-navy-600">Confirm against the official notice before attending.</p>` : ""}
-        </li>`,
-            )
+        </li>`;
+            })
             .join("")
         : "<li class='text-navy-600'>Nothing scheduled.</li>";
       panel.classList.remove("hidden");

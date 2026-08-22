@@ -92,6 +92,19 @@ check(
   JSON.stringify(pinned),
 );
 
+// 3b. saved reps are highlighted anywhere they appear (legislators index)
+await page.goto("http://127.0.0.1:8931/legislators/", { waitUntil: "networkidle2" });
+await page.waitForFunction(
+  () => [...document.querySelectorAll("a")].some((a) => a.classList.contains("bg-gold-100")),
+  { timeout: 10000 },
+).catch(() => {});
+const highlighted = await page.$$eval("a.bg-gold-100", (as) => as.map((a) => a.textContent.trim()));
+check(
+  "saved reps highlighted on legislators index",
+  highlighted.some((t) => t.includes("Tenorio")) && highlighted.some((t) => t.includes("Hutton")),
+  JSON.stringify(highlighted.slice(0, 4)),
+);
+
 // 4. AB 656 page shows Hearing None banner + LRB analysis
 await page.goto("http://127.0.0.1:8931/bills/2025/ab656/", { waitUntil: "networkidle2" });
 const body = await page.$eval("body", (el) => el.textContent);
