@@ -105,5 +105,131 @@
       "url": "https://ballotpedia.org/Van_Wanggaard_recall,_Wisconsin_State_Senate_(2011-2012)",
       "basis": "verified 2026-08-22: recalled June 5, 2012, lost to John Lehman by 819 votes after recount; returned by winning the redrawn seat in Nov 2014"
     }
+  ],
+  "ocd-person/a14523af-6b51-4c5b-95e5-98885090acc2": [
+    {
+      "matches": "2012-12-31",
+      "end": "2011-08-26",
+      "label": "Lost the August 2011 recall election",
+      "url": "https://ballotpedia.org/Dan_Kapanke_recall,_Wisconsin_State_Senate_(2011)",
+      "basis": "verified 2026-08-24: Dan Kapanke lost the Aug 9, 2011 recall to Jennifer Shilling, who took the SD 32 seat on Aug 26, 2011; the openstates end 2012-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/d91bccad-13b6-43ac-8e54-36fc6af3e68e": [
+    {
+      "matches": "2012-12-31",
+      "end": "2011-08-26",
+      "label": "Lost the August 2011 recall election",
+      "url": "https://ballotpedia.org/Recall_of_Wisconsin_State_Senators_(2011)",
+      "basis": "verified 2026-08-24: Randy Hopper lost the Aug 9, 2011 recall to Jessica King, who took the SD 18 seat on Aug 26, 2011; the openstates end 2012-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/34a948bb-7d10-442e-97d5-dae4b9aa76d1": [
+    {
+      "matches": "2014-12-31",
+      "end": "2011-01-03",
+      "label": "Lost the November 2010 election to Van Wanggaard",
+      "url": "https://ballotpedia.org/John_Lehman",
+      "basis": "verified 2026-08-24: John Lehman's first SD 21 stint ended at the Jan 3, 2011 inauguration after losing to Van Wanggaard in Nov 2010; the openstates row spans both his stints AND the Jan 2011-Jul 2012 gap between them, so its 2014-12-31 end is corrected to the first exit (the curated 2012 gap term and the labeled 2013 supplement carry the second stint)"
+    },
+    {
+      "end": "2015-01-01",
+      "chamber": "upper",
+      "label": "Lost the November 2014 election to Van Wanggaard",
+      "url": "https://ballotpedia.org/John_Lehman",
+      "basis": "verified 2026-08-24: John Lehman won Wanggaard's seat in the June 2012 recall, then lost the redrawn-district rematch in Nov 2014; annotates his final Senate supplement"
+    }
+  ],
+  "ocd-person/c8692ac4-68fe-4cf4-be7e-322bdb636e75": [
+    {
+      "matches": "2012-12-31",
+      "end": "2011-04-14",
+      "label": "Resigned after his election as Dane County Executive",
+      "url": "https://en.wikipedia.org/wiki/Joe_Parisi",
+      "basis": "verified 2026-08-24: Joe Parisi's AD 48 service ended April 14, 2011; he took office as Dane County Executive on April 18, 2011; the openstates end 2012-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/3e9081cc-e630-4e59-9770-15eacaa8c185": [
+    {
+      "matches": "2014-12-31",
+      "end": "2013-09-03",
+      "label": "Resigned to join the Public Service Commission",
+      "url": "https://ballotpedia.org/Scott_Suder",
+      "basis": "verified 2026-08-24: Scott Suder resigned from AD 69 on Sept 3, 2013 for a Public Service Commission post; the openstates end 2014-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/461ca9c3-6dff-40a6-820e-d354925d4dd4": [
+    {
+      "matches": "2014-12-31",
+      "end": "2013-09-18",
+      "label": "Resigned from the Assembly",
+      "url": "https://ballotpedia.org/Mark_Honadel",
+      "basis": "verified 2026-08-24: Mark Honadel's resignation from AD 21 took effect Sept 18, 2013; the openstates end 2014-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/880ef838-0375-4df8-99c0-6347f31faf02": [
+    {
+      "matches": "2014-12-31",
+      "end": "2013-10-14",
+      "label": "Resigned to join the Public Service Commission",
+      "url": "https://ballotpedia.org/Jeffrey_Stone_(Wisconsin)",
+      "basis": "verified 2026-08-24: Jeff Stone resigned from AD 82 effective Oct 14, 2013 to become a PSC division administrator; the openstates end 2014-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/67ecfe79-a3fa-4ed1-a6e7-a8c5aa31e331": [
+    {
+      "matches": "2018-12-31",
+      "end": "2017-11-10",
+      "label": "Resigned to become Secretary of Agriculture, Trade and Consumer Protection",
+      "url": "https://ballotpedia.org/Sheila_Harsdorf",
+      "basis": "verified 2026-08-24: Sheila Harsdorf's SD 10 resignation was effective Nov 10, 2017; she began as DATCP Secretary Nov 13, 2017; the openstates end 2018-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/b58e5901-e3b6-49e1-869c-2849757ff889": [
+    {
+      "matches": "2018-12-31",
+      "end": "2018-01-15",
+      "label": "Resigned after his election as Mayor of Racine",
+      "url": "https://ballotpedia.org/Cory_Mason",
+      "basis": "verified 2026-08-24: Cory Mason won the Oct 17, 2017 Racine mayoral special election and resigned AD 66 effective Jan 15, 2018; the openstates end 2018-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/9196bcd2-4e71-4f25-869e-41bac247f6a8": [
+    {
+      "matches": "2018-12-31",
+      "end": "2017-10-03",
+      "label": "Died in office",
+      "url": "https://en.wikipedia.org/wiki/Bob_Gannon",
+      "basis": "verified 2026-08-24: Bob Gannon (AD 58) died Oct 3, 2017 at age 58; the openstates end 2018-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/8c8db3b7-0faf-4964-9166-4d7423ce6e24": [
+    {
+      "matches": "2016-12-31",
+      "end": "2015-07-17",
+      "label": "Resigned after his election as Waukesha County Executive",
+      "url": "https://ballotpedia.org/Paul_Farrow",
+      "basis": "verified 2026-08-24: Paul Farrow represented SD 33 until July 17, 2015, resigning after winning the Waukesha County Executive race; the openstates end 2016-12-31 is a year-boundary artifact"
+    }
+  ],
+  "ocd-person/8d93f6ba-19eb-4684-a47d-6de08e009741": [
+    {
+      "matches": "2017-01-01",
+      "chamber": "lower",
+      "end": "2015-08-06",
+      "label": "Elected to the Senate in a special election",
+      "url": "https://ballotpedia.org/Chris_Kapenga",
+      "basis": "verified 2026-08-24: Chris Kapenga left AD 99 when he took the SD 33 seat on Aug 6, 2015 (special election for Paul Farrow's vacancy, per his openstates Senate start); corrects his 2015-biennium Assembly supplement"
+    }
+  ],
+  "ocd-person/13728fa5-9484-4767-b642-8bf9adf80a8b": [
+    {
+      "matches": "2023-01-01",
+      "chamber": "lower",
+      "end": "2021-04-23",
+      "label": "Elected to the Senate in a special election",
+      "url": "https://ballotpedia.org/John_Jagler",
+      "basis": "verified 2026-08-24: John Jagler left AD 37 when he took the SD 13 seat on Apr 23, 2021 (special election for Scott Fitzgerald's vacancy, per his openstates Senate start); corrects his 2021-biennium Assembly supplement"
+    }
   ]
 }

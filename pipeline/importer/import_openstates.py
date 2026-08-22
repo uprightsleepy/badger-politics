@@ -309,23 +309,25 @@ class Importer:
                     for pid, ch, ts, te in coverage
                 )
                 if not covered:
-                    # curated departure events label supplement ends too
-                    # (legacy-era members have no real dated terms to carry
-                    # them), e.g. a lost primary before a comeback
+                    # curated departure events label supplement ends too, and
+                    # a "matches" entry corrects them (a mid-biennium exit by
+                    # a legacy-era member has no real dated term to carry it)
                     event = events.get((m.id, end))
                     if event and event.get("chamber") not in (None, m.chamber):
                         event = None
+                    term_end = end
                     if event:
                         used.add((m.id, end))
+                        term_end = event["end"]
                     self.conn.execute(
                         "INSERT INTO person_terms"
                         " (person_id, chamber, district, start, end, end_label, end_url)"
                         " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        (m.id, m.chamber, m.district, start, end,
+                        (m.id, m.chamber, m.district, start, term_end,
                          event["label"] if event else None,
                          event.get("url") if event else None),
                     )
-                    coverage.append((m.id, m.chamber, start, end))
+                    coverage.append((m.id, m.chamber, start, term_end))
         dangling = set(events) - used
         if dangling:
             raise RuntimeError(f"term_events entries match no imported term: {dangling}")
