@@ -465,6 +465,16 @@ export const seatTerms = (chamber: string, district: number) =>
     start: string; end: string | null; end_label: string | null; end_url: string | null;
   }[];
 
+/** One person's committee assignments, chairs first. */
+export const committeesFor = (personId: string) =>
+  prep(
+      `SELECT c.id, c.name, m.role FROM committee_members m
+       JOIN committees c ON c.id = m.committee_id
+       WHERE m.person_id = ?
+       ORDER BY CASE WHEN m.role LIKE '%chair%' THEN 0 ELSE 1 END, c.name`,
+    )
+    .all(personId) as { id: string; name: string; role: string }[];
+
 /** Lobbying rollups over registrations already linked to bills. */
 export const lobbyingOrgs = () =>
   prep(

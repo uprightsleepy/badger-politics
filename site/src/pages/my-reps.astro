@@ -30,9 +30,9 @@ import Base from "../layouts/Base.astro";
   </form>
   <p id="status" class="mt-3 text-sm text-navy-600" role="status"></p>
 
-  <div id="result" class="mt-6 hidden max-w-xl rounded-lg border border-navy-100 bg-white p-4">
+  <div id="result" class="mt-6 hidden max-w-3xl rounded-lg border border-navy-100 bg-white p-4">
     <h2 id="result-heading" tabindex="-1" class="text-lg font-bold">Your districts</h2>
-    <div id="reps" class="mt-2 space-y-3"></div>
+    <div id="reps" class="mt-2 space-y-4"></div>
     <p class="mt-3 text-xs text-navy-600">
       Districts follow the Legislature's official 2024 boundaries. Saved in
       your browser only. <button id="forget" class="underline">Forget this</button>.
@@ -76,13 +76,15 @@ import Base from "../layouts/Base.astro";
     const repsEl = document.getElementById("reps")!;
     let districts: any = null;
     let reps: any = null;
+    let summaries: any = null;
 
     async function loadData() {
       if (!districts) {
         statusEl.textContent = "Loading district boundaries…";
-        [districts, reps] = await Promise.all([
+        [districts, reps, summaries] = await Promise.all([
           fetch("/data/wi-districts-2024.geojson").then((r) => r.json()),
           fetch("/data/reps.json").then((r) => r.json()),
+          fetch("/data/rep-summaries.json").then((r) => r.json()).catch(() => null),
         ]);
       }
     }
@@ -116,16 +118,87 @@ import Base from "../layouts/Base.astro";
       return null;
     }
 
+    const esc = (s: string) =>
+      s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+
+    function repCard(seat: string, districtHref: string, slim: any, full: any): string {
+      if (!slim) return "";
+      const head =
+        `<p class="flex flex-wrap items-baseline gap-x-2">` +
+        `<strong><a class="underline" href="${districtHref}">${seat}</a>:</strong>` +
+        ` <a class="font-bold underline" href="/legislators/${slim.slug}/">${esc(slim.name)}</a>` +
+        ` <span class="text-sm text-navy-600">(${slim.party?.[0] ?? "?"})</span></p>`;
+      if (!full) return `<div>${head}</div>`;
+
+      const att = full.attendance;
+      const attLine =
+        att.total > 0
+          ? att.missed > 0
+            ? `Missed ${att.missed} of ${att.total.toLocaleString()} floor votes this biennium.`
+            : `No missed floor votes this biennium (${att.total.toLocaleString()} cast or excused).`
+          : "";
+      const au = full.authored;
+      const authoredLine =
+        au.total > 0
+          ? `Authored ${au.total} bills this session: ${au.enacted} became law, ${au.vetoed} vetoed, ${au.noHearing} died without a hearing.`
+          : "";
+      const ballotLine =
+        full.election?.cycle_year === 2026
+          ? full.election.on_ballot === 1
+            ? "On the November 2026 ballot."
+            : full.election.on_ballot === 0
+              ? "Not running in November 2026."
+              : ""
+          : full.election
+            ? `Seat next on the ballot in ${full.election.cycle_year}.`
+            : "";
+      const committees = (full.committees ?? [])
+        .slice(0, 4)
+        .map((c: any) => `<a class="underline" href="/committees/${c.slug}/">${esc(c.name)}</a>`)
+        .join(", ");
+      const more = (full.committees ?? []).length > 4 ? ` +${full.committees.length - 4} more` : "";
+      const votes = (full.recentVotes ?? [])
+        .map(
+          (v: any) =>
+            `<li class="flex flex-wrap items-baseline gap-x-2">` +
+            `<span class="w-20 shrink-0 text-xs text-navy-600">${v.date ?? ""}</span>` +
+            `<a class="underline" href="/bills/${v.session}/${v.identifier.replace(/\s+/g, "").toLowerCase()}/">${v.identifier}</a>` +
+            `<span class="font-semibold">${v.option === "yes" ? "Aye" : v.option === "no" ? "Nay" : "Not voting"}</span>` +
+            `<span class="min-w-0 flex-1 truncate text-navy-700">${esc(v.title ?? "")}</span>` +
+            `<a class="shrink-0 text-xs underline" href="/votes/${v.event}/">roll call</a></li>`,
+        )
+        .join("");
+      return (
+        `<div class="rounded-lg border border-navy-100 p-3">` +
+        head +
+        `<ul class="mt-1 space-y-0.5 text-sm text-navy-700">` +
+        [attLine, authoredLine, ballotLine].filter(Boolean).map((l) => `<li>${l}</li>`).join("") +
+        (committees ? `<li>Committees: ${committees}${more}</li>` : "") +
+        `</ul>` +
+        (votes
+          ? `<p class="mt-2 text-sm font-semibold">Latest roll-call votes</p><ul class="mt-1 space-y-0.5 text-sm">${votes}</ul>`
+          : "") +
+        `<p class="mt-2 text-sm"><a class="underline" href="/legislators/${slim.slug}/">Full profile →</a></p>` +
+        `</div>`
+      );
+    }
+
     function show(props: { ad: number; sd: number }, announce = false) {
       localStorage.setItem("bp-district", JSON.stringify(props));
-      const rep = reps.assembly[props.ad];
-      const sen = reps.senate[props.sd];
       repsEl.innerHTML = [
-        rep &&
-          `<p><strong>Assembly District ${props.ad}:</strong> <a class="underline" href="/legislators/${rep.slug}/">${rep.name}</a> (${rep.party?.[0] ?? "?"})</p>`,
-        sen &&
-          `<p><strong>Senate District ${props.sd}:</strong> <a class="underline" href="/legislators/${sen.slug}/">${sen.name}</a> (${sen.party?.[0] ?? "?"})</p>`,
-        `<p class="text-sm">Now every bill page will pin how they voted.</p>`,
+        repCard(
+          `Assembly District ${props.ad}`,
+          `/districts/assembly-${props.ad}/`,
+          reps.assembly[props.ad],
+          summaries?.assembly?.[props.ad],
+        ),
+        repCard(
+          `Senate District ${props.sd}`,
+          `/districts/senate-${props.sd}/`,
+          reps.senate[props.sd],
+          summaries?.senate?.[props.sd],
+        ),
+        `<p class="text-sm">Now every bill page will pin how they voted, and they'll be highlighted anywhere they appear.</p>`,
       ]
         .filter(Boolean)
         .join("");
