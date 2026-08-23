@@ -3,6 +3,7 @@ export const STATUS_LABELS: Record<string, string> = {
   in_committee: "In committee",
   passed_chamber: "Passed one chamber",
   passed: "Passed both chambers",
+  adopted: "Adopted",
   enacted: "Became law",
   vetoed: "Vetoed",
   failed_sjr1: "Died at session end",
@@ -13,6 +14,7 @@ export const STATUS_STYLES: Record<string, string> = {
   in_committee: "bg-gold-100 text-navy-800",
   passed_chamber: "bg-navy-100 text-navy-800",
   passed: "bg-navy-100 text-navy-800",
+  adopted: "bg-moss-50 text-moss-600",
   enacted: "bg-moss-50 text-moss-600",
   vetoed: "bg-badger-50 text-badger-700",
   failed_sjr1: "bg-badger-50 text-badger-700",
@@ -97,26 +99,45 @@ export const COMPENSATION = {
   senate: { overnight: 140, note: "half rate for Dane County members" },
 };
 
-/** How a bill becomes law: the stepper's stations, derived from status. */
-export function stepperState(status: string | null, chamber: string | null) {
+/** How a bill becomes law: the stepper's stations, derived from status.
+ * Resolutions never go to the governor, so their track ends at adoption. */
+export function stepperState(
+  status: string | null,
+  chamber: string | null,
+  classification: string | null = null,
+) {
   const first = chamber === "upper" ? "Senate" : "Assembly";
   const second = chamber === "upper" ? "Assembly" : "Senate";
-  const steps = [
-    { label: "Introduced" },
-    { label: `Passes ${first}` },
-    { label: `Passes ${second}` },
-    { label: "Governor signs" },
-    { label: "Law" },
-  ];
+  const isResolution = classification?.includes("resolution") ?? false;
+  const oneHouse = isResolution && !(classification ?? "").includes("joint");
+  const steps = isResolution
+    ? [
+        { label: "Introduced" },
+        { label: `Passes ${first}` },
+        ...(oneHouse ? [] : [{ label: `Passes ${second}` }]),
+        { label: "Adopted" },
+      ]
+    : [
+        { label: "Introduced" },
+        { label: `Passes ${first}` },
+        { label: `Passes ${second}` },
+        { label: "Governor signs" },
+        { label: "Law" },
+      ];
   const reached: Record<string, number> = {
     introduced: 1,
     in_committee: 1,
     passed_chamber: 2,
     passed: 3,
+    adopted: steps.length,
     failed_sjr1: 1,
     vetoed: 3,
     enacted: 5,
   };
+  // a one-house resolution is fully adopted at "passed one chamber"
+  if (oneHouse && status === "passed_chamber") {
+    return { steps, reached: steps.length, failed: false };
+  }
   const failed = status === "failed_sjr1" || status === "vetoed";
   return { steps, reached: reached[status ?? "introduced"] ?? 1, failed };
 }

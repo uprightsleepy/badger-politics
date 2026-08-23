@@ -403,16 +403,28 @@ export const voteSplit = (voteEventId: string) => {
   };
 };
 
-/** Bills before (or past) the governor in the current built sessions,
- * plus veto-override roll calls, straight from official statuses. */
+/** Sessions of the newest biennium, regardless of BUILD_SESSIONS. */
+export const currentSessions = (): Session[] => {
+  const sessions = allSessions();
+  const by = (id: string) => {
+    const y = Number(id.slice(0, 4));
+    return y % 2 ? y : y - 1;
+  };
+  const newest = Math.max(...sessions.map((s) => by(s.id)));
+  return sessions.filter((s) => by(s.id) === newest);
+};
+
+/** Bills before (or past) the governor this biennium, plus veto-override
+ * roll calls, straight from official statuses. Bills only: resolutions
+ * pass without ever going to the governor. */
 export const governorsDesk = () => {
-  const ids = builtSessions().map((s) => s.id);
+  const ids = currentSessions().map((s) => s.id);
   const marks = ids.map(() => "?").join(",");
   const byStatus = (status: string) =>
     prep(
       `SELECT id, session_id, identifier, title, latest_action_date, latest_action_desc
        FROM bills WHERE session_id IN (${marks}) AND status = ?
-       AND source != 'legiscan'
+       AND classification = 'bill' AND source != 'legiscan'
        ORDER BY latest_action_date DESC, id`,
     ).all(...ids, status) as {
       id: string; session_id: string; identifier: string; title: string | null;

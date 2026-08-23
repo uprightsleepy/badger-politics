@@ -75,3 +75,17 @@ def test_database_string_classification_form() -> None:
     assert derive_status([{"classification": "passage,reading-3", "chamber": "lower"}]) == (
         "passed_chamber"
     )
+
+
+def test_resolution_adoption_never_reads_as_law() -> None:
+    # resolutions never go to the governor: their success is adoption
+    both = [action("passage", "lower"), action("passage", "upper")]
+    assert derive_status(both, "joint resolution") == "adopted"
+    assert derive_status([action("became-law")], "joint resolution") == "adopted"
+    assert derive_status([action("became-law")], "resolution") == "adopted"
+
+
+def test_bill_statuses_unchanged_by_classification() -> None:
+    both = [action("passage", "lower"), action("passage", "upper")]
+    assert derive_status(both, "bill") == "passed"
+    assert derive_status([action("became-law")], "bill") == "enacted"

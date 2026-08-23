@@ -122,6 +122,12 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             "SELECT COUNT(*) FROM committees c LEFT JOIN people p ON p.id = c.chair_person_id"
             " WHERE c.chair_person_id IS NOT NULL AND p.id IS NULL"
         ),
+        # resolutions never go to the governor; a governor-implying status
+        # on one is a derivation bug (compound classifications fail loudly)
+        "resolutions never carry governor statuses": (
+            "SELECT COUNT(*) FROM bills WHERE classification != 'bill'"
+            " AND status IN ('enacted', 'vetoed', 'passed')"
+        ),
         "no vote outside a recorded term": (
             "SELECT COUNT(*) FROM vote_records r"
             " JOIN vote_events e ON e.id = r.vote_event_id"

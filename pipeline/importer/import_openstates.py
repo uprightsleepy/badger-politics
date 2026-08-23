@@ -387,7 +387,7 @@ class Importer:
             for a in sorted(bill.get("actions", []), key=lambda a: a["date"])
         ]
         died, committee, committee_chamber = derive_graveyard(actions)
-        status = derive_status(actions)
+        status = derive_status(actions, ",".join(bill.get("classification", [])))
         chair_name = None
         if died and committee and key in self.current_sessions:
             # chairs known for the current biennium only; history stays NULL

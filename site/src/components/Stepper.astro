@@ -1,8 +1,8 @@
 ---
 import { stepperState } from "../lib/format";
-interface Props { status: string | null; chamber: string | null }
-const { status, chamber } = Astro.props;
-const { steps, reached, failed } = stepperState(status, chamber);
+interface Props { status: string | null; chamber: string | null; classification?: string | null }
+const { status, chamber, classification = null } = Astro.props;
+const { steps, reached, failed } = stepperState(status, chamber, classification);
 ---
 <ol class="flex items-start" aria-label="How this bill becomes law">
   {steps.map((step, i) => {

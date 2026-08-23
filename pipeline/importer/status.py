@@ -36,7 +36,7 @@ def _classes(action: dict) -> set[str]:
     return set(raw)
 
 
-def derive_status(actions: list[dict]) -> str:
+def derive_status(actions: list[dict], classification: str | None = None) -> str:
     all_classes: set[str] = set()
     passage_chambers: set[str] = set()
     sjr1 = False
@@ -48,14 +48,18 @@ def derive_status(actions: list[dict]) -> str:
         if SJR1_RE.search(action.get("description") or ""):
             sjr1 = True
 
+    # resolutions never go to the governor: final legislative approval is
+    # adoption, never enactment, a veto, or "passed, awaiting signature"
+    is_resolution = classification is not None and "resolution" in classification
+
     if all_classes & ENACTED:
-        return "enacted"
+        return "adopted" if is_resolution else "enacted"
     if all_classes & VETOED:
         return "vetoed"
     if sjr1:
         return "failed_sjr1"
     if len(passage_chambers) >= 2:
-        return "passed"
+        return "adopted" if is_resolution else "passed"
     if len(passage_chambers) == 1:
         return "passed_chamber"
     if "referral-committee" in all_classes:

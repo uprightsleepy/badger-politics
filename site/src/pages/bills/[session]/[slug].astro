@@ -78,7 +78,7 @@ const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
     )}
 
     <div class="mt-6 rounded-lg border border-navy-100 bg-white p-4">
-      <Stepper status={bill.status} chamber={bill.chamber} />
+      <Stepper status={bill.status} chamber={bill.chamber} classification={bill.classification} />
     </div>
 
     {bill.died_without_hearing === 1 && (
