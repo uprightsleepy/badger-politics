@@ -7,16 +7,33 @@ interface Props {
 }
 const { title, description = "Free, independent tracking of the Wisconsin Legislature. Every bill, every vote, and every committee graveyard." } = Astro.props;
 const dataThrough = meta().data_through;
-const NAV = [
-  ["/bills/", "Bills"],
-  ["/subjects/", "Subjects"],
-  ["/legislators/", "Legislators"],
-  ["/districts/", "Districts"],
-  ["/committees/", "Committees"],
-  ["/hearing-none/", "Hearing None"],
-  ["/money/", "Money"],
-  ["/lobbying/", "Lobbying"],
-  ["/governors-desk/", "Governor's desk"],
+const NAV_GROUPS: { label: string; items: [string, string][] }[] = [
+  {
+    label: "Legislation",
+    items: [
+      ["/bills/", "Bills"],
+      ["/subjects/", "Subjects"],
+      ["/governors-desk/", "Governor's desk"],
+      ["/hearing-none/", "Hearing None"],
+    ],
+  },
+  {
+    label: "People",
+    items: [
+      ["/legislators/", "Legislators"],
+      ["/districts/", "Districts"],
+      ["/committees/", "Committees"],
+    ],
+  },
+  {
+    label: "Money",
+    items: [
+      ["/money/", "Campaign money"],
+      ["/lobbying/", "Lobbying"],
+    ],
+  },
+];
+const NAV_DIRECT: [string, string][] = [
   ["/calendar/", "Calendar"],
   ["/elections/2026/", "2026 Ballot"],
   ["/following/", "Following"],
@@ -47,15 +64,24 @@ const NAV = [
             Badger Politics
           </a>
           <!-- phones and small tablets get a native disclosure menu -->
-          <details class="relative md:hidden">
+          <details data-nav-menu class="relative md:hidden">
             <summary class="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-navy-600 px-3 py-2 font-semibold [&::-webkit-details-marker]:hidden">
               <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
                 <path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M2 4h12M2 8h12M2 12h12" />
               </svg>
               Menu
             </summary>
-            <ul class="absolute right-0 top-full z-50 mt-2 w-60 space-y-1 rounded-lg border border-navy-700 bg-navy-900 p-2 shadow-lg">
-              {NAV.map(([href, label]) => (
+            <ul class="absolute right-0 top-full z-50 mt-2 max-h-[80vh] w-60 space-y-1 overflow-y-auto rounded-lg border border-navy-700 bg-navy-900 p-2 shadow-lg">
+              {NAV_GROUPS.map((g) => (
+                <>
+                  <li aria-hidden="true" class="px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-gold-500">{g.label}</li>
+                  {g.items.map(([href, label]) => (
+                    <li><a href={href} class="block rounded px-3 py-2 hover:bg-navy-800">{label}</a></li>
+                  ))}
+                </>
+              ))}
+              <li aria-hidden="true" class="border-t border-navy-700 pt-1"></li>
+              {NAV_DIRECT.map(([href, label]) => (
                 <li><a href={href} class="block rounded px-3 py-2 hover:bg-navy-800">{label}</a></li>
               ))}
               <li>
@@ -66,8 +92,23 @@ const NAV = [
             </ul>
           </details>
           <div class="hidden flex-wrap items-center gap-x-6 gap-y-2 md:flex">
-            {NAV.map(([href, label]) => (
-              <a href={href} class="hover:text-gold-500">{label}</a>
+            {NAV_GROUPS.map((g) => (
+              <details data-nav-menu class="group relative">
+                <summary class="flex cursor-pointer list-none items-center gap-1 py-1 hover:text-gold-500 [&::-webkit-details-marker]:hidden">
+                  {g.label}
+                  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" class="transition-transform group-open:rotate-180">
+                    <path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                </summary>
+                <ul class="absolute left-0 top-full z-50 mt-2 w-52 space-y-1 rounded-lg border border-navy-700 bg-navy-900 p-2 shadow-lg">
+                  {g.items.map(([href, label]) => (
+                    <li><a href={href} class="block rounded px-3 py-2 hover:bg-navy-800">{label}</a></li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+            {NAV_DIRECT.map(([href, label]) => (
+              <a href={href} class="py-1 hover:text-gold-500">{label}</a>
             ))}
             <a href="/my-reps/" data-nav-my-reps class="rounded-full bg-navy-700 px-3 py-1 hover:bg-navy-600">
               Find my legislators
@@ -102,6 +143,24 @@ const NAV = [
         </p>
       </div>
     </footer>
+
+    <script>
+      // nav dropdowns: one open at a time; click-outside and Escape close
+      const menus = [...document.querySelectorAll<HTMLDetailsElement>("[data-nav-menu]")];
+      for (const menu of menus) {
+        menu.addEventListener("toggle", () => {
+          if (menu.open) for (const other of menus) if (other !== menu) other.open = false;
+        });
+      }
+      document.addEventListener("click", (e) => {
+        for (const menu of menus) {
+          if (menu.open && e.target instanceof Node && !menu.contains(e.target)) menu.open = false;
+        }
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") for (const menu of menus) menu.open = false;
+      });
+    </script>
 
     <script>
       // "Your reps" chip: district saved by /my-reps lives in localStorage only
