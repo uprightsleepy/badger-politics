@@ -80,6 +80,9 @@ const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
 
     <div class="mt-6 rounded-lg border border-navy-100 bg-white p-4">
       <Stepper status={bill.status} chamber={bill.chamber} classification={bill.classification} />
+      <p class="mt-2 text-right text-xs text-navy-600">
+        Unfamiliar terms? <a href="/glossary/" class="inline-block py-1 underline">Glossary</a>
+      </p>
     </div>
 
     {bill.died_without_hearing === 1 && (

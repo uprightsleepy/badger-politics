@@ -14,7 +14,8 @@ const committeePages = new Set(allCommittees().map((c) => c.id));
 <section id="hearings">
   <h2 class="text-2xl font-bold">{heading}</h2>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Showing up to testify is the single most effective thing a voter can do.
+    Showing up to <a href="/testify/" class="underline">testify</a> is the
+    single most effective thing a voter can do.
     {upcoming.length === 0 && " Nothing is scheduled right now, so recent hearings are shown."}
     <a href="/calendar/hearings.ics" class="underline">Subscribe to the calendar</a>.
   </p>
