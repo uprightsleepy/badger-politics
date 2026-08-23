@@ -1,12 +1,16 @@
 ---
 import "../styles/global.css";
 import { meta } from "../lib/db";
+import { fmtDate } from "../lib/format";
 interface Props {
   title: string;
   description?: string;
 }
 const { title, description = "Free, independent tracking of the Wisconsin Legislature. Every bill, every vote, and every committee graveyard." } = Astro.props;
 const dataThrough = meta().data_through;
+// two different freshness facts: the newest action the Legislature has
+// recorded, and when we last pulled the records to look
+const pulledOn = meta().imported_at?.slice(0, 10);
 const NAV_GROUPS: { label: string; items: [string, string][] }[] = [
   {
     label: "Legislation",
@@ -128,8 +132,8 @@ const NAV_DIRECT: [string, string][] = [
           Badger Politics is an independent project, not affiliated with the State of Wisconsin.
         </p>
         <p>
-          Data is refreshed nightly from official Wisconsin Legislature records
-          {dataThrough && <span> and is current through <strong>{dataThrough}</strong></span>}.
+          Built from official Wisconsin Legislature records
+          {pulledOn && <span>, last pulled <strong>{fmtDate(pulledOn)}</strong></span>}{dataThrough && <span>; the Legislature's most recent recorded action is from <strong>{fmtDate(dataThrough)}</strong></span>}.
           Every page links to the <a href="https://docs.legis.wisconsin.gov" class="underline">official source</a> so you can check our work.
         </p>
         <div class="grid gap-6 border-t border-navy-100 pt-4 sm:grid-cols-3">

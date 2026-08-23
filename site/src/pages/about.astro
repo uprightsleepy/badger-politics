@@ -1,7 +1,9 @@
 ---
 import Base from "../layouts/Base.astro";
 import { meta } from "../lib/db";
+import { fmtDate } from "../lib/format";
 const dataThrough = meta().data_through;
+const pulledOn = meta().imported_at?.slice(0, 10);
 ---
 
 <Base title="About" description="Every data source behind Badger Politics, the checks each one passes, and how to get corrections.">
@@ -14,8 +16,11 @@ const dataThrough = meta().data_through;
       vote, and what died quietly without a hearing?
     </p>
     <p>
-      Everything is built from official public records, rebuilt nightly
-      {dataThrough && <span> and current through <strong>{dataThrough}</strong></span>}.
+      Everything is built from official public records
+      {pulledOn && <span>, last pulled <strong>{fmtDate(pulledOn)}</strong></span>}.
+      {dataThrough && <span>The Legislature's most recent recorded action is from
+      <strong>{fmtDate(dataThrough)}</strong> — between floorperiods those two
+      dates drift apart, because we keep checking while the Legislature rests.</span>}
       There are no accounts, no tracking cookies, and no ads. The
       <a href="/my-reps/" class="underline">Find my legislators</a> feature keeps
       your district in your browser only. Your address is never stored.
