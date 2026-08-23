@@ -465,6 +465,47 @@ export const seatTerms = (chamber: string, district: number) =>
     start: string; end: string | null; end_label: string | null; end_url: string | null;
   }[];
 
+/** Per-session name resolution for display linking: every printed form
+ * (surname, compound surname, initial-first, full name) of each member
+ * serving that session's biennium, per chamber. A form shared by two
+ * members maps to null and never links — exact-unique or nothing. */
+const _nameIndexes = new Map<string, Record<string, Map<string, string | null>>>();
+export const sessionNameIndex = (sessionId: string) => {
+  const cached = _nameIndexes.get(sessionId);
+  if (cached) return cached;
+  const year = Number(sessionId.slice(0, 4));
+  const by = year % 2 ? year : year - 1;
+  const start = `${by}-01-01`;
+  const end = `${by + 2}-01-01`;
+  const rows = prep(
+      `SELECT DISTINCT t.person_id, t.chamber, p.name
+       FROM person_terms t JOIN people p ON p.id = t.person_id
+       WHERE t.start < ? AND ? < COALESCE(t.end, '9999')`,
+    )
+    .all(end, start) as { person_id: string; chamber: string; name: string }[];
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
+  const index: Record<string, Map<string, string | null>> = { lower: new Map(), upper: new Map() };
+  for (const r of rows) {
+    const map = index[r.chamber];
+    if (!map) continue;
+    const words = r.name.split(/\s+/);
+    const first = words[0];
+    const family = words[words.length - 1];
+    const forms = new Set([r.name, family, `${first[0]}. ${family}`]);
+    if (words.length >= 3) {
+      const compound = words.slice(-2).join(" ");
+      forms.add(compound);
+      forms.add(`${first[0]}. ${compound}`);
+    }
+    for (const form of forms) {
+      const key = norm(form);
+      map.set(key, map.has(key) && map.get(key) !== r.person_id ? null : r.person_id);
+    }
+  }
+  _nameIndexes.set(sessionId, index);
+  return index;
+};
+
 /** One person's committee assignments, chairs first. */
 export const committeesFor = (personId: string) =>
   prep(

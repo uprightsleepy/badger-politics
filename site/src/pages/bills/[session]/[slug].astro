@@ -19,6 +19,7 @@ import {
 import {
   billSlug, fmtDate, personSlug, chamberName, subjectDisplay, subjectSlug,
 } from "../../../lib/format";
+import { linkifyAction } from "../../../lib/actionLinks";
 
 export function getStaticPaths() {
   return builtSessions().flatMap((session) =>
@@ -199,7 +200,7 @@ const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
     <section class="mt-6" data-pagefind-ignore>
       <h2 class="text-xl font-bold">Full history</h2>
       <div
-        class="mt-3 max-h-96 overflow-y-auto"
+        class="mt-3 max-h-96 overflow-y-auto pl-2"
         role="region"
         tabindex="0"
         aria-label="Bill history timeline"
@@ -211,7 +212,7 @@ const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
             <span class="text-xs font-semibold text-navy-600">
               {fmtDate(a.date)} · {chamberName(a.chamber)}
             </span>
-            <p class="text-sm">{a.description}</p>
+            <p class="text-sm" set:html={linkifyAction(a.description, bill.session_id)} />
           </li>
         ))}
       </ol>
