@@ -1,0 +1,105 @@
+---
+import Base from "../../layouts/Base.astro";
+import { governorsDesk } from "../../lib/db";
+import { billSlug, fmtDate } from "../../lib/format";
+
+const desk = governorsDesk();
+const billRow = (b: {
+  id: string; session_id: string; identifier: string; title: string | null;
+  latest_action_date: string | null; latest_action_desc: string | null;
+}) => ({
+  href: `/bills/${b.session_id}/${billSlug(b.identifier)}/`,
+  label: b.identifier,
+  title: b.title ?? "",
+  date: b.latest_action_date,
+  desc: b.latest_action_desc,
+});
+---
+
+<Base
+  title="Governor's desk"
+  description="Wisconsin bills awaiting the governor's signature, signed into law, vetoed, and veto-override votes — straight from official bill histories."
+>
+  <h1 class="text-2xl font-bold">The governor's desk</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    What happened after the Legislature acted, this session: bills awaiting the
+    governor, signed into law, vetoed, and every veto-override roll call. All
+    of it derives from each bill's
+    <a href="https://docs.legis.wisconsin.gov" class="underline">official history</a>,
+    linked on every bill page.
+  </p>
+
+  {desk.awaiting.length > 0 && (
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">Awaiting action · {desk.awaiting.length}</h2>
+      <p class="mt-1 text-sm text-navy-600">Passed both chambers; not yet signed or vetoed.</p>
+      <ul class="mt-3 space-y-1">
+        {desk.awaiting.map(billRow).map((r) => (
+          <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
+            <a href={r.href} class="w-20 shrink-0 font-bold underline">{r.label}</a>
+            <span class="min-w-0 flex-1 truncate">{r.title}</span>
+            {r.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(r.date)}</span>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  <section class="mt-6">
+    <h2 class="text-xl font-bold">Veto-override votes · {desk.overrides.length}</h2>
+    <p class="mt-1 max-w-3xl text-sm text-navy-600">
+      Overriding a veto takes a two-thirds vote in each chamber. Motion text is
+      the journal's own; each links to the official roll call.
+    </p>
+    {desk.overrides.length === 0 ? (
+      <p class="mt-3 rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600">
+        No override votes this session.
+      </p>
+    ) : (
+      <ul class="mt-3 space-y-1">
+        {desk.overrides.map((o) => (
+          <li class="rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
+            <div class="flex flex-wrap items-baseline gap-x-3">
+              <a href={`/bills/${o.session_id}/${billSlug(o.identifier)}/`} class="w-20 shrink-0 font-bold underline">{o.identifier}</a>
+              <span class="min-w-0 flex-1 truncate">{o.title}</span>
+              {o.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(o.date)}</span>}
+            </div>
+            <div class="flex flex-wrap items-baseline gap-x-3 text-xs text-navy-700">
+              <span class="py-1">{o.motion} — Ayes {o.yes_count}, Noes {o.no_count} ({o.result === "pass" ? "override succeeded" : "override failed"})</span>
+              <a href={`/votes/${o.id}/`} class="py-1 underline">roll call</a>
+              {o.source_url && (
+                <a href={o.source_url} class="py-1 underline">official record<span class="sr-only"> (opens in a new tab)</span></a>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    )}
+  </section>
+
+  <section class="mt-6">
+    <h2 class="text-xl font-bold">Vetoed · {desk.vetoed.length}</h2>
+    <ul class="mt-3 space-y-1">
+      {desk.vetoed.map(billRow).map((r) => (
+        <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
+          <a href={r.href} class="w-20 shrink-0 font-bold underline">{r.label}</a>
+          <span class="min-w-0 flex-1 truncate">{r.title}</span>
+          {r.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(r.date)}</span>}
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="mt-6">
+    <h2 class="text-xl font-bold">Signed into law · {desk.enacted.length}</h2>
+    <ul class="mt-3 space-y-1">
+      {desk.enacted.map(billRow).map((r) => (
+        <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
+          <a href={r.href} class="w-20 shrink-0 font-bold underline">{r.label}</a>
+          <span class="min-w-0 flex-1 truncate">{r.title}</span>
+          {r.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(r.date)}</span>}
+        </li>
+      ))}
+    </ul>
+  </section>
+</Base>

@@ -1,0 +1,54 @@
+---
+import Base from "../../layouts/Base.astro";
+import { sittingPeople } from "../../lib/db";
+import { partyStyle } from "../../lib/format";
+
+const holders = new Map(sittingPeople().map((p) => [`${p.chamber}-${p.district}`, p]));
+const ASSEMBLY = Array.from({ length: 99 }, (_, i) => i + 1);
+const SENATE = Array.from({ length: 33 }, (_, i) => i + 1);
+---
+
+<Base
+  title="Districts"
+  description="Every Wisconsin legislative seat: who holds it now, everyone who has held it since 2009, and its official election results."
+>
+  <h1 class="text-2xl font-bold">Districts</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    Every seat in the Legislature: who holds it, everyone who has held it since
+    2009 (and how each departed), and its official election results.
+    Not sure which is yours? <a href="/my-reps/" class="underline">Find your districts</a>.
+  </p>
+
+  {[["Senate", "senate", SENATE, "upper"], ["Assembly", "assembly", ASSEMBLY, "lower"]].map(
+    ([label, slug, nums, chamber]) => (
+      <section class="mt-6">
+        <h2 class="text-xl font-bold">{label} districts</h2>
+        <ul class="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-4">
+          {(nums as number[]).map((d) => {
+            const holder = holders.get(`${chamber}-${d}`);
+            return (
+              <li>
+                <a
+                  href={`/districts/${slug}-${d}/`}
+                  class="flex items-baseline gap-2 rounded px-2 py-1.5 text-sm hover:bg-navy-50"
+                >
+                  <span class="w-7 shrink-0 font-bold tabular-nums">{d}</span>
+                  {holder ? (
+                    <>
+                      <span class="min-w-0 flex-1 truncate underline">{holder.name}</span>
+                      <span class={`shrink-0 rounded px-1 text-xs ${partyStyle(holder.party)}`}>
+                        {holder.party?.[0] ?? "?"}
+                      </span>
+                    </>
+                  ) : (
+                    <span class="min-w-0 flex-1 truncate text-navy-600 underline">Vacant</span>
+                  )}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    ),
+  )}
+</Base>

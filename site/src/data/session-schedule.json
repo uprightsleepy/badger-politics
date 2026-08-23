@@ -1,0 +1,26 @@
+{
+  "_comment": "Scheduled floorperiods of the 2025-26 biennial session, from enrolled 2025 Senate Joint Resolution 1. Dates verified 2026-08-24 against the enrolled resolution.",
+  "session": "2025-26",
+  "source_url": "https://docs.legis.wisconsin.gov/2025/related/enrolled/sjr1",
+  "session_start": "2025-01-06",
+  "session_end": "2027-01-04",
+  "session_end_note": "The biennial session period ends at noon on Monday, January 4, 2027.",
+  "floorperiods": [
+    { "start": "2025-01-07", "end": "2025-01-09" },
+    { "start": "2025-01-13", "end": "2025-01-15" },
+    { "start": "2025-01-21", "end": "2025-01-23" },
+    { "start": "2025-02-18", "end": "2025-02-20" },
+    { "start": "2025-03-11", "end": "2025-03-20" },
+    { "start": "2025-04-15", "end": "2025-04-24" },
+    { "start": "2025-05-13", "end": "2025-05-15" },
+    { "start": "2025-06-03", "end": "2025-06-30" },
+    { "start": "2025-09-02", "end": "2025-09-11" },
+    { "start": "2025-10-07", "end": "2025-10-16" },
+    { "start": "2025-11-11", "end": "2025-11-20" },
+    { "start": "2026-01-13", "end": "2026-01-15" },
+    { "start": "2026-01-20", "end": "2026-01-22" },
+    { "start": "2026-02-10", "end": "2026-02-19" },
+    { "start": "2026-03-17", "end": "2026-03-19", "label": "Final general-business floorperiod" },
+    { "start": "2026-05-12", "end": "2026-05-13", "label": "Veto review floorperiod" }
+  ]
+}

@@ -11,7 +11,8 @@ const PAGES = [
   "/", "/bills/", "/bills/2025/", "/bills/2025/ab656/", "/votes/2025-av0001-ar1/",
   "/legislators/", "/hearing-none/2025/", "/calendar/", "/my-reps/",
   "/elections/2026/", "/data/", "/about/", "/money/", "/money/committees/",
-  "/money/committees/651839/", "/404.html",
+  "/money/committees/651839/", "/404.html", "/governors-desk/", "/districts/",
+  "/districts/senate-21/", "/lobbying/", "/testify/", "/glossary/",
 ];
 const moneyHref = await moneyLegislatorHref();
 if (moneyHref) PAGES.push(moneyHref);

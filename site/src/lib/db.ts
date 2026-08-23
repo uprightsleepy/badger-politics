@@ -164,7 +164,8 @@ export const personVotes = (personId: string, limit: number) =>
 
 export const personSponsorships = (personId: string) =>
   prep(
-      `SELECT s.is_primary, b.id AS bill_id, b.identifier, b.title, b.status, b.session_id
+      `SELECT s.is_primary, b.id AS bill_id, b.identifier, b.title, b.status,
+              b.session_id, b.died_without_hearing
        FROM sponsorships s JOIN bills b ON b.id = s.bill_id
        WHERE s.person_id = ? AND b.source != 'legiscan' ORDER BY b.id DESC`,
     )
@@ -175,6 +176,7 @@ export const personSponsorships = (personId: string) =>
     title: string | null;
     status: string | null;
     session_id: string;
+    died_without_hearing: number;
   }[];
 
 const _elections = new Map<string, ReturnType<typeof queryElection>>();
@@ -323,8 +325,10 @@ export const personVoteDays = (personId: string) =>
     )
     .all(personId) as { date: string; chamber: string; cast: number; nv: number }[];
 
-// majority position (aye/nay) per (vote event, party); ties excluded
+// majority position (aye/nay) per (vote event, party); ties excluded.
+// The full yes/no split is kept alongside so pages can cite exact counts.
 let _partyMajority: Map<string, string> | undefined;
+let _partySplits: Map<string, { yes: number; no: number }> | undefined;
 const partyMajorities = (): Map<string, string> => {
   if (_partyMajority) return _partyMajority;
   const rows = prep(
@@ -341,12 +345,147 @@ const partyMajorities = (): Map<string, string> => {
     c[row.option as "yes" | "no"] += row.n;
     counts.set(key, c);
   }
+  _partySplits = counts;
   _partyMajority = new Map();
   for (const [key, c] of counts) {
     if (c.yes !== c.no) _partyMajority.set(key, c.yes > c.no ? "yes" : "no");
   }
   return _partyMajority;
 };
+
+const partySplits = (): Map<string, { yes: number; no: number }> => {
+  partyMajorities();
+  return _partySplits!;
+};
+
+/** Votes where this member's Aye/Nay opposed their own party's majority
+ * position on the roll call (ties excluded, absences never counted). */
+export const partyBreaks = (personId: string, party: string | null) => {
+  if (party !== "Democratic" && party !== "Republican") return [];
+  const majorities = partyMajorities();
+  const splits = partySplits();
+  const votes = prep(
+      `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.source_url,
+              b.id AS bill_id, b.identifier, b.title, b.session_id
+       FROM vote_records r
+       JOIN vote_events e ON e.id = r.vote_event_id
+       JOIN bills b ON b.id = e.bill_id
+       WHERE r.person_id = ? AND r.option IN ('yes', 'no')
+       ORDER BY e.date DESC, e.id`,
+    )
+    .all(personId) as {
+    option: string; vote_event_id: string; date: string | null; motion: string | null;
+    source_url: string | null; bill_id: string; identifier: string;
+    title: string | null; session_id: string;
+  }[];
+  return votes
+    .filter((v) => {
+      const majority = majorities.get(`${v.vote_event_id}|${party}`);
+      return majority !== undefined && majority !== v.option;
+    })
+    .map((v) => ({ ...v, split: splits.get(`${v.vote_event_id}|${party}`)! }));
+};
+
+/** Per-party Aye/Nay splits for one roll call, for the party-line /
+ * bipartisan tag. Null when either party cast no recorded Aye/Nay. */
+export const voteSplit = (voteEventId: string) => {
+  const splits = partySplits();
+  const dem = splits.get(`${voteEventId}|Democratic`);
+  const rep = splits.get(`${voteEventId}|Republican`);
+  if (!dem || !rep) return null;
+  const dir = (c: { yes: number; no: number }) =>
+    c.yes === c.no ? null : c.yes > c.no ? "yes" : "no";
+  const d = dir(dem);
+  const r = dir(rep);
+  return {
+    dem, rep,
+    label: d === null || r === null ? null : d === r ? "Bipartisan" : "Party-line",
+  };
+};
+
+/** Bills before (or past) the governor in the current built sessions,
+ * plus veto-override roll calls, straight from official statuses. */
+export const governorsDesk = () => {
+  const ids = builtSessions().map((s) => s.id);
+  const marks = ids.map(() => "?").join(",");
+  const byStatus = (status: string) =>
+    prep(
+      `SELECT id, session_id, identifier, title, latest_action_date, latest_action_desc
+       FROM bills WHERE session_id IN (${marks}) AND status = ?
+       AND source != 'legiscan'
+       ORDER BY latest_action_date DESC, id`,
+    ).all(...ids, status) as {
+      id: string; session_id: string; identifier: string; title: string | null;
+      latest_action_date: string | null; latest_action_desc: string | null;
+    }[];
+  const overrides = prep(
+      `SELECT e.id, e.bill_id, e.date, e.chamber, e.motion, e.result,
+              e.yes_count, e.no_count, e.source_url,
+              b.identifier, b.title, b.session_id
+       FROM vote_events e JOIN bills b ON b.id = e.bill_id
+       WHERE b.session_id IN (${marks}) AND e.motion LIKE '%NOTWITHSTANDING%'
+       ORDER BY e.date DESC, e.id`,
+    ).all(...ids) as {
+      id: string; bill_id: string; date: string | null; chamber: string | null;
+      motion: string | null; result: string | null; yes_count: number | null;
+      no_count: number | null; source_url: string | null;
+      identifier: string; title: string | null; session_id: string;
+    }[];
+  return {
+    awaiting: byStatus("passed"),
+    enacted: byStatus("enacted"),
+    vetoed: byStatus("vetoed"),
+    overrides,
+  };
+};
+
+/** Everyone who has held one seat, newest first: term rows joined to
+ * people, straight from the Legislature's service records. */
+export const seatTerms = (chamber: string, district: number) =>
+  prep(
+      `SELECT t.person_id, p.name, p.party, p.current_role, t.start, t.end,
+              t.end_label, t.end_url
+       FROM person_terms t JOIN people p ON p.id = t.person_id
+       WHERE t.chamber = ? AND t.district = ? ORDER BY t.start`,
+    )
+    .all(chamber, district) as {
+    person_id: string; name: string; party: string | null; current_role: string | null;
+    start: string; end: string | null; end_label: string | null; end_url: string | null;
+  }[];
+
+/** Lobbying rollups over registrations already linked to bills. */
+export const lobbyingOrgs = () =>
+  prep(
+      `SELECT principal_id AS id, MAX(principal) AS name,
+              COUNT(DISTINCT bill_id) AS bills
+       FROM lobbying_interests GROUP BY principal_id ORDER BY bills DESC, name`,
+    )
+    .all() as { id: number; name: string; bills: number }[];
+
+export const mostLobbiedBills = (sessionId: string, limit: number) =>
+  prep(
+      `SELECT b.id, b.identifier, b.title, b.status, COUNT(*) AS orgs
+       FROM lobbying_interests l JOIN bills b ON b.id = l.bill_id
+       WHERE b.session_id = ? AND b.source != 'legiscan'
+       GROUP BY b.id ORDER BY orgs DESC, b.id LIMIT ?`,
+    )
+    .all(sessionId, limit) as {
+    id: string; identifier: string; title: string | null;
+    status: string | null; orgs: number;
+  }[];
+
+export const orgLobbying = (principalId: number) =>
+  prep(
+      `SELECT l.bill_id, l.principal, l.source_url, b.identifier, b.title,
+              b.status, b.session_id
+       FROM lobbying_interests l JOIN bills b ON b.id = l.bill_id
+       WHERE l.principal_id = ? AND b.source != 'legiscan'
+       ORDER BY b.session_id DESC, b.id`,
+    )
+    .all(principalId) as {
+    bill_id: string; principal: string; source_url: string | null;
+    identifier: string; title: string | null; status: string | null; session_id: string;
+  }[];
 
 /** Share of a member's aye/nay floor votes matching their party's majority
  * position, per session. Presented as a plain number, never a grade. */

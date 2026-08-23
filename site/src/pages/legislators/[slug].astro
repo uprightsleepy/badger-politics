@@ -19,6 +19,7 @@ import {
   moneyFor,
   personIdByName,
   hasDonorPage,
+  partyBreaks,
 } from "../../lib/db";
 import {
   COMPENSATION,
@@ -97,6 +98,8 @@ const openYears = new Set(
 // Running tally of their sponsored bills by stage; counts recompute from
 // live statuses every nightly rebuild, so they track bills through stages.
 const agreement = partyAgreement(person.id, person.party);
+const breaks = partyBreaks(person.id, person.party);
+const partyPlural = person.party === "Democratic" ? "Democrats" : "Republicans";
 const money = sitting ? moneyFor(person.id) : null;
 const history = sitting ? electionHistoryFor(person.chamber, person.district) : [];
 const surname = person.name.split(" ").pop()!.toLowerCase();
@@ -274,6 +277,15 @@ const tally = TALLY_ORDER.map((status) => ({
     <div class="min-w-0 flex-1">
       <section>
         <h2 class="text-xl font-bold">Sponsored bills · {primarySponsored.length}</h2>
+        {primarySponsored.length > 0 && (
+          <p class="mt-1 text-sm text-navy-600">
+            Of the {primarySponsored.length} bills they authored:
+            {" "}{primarySponsored.filter((s) => s.status === "enacted").length} became law,
+            {" "}{primarySponsored.filter((s) => s.status === "vetoed").length} were vetoed,
+            {" "}{primarySponsored.filter((s) => s.died_without_hearing === 1).length} died
+            without a public hearing. Statuses come from each bill's official history.
+          </p>
+        )}
         <div class="mt-2 flex flex-wrap gap-2 text-sm">
           {tally.map((t) => (
             <a
@@ -388,6 +400,36 @@ const tally = TALLY_ORDER.map((status) => ({
               </p>
             </div>
           )}
+        </section>
+      )}
+
+      {breaks.length > 0 && (
+        <section class="mt-6">
+          <h2 class="text-xl font-bold">Votes against their party · {breaks.length}</h2>
+          <p class="mt-1 max-w-3xl text-sm text-navy-600">
+            Roll calls where {person.name} voted opposite the majority of
+            {" "}{partyPlural} casting an Aye or Nay on that roll call. Ties
+            within the party are excluded; absences never count. Each row
+            links to the official roll call.
+          </p>
+          <details class="mt-3 rounded-lg border border-navy-100 bg-white" open={breaks.length <= 12}>
+            <summary class="cursor-pointer px-3 py-2 text-sm font-semibold">
+              Show all {breaks.length} party-break votes
+            </summary>
+            <ul class="space-y-1 px-3 pb-3">
+              {breaks.map((v) => (
+                <li class="flex flex-wrap items-baseline gap-x-3 border-t border-navy-100 pt-1 text-sm">
+                  <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{v.date ? fmtDate(v.date) : ""}</span>
+                  <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="w-20 shrink-0 font-bold underline">{v.identifier}</a>
+                  <span class="min-w-0 flex-1 truncate">{v.motion ?? v.title}</span>
+                  <span class="shrink-0 text-xs text-navy-700">
+                    Voted {v.option === "yes" ? "Aye" : "Nay"}; {partyPlural} split {v.split.yes} Aye–{v.split.no} Nay
+                  </span>
+                  <a href={`/votes/${v.vote_event_id}/`} class="shrink-0 text-xs underline">roll call</a>
+                </li>
+              ))}
+            </ul>
+          </details>
         </section>
       )}
 

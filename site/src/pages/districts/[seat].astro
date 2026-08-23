@@ -1,0 +1,134 @@
+---
+import Base from "../../layouts/Base.astro";
+import { seatTerms, sittingPeople, electionFor, electionHistoryFor } from "../../lib/db";
+import { partyStyle, personSlug, monthYear, chamberName } from "../../lib/format";
+import { mergeServiceSpans } from "../../lib/service";
+
+export function getStaticPaths() {
+  const seats = [
+    ...Array.from({ length: 99 }, (_, i) => ({ chamber: "lower", slug: "assembly", district: i + 1 })),
+    ...Array.from({ length: 33 }, (_, i) => ({ chamber: "upper", slug: "senate", district: i + 1 })),
+  ];
+  return seats.map((s) => ({
+    params: { seat: `${s.slug}-${s.district}` },
+    props: { chamber: s.chamber, district: s.district },
+  }));
+}
+const { chamber, district } = Astro.props;
+const seatName = `${chamberName(chamber)} District ${district}`;
+
+const holder = sittingPeople().find((p) => p.chamber === chamber && p.district === district);
+const election = holder ? electionFor(holder.id) : undefined;
+const opponents = election?.opponents.filter((o) => o.ballot_status !== "Deny") ?? [];
+const history = electionHistoryFor(chamber, district);
+
+// one lineage entry per continuous stint: rows grouped per person, then
+// biennium-boundary rows merged exactly like the profile's Service card
+const rows = seatTerms(chamber, district);
+const byPerson = new Map<string, typeof rows>();
+for (const r of rows) {
+  if (!byPerson.has(r.person_id)) byPerson.set(r.person_id, []);
+  byPerson.get(r.person_id)!.push(r);
+}
+const lineage = [...byPerson.entries()]
+  .flatMap(([pid, personRows]) =>
+    mergeServiceSpans(
+      personRows.map((r) => ({
+        chamber, district, start: r.start, end: r.end,
+        end_label: r.end_label, end_url: r.end_url,
+      })),
+    ).map((span) => ({
+      person_id: pid,
+      name: personRows[0].name,
+      party: personRows[0].party,
+      ...span,
+    })),
+  )
+  .sort((a, b) => (a.start < b.start ? 1 : -1));
+---
+
+<Base
+  title={seatName}
+  description={`${seatName}: the current member, everyone who has held the seat since 2009, and official election results.`}
+>
+  <p class="text-sm text-navy-600"><a href="/districts/" class="underline">← All districts</a></p>
+  <h1 class="mt-2 text-2xl font-bold">{seatName}</h1>
+
+  {holder ? (
+    <div class="mt-3 rounded-lg border border-navy-100 bg-white p-4">
+      <p class="text-sm text-navy-600">Current member</p>
+      <p class="mt-1 flex items-baseline gap-2 text-lg font-bold">
+        <a href={`/legislators/${personSlug(holder.id)}/`} class="underline">{holder.name}</a>
+        <span class={`rounded px-1.5 text-sm ${partyStyle(holder.party)}`}>{holder.party ?? "?"}</span>
+      </p>
+      {election && (
+        <p class="mt-1 text-sm text-navy-700">
+          {election.cycle_year === 2026
+            ? election.on_ballot === 1
+              ? `On the November 2026 ballot${opponents.length ? ` — challenged by ${opponents.map((o) => `${o.name} (${o.party?.[0] ?? "?"})`).join(", ")}` : ", unopposed so far"}`
+              : election.on_ballot === 0
+                ? "Not running in November 2026"
+                : `Seat next on the ballot in November ${election.cycle_year}`
+            : `Seat next on the ballot in November ${election.cycle_year}`}
+        </p>
+      )}
+    </div>
+  ) : (
+    <p class="mt-3 rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600">
+      The seat is currently vacant.
+    </p>
+  )}
+
+  <section class="mt-6">
+    <h2 class="text-xl font-bold">Who has held this seat</h2>
+    <p class="mt-1 max-w-3xl text-sm text-navy-600">
+      From the Legislature's service records; our records begin with the 2009
+      session. District boundaries were redrawn in 2011, 2022, and again in
+      2024, so the seat's constituency shifts across those lines.
+    </p>
+    <ul class="mt-3 space-y-1">
+      {lineage.map((s) => (
+        <li class="rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
+          <div class="flex flex-wrap items-baseline gap-x-3">
+            <a href={`/legislators/${personSlug(s.person_id)}/`} class="min-w-0 py-1 font-bold underline">{s.name}</a>
+            <span class={`shrink-0 rounded px-1 text-xs ${partyStyle(s.party)}`}>{s.party?.[0] ?? "?"}</span>
+            <span class="shrink-0 text-navy-700">{monthYear(s.start)} to {s.end ? monthYear(s.end) : "present"}</span>
+          </div>
+          {s.end_label && (
+            <p class="text-xs text-navy-600">
+              {s.end_url ? <a href={s.end_url} class="inline-block py-1 underline">{s.end_label}</a> : <span class="inline-block py-1">{s.end_label}</span>}
+            </p>
+          )}
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  {history.length > 0 && (
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">General-election results</h2>
+      <p class="mt-1 text-sm text-navy-600">
+        Official Wisconsin Elections Commission canvass results.
+      </p>
+      <div class="mt-3 space-y-3">
+        {history.map((h) => (
+          <div class="rounded-lg border border-navy-100 bg-white px-4 py-3 text-sm">
+            <p class="font-bold">November {h.year}</p>
+            <ul class="mt-1 space-y-0.5">
+              {h.candidates.map((c) => (
+                <li class="flex flex-wrap items-baseline gap-x-3">
+                  <span class="min-w-0 flex-1">{c.candidate}</span>
+                  <span class={`shrink-0 rounded px-1 text-xs ${partyStyle(c.party)}`}>{c.party?.[0] ?? "?"}</span>
+                  <span class="w-20 shrink-0 text-right tabular-nums">{c.votes.toLocaleString()}</span>
+                  <span class="w-14 shrink-0 text-right tabular-nums text-navy-600">
+                    {h.total ? `${((c.votes / h.total) * 100).toFixed(1)}%` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+  )}
+</Base>

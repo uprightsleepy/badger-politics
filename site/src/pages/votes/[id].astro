@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import RollCall from "../../components/RollCall.astro";
-import { builtSessions, billsFor, votesFor } from "../../lib/db";
+import { builtSessions, billsFor, votesFor, voteSplit } from "../../lib/db";
 import { billSlug } from "../../lib/format";
 
 export function getStaticPaths() {
@@ -15,6 +15,7 @@ export function getStaticPaths() {
   );
 }
 const { event, bill, sessionId } = Astro.props;
+const split = voteSplit(event.id);
 ---
 
 <Base title={`Roll call: ${bill.identifier} · ${event.motion ?? "vote"}`}>
@@ -23,7 +24,22 @@ const { event, bill, sessionId } = Astro.props;
       ← {bill.identifier}: {bill.title?.slice(0, 90)}
     </a>
   </p>
-  <h1 class="mt-2 text-2xl font-bold">Roll call vote</h1>
+  <h1 class="mt-2 flex flex-wrap items-center gap-3 text-2xl font-bold">
+    Roll call vote
+    {split?.label && (
+      <span class={`rounded-full px-3 py-0.5 text-sm font-semibold ${split.label === "Party-line" ? "bg-badger-50 text-badger-700" : "bg-moss-50 text-moss-600"}`}>
+        {split.label}
+      </span>
+    )}
+  </h1>
+  {split && (
+    <p class="mt-1 text-sm text-navy-600">
+      Among members casting an Aye or Nay: Democrats {split.dem.yes} Aye–{split.dem.no} Nay,
+      Republicans {split.rep.yes} Aye–{split.rep.no} Nay.
+      {split.label === "Party-line" && " The parties' majorities took opposite positions."}
+      {split.label === "Bipartisan" && " Majorities of both parties voted the same way."}
+    </p>
+  )}
   <div class="mt-4">
     <RollCall event={event} compact headingLevel="h2" />
   </div>

@@ -1,14 +1,17 @@
 ---
 import Base from "../layouts/Base.astro";
 import HearingsList from "../components/HearingsList.astro";
+import SCHEDULE from "../data/session-schedule.json";
+import { fmtDate } from "../lib/format";
 ---
 
-<Base title="Civic calendar" description="Interactive calendar of Wisconsin Legislature hearings and election days, with the full upcoming hearings list.">
+<Base title="Civic calendar" description="Interactive calendar of Wisconsin Legislature hearings and election days, with the session schedule and the full upcoming hearings list.">
   <h1 class="text-2xl font-bold">Civic calendar</h1>
   <p class="mt-1 text-sm text-navy-700">
     Committee hearings and election days.
     <a href="/calendar/hearings.ics" class="underline">Subscribe (hearings)</a> ·
-    <a href="/calendar/election-days.ics" class="underline">election days</a>
+    <a href="/calendar/election-days.ics" class="underline">election days</a> ·
+    <a href="/testify/" class="underline">how to testify</a>
   </p>
 
   <div class="mt-4 rounded-lg border border-navy-100 bg-white p-4">
@@ -26,6 +29,26 @@ import HearingsList from "../components/HearingsList.astro";
   <section id="day-panel" aria-labelledby="day-label" tabindex="-1" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4">
     <h2 id="day-label" class="font-bold"></h2>
     <ul id="day-events" class="mt-2 space-y-2 text-sm"></ul>
+  </section>
+
+  <section class="mt-8">
+    <h2 class="text-xl font-bold">Session schedule</h2>
+    <p class="mt-1 max-w-3xl text-sm text-navy-700">
+      The {SCHEDULE.session} floorperiods as scheduled by
+      <a href={SCHEDULE.source_url} class="underline">enrolled 2025 Senate Joint Resolution 1</a>.
+      Bills still pending when the final general-business floorperiod ends
+      formally fail; the biennial session period ends at noon on {fmtDate(SCHEDULE.session_end)}.
+    </p>
+    <ul class="mt-3 grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3">
+      {SCHEDULE.floorperiods.map((f) => (
+        <li class="rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm">
+          <span class="tabular-nums">{fmtDate(f.start)} – {fmtDate(f.end)}</span>
+          {"label" in f && f.label && (
+            <span class="block text-xs font-semibold text-badger-700">{f.label}</span>
+          )}
+        </li>
+      ))}
+    </ul>
   </section>
 
   <div class="mt-8">

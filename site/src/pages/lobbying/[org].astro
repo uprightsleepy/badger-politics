@@ -1,0 +1,51 @@
+---
+import Base from "../../layouts/Base.astro";
+import { lobbyingOrgs, orgLobbying, allSessions } from "../../lib/db";
+import { billSlug, STATUS_LABELS } from "../../lib/format";
+
+export function getStaticPaths() {
+  return lobbyingOrgs().map((o) => ({
+    params: { org: String(o.id) },
+    props: { orgId: o.id, name: o.name },
+  }));
+}
+const { orgId, name } = Astro.props;
+const rows = orgLobbying(orgId);
+const sessionNames = new Map(allSessions().map((s) => [s.id, s.name ?? s.id]));
+const bySession = new Map<string, typeof rows>();
+for (const r of rows) {
+  if (!bySession.has(r.session_id)) bySession.set(r.session_id, []);
+  bySession.get(r.session_id)!.push(r);
+}
+---
+
+<Base
+  title={name}
+  description={`Every Wisconsin bill ${name} registered a lobbying interest on, from the Ethics Commission's records.`}
+>
+  <p class="text-sm text-navy-600"><a href="/lobbying/" class="underline">← All organizations</a></p>
+  <h1 class="mt-2 text-2xl font-bold">{name}</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    {rows.length} bill registration{rows.length === 1 ? "" : "s"} with the
+    Wisconsin Ethics Commission. A registration is an interest in the bill,
+    not a for-or-against position; each links to the official record.
+  </p>
+
+  {[...bySession.entries()].map(([sessionId, sessionRows]) => (
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">{sessionNames.get(sessionId) ?? sessionId}</h2>
+      <ul class="mt-3 space-y-1">
+        {sessionRows.map((r) => (
+          <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
+            <a href={`/bills/${r.session_id}/${billSlug(r.identifier)}/`} class="w-20 shrink-0 py-1 font-bold underline">{r.identifier}</a>
+            <span class="min-w-0 flex-1 truncate">{r.title}</span>
+            <span class="shrink-0 text-xs text-navy-600">{r.status ? (STATUS_LABELS[r.status] ?? r.status) : ""}</span>
+            {r.source_url && (
+              <a href={r.source_url} class="shrink-0 py-1 text-xs underline">official record<span class="sr-only"> (opens in a new tab)</span></a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+</Base>

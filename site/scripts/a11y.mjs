@@ -14,8 +14,14 @@ const PAGES = [
   "/hearing-none/", "/hearing-none/2025/", "/calendar/",
   "/my-reps/", "/elections/2026/", "/data/", "/about/", "/money/", "/404.html",
   "/money/committees/", "/money/committees/651839/", "/committees/", "/subjects/",
-  "/following/",
+  "/following/", "/governors-desk/", "/districts/", "/districts/senate-21/",
+  "/lobbying/", "/testify/", "/glossary/",
 ];
+{
+  const idx = await readFile(join(DIST, "lobbying/index.html"), "utf-8").catch(() => "");
+  const m = idx.match(/href="(\/lobbying\/\d+\/)"/);
+  if (m) PAGES.push(m[1]);
+}
 {
   const idx = await readFile(join(DIST, "subjects/index.html"), "utf-8").catch(() => "");
   const m = idx.match(/href="(\/subjects\/[^"]+\/)"/);
