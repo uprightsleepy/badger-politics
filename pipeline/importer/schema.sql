@@ -175,6 +175,28 @@ CREATE TABLE election_history (
 );
 CREATE INDEX idx_election_history_seat ON election_history (chamber, district, year);
 
+-- Statewide constitutional offices on the current ballot, straight from
+-- the WEC ballot-access report (candidates, incumbents, non-candidacy).
+CREATE TABLE statewide_races (
+    office                 TEXT NOT NULL,
+    incumbent              TEXT,
+    incumbent_noncandidacy INTEGER NOT NULL CHECK (incumbent_noncandidacy IN (0, 1)),
+    candidate              TEXT NOT NULL,
+    party                  TEXT,
+    ballot_status          TEXT,
+    source                 TEXT NOT NULL
+);
+
+-- Official WEC general-election results for statewide contests, summed
+-- from ward-by-ward canvass spreadsheets. Display data (no FKs).
+CREATE TABLE statewide_history (
+    year      INTEGER NOT NULL,
+    office    TEXT NOT NULL,
+    candidate TEXT NOT NULL,
+    party     TEXT,
+    votes     INTEGER NOT NULL
+);
+
 -- Organizations registered as lobbying on a bill (Ethics Commission's Eye
 -- on Lobbying; registration of interest, NOT a for/against position).
 CREATE TABLE lobbying_interests (

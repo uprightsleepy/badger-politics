@@ -57,6 +57,13 @@ def db_path(tmp_path: Path, make_db) -> Path:
                   '[{"name": "Bob Rival", "party": "Test", "ballot_status": "Approve"}]',
                   'wec');
         INSERT INTO meta (key, value) VALUES ('data_through', '2025-06-03');
+        INSERT INTO statewide_races (office, incumbent, incumbent_noncandidacy,
+                                     candidate, party, ballot_status, source)
+          VALUES ('GOVERNOR', 'Tony Evers', 1, 'Sara Rodriguez', 'Democratic',
+                  'Approve', 'wec');
+        INSERT INTO statewide_history (year, office, candidate, party, votes)
+          VALUES (2022, 'GOVERNOR / LIEUTENANT GOVERNOR',
+                  'Tony Evers / Sara Rodriguez', 'DEM', 1358774);
         """
     )
     conn.commit()
@@ -99,6 +106,17 @@ def test_legislator_json_shape(built: Path) -> None:
     assert payload["election"]["opponents"][0]["name"] == "Bob Rival"
     assert payload["votes"][0]["option"] == "yes"
     assert payload["sponsorships"][0]["bill_id"] == "2025-ab656"
+
+
+def test_statewide_json_shape(built: Path) -> None:
+    payload = json.loads(
+        (built / "public" / "api" / "v1" / "elections" / "statewide.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert payload["races"][0]["office"] == "GOVERNOR"
+    assert payload["races"][0]["incumbent_noncandidacy"] == 1
+    assert payload["history"][0]["votes"] == 1358774
 
 
 def test_no_legiscan_anywhere(built: Path) -> None:

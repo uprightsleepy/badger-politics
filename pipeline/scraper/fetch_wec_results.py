@@ -31,6 +31,23 @@ FILES = {
         "https://elections.wi.gov/sites/default/files/documents/"
         "Ward%20by%20Ward%20Report_State%20Senator_0.xlsx"
     ),
+    # statewide constitutional offices, certified Nov 30, 2022
+    "ger2022-governor.xlsx": (
+        "https://elections.wi.gov/sites/default/files/documents/"
+        "Ward%20by%20Ward%20Report_Governor_0.xlsx"
+    ),
+    "ger2022-attorney-general.xlsx": (
+        "https://elections.wi.gov/sites/default/files/documents/"
+        "Ward%20by%20Ward%20Report_Attorney%20General_0.xlsx"
+    ),
+    "ger2022-secretary-of-state.xlsx": (
+        "https://elections.wi.gov/sites/default/files/documents/"
+        "Ward%20by%20Ward%20Report_Secretary%20of%20State_0.xlsx"
+    ),
+    "ger2022-state-treasurer.xlsx": (
+        "https://elections.wi.gov/sites/default/files/documents/"
+        "Ward%20by%20Ward%20Report_State%20Treasurer_0.xlsx"
+    ),
 }
 
 

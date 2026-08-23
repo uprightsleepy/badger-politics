@@ -153,6 +153,22 @@ total += check("current committee rosters listing non-sitting people", db.execut
   JOIN committees c ON c.id = m.committee_id
   WHERE p.current_role NOT IN ('Representative','Senator')"""))
 
+# 11b. statewide data: candidate rows and history stay within the five
+#      constitutional offices, with sane certified-turnout totals
+total += check("statewide rows outside the five constitutional offices", db.execute("""
+  SELECT office, COUNT(*) n FROM (
+    SELECT office FROM statewide_races
+    UNION ALL
+    SELECT CASE WHEN office = 'GOVERNOR / LIEUTENANT GOVERNOR' THEN 'GOVERNOR'
+                ELSE office END FROM statewide_history)
+  WHERE office NOT IN ('GOVERNOR', 'LIEUTENANT GOVERNOR', 'ATTORNEY GENERAL',
+                       'SECRETARY OF STATE', 'STATE TREASURER')
+  GROUP BY office"""))
+total += check("statewide contests below real-canvass turnout", db.execute("""
+  SELECT year, office, COUNT(*) candidates, SUM(votes) total
+  FROM statewide_history GROUP BY year, office
+  HAVING COUNT(*) < 2 OR SUM(votes) < 500000"""))
+
 # 12. elections rows for non-sitting people
 total += check("election rows for non-sitting people", db.execute("""
   SELECT p.name, p.current_role, e.cycle_year

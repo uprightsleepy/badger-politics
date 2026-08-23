@@ -19,80 +19,121 @@ from openpyxl import load_workbook
 CONTEST_RE = re.compile(
     r"^(STATE SENATOR|REPRESENTATIVE TO THE ASSEMBLY)\s+DISTRICT\s+(\d+)", re.I
 )
+STATEWIDE_RE = re.compile(
+    r"^(GOVERNOR / LIEUTENANT GOVERNOR|ATTORNEY GENERAL"
+    r"|SECRETARY OF STATE|STATE TREASURER)$",
+    re.I,
+)
 YEAR_RE = re.compile(r"^(\d{4}) General Election", re.I)
 
 
-def parse_workbook(path: Path) -> list[tuple[int, str, int, str, str | None, int]]:
+def _ticket(candidate: str) -> str:
+    """'Tony Evers \\n Sara Rodriguez' -> 'Tony Evers / Sara Rodriguez'."""
+    parts = [" ".join(p.split()) for p in str(candidate).split("\n")]
+    return " / ".join(p for p in parts if p)
+
+
+SUBTOTAL_RE = re.compile(r"totals?:\s*$", re.I)
+
+
+def _walk_contests(path: Path, contest_re: re.Pattern):
+    """Yield (year, match, parties, candidates, sums) per contest.
+
+    Columns anchor absolutely on the 'Total Votes Cast' header (canvass
+    rows are ragged, so length arithmetic misaligns), and county/office
+    subtotal rows are excluded from the sums — the report interleaves
+    them with ward rows, which silently multiplies every total."""
     wb = load_workbook(path, read_only=True)
-    rows_out: list[tuple[int, str, int, str, str | None, int]] = []
     year: int | None = None
-    contest: tuple[str, int] | None = None
+    match: re.Match | None = None
+    base: int | None = None
     parties: list[str | None] = []
     candidates: list[str] = []
     totals: list[int] = []
 
-    def flush() -> None:
-        nonlocal contest, candidates, totals, parties
-        if contest and candidates:
-            if year is None:
-                raise RuntimeError(f"{path.name}: contest found before year header")
-            chamber, district = contest
-            for i, candidate in enumerate(candidates):
-                if not candidate or candidate.upper() == "SCATTERING":
-                    continue
-                rows_out.append(
-                    (year, chamber, district,
-                     " ".join(str(candidate).split()),
-                     parties[i] if i < len(parties) else None,
-                     totals[i] if i < len(totals) else 0)
-                )
-        contest, candidates, totals, parties = None, [], [], []
+    def snapshot():
+        return (year, match, list(parties), list(candidates), list(totals))
 
     for ws in wb.worksheets:
         for row in ws.iter_rows(values_only=True):
             cells = list(row)
-            first = str(cells[0]).strip() if cells and cells[0] is not None else ""
+            texts = ["" if c is None else str(c).strip() for c in cells]
+            first = texts[0] if texts else ""
             if year is None:
                 m = YEAR_RE.match(first)
                 if m:
                     year = int(m.group(1))
-            m = CONTEST_RE.match(first)
+            m = contest_re.match(first)
             if m:
-                flush()
-                chamber = "upper" if m.group(1).upper().startswith("STATE SEN") else "lower"
-                contest = (chamber, int(m.group(2)))
+                if match and candidates:
+                    yield snapshot()
+                match, base, parties, candidates, totals = m, None, [], [], []
                 continue
-            if contest is None:
+            if match is None:
                 continue
-            texts = ["" if c is None else str(c).strip() for c in cells]
             if "Total Votes Cast" in texts:
-                start = texts.index("Total Votes Cast")
-                parties = [t or None for t in texts[start + 1:]]
-                candidates, totals = [], []
+                base = texts.index("Total Votes Cast") + 1
+                parties, candidates, totals = [t or None for t in texts[base:]], [], []
                 continue
-            if parties and not candidates and any(texts[len(texts) - len(parties):]):
-                offset = len(texts) - len(parties)
-                candidates = texts[offset:]
+            if base is not None and not candidates and any(texts[base:]):
+                candidates = texts[base:]
+                while candidates and not candidates[-1]:
+                    candidates.pop()
                 totals = [0] * len(candidates)
+                parties = (parties + [None] * len(candidates))[: len(candidates)]
                 continue
             if candidates:
-                offset = len(texts) - len(parties)
-                numeric = cells[offset:]
-                if any(isinstance(v, (int, float)) for v in numeric):
-                    for i, v in enumerate(numeric):
-                        if isinstance(v, (int, float)) and i < len(totals):
-                            totals[i] += int(v)
-    flush()
+                if any(SUBTOTAL_RE.search(t) for t in texts[:2] if t):
+                    continue
+                for i in range(len(candidates)):
+                    v = cells[base + i] if base + i < len(cells) else None
+                    if isinstance(v, (int, float)):
+                        totals[i] += int(v)
+    if match and candidates:
+        yield snapshot()
     wb.close()
+
+
+def parse_workbook(path: Path) -> list[tuple[int, str, int, str, str | None, int]]:
+    rows_out: list[tuple[int, str, int, str, str | None, int]] = []
+    for year, m, parties, candidates, totals in _walk_contests(path, CONTEST_RE):
+        if year is None:
+            raise RuntimeError(f"{path.name}: contest found before year header")
+        chamber = "upper" if m.group(1).upper().startswith("STATE SEN") else "lower"
+        district = int(m.group(2))
+        for i, candidate in enumerate(candidates):
+            if not candidate or candidate.upper() == "SCATTERING":
+                continue
+            rows_out.append(
+                (year, chamber, district, " ".join(str(candidate).split()),
+                 parties[i], totals[i])
+            )
+    return rows_out
+
+
+def parse_statewide(path: Path) -> list[tuple[int, str, str, str | None, int]]:
+    rows_out: list[tuple[int, str, str, str | None, int]] = []
+    for year, m, parties, candidates, totals in _walk_contests(path, STATEWIDE_RE):
+        if year is None:
+            raise RuntimeError(f"{path.name}: contest found before year header")
+        office = m.group(1).upper()
+        for i, candidate in enumerate(candidates):
+            if not candidate or candidate.upper() == "SCATTERING":
+                continue
+            rows_out.append((year, office, _ticket(candidate), parties[i], totals[i]))
     return rows_out
 
 
 def run(xlsx_dir: Path, db_path: Path) -> int:
     all_rows: list[tuple] = []
+    statewide_rows: list[tuple] = []
     for path in sorted(xlsx_dir.glob("*.xlsx")):
         rows = parse_workbook(path)
-        print(f"{path.name}: {len(rows)} candidate rows")
+        sw = parse_statewide(path)
+        print(f"{path.name}: {len(rows)} candidate rows"
+              + (f", {len(sw)} statewide" if sw else ""))
         all_rows.extend(rows)
+        statewide_rows.extend(sw)
     if not all_rows:
         raise RuntimeError(f"no legislative contests parsed from {xlsx_dir}")
     # a general election covers all 99 Assembly districts
@@ -101,6 +142,15 @@ def run(xlsx_dir: Path, db_path: Path) -> int:
         if len(assembly) < 95:
             raise RuntimeError(
                 f"{year}: only {len(assembly)} Assembly districts parsed — format drift?"
+            )
+    # every statewide contest is a two-party-plus race with 7-figure turnout
+    for year, office in {(r[0], r[1]) for r in statewide_rows}:
+        contest = [r for r in statewide_rows if r[0] == year and r[1] == office]
+        total = sum(r[4] for r in contest)
+        if len(contest) < 2 or total < 500_000:
+            raise RuntimeError(
+                f"{year} {office}: {len(contest)} candidates, {total} votes"
+                " — format drift?"
             )
 
     conn = sqlite3.connect(db_path)
@@ -111,11 +161,19 @@ def run(xlsx_dir: Path, db_path: Path) -> int:
             " party, votes) VALUES (?, ?, ?, ?, ?, ?)",
             all_rows,
         )
+        conn.execute("DELETE FROM statewide_history")
+        conn.executemany(
+            "INSERT INTO statewide_history (year, office, candidate, party, votes)"
+            " VALUES (?, ?, ?, ?, ?)",
+            statewide_rows,
+        )
     seats = conn.execute(
         "SELECT COUNT(DISTINCT chamber || district || year) FROM election_history"
     ).fetchone()[0]
     conn.close()
     print(f"election_history: {len(all_rows)} rows across {seats} contests")
+    contests = len({(r[0], r[1]) for r in statewide_rows})
+    print(f"statewide_history: {len(statewide_rows)} rows across {contests} contests")
     return 0
 
 

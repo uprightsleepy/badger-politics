@@ -98,6 +98,15 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
             write_json(api / "bills" / session_id / f"{bill_slug(bill)}.json", payload)
             files += 1
 
+    write_json(
+        api / "elections" / "statewide.json",
+        {
+            "races": queries.statewide_races(conn),
+            "history": queries.statewide_history(conn),
+        },
+    )
+    files += 1
+
     people = queries.people(conn)
     write_json(
         api / "legislators" / "index.json",

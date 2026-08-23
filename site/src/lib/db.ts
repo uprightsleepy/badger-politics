@@ -506,6 +506,22 @@ export const sessionNameIndex = (sessionId: string) => {
   return index;
 };
 
+/** Statewide constitutional races from the WEC ballot-access report. */
+export const statewideRaces = () =>
+  prep("SELECT * FROM statewide_races ORDER BY office, candidate").all() as {
+    office: string; incumbent: string | null; incumbent_noncandidacy: number;
+    candidate: string; party: string | null; ballot_status: string | null;
+  }[];
+
+/** Certified statewide general-election results (WEC canvasses). */
+export const statewideHistory = () =>
+  prep(
+      "SELECT * FROM statewide_history ORDER BY year DESC, office, votes DESC",
+    ).all() as {
+    year: number; office: string; candidate: string;
+    party: string | null; votes: number;
+  }[];
+
 /** One person's committee assignments, chairs first. */
 export const committeesFor = (personId: string) =>
   prep(

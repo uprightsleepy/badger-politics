@@ -1,27 +1,112 @@
 ---
 import Base from "../../layouts/Base.astro";
 import PartyChip from "../../components/PartyChip.astro";
-import { sittingPeople, electionFor, personIdByName } from "../../lib/db";
+import {
+  sittingPeople, electionFor, personIdByName, statewideRaces, statewideHistory,
+} from "../../lib/db";
 import { personSlug } from "../../lib/format";
 const seats = sittingPeople()
   .map((p) => ({ person: p, election: electionFor(p.id) }))
   .filter((s) => s.election?.cycle_year === 2026);
 const senate = seats.filter((s) => s.person.chamber === "upper");
 const assembly = seats.filter((s) => s.person.chamber === "lower");
+
+const OFFICES: [string, string][] = [
+  ["GOVERNOR", "Governor"],
+  ["LIEUTENANT GOVERNOR", "Lieutenant Governor"],
+  ["ATTORNEY GENERAL", "Attorney General"],
+  ["SECRETARY OF STATE", "Secretary of State"],
+  ["STATE TREASURER", "State Treasurer"],
+];
+const allStatewide = statewideRaces();
+const history = statewideHistory();
+// the governor and lieutenant governor run as one ticket in November;
+// the certified 2022 contest is recorded under the joint heading
+const historyFor = (office: string) =>
+  history.filter(
+    (h) =>
+      h.office === office ||
+      (office === "GOVERNOR" && h.office === "GOVERNOR / LIEUTENANT GOVERNOR"),
+  );
+const statewide = OFFICES.map(([key, label]) => {
+  const rows = allStatewide.filter((r) => r.office === key);
+  return {
+    key, label,
+    incumbent: rows[0]?.incumbent ?? null,
+    retiring: rows[0]?.incumbent_noncandidacy === 1,
+    approved: rows.filter((r) => r.ballot_status === "Approve"),
+    otherFilings: rows.filter((r) => r.ballot_status !== "Approve").length,
+    last: historyFor(key),
+  };
+});
 ---
 
-<Base title="2026 legislative elections" description="Every Wisconsin legislative seat on the November 2026 ballot: incumbents, retirements, and qualified candidates.">
+<Base title="2026 elections" description="Everything on Wisconsin's November 2026 ballot: all five statewide constitutional offices and every legislative seat, with incumbents, retirements, and qualified candidates.">
   <h1 class="text-2xl font-bold">On the ballot: November 3, 2026</h1>
   <p class="mt-2 max-w-3xl text-navy-700">
-    All 99 Assembly seats and the 17 odd-numbered Senate seats are on the ballot.
-    Candidate status comes from the Wisconsin Elections Commission's ballot access
-    report. The final ballot is certified after the August 11 primary.
+    All five statewide constitutional offices, all 99 Assembly seats, and the
+    17 odd-numbered Senate seats are on the ballot. Candidate status comes
+    from the Wisconsin Elections Commission's ballot access report. The final
+    ballot is certified after the August 11 primary.
   </p>
   <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
     <a href="https://myvote.wi.gov/en-us/Find-My-Polling-Place" class="py-1 font-semibold underline">Find where you vote ↗</a>
     <a href="https://myvote.wi.gov/en-us/Vote-Absentee-Guide" class="py-1 font-semibold underline">Vote absentee ↗</a>
     <a href="/calendar/election-days.ics" class="py-1 underline">Add election days to your calendar</a>
   </p>
+
+  <section class="mt-6">
+    <h2 class="text-xl font-bold">Statewide offices</h2>
+    <p class="mt-1 max-w-3xl text-sm text-navy-700">
+      All five constitutional offices are on the ballot. Candidates and
+      ballot status come from the WEC ballot-access report; past results are
+      the WEC's certified canvasses.
+    </p>
+    <div class="mt-3 grid gap-3 lg:grid-cols-2">
+      {statewide.map((o) => (
+        <div class="rounded-lg border border-navy-100 bg-white p-4 text-sm">
+          <h3 class="flex flex-wrap items-baseline gap-x-2 text-lg font-bold">
+            {o.label}
+            {o.incumbent && o.retiring && (
+              <span class="rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">open seat</span>
+            )}
+          </h3>
+          {o.incumbent && (
+            <p class="mt-1 text-navy-700">
+              Incumbent: {o.incumbent}{o.retiring && " — not seeking reelection"}
+            </p>
+          )}
+          <p class="mt-2 font-semibold">
+            {o.approved.length} candidate{o.approved.length === 1 ? "" : "s"} approved for the ballot
+            {o.otherFilings > 0 && (
+              <span class="font-normal text-navy-600"> ({o.otherFilings} more filings not approved)</span>
+            )}
+          </p>
+          <ul class="mt-1 space-y-0.5">
+            {o.approved.map((c) => (
+              <li class="flex flex-wrap items-baseline gap-x-2">
+                <PartyChip party={c.party} />
+                <span>{c.candidate}</span>
+              </li>
+            ))}
+          </ul>
+          {o.last.length > 0 && (
+            <p class="mt-2 border-t border-navy-100 pt-2 text-xs text-navy-600">
+              {o.last[0].year} result: {o.last.slice(0, 2).map((h) =>
+                `${h.candidate} (${h.party?.[0] ?? "?"}) ${h.votes.toLocaleString()}`
+              ).join(" — ")}
+            </p>
+          )}
+          {o.key === "LIEUTENANT GOVERNOR" && (
+            <p class="mt-2 border-t border-navy-100 pt-2 text-xs text-navy-600">
+              Runs on one ticket with the governor in November; the 2022 result
+              is recorded under the joint contest.
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  </section>
   {[
     { label: "Senate (odd districts)", rows: senate },
     { label: "Assembly (all districts)", rows: assembly },

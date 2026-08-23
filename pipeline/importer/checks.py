@@ -122,6 +122,18 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             "SELECT COUNT(*) FROM committees c LEFT JOIN people p ON p.id = c.chair_person_id"
             " WHERE c.chair_person_id IS NOT NULL AND p.id IS NULL"
         ),
+        # statewide rows only ever carry the five constitutional offices,
+        # and a parsed statewide contest below real turnout is a bad parse
+        "statewide races carry only known offices": (
+            "SELECT COUNT(*) FROM statewide_races WHERE office NOT IN"
+            " ('GOVERNOR', 'LIEUTENANT GOVERNOR', 'ATTORNEY GENERAL',"
+            "  'SECRETARY OF STATE', 'STATE TREASURER')"
+        ),
+        "statewide history contests look like real canvasses": (
+            "SELECT COUNT(*) FROM (SELECT year, office FROM statewide_history"
+            " GROUP BY year, office"
+            " HAVING COUNT(*) < 2 OR SUM(votes) < 500000)"
+        ),
         # resolutions never go to the governor; a governor-implying status
         # on one is a derivation bug (compound classifications fail loudly)
         "resolutions never carry governor statuses": (

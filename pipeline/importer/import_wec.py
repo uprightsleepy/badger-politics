@@ -25,6 +25,16 @@ EXPECTED_COLUMNS = [
 OFFICE_RE = re.compile(
     r"^(STATE SENATOR|REPRESENTATIVE TO THE ASSEMBLY) DISTRICT (\d+)$"
 )
+# statewide constitutional offices tracked; federal contests are known and
+# skipped; anything else in the report is drift and fails loudly
+STATEWIDE_OFFICES = {
+    "GOVERNOR",
+    "LIEUTENANT GOVERNOR",
+    "ATTORNEY GENERAL",
+    "SECRETARY OF STATE",
+    "STATE TREASURER",
+}
+FEDERAL_RE = re.compile(r"^(REPRESENTATIVE IN CONGRESS|UNITED STATES SENATOR)")
 
 
 SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
@@ -102,10 +112,18 @@ def load_candidates(csv_path: Path) -> dict[tuple[str, int], list[dict]]:
     for row in rows:
         m = OFFICE_RE.match(row["office"])
         if not m:
-            continue
+            if row["office"] in STATEWIDE_OFFICES or FEDERAL_RE.match(row["office"]):
+                continue
+            raise RuntimeError(f"WEC drift: unrecognized office {row['office']!r}")
         chamber = "upper" if m.group(1) == "STATE SENATOR" else "lower"
         seats.setdefault((chamber, int(m.group(2))), []).append(row)
     return seats
+
+
+def load_statewide(csv_path: Path) -> list[dict]:
+    with csv_path.open(encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    return [r for r in rows if r["office"] in STATEWIDE_OFFICES]
 
 
 def overlay(csv_path: Path, db_path: Path, cycle: int) -> int:
@@ -162,8 +180,23 @@ def overlay(csv_path: Path, db_path: Path, cycle: int) -> int:
                 (on_ballot, json.dumps(opponents), person_id, cycle),
             )
             updated += 1
+        statewide = load_statewide(csv_path)
+        conn.execute("DELETE FROM statewide_races")
+        conn.executemany(
+            "INSERT INTO statewide_races (office, incumbent, incumbent_noncandidacy,"
+            " candidate, party, ballot_status, source)"
+            " VALUES (?, ?, ?, ?, ?, ?, 'wec')",
+            [
+                (r["office"], r["incumbent"] or None,
+                 int(r["incumbent_noncandidacy"] == "1"), r["candidate"],
+                 r["party"] or None, r["ballot_status"] or None)
+                for r in statewide
+            ],
+        )
     conn.close()
-    print(f"wec overlay: {updated} seats updated, {warnings} warnings")
+    races = len({r["office"] for r in statewide})
+    print(f"wec overlay: {updated} seats updated, {warnings} warnings;"
+          f" {len(statewide)} statewide candidates across {races} offices")
     return 0
 
 

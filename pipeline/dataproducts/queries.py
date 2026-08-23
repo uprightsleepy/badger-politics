@@ -141,6 +141,22 @@ def election_for(conn: sqlite3.Connection, person_id: str) -> dict | None:
     return result
 
 
+def statewide_races(conn: sqlite3.Connection) -> list[dict]:
+    return [
+        dict(r)
+        for r in conn.execute("SELECT * FROM statewide_races ORDER BY office, candidate")
+    ]
+
+
+def statewide_history(conn: sqlite3.Connection) -> list[dict]:
+    return [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM statewide_history ORDER BY year DESC, office, votes DESC"
+        )
+    ]
+
+
 def hearings(conn: sqlite3.Connection) -> list[dict]:
     rows = [
         dict(r)
