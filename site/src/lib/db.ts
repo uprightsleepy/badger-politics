@@ -52,8 +52,14 @@ export interface Person {
   image_url: string | null;
 }
 
+// order by real start (first recorded action), newest first: special-session
+// ids like '2013s-oct' would otherwise sort alphabetically, not by month
 export const allSessions = (): Session[] =>
-  prep("SELECT * FROM sessions ORDER BY id DESC").all() as Session[];
+  prep(
+    `SELECT s.*, (SELECT MIN(a.date) FROM actions a JOIN bills b ON b.id = a.bill_id
+       WHERE b.session_id = s.id) AS first_action
+     FROM sessions s ORDER BY first_action DESC, s.id DESC`,
+  ).all() as Session[];
 
 // BUILD_SESSIONS cannot change mid-build
 let _built: Session[] | undefined;

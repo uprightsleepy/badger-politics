@@ -4,12 +4,16 @@ terms, misattribution, mapping drift) plus gate blind spots.
 
 Usage: uv run python audit.py [sqlite_path]
 """
+import re
 import sqlite3
 import sys
 
 db = sqlite3.connect(sys.argv[1] if len(sys.argv) > 1 else "../data/wi.sqlite")
 db.row_factory = sqlite3.Row
-FULL = "'2011','2013','2015','2017','2019','2021','2023','2025','2026s1'"
+# sessions with complete roll-call coverage (2009's documents are partial)
+FULL = ("'2011','2011s-jan','2011s-sep','2013','2013s-oct','2013s-dec',"
+        "'2014s-jan','2015','2017','2017s-jan','2017s-aug','2018s-jan',"
+        "'2018s-mar','2019','2021','2021s1','2023','2023s1','2025','2026s1'")
 
 db.executescript("""
 CREATE TEMP TABLE pv AS
@@ -245,7 +249,25 @@ for r in db.execute(f"""
   WHERE b.session_id IN ({FULL}) GROUP BY b.session_id ORDER BY b.session_id"""):
     print(f"       {r['session_id']}: {r['pct']}% of {r['n']}")
 
-# 15. duplicate people: same normalized name, different ids
+# 15. every Wisconsin Act number 1..max exists per biennium: a hole means
+#    a session (special sessions produce acts too) is missing from the DB
+_act_re = re.compile(r"[Ww]isconsin [Aa]ct (\d+)")
+_acts = {}
+for _r in db.execute("""
+  SELECT b.session_id, a.description FROM actions a
+  JOIN bills b ON b.id = a.bill_id WHERE b.status = 'enacted'"""):
+    _m = _act_re.search(_r["description"])
+    if _m:
+        _y = int(_r["session_id"][:4])
+        _acts.setdefault(_y if _y % 2 else _y - 1, set()).add(int(_m.group(1)))
+_holes = [
+    {"biennium": _b, "missing_acts": sorted(set(range(1, max(_ns) + 1)) - _ns)}
+    for _b, _ns in sorted(_acts.items())
+    if set(range(1, max(_ns) + 1)) - _ns
+]
+total += check("bienniums with holes in the Wisconsin Act number sequence", _holes)
+
+# 16. duplicate people: same normalized name, different ids
 total += check("distinct person ids sharing a normalized name", db.execute("""
   SELECT a.name, a.id id1, b.id id2
   FROM people a JOIN people b ON a.id < b.id

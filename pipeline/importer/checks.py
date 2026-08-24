@@ -132,6 +132,14 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             " AND NOT EXISTS (SELECT 1 FROM actions w WHERE w.bill_id = a.bill_id"
             "   AND w.description LIKE '%withdrawn as a cosponsor%')"
         ),
+        # an event with no counts and no records shows nothing and can only
+        # cite a document that isn't a vote (see import_vote_event)
+        "vote events with all-zero counts and no records": (
+            "SELECT COUNT(*) FROM vote_events e"
+            " WHERE COALESCE(yes_count,0)=0 AND COALESCE(no_count,0)=0"
+            " AND COALESCE(nv_count,0)=0 AND NOT EXISTS"
+            " (SELECT 1 FROM vote_records r WHERE r.vote_event_id = e.id)"
+        ),
         # statewide rows only ever carry the five constitutional offices,
         # and a parsed statewide contest below real turnout is a bad parse
         "statewide races carry only known offices": (

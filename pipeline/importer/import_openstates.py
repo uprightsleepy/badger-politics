@@ -608,6 +608,12 @@ class Importer:
         for c in vote.get("counts", []):
             counts[option_bucket(c["option"])] += c["value"]
 
+        # all-zero counts with no name list is a mispaired document (2011
+        # sv0001/sv0002 are attendance rolls, not votes); the motion's tally
+        # stays visible in the bill history — drop the empty artifact
+        if not any(counts.values()) and not vote.get("votes"):
+            return
+
         self.conn.execute(
             "INSERT INTO vote_events (id, bill_id, date, chamber, motion, result,"
             " yes_count, no_count, nv_count, source_url, source)"
