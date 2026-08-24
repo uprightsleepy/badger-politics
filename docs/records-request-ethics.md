@@ -23,9 +23,9 @@ you can export routinely.
    in CFIS, committee name, candidate name, office sought, district, and
    registration status. A CSV or any machine-readable export is ideal.
    Purpose: verifying committee-to-candidate attribution so my site
-   never links a contribution to the wrong person. The public CFIS API
-   exposes committee names but not the candidate/office fields, which is
-   why I'm asking.
+   never links a contribution to the wrong person. The CFIS website's
+   search shows committee names but not the candidate/office fields,
+   which is why I'm asking.
 
 2. **Filed report summaries (if exportable).** Per committee, per filing
    period: report ID, period covered, and the cover-sheet totals (total
