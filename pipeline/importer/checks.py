@@ -122,6 +122,16 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             "SELECT COUNT(*) FROM committees c LEFT JOIN people p ON p.id = c.chair_person_id"
             " WHERE c.chair_person_id IS NOT NULL AND p.id IS NULL"
         ),
+        # the official history names cosponsors at introduction; every such
+        # bill must carry cosponsor rows (derived when the scraper drops them)
+        "bills whose introduction names cosponsors but carry none": (
+            "SELECT COUNT(DISTINCT a.bill_id) FROM actions a"
+            " WHERE a.description LIKE 'Introduced by%cosponsored by%'"
+            " AND NOT EXISTS (SELECT 1 FROM sponsorships s"
+            "   WHERE s.bill_id = a.bill_id AND s.classification = 'cosponsor')"
+            " AND NOT EXISTS (SELECT 1 FROM actions w WHERE w.bill_id = a.bill_id"
+            "   AND w.description LIKE '%withdrawn as a cosponsor%')"
+        ),
         # statewide rows only ever carry the five constitutional offices,
         # and a parsed statewide contest below real turnout is a bad parse
         "statewide races carry only known offices": (

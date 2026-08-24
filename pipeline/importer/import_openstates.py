@@ -132,6 +132,49 @@ def committee_from_referral(description: str) -> str | None:
     return name
 
 
+TITLE_CHAMBER = {"Senator": "upper", "Senators": "upper",
+                 "Representative": "lower", "Representatives": "lower"}
+NAME_SPLIT_RE = re.compile(r",\s*(?:and\s+)?|\s+and\s+")
+ADDED_RE = re.compile(
+    r"^(Senator|Representative)s?\s+(.+?)\s+(?:added|withdrawn) as\s+a?\s*co(author|sponsor)s?",
+    re.I,
+)
+
+
+def parse_intro_cosponsors(description: str) -> list[tuple[str, str]]:
+    """(chamber, printed name) for every cosponsor in an introduction line.
+    The openstates scraper has recorded no cosponsors since 2013, but the
+    official history's own text names them; this reads that record."""
+    text = " ".join(description.split())
+    m = re.search(r"cosponsored by (.+)$", text)
+    if not m:
+        return []
+    out: list[tuple[str, str]] = []
+    chamber: str | None = None
+    for chunk in NAME_SPLIT_RE.split(m.group(1).rstrip(". ")):
+        chunk = chunk.strip()
+        title = re.match(r"(Senators?|Representatives?)\s+(.*)", chunk)
+        if title:
+            chamber = TITLE_CHAMBER[title.group(1)]
+            chunk = title.group(2).strip()
+        # 'by request of ...' and similar trailers are not legislators
+        if not chunk or chamber is None or chunk[0].islower():
+            continue
+        out.append((chamber, chunk))
+    return out
+
+
+def parse_sponsor_change(description: str) -> tuple[str, str, str, bool] | None:
+    """('lower', 'Tucker', 'coauthor', added?) for the mid-session
+    'Representative X added/withdrawn as a coauthor' history entries."""
+    m = ADDED_RE.match(" ".join(description.split()))
+    if not m:
+        return None
+    chamber = TITLE_CHAMBER[m.group(1)]
+    return (chamber, m.group(2).strip(), f"co{m.group(3).lower()}",
+            "added" in description.lower())
+
+
 def derive_graveyard(actions: list[dict]) -> tuple[int, str | None, str | None]:
     """(died_without_hearing, committee_at_death, committee_chamber):
     a referral, no hearing, then the SJR1 death. Chamber comes from the
@@ -481,6 +524,70 @@ class Importer:
                     int(sp.get("primary", False)),
                 ),
             )
+        self._derive_cosponsors(pk, roster, bill, actions)
+
+    def _derive_cosponsors(
+        self, pk: str, roster: Roster, bill: dict, actions: list[dict]
+    ) -> None:
+        """The scraper has recorded no cosponsors since 2013; the official
+        history text still names them — at introduction and via 'added as
+        a coauthor/cosponsor' entries (withdrawals remove them again).
+        Resolution is exact-unique through the session roster; an
+        unresolved name is kept name-only, never guessed."""
+        has_scraped = any(
+            sp.get("classification") == "cosponsor"
+            for sp in bill.get("sponsorships", [])
+        )
+        derived: dict[tuple[str, str], tuple[str | None, str, str]] = {}
+        withdrawals: list[tuple[str, str]] = []
+        for action in actions:
+            description = action.get("description") or ""
+            if description.startswith("Introduced by") and not has_scraped:
+                for chamber, name in parse_intro_cosponsors(description):
+                    member = roster.resolve_or_none(name, chamber)
+                    derived[(chamber, name)] = (
+                        member.id if member else None, name, "cosponsor",
+                    )
+            change = parse_sponsor_change(description)
+            if change:
+                chamber, name, kind, added = change
+                if added:
+                    member = roster.resolve_or_none(name, chamber)
+                    derived[(chamber, name)] = (
+                        member.id if member else None, name, kind,
+                    )
+                else:
+                    derived.pop((chamber, name), None)
+                    withdrawals.append((chamber, name))
+        primaries = {
+            sp["name"] for sp in bill.get("sponsorships", []) if sp.get("primary")
+        }
+        for person_id, name, kind in derived.values():
+            if name in primaries:
+                continue
+            self.conn.execute(
+                "INSERT INTO sponsorships (bill_id, person_id, name, classification,"
+                " is_primary) VALUES (?, ?, ?, ?, 0)",
+                (pk, person_id, name, kind),
+            )
+        # a formal withdrawal removes the sponsor from the bill's official
+        # list, wherever the row came from (scraped authors included);
+        # anyone re-added afterwards is still in `derived` and is kept
+        for chamber, name in withdrawals:
+            if (chamber, name) in derived:
+                continue
+            member = roster.resolve_or_none(name, chamber)
+            if member:
+                self.conn.execute(
+                    "DELETE FROM sponsorships WHERE bill_id = ? AND person_id = ?",
+                    (pk, member.id),
+                )
+            else:
+                self.conn.execute(
+                    "DELETE FROM sponsorships WHERE bill_id = ? AND name = ?"
+                    " AND person_id IS NULL",
+                    (pk, name),
+                )
 
     def import_vote_event(self, vote: dict) -> None:
         session = vote["legislative_session"]

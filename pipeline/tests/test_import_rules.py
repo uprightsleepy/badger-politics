@@ -200,3 +200,36 @@ def test_biennium_covers_special_sessions() -> None:
     # unmapped bienniums must stay absent so titles there hard-fail
     # (2009 is partial — no individual roll call records, no titles needed)
     assert (biennium("2009"), "lower") not in TITLE_VOTERS
+
+
+def test_intro_cosponsors_parse_across_chambers() -> None:
+    from importer.import_openstates import parse_intro_cosponsors
+
+    desc = ("Introduced by Representatives Swearingen and Callahan; \n"
+            "cosponsored by Senators Felzkowski, L. Johnson and Habush Sinykin.")
+    assert parse_intro_cosponsors(desc) == [
+        ("upper", "Felzkowski"),
+        ("upper", "L. Johnson"),
+        ("upper", "Habush Sinykin"),
+    ]
+    # a single cosponsor with a singular title
+    assert parse_intro_cosponsors(
+        "Introduced by Senator Jacque; cosponsored by Representative Tucker."
+    ) == [("lower", "Tucker")]
+    # no cosponsor clause: nothing derived
+    assert parse_intro_cosponsors("Introduced by Representatives Vos and Kurtz") == []
+
+
+def test_sponsor_change_parse() -> None:
+    from importer.import_openstates import parse_sponsor_change
+
+    assert parse_sponsor_change("Representative Tucker added as a coauthor") == (
+        "lower", "Tucker", "coauthor", True,
+    )
+    assert parse_sponsor_change("Senator L. Johnson added as a cosponsor") == (
+        "upper", "L. Johnson", "cosponsor", True,
+    )
+    assert parse_sponsor_change("Representative Tucker withdrawn as a coauthor") == (
+        "lower", "Tucker", "coauthor", False,
+    )
+    assert parse_sponsor_change("Read first time and referred") is None
