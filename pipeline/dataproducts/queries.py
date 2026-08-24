@@ -157,6 +157,16 @@ def statewide_history(conn: sqlite3.Connection) -> list[dict]:
     ]
 
 
+def statewide_counties(conn: sqlite3.Connection) -> list[dict]:
+    return [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM statewide_county_results"
+            " ORDER BY year DESC, office, county, votes DESC"
+        )
+    ]
+
+
 def hearings(conn: sqlite3.Connection) -> list[dict]:
     rows = [
         dict(r)

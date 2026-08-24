@@ -166,12 +166,13 @@ CREATE TABLE elections (
 -- Official WEC general-election results for legislative contests, summed
 -- from ward-by-ward canvass spreadsheets. Display data (no FKs).
 CREATE TABLE election_history (
-    year      INTEGER NOT NULL,
-    chamber   TEXT NOT NULL CHECK (chamber IN ('lower', 'upper')),
-    district  INTEGER NOT NULL,
-    candidate TEXT NOT NULL,
-    party     TEXT,
-    votes     INTEGER NOT NULL
+    year       INTEGER NOT NULL,
+    chamber    TEXT NOT NULL CHECK (chamber IN ('lower', 'upper')),
+    district   INTEGER NOT NULL,
+    candidate  TEXT NOT NULL,
+    party      TEXT,
+    votes      INTEGER NOT NULL,
+    total_cast INTEGER  -- the contest's official Total Votes Cast, repeated per row
 );
 CREATE INDEX idx_election_history_seat ON election_history (chamber, district, year);
 
@@ -190,8 +191,21 @@ CREATE TABLE statewide_races (
 -- Official WEC general-election results for statewide contests, summed
 -- from ward-by-ward canvass spreadsheets. Display data (no FKs).
 CREATE TABLE statewide_history (
+    year       INTEGER NOT NULL,
+    office     TEXT NOT NULL,
+    candidate  TEXT NOT NULL,
+    party      TEXT,
+    votes      INTEGER NOT NULL,
+    total_cast INTEGER  -- the contest's official Total Votes Cast, repeated per row
+);
+
+-- Certified county aggregates for statewide contests, taken from the
+-- canvass's own County Totals rows (all 72, summing exactly to the
+-- statewide candidate totals - both gate-checked).
+CREATE TABLE statewide_county_results (
     year      INTEGER NOT NULL,
     office    TEXT NOT NULL,
+    county    TEXT NOT NULL,
     candidate TEXT NOT NULL,
     party     TEXT,
     votes     INTEGER NOT NULL

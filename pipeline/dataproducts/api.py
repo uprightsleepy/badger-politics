@@ -103,6 +103,7 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
         {
             "races": queries.statewide_races(conn),
             "history": queries.statewide_history(conn),
+            "counties": queries.statewide_counties(conn),
         },
     )
     files += 1

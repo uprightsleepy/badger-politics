@@ -593,24 +593,53 @@ export const partyAgreement = (personId: string, party: string | null) => {
     .sort((a, b) => (a.session < b.session ? 1 : -1));
 };
 
-/** Official WEC general-election results for one seat, newest first. */
+/** Official WEC general-election results for one seat, newest first.
+ * Percentages use the canvass's own Total Votes Cast where present, so
+ * they match the certified report exactly. */
 export const electionHistoryFor = (chamber: string | null, district: number | null) => {
   if (!chamber || district == null) return [];
   const rows = prep(
-      `SELECT year, candidate, party, votes FROM election_history
+      `SELECT year, candidate, party, votes, total_cast FROM election_history
        WHERE chamber = ? AND district = ? ORDER BY year DESC, votes DESC`,
     )
-    .all(chamber, district) as { year: number; candidate: string; party: string | null; votes: number }[];
+    .all(chamber, district) as {
+    year: number; candidate: string; party: string | null;
+    votes: number; total_cast: number | null;
+  }[];
   const byYear = new Map<number, typeof rows>();
   for (const r of rows) {
     if (!byYear.has(r.year)) byYear.set(r.year, []);
     byYear.get(r.year)!.push(r);
   }
   return [...byYear.entries()].map(([year, candidates]) => {
-    const total = candidates.reduce((s, c) => s + c.votes, 0);
+    const total = candidates[0].total_cast ?? candidates.reduce((s, c) => s + c.votes, 0);
     return { year, total, candidates };
   });
 };
+
+/** The seat's most recent general-election margin, for competitiveness
+ * context: percentage-point gap between the top two candidates over the
+ * official ballots cast, or null margin when unopposed. */
+export const lastMarginFor = (chamber: string | null, district: number | null) => {
+  const history = electionHistoryFor(chamber, district);
+  if (!history.length) return null;
+  const { year, total, candidates } = history[0];
+  if (candidates.length < 2) return { year, margin: null };
+  const gap = candidates[0].votes - candidates[1].votes;
+  return { year, margin: total > 0 ? (gap / total) * 100 : null };
+};
+
+/** Certified county aggregates for one statewide contest, alphabetical,
+ * candidates ordered by statewide finish within each county. */
+export const statewideCountiesFor = (office: string) =>
+  prep(
+      `SELECT year, county, candidate, party, votes FROM statewide_county_results
+       WHERE office = ? ORDER BY year DESC, county, votes DESC`,
+    )
+    .all(office) as {
+    year: number; county: string; candidate: string;
+    party: string | null; votes: number;
+  }[];
 
 // donors report occupations in arbitrary casing; de-shout long all-caps
 // words but keep short ones (CEO, RN, CPA) as likely acronyms

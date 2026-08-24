@@ -168,6 +168,19 @@ total += check("statewide contests below real-canvass turnout", db.execute("""
   SELECT year, office, COUNT(*) candidates, SUM(votes) total
   FROM statewide_history GROUP BY year, office
   HAVING COUNT(*) < 2 OR SUM(votes) < 500000"""))
+total += check("statewide contests missing any of the 72 counties", db.execute("""
+  SELECT year, office, COUNT(DISTINCT county) n FROM statewide_county_results
+  GROUP BY year, office HAVING n != 72"""))
+total += check("county sums that disagree with certified statewide totals", db.execute("""
+  SELECT h.year, h.office, h.candidate, h.votes statewide, SUM(c.votes) county_sum
+  FROM statewide_history h
+  JOIN statewide_county_results c
+    ON c.year = h.year AND c.office = h.office AND c.candidate = h.candidate
+  GROUP BY h.year, h.office, h.candidate HAVING county_sum != h.votes"""))
+total += check("official total_cast below the candidate sum", db.execute("""
+  SELECT year, chamber, district FROM election_history
+  WHERE total_cast IS NOT NULL
+  GROUP BY year, chamber, district HAVING MAX(total_cast) < SUM(votes)"""))
 
 # 12. elections rows for non-sitting people
 total += check("election rows for non-sitting people", db.execute("""

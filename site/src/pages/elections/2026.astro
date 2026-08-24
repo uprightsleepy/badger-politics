@@ -3,13 +3,29 @@ import Base from "../../layouts/Base.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import {
   sittingPeople, electionFor, personIdByName, statewideRaces, statewideHistory,
+  lastMarginFor, statewideCountiesFor,
 } from "../../lib/db";
 import { personSlug } from "../../lib/format";
 const seats = sittingPeople()
-  .map((p) => ({ person: p, election: electionFor(p.id) }))
+  .map((p) => ({
+    person: p,
+    election: electionFor(p.id),
+    margin: lastMarginFor(p.chamber, p.district),
+  }))
   .filter((s) => s.election?.cycle_year === 2026);
 const senate = seats.filter((s) => s.person.chamber === "upper");
 const assembly = seats.filter((s) => s.person.chamber === "lower");
+
+// cycle-at-a-glance, straight arithmetic on WEC data: retirements, seats
+// with a single approved candidate so far, and seats that were close
+const approvedCount = (s: (typeof seats)[number]) =>
+  (s.election!.on_ballot === 1 ? 1 : 0) +
+  s.election!.opponents.filter((o) => o.ballot_status === "Approve").length;
+const openSeats = seats.filter((s) => s.election!.on_ballot === 0).length;
+const singleCandidate = seats.filter((s) => approvedCount(s) <= 1).length;
+const closeSeats = seats.filter(
+  (s) => s.margin?.margin != null && s.margin.margin < 5,
+).length;
 
 const OFFICES: [string, string][] = [
   ["GOVERNOR", "Governor"],
@@ -28,7 +44,41 @@ const historyFor = (office: string) =>
       h.office === office ||
       (office === "GOVERNOR" && h.office === "GOVERNOR / LIEUTENANT GOVERNOR"),
   );
+// "Evers / Rodriguez (D)" column headers from a ticket's lead surname
+const shortName = (candidate: string) =>
+  candidate
+    .split(" / ")
+    .map((part) => part.replace(/\(write-in\)/i, "").trim().split(" ").pop())
+    .join(" / ");
+
 const statewide = OFFICES.map(([key, label]) => {
+  const last = historyFor(key);
+  let countyTable: {
+    year: number;
+    columns: { candidate: string; party: string | null }[];
+    rows: { county: string; votes: number[] }[];
+  } | null = null;
+  if (last.length > 0) {
+    const countyRows = statewideCountiesFor(last[0].office).filter(
+      (c) => c.year === last[0].year,
+    );
+    if (countyRows.length > 0) {
+      const columns = last.map((h) => ({ candidate: h.candidate, party: h.party }));
+      const byCounty = new Map<string, Map<string, number>>();
+      for (const c of countyRows) {
+        if (!byCounty.has(c.county)) byCounty.set(c.county, new Map());
+        byCounty.get(c.county)!.set(c.candidate, c.votes);
+      }
+      countyTable = {
+        year: last[0].year,
+        columns,
+        rows: [...byCounty.keys()].sort().map((county) => ({
+          county,
+          votes: columns.map((col) => byCounty.get(county)!.get(col.candidate) ?? 0),
+        })),
+      };
+    }
+  }
   const rows = allStatewide.filter((r) => r.office === key);
   return {
     key, label,
@@ -36,7 +86,8 @@ const statewide = OFFICES.map(([key, label]) => {
     retiring: rows[0]?.incumbent_noncandidacy === 1,
     approved: rows.filter((r) => r.ballot_status === "Approve"),
     otherFilings: rows.filter((r) => r.ballot_status !== "Approve").length,
-    last: historyFor(key),
+    last,
+    countyTable,
   };
 });
 ---
@@ -53,6 +104,13 @@ const statewide = OFFICES.map(([key, label]) => {
     <a href="https://myvote.wi.gov/en-us/Find-My-Polling-Place" class="py-1 font-semibold underline">Find where you vote ↗</a>
     <a href="https://myvote.wi.gov/en-us/Vote-Absentee-Guide" class="py-1 font-semibold underline">Vote absentee ↗</a>
     <a href="/calendar/election-days.ics" class="py-1 underline">Add election days to your calendar</a>
+  </p>
+
+  <p class="mt-3 max-w-3xl rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm text-navy-700">
+    The legislative cycle at a glance: <strong>{openSeats}</strong> open seats
+    (incumbent not running) · <strong>{closeSeats}</strong> seats decided by
+    under 5 points last time · <strong>{singleCandidate}</strong> seats with
+    only one approved candidate so far.
   </p>
 
   <section class="mt-6">
@@ -103,6 +161,42 @@ const statewide = OFFICES.map(([key, label]) => {
               is recorded under the joint contest.
             </p>
           )}
+          {o.countyTable && (
+            <details class="mt-2 border-t border-navy-100 pt-2 text-xs">
+              <summary class="cursor-pointer py-1 font-semibold text-navy-700">
+                County-by-county, {o.countyTable.year} (certified)
+              </summary>
+              <div
+                class="mt-1 max-h-80 overflow-y-auto"
+                role="region"
+                tabindex="0"
+                aria-label={`${o.label}: certified ${o.countyTable.year} results by county`}
+              >
+                <table class="w-full text-left tabular-nums">
+                  <thead>
+                    <tr class="border-b border-navy-100">
+                      <th scope="col" class="py-1 pr-2 font-semibold">County</th>
+                      {o.countyTable.columns.map((c) => (
+                        <th scope="col" class="py-1 pr-2 text-right font-semibold">
+                          {shortName(c.candidate)} ({c.party?.[0] ?? "?"})
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {o.countyTable.rows.map((r) => (
+                      <tr class="border-b border-navy-100/60">
+                        <th scope="row" class="py-0.5 pr-2 font-normal">{r.county}</th>
+                        {r.votes.map((v) => (
+                          <td class="py-0.5 pr-2 text-right">{v.toLocaleString()}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
         </div>
       ))}
     </div>
@@ -114,13 +208,18 @@ const statewide = OFFICES.map(([key, label]) => {
     <section class="mt-6">
       <h2 class="text-xl font-bold">{chamber.label}</h2>
       <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
-        {chamber.rows.map(({ person, election }) => {
+        {chamber.rows.map(({ person, election, margin }) => {
           const opponents = election!.opponents.filter((o) => o.ballot_status !== "Deny");
           return (
             <li class="flex flex-wrap items-baseline gap-x-3 px-4 py-2">
               <span class="w-10 shrink-0 font-bold">D{person.district}</span>
               <PartyChip party={person.party} />
               <a href={`/legislators/${personSlug(person.id)}/`} class="underline">{person.name}</a>
+              {margin?.margin != null && margin.margin < 5 && (
+                <span class="rounded-full bg-gold-100 px-2 py-0.5 text-xs font-bold text-navy-800">
+                  +{margin.margin.toFixed(1)} in {margin.year}
+                </span>
+              )}
               {election!.on_ballot === 0 && (
                 <span class="rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">retiring</span>
               )}

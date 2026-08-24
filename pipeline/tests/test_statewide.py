@@ -28,11 +28,27 @@ def test_statewide_contest_parses_with_ticket_names(tmp_path: Path) -> None:
         ["", "", "", "Tony Evers \n Sara Rodriguez", "Tim Michels \n Roger Roth"],
         ["ADAMS", "Town of ADAMS", 10, 4, 6],
         ["", "Town of BIG FLATS", 20, 12, 8],
+        ["", "County Totals:", 30, 16, 14],
+        ["BAYFIELD", "Town of BAYFIELD", 5, 3, 2],
+        ["", "County Totals:", 5, 3, 2],
     ])
-    rows = parse_statewide(path)
+    rows, counties = parse_statewide(path)
     assert rows == [
-        (2022, "GOVERNOR / LIEUTENANT GOVERNOR", "Tony Evers / Sara Rodriguez", "DEM", 16),
-        (2022, "GOVERNOR / LIEUTENANT GOVERNOR", "Tim Michels / Roger Roth", "REP", 14),
+        (2022, "GOVERNOR / LIEUTENANT GOVERNOR", "Tony Evers / Sara Rodriguez",
+         "DEM", 19, 35),
+        (2022, "GOVERNOR / LIEUTENANT GOVERNOR", "Tim Michels / Roger Roth",
+         "REP", 16, 35),
+    ]
+    # county aggregates come from the canvass's own County Totals rows
+    assert counties == [
+        (2022, "GOVERNOR / LIEUTENANT GOVERNOR", "Adams",
+         "Tony Evers / Sara Rodriguez", "DEM", 16),
+        (2022, "GOVERNOR / LIEUTENANT GOVERNOR", "Bayfield",
+         "Tony Evers / Sara Rodriguez", "DEM", 3),
+        (2022, "GOVERNOR / LIEUTENANT GOVERNOR", "Adams",
+         "Tim Michels / Roger Roth", "REP", 14),
+        (2022, "GOVERNOR / LIEUTENANT GOVERNOR", "Bayfield",
+         "Tim Michels / Roger Roth", "REP", 2),
     ]
 
 
@@ -42,7 +58,7 @@ def test_legislative_contest_is_not_statewide(tmp_path: Path) -> None:
         ["", "", "", "A", "B"],
         ["X", "Town of X", 10, 4, 6],
     ])
-    assert parse_statewide(path) == []
+    assert parse_statewide(path) == ([], [])
 
 
 def test_ticket_normalization() -> None:
