@@ -11,10 +11,10 @@ Subject: Public records request: candidate committee registrant data
 
 Dear Wisconsin Ethics Commission staff,
 
-I run Badger Politics (badgerpolitics.org), a free, independent,
+I'm building Badger Politics (badgerpolitics.org), a free, independent,
 noncommercial website that helps Wisconsin residents follow the
-Legislature. It presents campaign finance data from CFIS with links back
-to campaignfinance.wi.gov on every figure. This is a public records
+Legislature. It will present campaign finance data from CFIS with links
+back to campaignfinance.wi.gov on every figure. This is a public records
 request under Wis. Stat. § 19.35, though I suspect much of it is data
 you can export routinely.
 
@@ -33,26 +33,27 @@ you can export routinely.
    itemized sums against committees' own filed totals as an accuracy
    check.
 
-3. **CFIS automated retrieval.** Separately from the records request: my
-   site's nightly job currently retrieves contribution records for
-   sitting legislators' committees from campaignfinance.wi.gov using the
-   same JSON endpoints the website itself loads data from
-   (/api/trpc/...), at low volume (roughly one paged pull per day,
-   throttled, with an identifying User-Agent carrying this email
-   address). Since those endpoints aren't formally published, I want to
-   ask directly rather than assume: is this retrieval acceptable to the
-   Commission, and is there a preferred method — a bulk export, the
-   site's spreadsheet downloads, or a different schedule — that would be
-   easier on your infrastructure? I'm happy to switch to whatever you
-   prefer.
+3. **CFIS automated retrieval.** Separately from the records request: to
+   keep the site current, I would like to run a nightly job that
+   retrieves contribution records for sitting legislators' committees
+   from campaignfinance.wi.gov, using the same JSON endpoints the
+   website itself loads data from (/api/trpc/...), at low volume —
+   roughly one paged, throttled pull per day, with an identifying
+   User-Agent carrying this email address. Since those endpoints aren't
+   formally published, I want to ask before making that routine: would
+   something like that be acceptable to the Commission, and is there a
+   preferred method — a bulk export, the site's spreadsheet downloads,
+   or a different schedule — that would be easier on your
+   infrastructure? I'm happy to use whatever you prefer.
 
-4. **Eye on Lobbying retrieval.** Same question for lobbying.wi.gov: my
-   site displays which principals registered on each bill, retrieved
-   nightly at low volume with the same identifying User-Agent. The
-   site's robots.txt has a blanket disallow, which I want to respect in
-   spirit, so I'm asking directly: is this retrieval acceptable, and is
-   there a preferred method or schedule? I'm happy to adjust frequency,
-   timing, or mechanism to whatever suits your infrastructure.
+4. **Eye on Lobbying retrieval.** Same question for lobbying.wi.gov: the
+   site will display which principals registered on each bill, and I
+   would like to retrieve that nightly at low volume with the same
+   identifying User-Agent. The site's robots.txt has a blanket disallow,
+   which I want to respect in spirit, so I'm asking directly: would that
+   retrieval be acceptable, and is there a preferred method or schedule?
+   I'm happy to adjust frequency, timing, or mechanism to whatever suits
+   your infrastructure.
 
 I'm glad to accept whatever format is least work for your staff, and to
 pay reasonable location/copying costs as provided by statute. Thank you
