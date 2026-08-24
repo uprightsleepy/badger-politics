@@ -33,7 +33,7 @@ def _ticket(candidate: str) -> str:
     return " / ".join(p for p in parts if p)
 
 
-SUBTOTAL_RE = re.compile(r"totals?:\s*$", re.I)
+SUBTOTAL_RE = re.compile(r"(sub)?totals?:\s*$", re.I)
 
 
 def _walk_contests(path: Path, contest_re: re.Pattern):
@@ -95,7 +95,15 @@ def _walk_contests(path: Path, contest_re: re.Pattern):
                 parties = (parties + [None] * len(candidates))[: len(candidates)]
                 continue
             if candidates:
-                if any(SUBTOTAL_RE.search(t) for t in texts[:2] if t):
+                # the by-CD layout adds a CD rollup row: a CD label with an
+                # empty municipality cell (real ward rows carry the CD label
+                # in col 0 WITH a municipality, and must still be summed)
+                if (
+                    any(t.startswith("U.S. Congressional District") for t in texts[:3])
+                    and (len(texts) < 3 or not texts[2])
+                ):
+                    continue
+                if any(SUBTOTAL_RE.search(t) for t in texts[:3] if t):
                     # the county aggregate row: capture once, never sum
                     if texts[1] == "County Totals:" and county:
                         counties.append((
@@ -104,9 +112,30 @@ def _walk_contests(path: Path, contest_re: re.Pattern):
                              and isinstance(cells[base + i], (int, float)) else 0
                              for i in range(len(candidates))],
                         ))
+                    # the contest's own certified totals END it: verify our
+                    # ward sums against them to the vote, then deactivate so
+                    # trailing non-legislative contests can't leak in (the
+                    # old parser let the file's last contest absorb them)
+                    if "Office Totals:" in texts[:2]:
+                        official = [
+                            int(cells[base + i]) if base + i < len(cells)
+                            and isinstance(cells[base + i], (int, float)) else 0
+                            for i in range(len(candidates))
+                        ]
+                        cast = cells[base - 1] if base - 1 < len(cells) else None
+                        if official != totals or (
+                            isinstance(cast, (int, float)) and int(cast) != total_cast
+                        ):
+                            raise RuntimeError(
+                                f"{path.name} {match.group(0)!r}: ward sums {totals}"
+                                f"/{total_cast} != Office Totals {official}/{cast}"
+                            )
+                        yield snapshot()
+                        reset(None)
                     continue
                 if first:
-                    county = " ".join(first.split()).title()
+                    # canonical county casing ('Fond du Lac', not 'Fond Du Lac')
+                    county = " ".join(first.split()).title().replace(" Du ", " du ")
                 cast = cells[base - 1] if base - 1 < len(cells) else None
                 if isinstance(cast, (int, float)):
                     total_cast += int(cast)

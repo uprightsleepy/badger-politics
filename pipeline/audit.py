@@ -181,6 +181,39 @@ total += check("official total_cast below the candidate sum", db.execute("""
   SELECT year, chamber, district FROM election_history
   WHERE total_cast IS NOT NULL
   GROUP BY year, chamber, district HAVING MAX(total_cast) < SUM(votes)"""))
+# every contest winner must share a surname with someone recorded as
+# seated in that seat a month into the new term (nicknames differ;
+# surnames don't). Catches misparsed contests and phantom terms alike.
+def _surname(name):
+    return "".join(ch for ch in name.split()[-1].lower() if ch.isalpha())
+
+
+winner_orphans = []
+for year, chamber, district, candidate in db.execute("""
+  SELECT year, chamber, district, candidate FROM (
+    SELECT year, chamber, district, candidate,
+           RANK() OVER (PARTITION BY year, chamber, district ORDER BY votes DESC) rk
+    FROM election_history) WHERE rk = 1"""):
+    seated = [r[0] for r in db.execute("""
+      SELECT p.name FROM person_terms t JOIN people p ON p.id = t.person_id
+      WHERE t.chamber = ? AND t.district = ?
+      AND t.start <= ? AND COALESCE(t.end, '9999') >= ?""",
+      (chamber, district, f"{year + 1}-02-01", f"{year + 1}-02-01"))]
+    cand_squash = "".join(ch for ch in candidate.lower() if ch.isalpha())
+    if not any(
+        _surname(s) in cand_squash or cand_squash.endswith(_surname(s)[-6:])
+        for s in seated
+        if _surname(s)
+    ):
+        winner_orphans.append(
+            {"year": year, "seat": f"{chamber} {district}",
+             "winner": candidate, "seated": "; ".join(seated) or "(nobody)"}
+        )
+flag = "!!" if winner_orphans else "ok"
+print(f"[{flag}] election winners never seated in the seat they won: {len(winner_orphans)}")
+for w in winner_orphans[:10]:
+    print("      ", w)
+total += len(winner_orphans)
 
 # 12. elections rows for non-sitting people
 total += check("election rows for non-sitting people", db.execute("""
