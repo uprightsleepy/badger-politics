@@ -168,11 +168,17 @@ import Base from "../layouts/Base.astro";
             `<a class="shrink-0 text-xs underline" href="/votes/${v.event}/">roll call</a></li>`,
         )
         .join("");
+      const contactLine = full.contact
+        ? `Contact: <a class="underline" href="mailto:${esc(full.contact.email)}">${esc(full.contact.email)}</a>` +
+          (full.contact.phone
+            ? ` · <a class="underline" href="tel:${full.contact.phone.replace(/\D/g, "")}">${esc(full.contact.phone)}</a>`
+            : "")
+        : "";
       return (
         `<div class="rounded-lg border border-navy-100 p-3">` +
         head +
         `<ul class="mt-1 space-y-0.5 text-sm text-navy-700">` +
-        [attLine, authoredLine, ballotLine].filter(Boolean).map((l) => `<li>${l}</li>`).join("") +
+        [contactLine, attLine, authoredLine, ballotLine].filter(Boolean).map((l) => `<li>${l}</li>`).join("") +
         (committees ? `<li>Committees: ${committees}${more}</li>` : "") +
         `</ul>` +
         (votes

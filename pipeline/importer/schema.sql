@@ -20,7 +20,13 @@ CREATE TABLE people (
     current_role TEXT,
     chamber      TEXT,
     district     INTEGER,
-    image_url    TEXT
+    image_url    TEXT,
+    -- official Capitol office contacts (sitting members only), from each
+    -- member's docs.legis page; never personal contacts
+    email          TEXT,
+    office_phone   TEXT,
+    office_address TEXT,
+    contact_url    TEXT
 );
 
 CREATE TABLE bills (

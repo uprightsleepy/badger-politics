@@ -39,6 +39,9 @@ python -m importer.import_subjects _data/subjects ../data/wi.sqlite
 python -m scraper.fetch_wiseye                # recording metadata, outage-tolerant
 python -m importer.import_wiseye _data/wiseye/videos.json ../data/wi.sqlite
 
+python -m scraper.fetch_contacts --refresh    # Capitol office contacts (docs.legis)
+python -m importer.import_contacts _data/contacts/contacts.json ../data/wi.sqlite
+
 python -m importer.enrich_lrb ../data/wi.sqlite
 python -m importer.checks ../data/wi.sqlite   # hard gate: abort deploy on failure
 

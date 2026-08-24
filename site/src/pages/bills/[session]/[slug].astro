@@ -15,6 +15,7 @@ import {
   documentsFor,
   subjectsForBill,
   personIdByName,
+  vetoMessageUrl,
 } from "../../../lib/db";
 import {
   billSlug, fmtDate, personSlug, chamberName, subjectDisplay, subjectSlug,
@@ -44,6 +45,14 @@ const fiscalEstimates = documentsFor(bill.id).filter((d) =>
 const subjects = subjectsForBill(bill.id);
 // "AB 12: Fiscal Estimate From DOA" -> "Fiscal Estimate From DOA"
 const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
+
+// plain-language fate explainer: docs.legis never says "this bill is dead"
+const vetoMsg = bill.status === "vetoed" || bill.status === "enacted"
+  ? vetoMessageUrl(bill.id) : null;
+const partialVeto = actions.some((a) => /partial veto/i.test(a.description));
+const isBill = bill.classification === "bill";
+const passedChamberName = bill.chamber === "upper" ? "Senate" : "Assembly";
+const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
 ---
 
 <Base title={`${bill.identifier} (${sessionName})`} description={bill.title ?? undefined}>
@@ -84,6 +93,61 @@ const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
         Unfamiliar terms? <a href="/glossary/" class="inline-block py-1 underline">Glossary</a>
       </p>
     </div>
+
+    {bill.status === "failed_sjr1" && bill.died_without_hearing !== 1 && (
+      <aside class="mt-4 rounded-lg border border-navy-100 bg-navy-50 p-4 text-sm">
+        <p>
+          <strong>This {isBill ? "bill" : "proposal"} is dead.</strong> The
+          Legislature's session schedule, set by Senate Joint Resolution 1 at
+          the session's start, fixes a last day for floor action — and any
+          proposal still pending on that day fails automatically. That is how
+          most {isBill ? "bills" : "proposals"} end. Taking the idea up again
+          would require a new {isBill ? "bill" : "proposal"} in a future
+          session. <a href="/glossary/" class="underline">Glossary</a>
+        </p>
+      </aside>
+    )}
+    {bill.status === "passed_chamber" && (
+      <aside class="mt-4 rounded-lg border border-navy-100 bg-navy-50 p-4 text-sm">
+        <p>
+          <strong>This {isBill ? "bill" : "proposal"} passed the
+          {" "}{passedChamberName} but is dead.</strong> The
+          {" "}{otherChamberName} never took it up before the session's floor
+          deadline, so it failed with the session's end — passing one house is
+          not enough. <a href="/glossary/" class="underline">Glossary</a>
+        </p>
+      </aside>
+    )}
+    {bill.status === "vetoed" && (
+      <aside class="mt-4 rounded-lg border border-navy-100 bg-navy-50 p-4 text-sm">
+        <p>
+          <strong>The governor vetoed this bill</strong>, blocking it from
+          becoming law after both chambers passed it. The Legislature can
+          override a veto only with a two-thirds vote of each chamber.
+          {vetoMsg && (
+            <>
+              {" "}<a href={vetoMsg} class="underline">Read the governor's veto message</a>.
+            </>
+          )}
+          {" "}<a href="/vetoes/" class="underline">All vetoes this session</a>
+        </p>
+      </aside>
+    )}
+    {bill.status === "enacted" && partialVeto && (
+      <aside class="mt-4 rounded-lg border border-navy-100 bg-navy-50 p-4 text-sm">
+        <p>
+          <strong>Signed with a partial veto:</strong> the governor struck
+          parts of this bill and signed the rest into law — a power unique to
+          Wisconsin's governor on appropriation bills.
+          {vetoMsg && (
+            <>
+              {" "}<a href={vetoMsg} class="underline">Read the veto message</a>.
+            </>
+          )}
+          {" "}<a href="/partial-veto/" class="underline">How the partial veto works</a>
+        </p>
+      </aside>
+    )}
 
     {bill.died_without_hearing === 1 && (
       <aside class="mt-4 rounded-lg border border-badger-600/30 bg-badger-50 p-4">

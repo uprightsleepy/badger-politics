@@ -50,6 +50,10 @@ export interface Person {
   chamber: string | null;
   district: number | null;
   image_url: string | null;
+  email: string | null;
+  office_phone: string | null;
+  office_address: string | null;
+  contact_url: string | null;
 }
 
 // order by real start (first recorded action), newest first: special-session
@@ -1149,6 +1153,13 @@ export const lawBienniums = () =>
     .sort((a, b) => b - a)
     .map((biennium) => ({ biennium, laws: lawsFor(biennium) }))
     .filter((b) => b.laws.length > 0);
+
+/** The governor's official veto message for a bill, when docs.legis
+ * attaches one. */
+export const vetoMessageUrl = (billId: string): string | null =>
+  (prep(
+      "SELECT url FROM bill_documents WHERE bill_id = ? AND note = 'Veto Message'",
+    ).get(billId) as { url: string } | undefined)?.url ?? null;
 
 export interface VetoBiennium {
   biennium: number;

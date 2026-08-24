@@ -60,7 +60,8 @@ const billRow = (b: {
         <p>
           This session: <strong>{desk.enacted.length}</strong> bills signed into law,
           {" "}<strong>{desk.vetoed.length}</strong> vetoed.
-          {" "}<a href="/vetoes/" class="underline">Veto tracker</a>
+          {" "}<a href="/vetoes/" class="underline">Veto tracker</a> ·
+          {" "}<a href="/partial-veto/" class="underline">the partial veto</a>
         </p>
         {gov.notRunning && (
           <p class="font-semibold text-badger-700">

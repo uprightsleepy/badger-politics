@@ -1,6 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { vetoTracker } from "../../lib/db";
+import { vetoTracker, vetoMessageUrl } from "../../lib/db";
 import { billSlug, chamberName, fmtDate } from "../../lib/format";
 const bienniums = vetoTracker();
 ---
@@ -12,9 +12,11 @@ const bienniums = vetoTracker();
   <h1 class="text-2xl font-bold">Veto tracker</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-600">
     Wisconsin governors can veto a bill outright or, on appropriation bills,
-    strike parts and sign the rest (a partial veto). The Legislature can pass
-    a bill over a veto with a two-thirds vote of both chambers. Everything
-    below comes verbatim from the official bill histories.
+    strike parts and sign the rest (<a href="/partial-veto/" class="underline">how
+    the partial veto works</a>). The Legislature can pass a bill over a veto
+    with a two-thirds vote of both chambers. Everything below comes verbatim
+    from the official bill histories; where docs.legis publishes the
+    governor's veto message, it's linked.
   </p>
   {bienniums.map((b) => (
     <section class="mt-6">
@@ -54,15 +56,21 @@ const bienniums = vetoTracker();
           </summary>
           <div class="max-h-96 overflow-y-auto border-t border-navy-100" role="region" tabindex="0" aria-label={`Bills vetoed in ${b.biennium}–${b.biennium + 1}`}>
             <ul class="space-y-1 p-3 text-sm">
-              {b.fullVetoes.map((v) => (
-                <li class="flex items-baseline gap-2">
-                  <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
-                  <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="w-20 shrink-0 font-semibold underline">
-                    {v.identifier}
-                  </a>
-                  <span class="min-w-0 flex-1 truncate">{v.title?.replace(/^Relating to: /, "")}</span>
-                </li>
-              ))}
+              {b.fullVetoes.map((v) => {
+                const msg = vetoMessageUrl(v.bill_id);
+                return (
+                  <li class="flex items-baseline gap-2">
+                    <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
+                    <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="w-20 shrink-0 font-semibold underline">
+                      {v.identifier}
+                    </a>
+                    <span class="min-w-0 flex-1 truncate">{v.title?.replace(/^Relating to: /, "")}</span>
+                    {msg && (
+                      <a href={msg} class="shrink-0 py-1 text-xs underline">veto message</a>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </details>
@@ -73,15 +81,21 @@ const bienniums = vetoTracker();
             Signed with a partial veto · {b.partialVetoes.length}
           </summary>
           <ul class="space-y-1 px-3 pb-3">
-            {b.partialVetoes.map((l) => (
-              <li class="flex items-baseline gap-2 border-t border-navy-100 pt-1 text-sm">
-                <span class="w-16 shrink-0 font-bold tabular-nums">Act {l.act}</span>
-                <a href={`/bills/${l.session_id}/${billSlug(l.identifier)}/`} class="w-20 shrink-0 font-semibold underline">
-                  {l.identifier}
-                </a>
-                <span class="min-w-0 flex-1 truncate">{l.title?.replace(/^Relating to: /, "")}</span>
-              </li>
-            ))}
+            {b.partialVetoes.map((l) => {
+              const msg = vetoMessageUrl(l.bill_id);
+              return (
+                <li class="flex items-baseline gap-2 border-t border-navy-100 pt-1 text-sm">
+                  <span class="w-16 shrink-0 font-bold tabular-nums">Act {l.act}</span>
+                  <a href={`/bills/${l.session_id}/${billSlug(l.identifier)}/`} class="w-20 shrink-0 font-semibold underline">
+                    {l.identifier}
+                  </a>
+                  <span class="min-w-0 flex-1 truncate">{l.title?.replace(/^Relating to: /, "")}</span>
+                  {msg && (
+                    <a href={msg} class="shrink-0 py-1 text-xs underline">veto message</a>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </details>
       )}

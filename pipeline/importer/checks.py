@@ -169,6 +169,13 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             "SELECT COUNT(*) FROM person_terms t"
             " LEFT JOIN people p ON p.id = t.person_id WHERE p.id IS NULL"
         ),
+        # office contacts come from docs.legis member pages; a sitting member
+        # without one means the contact fetch or parse broke
+        "sitting members missing office contact info": (
+            "SELECT COUNT(*) FROM people WHERE current_role IN"
+            " ('Representative', 'Senator')"
+            " AND (email IS NULL OR office_phone IS NULL)"
+        ),
         "every sitting member has a live term": (
             "SELECT COUNT(*) FROM people WHERE current_role IN"
             " ('Representative', 'Senator') AND id NOT IN"

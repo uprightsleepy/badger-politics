@@ -39,6 +39,9 @@ export const GET: APIRoute = () => {
       party: p.party,
       slug: personSlug(p.id),
       role: p.current_role,
+      contact: p.email
+        ? { email: p.email, phone: p.office_phone }
+        : null,
       committees: committeesFor(p.id).map((c) => ({
         name: c.name,
         role: c.role,

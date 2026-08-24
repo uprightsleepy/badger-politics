@@ -193,6 +193,35 @@ const tally = TALLY_ORDER.map((status) => ({
             </p>
           </div>
         )}
+        {sitting && person.email && (
+          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
+            <h2 class="font-bold">Contact</h2>
+            <p class="mt-1 break-all">
+              <a href={`mailto:${person.email}`} class="underline">{person.email}</a>
+            </p>
+            {person.office_phone && (
+              <p class="mt-1">
+                <a href={`tel:${person.office_phone.replace(/\D/g, "")}`} class="underline">
+                  {person.office_phone}
+                </a>
+              </p>
+            )}
+            {person.office_address && (
+              <p class="mt-1 text-xs text-navy-700">{person.office_address}</p>
+            )}
+            <p class="mt-1 text-xs text-navy-600">
+              Official Capitol office contacts, from
+              {" "}{person.contact_url ? (
+                <a href={person.contact_url} class="underline">their Legislature page</a>
+              ) : (
+                "their Legislature page"
+              )}.
+              Not sure who represents you? The Legislative Hotline
+              {" "}(<a href="tel:18003629472" class="underline">1-800-362-9472</a>)
+              or <a href="/districts/" class="underline">our district finder</a> can tell you.
+            </p>
+          </div>
+        )}
         {sitting && election && (
           <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
             <h2 class="font-bold">Up for reelection: Nov {election.cycle_year}</h2>
