@@ -49,11 +49,9 @@ you can export routinely.
 4. **Eye on Lobbying retrieval.** Same question for lobbying.wi.gov: the
    site will display which principals registered on each bill, and I
    would like to retrieve that nightly at low volume with the same
-   identifying User-Agent. The site's robots.txt has a blanket disallow,
-   which I want to respect in spirit, so I'm asking directly: would that
-   retrieval be acceptable, and is there a preferred method or schedule?
-   I'm happy to adjust frequency, timing, or mechanism to whatever suits
-   your infrastructure.
+   identifying User-Agent. Would that retrieval be acceptable, and is
+   there a preferred method or schedule? I'm happy to adjust frequency,
+   timing, or mechanism to whatever suits your infrastructure.
 
 I'm glad to accept whatever format is least work for your staff, and to
 pay reasonable location/copying costs as provided by statute. Thank you
