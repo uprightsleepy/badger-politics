@@ -194,6 +194,15 @@ const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
     {votes.length > 0 && (
       <section class="mt-6" data-pagefind-ignore>
         <h2 class="text-xl font-bold">Votes</h2>
+        {votes.some((v) => /suspend/i.test(v.motion ?? "")) && (
+          <p class="mt-1 max-w-3xl text-sm text-navy-600">
+            Suspending the rules (to take a vote immediately) needs a
+            two-thirds majority — a higher bar than passing the bill, which
+            needs a simple majority. That's why a suspension motion can show
+            more Ayes than the passage vote that follows it.
+            {" "}<a href="/glossary/" class="underline">Glossary</a>
+          </p>
+        )}
         <div class="mt-2 space-y-4">
           {votes.map((event) => <RollCall event={event} />)}
         </div>

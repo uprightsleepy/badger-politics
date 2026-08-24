@@ -123,6 +123,7 @@ const money = sitting ? moneyFor(person.id) : null;
 const history = sitting ? electionHistoryFor(person.chamber, person.district) : [];
 const surname = person.name.split(" ").pop()!.toLowerCase();
 const primarySponsored = sponsorships.filter((s) => s.is_primary);
+const cosponsored = sponsorships.filter((s) => !s.is_primary);
 const TALLY_ORDER = [
   "enacted",
   "adopted",
@@ -296,7 +297,12 @@ const tally = TALLY_ORDER.map((status) => ({
 
     <div class="min-w-0 flex-1">
       <section>
-        <h2 class="text-xl font-bold">Sponsored bills · {primarySponsored.length}</h2>
+        <h2 class="text-xl font-bold">Authored bills · {primarySponsored.length}</h2>
+        <p class="mt-1 max-w-3xl text-sm text-navy-600">
+          Bills {person.name} introduced as a primary author, from each bill's
+          official history. Bills they signed onto in support are under
+          Cosponsored below; bills they merely voted on are in Vote history.
+        </p>
         {primarySponsored.length > 0 && (
           <p class="mt-1 text-sm text-navy-600">
             Of the {primarySponsored.length} bills they authored:
@@ -346,6 +352,40 @@ const tally = TALLY_ORDER.map((status) => ({
           ))}
         </div>
       </section>
+
+      {cosponsored.length > 0 && (
+        <section class="mt-6">
+          <h2 class="text-xl font-bold">Cosponsored bills · {cosponsored.length.toLocaleString()}</h2>
+          <p class="mt-1 max-w-3xl text-sm text-navy-600">
+            Bills by other members that {person.name} formally signed onto as a
+            cosponsor or coauthor, from each bill's official history.
+          </p>
+          <details class="mt-2 rounded-lg border border-navy-100 bg-white">
+            <summary class="cursor-pointer px-3 py-2 text-sm font-semibold">
+              Show all {cosponsored.length.toLocaleString()} cosponsored bills
+            </summary>
+            <div
+              class="max-h-96 overflow-y-auto border-t border-navy-100"
+              role="region"
+              tabindex="0"
+              aria-label="Cosponsored bills"
+            >
+              <ul class="space-y-1 p-3 text-sm">
+                {cosponsored.map((s) => (
+                  <li class="flex items-center gap-2">
+                    <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-16 shrink-0 py-1 font-semibold underline">
+                      {s.identifier}
+                    </a>
+                    <span class="min-w-0 flex-1 truncate">{s.title}</span>
+                    <span class="shrink-0 text-xs text-navy-600">{s.classification}</span>
+                    <span class="shrink-0 text-xs text-navy-600">{s.session_id}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </details>
+        </section>
+      )}
 
       {sitting && (
         <section class="mt-6">

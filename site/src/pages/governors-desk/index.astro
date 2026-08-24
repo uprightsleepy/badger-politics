@@ -1,9 +1,12 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { governorsDesk } from "../../lib/db";
-import { billSlug, fmtDate } from "../../lib/format";
+import { governorsDesk, governorInfo } from "../../lib/db";
+import { billSlug, fmtDate, partyStyle } from "../../lib/format";
 
 const desk = governorsDesk();
+const gov = governorInfo();
+const pct = (votes: number, total: number) =>
+  total > 0 ? ((votes / total) * 100).toFixed(1) : null;
 const billRow = (b: {
   id: string; session_id: string; identifier: string; title: string | null;
   latest_action_date: string | null; latest_action_desc: string | null;
@@ -28,6 +31,51 @@ const billRow = (b: {
     <a href="https://docs.legis.wisconsin.gov" class="underline">official history</a>,
     linked on every bill page.
   </p>
+
+  {gov && (
+    <div class="mt-4 rounded-lg border border-navy-100 bg-white p-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <h2 class="text-lg font-bold">Governor {gov.name}</h2>
+        {gov.party && (
+          <span class={`rounded-full px-2 py-0.5 text-xs font-bold ${partyStyle(gov.party)}`}>
+            {gov.party}
+          </span>
+        )}
+      </div>
+      <div class="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+        {gov.lastElection && (
+          <p>
+            Elected November {gov.lastElection.year} with{" "}
+            <strong>{pct(gov.lastElection.votes, gov.lastElection.total)}%</strong>{" "}
+            ({gov.lastElection.votes.toLocaleString()} votes)
+            {gov.lastElection.runnerUp && (
+              <span class="text-navy-600">
+                {" "}over {gov.lastElection.runnerUp.candidate.split(" / ")[0]}
+                {" "}({pct(gov.lastElection.runnerUp.votes, gov.lastElection.total)}%)
+              </span>
+            )}
+            — certified WEC canvass.
+          </p>
+        )}
+        <p>
+          This session: <strong>{desk.enacted.length}</strong> bills signed into law,
+          {" "}<strong>{desk.vetoed.length}</strong> vetoed.
+          {" "}<a href="/vetoes/" class="underline">Veto tracker</a>
+        </p>
+        {gov.notRunning && (
+          <p class="font-semibold text-badger-700">
+            Not seeking reelection in 2026
+            {gov.candidates2026.length > 0 && (
+              <span class="font-normal text-navy-600">
+                {" "}— {gov.candidates2026.length} candidates have filed for the open seat.
+              </span>
+            )}
+            {" "}<a href="/elections/2026/" class="font-normal underline">2026 ballot</a>
+          </p>
+        )}
+      </div>
+    </div>
+  )}
 
   {desk.awaiting.length > 0 && (
     <section class="mt-6">

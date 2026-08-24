@@ -31,7 +31,13 @@ const roleLabel = (role: string) =>
   <div class="mt-4 grid gap-6 lg:grid-cols-2">
     <section class="min-w-0">
       <h2 class="text-xl font-bold">Members · {members.length}</h2>
-      <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+      <div
+        class="mt-2 max-h-96 overflow-y-auto rounded-lg border border-navy-100 bg-white"
+        role="region"
+        tabindex="0"
+        aria-label="Committee members"
+      >
+      <ul class="divide-y divide-navy-100 text-sm">
         {members.map((m) => (
           <li class="flex items-center gap-2 px-4 py-1.5">
             <PartyChip party={m.party} size="sm" />
@@ -49,6 +55,7 @@ const roleLabel = (role: string) =>
           </li>
         ))}
       </ul>
+      </div>
     </section>
 
     <section class="min-w-0">
@@ -57,7 +64,13 @@ const roleLabel = (role: string) =>
         Bills referred here that died at session's end without a public hearing.
       </p>
       {graveyard.length > 0 ? (
-        <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+        <div
+          class="mt-2 max-h-96 overflow-y-auto rounded-lg border border-navy-100 bg-white"
+          role="region"
+          tabindex="0"
+          aria-label="Hearing None record by session"
+        >
+        <ul class="divide-y divide-navy-100 text-sm">
           {graveyard.map((g) => (
             <li class="flex items-center gap-3 px-4 py-2">
               <span class="w-16 shrink-0 font-semibold">{g.session_id}</span>
@@ -66,6 +79,7 @@ const roleLabel = (role: string) =>
             </li>
           ))}
         </ul>
+        </div>
       ) : (
         <p class="mt-2 rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600">
           No bills on record died in this committee without a hearing.
@@ -77,19 +91,28 @@ const roleLabel = (role: string) =>
           {upcoming.length > 0 ? "Upcoming hearings" : "Recent hearings"}
         </h2>
       )}
-      {(upcoming.length > 0 ? upcoming : recent.slice(0, 6)).map((h) => (
-        <p class="mt-2 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
-          <span class="font-semibold">{fmtDate(h.date)}</span>
-          {h.time && ` · ${fmtTime(h.time)}`}
-          {h.location && ` · ${h.location}`}
-          {h.source_url && (
-            <a href={h.source_url} class="ml-2 underline">official notice</a>
-          )}
-          {h.video_url && (
-            <a href={h.video_url} class="ml-2 font-semibold underline">watch on WisconsinEye</a>
-          )}
-        </p>
-      ))}
+      {(upcoming.length > 0 || recent.length > 0) && (
+        <div
+          class="mt-2 max-h-96 space-y-2 overflow-y-auto"
+          role="region"
+          tabindex="0"
+          aria-label={upcoming.length > 0 ? "Upcoming hearings" : "Recent hearings"}
+        >
+          {(upcoming.length > 0 ? upcoming : recent).map((h) => (
+            <p class="rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
+              <span class="font-semibold">{fmtDate(h.date)}</span>
+              {h.time && ` · ${fmtTime(h.time)}`}
+              {h.location && ` · ${h.location}`}
+              {h.source_url && (
+                <a href={h.source_url} class="ml-2 underline">official notice</a>
+              )}
+              {h.video_url && (
+                <a href={h.video_url} class="ml-2 font-semibold underline">watch on WisconsinEye</a>
+              )}
+            </p>
+          ))}
+        </div>
+      )}
     </section>
   </div>
 </Base>

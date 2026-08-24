@@ -170,13 +170,14 @@ export const personVotes = (personId: string, limit: number) =>
 
 export const personSponsorships = (personId: string) =>
   prep(
-      `SELECT s.is_primary, b.id AS bill_id, b.identifier, b.title, b.status,
-              b.session_id, b.died_without_hearing
+      `SELECT s.is_primary, s.classification, b.id AS bill_id, b.identifier,
+              b.title, b.status, b.session_id, b.died_without_hearing
        FROM sponsorships s JOIN bills b ON b.id = s.bill_id
        WHERE s.person_id = ? AND b.source != 'legiscan' ORDER BY b.id DESC`,
     )
     .all(personId) as {
     is_primary: number;
+    classification: string;
     bill_id: string;
     identifier: string;
     title: string | null;
@@ -454,6 +455,43 @@ export const governorsDesk = () => {
     enacted: byStatus("enacted"),
     vetoed: byStatus("vetoed"),
     overrides,
+  };
+};
+
+/** The sitting governor, entirely from certified data: identity and 2026
+ * candidacy from the WEC ballot-access report, last election from the
+ * certified canvass. Party comes from the winning ticket, never assumed. */
+export const governorInfo = () => {
+  const row = prep(
+      `SELECT incumbent, MAX(incumbent_noncandidacy) AS noncandidacy
+       FROM statewide_races WHERE office = 'GOVERNOR' AND incumbent IS NOT NULL`,
+    ).get() as { incumbent: string | null; noncandidacy: number } | undefined;
+  if (!row?.incumbent) return null;
+  const results = prep(
+      `SELECT year, candidate, party, votes, total_cast FROM statewide_history
+       WHERE office = 'GOVERNOR / LIEUTENANT GOVERNOR'
+       AND year = (SELECT MAX(year) FROM statewide_history
+                   WHERE office = 'GOVERNOR / LIEUTENANT GOVERNOR')
+       ORDER BY votes DESC`,
+    ).all() as {
+      year: number; candidate: string; party: string | null;
+      votes: number; total_cast: number;
+    }[];
+  const won = results.find((r) => r.candidate.includes(row.incumbent!)) ?? null;
+  const runnerUp = results.filter((r) => r !== won)[0] ?? null;
+  const candidates2026 = prep(
+      `SELECT candidate, party, ballot_status FROM statewide_races
+       WHERE office = 'GOVERNOR' ORDER BY candidate`,
+    ).all() as { candidate: string; party: string | null; ballot_status: string | null }[];
+  return {
+    name: row.incumbent,
+    party: won?.party ?? null,
+    notRunning: row.noncandidacy === 1,
+    lastElection: won
+      ? { year: won.year, ticket: won.candidate, votes: won.votes,
+          total: won.total_cast, runnerUp }
+      : null,
+    candidates2026,
   };
 };
 
