@@ -285,30 +285,43 @@ hosting.**
 | LegiScan as a data source | **Rejected for now** | We scrape the primary source directly; LegiScan adds nothing we lack, and its governing ToS is behind a bot wall no automated read could reach — storage rights unverified. If ever wanted (e.g., as a cross-check feed), a human must read [legiscan.com/terms-of-service](https://legiscan.com/terms-of-service) first. |
 | Administrative-rules tracker | **Deferred (weak demand)** | Every guide found is professional-facing (e.g., [lobbying-firm guide](https://www.hamilton-consulting.com/hcg-guide-to-the-wisconsin-administrative-rules-process/)); zero consumer explainers or FAQ presence. Data is feasible (Register is public-record HTML/PDF with RSS, [register](https://docs.legis.wisconsin.gov/code/register)) — so this is a demand rejection, not a licensing one. Revisit if a rule ever drives constituent traffic. |
 | Election-night results | **Rejected** | No feed exists: "Wisconsin does not have a statewide system for reporting unofficial results on Election Night" ([WEC](https://elections.wi.gov/elections/election-results)). Certified-only is what we already do. |
+| WCCA circuit-court data subscription (CCAP REST) | **Rejected — cost** | $12,500/yr non-refundable (§XIII of the subscription agreement, on file); 7-day update duty (§VIII.D) and destroy-on-direction (§VIII.E) also misfit a static archive. Court tracking proceeds federal-first (CourtListener) + curated WSCCA links. |
 | Bill prognosis / ideology scores / report-card grades | **Rejected** | GovTrack/CalMatters pattern, but computed judgment scores conflict with our raw-facts-with-methodology ethos; our rule-selected Key Votes already covers the defensible part. |
 | Ballotpedia-style pro/con argument curation | **Deferred** | Valuable but original editorial content with ongoing maintenance; doesn't fit the current one-maintainer, data-derived model. |
 
-## 5. Open questions needing your decision
+## 5. Open questions — DECIDED 2026-08-24
 
-1. **One-time legal read on rehosting** state legislative PDFs (veto messages,
-   LRB-produced documents). Statutes/acts/bills are uncopyrightable edicts of
-   government (*Georgia v. Public.Resource.Org*, 590 U.S. 255 (2020)
-   reasoning), and docs.legis states no site ToS at all — but Wisconsin has
-   historically asserted copyright over certain LRB compilations. Linking is
-   unambiguous; **rehosting** needs one considered decision. (Everything
-   ranked above works with links alone.)
-2. **Deployment gating:** #3 and #8 are only worth building once nightly
-   builds are live. Do you want them queued behind Phase 6, or built dark?
-3. **State-court tracking:** worth a human look at WSCCA's terms (none found;
-   scraping permissibility unclear), or ship federal-only court tracking with
-   an honest coverage label?
-4. **Reddit demand check:** all demand ratings above lean on institutional
-   evidence because Reddit was unreachable from this environment. A manual
-   skim of r/wisconsin & r/madison for "who represents me / how do I testify /
-   what happened to bill X" threads would either confirm or adjust the top
-   rankings before you commit build effort.
-5. **Contact-info scope for #1:** email only (already in our CC0 data), or
-   also scrape office phone/address from docs.legis member pages?
+1. **Rehosting state PDFs: links only.** No rehosting of veto messages, LRB
+   documents, or any state PDF; every ranked feature works with links to the
+   stable docs.legis URLs. This removes the LRB-copyright question entirely.
+2. **Deployment gating: confirmed.** #3 (this-week hearings) and #8
+   (most-viewed bills) queue behind Phase 6 hosting; not built dark.
+3. **State-court tracking: circuit-court data is rejected on cost.** The
+   Wisconsin Court Data Subscription Agreement (CCAP REST, non-state
+   subscriber form, rev. 08/2022 — on file) settles it: §XIII "Subscriber
+   agrees to pay a non-refundable subscription fee of **$12,500** for 12
+   months of electronic access to WCCA Information through the REST
+   interface." That is ~520× the site's entire annual budget, so it fails
+   hard constraint #1 regardless of terms. The terms would independently be a
+   poor fit for a static archive: published records must be updated "within
+   seven (7) days after receiving WCCA Information" (§VIII.D), the subscriber
+   must "promptly comply with all CCAP instructions… including… any direction
+   to destroy or modify the data" (§VIII.E), a mandatory disclosure statement
+   must accompany every display (§VIII.C), criminal-case displays require a
+   statutory employer advisory (§VIII.F), and all data must be destroyed on
+   termination (§XII.F). Redistribution per se *is* permitted on websites
+   listed in Exhibit A (§VII.D) — cost and the update/destroy duties are what
+   kill it, not a display ban. **Resolution: candidate #7 proceeds
+   federal-first via CourtListener (public-domain bulk, verified), with major
+   state cases handled as curated links to WSCCA/wicourts case pages —
+   linking to the public appellate site requires no agreement.**
+4. **Reddit demand check: skipped** by decision; rankings stand on the
+   institutional evidence.
+5. **Contact-info scope for #1: email and phone, office contacts only** —
+   official Capitol office email/phone/address as published by the
+   Legislature; never personal numbers or addresses. Emails come from the
+   CC0 people YAML already fetched; office phone/address will come from each
+   member's docs.legis page (public record).
 
 ## Appendix: source-terms summary matrix
 
