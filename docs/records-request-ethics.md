@@ -1,6 +1,10 @@
 # Records request: Wisconsin Ethics Commission
 
-Draft, ready to send to ethics@wi.gov from Henry's own address.
+**SENT 2026-08-24** to ethics@wi.gov from hphil.work@gmail.com, signed
+Henry Phillips. Awaiting response. § 19.35 sets no fixed deadline
+("as soon as practicable and without delay"); a polite follow-up is
+reasonable after ~2 weeks of silence.
+
 Covers four asks: the committee registrant extract, filed-report
 summary data if available, and a courtesy blessing for automated
 retrieval from both CFIS and Eye on Lobbying.
