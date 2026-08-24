@@ -750,7 +750,24 @@ export const moneyFor = (personId: string) => {
        GROUP BY q ORDER BY q`,
     )
     .all(P) as { q: string; total: number }[];
-  return { ...summary, entry, committees, occupations, quarters };
+  // composition by CFIS source type, exactly as the committee reported it
+  const byType = prep(
+      `SELECT COALESCE(from_type, 'Other') AS type, SUM(amount) AS total, COUNT(*) AS n
+       FROM contributions c WHERE c.person_id = @person AND ${IN_TERM}
+       GROUP BY COALESCE(from_type, 'Other') ORDER BY total DESC`,
+    )
+    .all(P) as { type: string; total: number; n: number }[];
+  // individual donors grouped by CFIS entity id (collision-proof), never name
+  const individuals = prep(
+      `SELECT from_entity_id AS entityId, MAX(from_name) AS name,
+              SUM(amount) AS total, COUNT(*) AS n
+       FROM contributions c
+       WHERE c.person_id = @person AND ${IN_TERM}
+       AND from_type = 'Individual' AND from_entity_id IS NOT NULL
+       GROUP BY from_entity_id ORDER BY total DESC LIMIT 5`,
+    )
+    .all(P) as { entityId: number; name: string; total: number; n: number }[];
+  return { ...summary, entry, committees, occupations, quarters, byType, individuals };
 };
 
 interface CommitteeAgg {
@@ -1004,6 +1021,221 @@ export const lobbyingFor = (billId: string) =>
        WHERE bill_id = ? ORDER BY principal`,
     )
     .all(billId) as { principal_id: number; principal: string; source_url: string | null }[];
+
+/** ---- New laws, veto tracker, key votes ---- */
+
+export const bienniumOf = (sessionId: string): number => {
+  const y = Number(sessionId.slice(0, 4));
+  return y % 2 ? y : y - 1;
+};
+
+const ACT_RE = /Wisconsin Act (\d+)/i;
+const APPROVED_RE = /on (\d{1,2}-\d{1,2}-\d{4})/;
+// matches every passage-stage motion phrasing on floor roll calls,
+// including the terse all-caps docs ('PASSAGE', 'CONCURRENCE AS AMENDED');
+// the negative guard keeps procedural motions that merely mention passage
+// (refused to reconsider the vote by which the bill passed) out
+const PASSAGE_RE = /read a third time|concurred in|passed|passage|concurrence/i;
+const NOT_PASSAGE_RE = /refused|reconsider|nonconcur|reject|laid on table|suspend/i;
+const isPassage = (motion: string | null): boolean =>
+  motion != null && PASSAGE_RE.test(motion) && !NOT_PASSAGE_RE.test(motion);
+
+export interface LawVote {
+  id: string; chamber: string | null; motion: string | null;
+  yes: number; no: number; date: string | null;
+}
+export interface Law {
+  bill_id: string; session_id: string; identifier: string; title: string | null;
+  act: number; approved: string | null; partial: boolean; votes: LawVote[];
+}
+
+/** Each chamber's last recorded passage roll call on one bill. Voice and
+ * paper votes leave no roll-call document and are omitted, never guessed. */
+const passageVotes = (billId: string): LawVote[] => {
+  const events = prep(
+      `SELECT id, chamber, motion, yes_count, no_count, date FROM vote_events
+       WHERE bill_id = ? AND source_url LIKE '%/votes/%'
+       AND COALESCE(yes_count, 0) + COALESCE(no_count, 0) > 0
+       ORDER BY date, id`,
+    )
+    .all(billId) as {
+      id: string; chamber: string | null; motion: string | null;
+      yes_count: number; no_count: number; date: string | null;
+    }[];
+  const last = new Map<string, LawVote>();
+  for (const e of events) {
+    if (!e.chamber || !isPassage(e.motion)) continue;
+    last.set(e.chamber, {
+      id: e.id, chamber: e.chamber, motion: e.motion,
+      yes: e.yes_count, no: e.no_count, date: e.date,
+    });
+  }
+  return ["upper", "lower"].flatMap((c) => (last.has(c) ? [last.get(c)!] : []));
+};
+
+/** Every act of law from one biennium, in act-number order. The act
+ * number and approval date come verbatim from the governor's approval
+ * action in the official bill history. */
+const _laws = new Map<number, Law[]>();
+export const lawsFor = (biennium: number): Law[] => {
+  const cached = _laws.get(biennium);
+  if (cached) return cached;
+  const rows = prep(
+      `SELECT b.id, b.session_id, b.identifier, b.title, a.description
+       FROM bills b JOIN actions a ON a.bill_id = b.id
+       WHERE b.status = 'enacted' AND b.source != 'legiscan'
+       AND CAST(substr(b.session_id, 1, 4) AS INTEGER) IN (?, ?)
+       AND a.description LIKE '%Wisconsin Act %'`,
+    )
+    .all(biennium, biennium + 1) as {
+      id: string; session_id: string; identifier: string;
+      title: string | null; description: string;
+    }[];
+  const laws = rows
+    .map((r) => ({
+      bill_id: r.id, session_id: r.session_id, identifier: r.identifier,
+      title: r.title,
+      act: Number(ACT_RE.exec(r.description)![1]),
+      approved: APPROVED_RE.exec(r.description)?.[1] ?? null,
+      partial: /partial veto/i.test(r.description),
+      votes: passageVotes(r.id),
+    }))
+    .sort((a, b) => a.act - b.act);
+  _laws.set(biennium, laws);
+  return laws;
+};
+
+/** Bienniums covered by this build that produced acts, newest first. */
+export const lawBienniums = () =>
+  [...new Set(builtSessions().map((s) => bienniumOf(s.id)))]
+    .sort((a, b) => b - a)
+    .map((biennium) => ({ biennium, laws: lawsFor(biennium) }))
+    .filter((b) => b.laws.length > 0);
+
+export interface VetoBiennium {
+  biennium: number;
+  fullVetoes: {
+    bill_id: string; session_id: string; identifier: string;
+    title: string | null; date: string | null;
+  }[];
+  partialVetoes: Law[];
+  attempts: {
+    bill_id: string; session_id: string; identifier: string; title: string | null;
+    date: string; description: string; vote: LawVote | null;
+  }[];
+}
+
+/** Vetoes and override attempts per built biennium, straight from the
+ * official history: full vetoes (bill status), partial vetoes (approval
+ * text), and every "notwithstanding the objections" attempt with its
+ * roll call where one was recorded. */
+export const vetoTracker = (): VetoBiennium[] =>
+  [...new Set(builtSessions().map((s) => bienniumOf(s.id)))]
+    .sort((a, b) => b - a)
+    .map((biennium) => {
+      const years = [biennium, biennium + 1];
+      const fullVetoes = (prep(
+          `SELECT b.id AS bill_id, b.session_id, b.identifier, b.title, a.date
+           FROM bills b LEFT JOIN actions a ON a.bill_id = b.id
+             AND LOWER(a.description) LIKE '%vetoed by the governor%'
+           WHERE b.status = 'vetoed' AND b.source != 'legiscan'
+           AND CAST(substr(b.session_id, 1, 4) AS INTEGER) IN (?, ?)
+           GROUP BY b.id ORDER BY MAX(a.date) DESC, b.id`,
+        )
+        .all(...years)) as VetoBiennium["fullVetoes"];
+      const partialVetoes = lawsFor(biennium).filter((l) => l.partial);
+      const attemptRows = prep(
+          `SELECT b.id AS bill_id, b.session_id, b.identifier, b.title,
+                  a.date, a.description
+           FROM actions a JOIN bills b ON b.id = a.bill_id
+           WHERE LOWER(a.description) LIKE '%notwithstanding the objections%'
+           AND b.source != 'legiscan'
+           AND CAST(substr(b.session_id, 1, 4) AS INTEGER) IN (?, ?)
+           ORDER BY a.date DESC, b.id`,
+        )
+        .all(...years) as {
+          bill_id: string; session_id: string; identifier: string;
+          title: string | null; date: string; description: string;
+        }[];
+      const attempts = attemptRows.map((a) => {
+        const vote = prep(
+            `SELECT id, chamber, motion, yes_count AS yes, no_count AS no, date
+             FROM vote_events WHERE bill_id = ? AND substr(date, 1, 10) = ?
+             AND LOWER(motion) LIKE '%notwithstanding%'
+             AND source_url LIKE '%/votes/%' LIMIT 1`,
+          )
+          .get(a.bill_id, a.date.slice(0, 10)) as LawVote | undefined;
+        return { ...a, vote: vote ?? null };
+      });
+      return { biennium, fullVetoes, partialVetoes, attempts };
+    })
+    .filter((b) => b.fullVetoes.length || b.partialVetoes.length || b.attempts.length);
+
+/** Roll calls that qualify as key votes, by rule: the final recorded
+ * passage vote of every bill that became law, any floor vote decided by
+ * five or fewer, and every veto-override vote. One scan serves every
+ * legislator page. */
+let _keyEvents: Map<string, string[]> | undefined;
+const keyEvents = (): Map<string, string[]> => {
+  if (_keyEvents) return _keyEvents;
+  const m = new Map<string, string[]>();
+  const add = (id: string, kind: string) => {
+    const kinds = m.get(id) ?? [];
+    if (!kinds.includes(kind)) kinds.push(kind);
+    m.set(id, kinds);
+  };
+  const lawEvents = prep(
+      `SELECT e.id, e.bill_id, e.chamber, e.motion FROM vote_events e
+       JOIN bills b ON b.id = e.bill_id
+       WHERE b.status = 'enacted' AND e.source_url LIKE '%/votes/%'
+       AND COALESCE(e.yes_count, 0) + COALESCE(e.no_count, 0) > 0
+       ORDER BY e.date, e.id`,
+    )
+    .all() as { id: string; bill_id: string; chamber: string | null; motion: string | null }[];
+  const lastPassage = new Map<string, string>();
+  for (const e of lawEvents) {
+    if (e.chamber && isPassage(e.motion)) {
+      lastPassage.set(`${e.bill_id}|${e.chamber}`, e.id);
+    }
+  }
+  for (const id of lastPassage.values()) add(id, "became law");
+  for (const { id } of prep(
+      `SELECT id FROM vote_events WHERE source_url LIKE '%/votes/%'
+       AND COALESCE(yes_count, 0) + COALESCE(no_count, 0) > 0
+       AND ABS(yes_count - no_count) <= 5`,
+    ).all() as { id: string }[]) {
+    add(id, "close vote");
+  }
+  for (const { id } of prep(
+      `SELECT id FROM vote_events WHERE source_url LIKE '%/votes/%'
+       AND LOWER(motion) LIKE '%notwithstanding%'`,
+    ).all() as { id: string }[]) {
+    add(id, "veto override");
+  }
+  return (_keyEvents = m);
+};
+
+/** One member's votes on the key roll calls, newest first. */
+export const keyVotesFor = (personId: string) => {
+  const keys = keyEvents();
+  const rows = prep(
+      `SELECT r.option, e.id AS vote_event_id, e.date, e.motion,
+              e.yes_count, e.no_count,
+              b.identifier, b.title, b.session_id
+       FROM vote_records r
+       JOIN vote_events e ON e.id = r.vote_event_id
+       JOIN bills b ON b.id = e.bill_id
+       WHERE r.person_id = ? ORDER BY e.date DESC, e.id`,
+    )
+    .all(personId) as {
+      option: string; vote_event_id: string; date: string | null;
+      motion: string | null; yes_count: number | null; no_count: number | null;
+      identifier: string; title: string | null; session_id: string;
+    }[];
+  return rows
+    .filter((r) => keys.has(r.vote_event_id))
+    .map((r) => ({ ...r, kinds: keys.get(r.vote_event_id)! }));
+};
 
 export const sessionStats = (sessionId: string) =>
   prep(

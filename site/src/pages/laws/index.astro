@@ -1,0 +1,31 @@
+---
+import Base from "../../layouts/Base.astro";
+import { lawBienniums } from "../../lib/db";
+const bienniums = lawBienniums();
+---
+
+<Base
+  title="New laws"
+  description="Every Wisconsin Act, by legislative session, from the official bill histories."
+>
+  <h1 class="text-2xl font-bold">New laws</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-600">
+    Every bill signed into law becomes a numbered Wisconsin Act. Each biennium
+    below lists its acts in order, with the governor's approval date and the
+    final recorded floor votes, all from the official bill histories.
+  </p>
+  <ul class="mt-4 space-y-2">
+    {bienniums.map(({ biennium, laws }) => (
+      <li class="flex flex-wrap items-baseline gap-3 rounded-lg border border-navy-100 bg-white px-4 py-3">
+        <a href={`/laws/${biennium}/`} class="font-bold underline">
+          {biennium}–{biennium + 1} session
+        </a>
+        <span class="text-sm text-navy-600">
+          {laws.length} acts
+          {laws.filter((l) => l.partial).length > 0 &&
+            ` · ${laws.filter((l) => l.partial).length} signed with a partial veto`}
+        </span>
+      </li>
+    ))}
+  </ul>
+</Base>

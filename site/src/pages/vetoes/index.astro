@@ -1,0 +1,95 @@
+---
+import Base from "../../layouts/Base.astro";
+import { vetoTracker } from "../../lib/db";
+import { billSlug, chamberName, fmtDate } from "../../lib/format";
+const bienniums = vetoTracker();
+---
+
+<Base
+  title="Veto tracker"
+  description="Every gubernatorial veto, partial veto, and override attempt, from the official bill histories."
+>
+  <h1 class="text-2xl font-bold">Veto tracker</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-600">
+    Wisconsin governors can veto a bill outright or, on appropriation bills,
+    strike parts and sign the rest (a partial veto). The Legislature can pass
+    a bill over a veto with a two-thirds vote of both chambers. Everything
+    below comes verbatim from the official bill histories.
+  </p>
+  {bienniums.map((b) => (
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">{b.biennium}–{b.biennium + 1}</h2>
+      <p class="mt-1 text-sm text-navy-600">
+        {b.fullVetoes.length} bills vetoed · {b.partialVetoes.length} signed
+        with a partial veto · {b.attempts.length} override
+        {b.attempts.length === 1 ? " attempt" : " attempts"} recorded
+      </p>
+      {b.attempts.length > 0 && (
+        <details class="mt-2 rounded-lg border border-navy-100 bg-white" open={b.attempts.length <= 10}>
+          <summary class="cursor-pointer px-3 py-2 text-sm font-semibold">
+            Override attempts · {b.attempts.length}
+          </summary>
+          <ul class="space-y-1 px-3 pb-3">
+            {b.attempts.map((a) => (
+              <li class="flex flex-wrap items-baseline gap-x-3 border-t border-navy-100 pt-1 text-sm">
+                <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(a.date)}</span>
+                <a href={`/bills/${a.session_id}/${billSlug(a.identifier)}/`} class="w-20 shrink-0 font-bold underline">
+                  {a.identifier}
+                </a>
+                <span class="min-w-0 flex-1 basis-64">{a.description}</span>
+                {a.vote && (
+                  <a href={`/votes/${a.vote.id}/`} class="shrink-0 py-1 text-xs underline tabular-nums">
+                    {chamberName(a.vote.chamber)} roll call {a.vote.yes}–{a.vote.no}
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {b.fullVetoes.length > 0 && (
+        <details class="mt-2 rounded-lg border border-navy-100 bg-white">
+          <summary class="cursor-pointer px-3 py-2 text-sm font-semibold">
+            Vetoed bills · {b.fullVetoes.length}
+          </summary>
+          <div class="max-h-96 overflow-y-auto border-t border-navy-100" role="region" tabindex="0" aria-label={`Bills vetoed in ${b.biennium}–${b.biennium + 1}`}>
+            <ul class="space-y-1 p-3 text-sm">
+              {b.fullVetoes.map((v) => (
+                <li class="flex items-baseline gap-2">
+                  <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
+                  <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="w-20 shrink-0 font-semibold underline">
+                    {v.identifier}
+                  </a>
+                  <span class="min-w-0 flex-1 truncate">{v.title?.replace(/^Relating to: /, "")}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </details>
+      )}
+      {b.partialVetoes.length > 0 && (
+        <details class="mt-2 rounded-lg border border-navy-100 bg-white">
+          <summary class="cursor-pointer px-3 py-2 text-sm font-semibold">
+            Signed with a partial veto · {b.partialVetoes.length}
+          </summary>
+          <ul class="space-y-1 px-3 pb-3">
+            {b.partialVetoes.map((l) => (
+              <li class="flex items-baseline gap-2 border-t border-navy-100 pt-1 text-sm">
+                <span class="w-16 shrink-0 font-bold tabular-nums">Act {l.act}</span>
+                <a href={`/bills/${l.session_id}/${billSlug(l.identifier)}/`} class="w-20 shrink-0 font-semibold underline">
+                  {l.identifier}
+                </a>
+                <span class="min-w-0 flex-1 truncate">{l.title?.replace(/^Relating to: /, "")}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  ))}
+  <p class="mt-6 text-xs text-navy-600">
+    Source: each bill's official history at docs.legis.wisconsin.gov. An
+    override needs two-thirds in both chambers; attempts that passed one
+    chamber but not the other did not become law.
+  </p>
+</Base>

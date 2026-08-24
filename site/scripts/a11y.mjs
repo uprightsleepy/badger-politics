@@ -16,6 +16,7 @@ const PAGES = [
   "/money/committees/", "/money/committees/651839/", "/committees/", "/subjects/",
   "/following/", "/governors-desk/", "/districts/", "/districts/senate-21/",
   "/lobbying/", "/testify/", "/glossary/",
+  "/laws/", "/laws/2025/", "/vetoes/",
 ];
 {
   const idx = await readFile(join(DIST, "lobbying/index.html"), "utf-8").catch(() => "");

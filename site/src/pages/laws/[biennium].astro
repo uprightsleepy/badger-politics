@@ -1,0 +1,69 @@
+---
+import Base from "../../layouts/Base.astro";
+import { lawBienniums, lawsFor } from "../../lib/db";
+import { billSlug, chamberName } from "../../lib/format";
+
+export function getStaticPaths() {
+  return lawBienniums().map(({ biennium }) => ({
+    params: { biennium: String(biennium) },
+  }));
+}
+const biennium = Number(Astro.params.biennium);
+const laws = lawsFor(biennium);
+const partials = laws.filter((l) => l.partial).length;
+
+// approval dates come verbatim as M-D-YYYY from the approval action
+const fmtApproved = (raw: string | null): string => {
+  if (!raw) return "";
+  const [m, d, y] = raw.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
+    year: "numeric", month: "short", day: "numeric", timeZone: "UTC",
+  });
+};
+---
+
+<Base
+  title={`New laws · ${biennium}–${biennium + 1}`}
+  description={`All ${laws.length} Wisconsin Acts of the ${biennium}–${biennium + 1} legislative session.`}
+>
+  <h1 class="text-2xl font-bold">New laws · {biennium}–{biennium + 1}</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-600">
+    {laws.length} bills became Wisconsin Acts this session{partials > 0 && (
+      <>, {partials} of them signed with a partial veto</>
+    )}. Act numbers and approval dates come verbatim from each bill's
+    official history. Vote tallies are each chamber's last recorded passage
+    roll call; a chamber with no tally shown passed the bill without a
+    recorded roll call (a voice or paper vote).
+  </p>
+  <ul class="mt-4 space-y-1">
+    {laws.map((law) => (
+      <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm">
+        <span class="w-16 shrink-0 font-bold tabular-nums">Act {law.act}</span>
+        <a
+          href={`/bills/${law.session_id}/${billSlug(law.identifier)}/`}
+          class="w-16 shrink-0 font-semibold underline"
+        >
+          {law.identifier}
+        </a>
+        <span class="min-w-0 flex-1 basis-64">{law.title?.replace(/^Relating to: /, "")}</span>
+        <span class="shrink-0 text-xs text-navy-600">
+          approved {fmtApproved(law.approved)}
+        </span>
+        {law.partial && (
+          <span class="shrink-0 rounded-full bg-gold-100 px-2 py-0.5 text-xs font-semibold">
+            partial veto
+          </span>
+        )}
+        {law.votes.map((v) => (
+          <a href={`/votes/${v.id}/`} class="shrink-0 py-1 text-xs underline tabular-nums">
+            {chamberName(v.chamber)} {v.yes}–{v.no}
+          </a>
+        ))}
+      </li>
+    ))}
+  </ul>
+  <p class="mt-3 text-xs text-navy-600">
+    Source: each bill's official history at docs.legis.wisconsin.gov. Special
+    sessions share the biennium's act numbering, so their acts appear here too.
+  </p>
+</Base>

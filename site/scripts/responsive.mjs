@@ -13,6 +13,7 @@ const PAGES = [
   "/elections/2026/", "/data/", "/about/", "/money/", "/money/committees/",
   "/money/committees/651839/", "/404.html", "/governors-desk/", "/districts/",
   "/districts/senate-21/", "/lobbying/", "/testify/", "/glossary/",
+  "/laws/", "/laws/2025/", "/vetoes/",
 ];
 const moneyHref = await moneyLegislatorHref();
 if (moneyHref) PAGES.push(moneyHref);
