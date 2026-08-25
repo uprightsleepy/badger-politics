@@ -1395,6 +1395,7 @@ export const cfCommitteeFor = (entityId: number) => {
     advocacy: prep(
         `SELECT date, amount, stance, related_name, related_office, related_district, purpose
          FROM cf_transactions WHERE filer_entity_id = ? AND stance IS NOT NULL
+         AND related_name IS NOT NULL
          ORDER BY date DESC LIMIT 100`,
       ).all(entityId) as {
         date: string; amount: number; stance: string; related_name: string | null;
@@ -1416,7 +1417,7 @@ export const independentExpenditures = (limit = 500) =>
               c.name AS filer_name, c.committee_type AS filer_type
        FROM cf_transactions t
        LEFT JOIN cf_committees c ON c.entity_id = t.filer_entity_id
-       WHERE t.stance IS NOT NULL
+       WHERE t.stance IS NOT NULL AND t.related_name IS NOT NULL
        AND COALESCE(t.filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')
        ORDER BY t.date DESC, t.amount DESC LIMIT ?`,
     )
@@ -1443,6 +1444,18 @@ export const advocacyForName = (name: string) =>
       date: string; amount: number; stance: string; related_office: string | null;
       related_district: string | null; filer_name: string | null; filer_type: string | null;
     }[];
+
+/** Totals over every attributed filing, not just the page's visible slice
+ * — a summary computed from a truncated list would understate the money. */
+export const independentExpenditureTotals = () =>
+  prep(
+      `SELECT stance, COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total
+       FROM cf_transactions
+       WHERE stance IS NOT NULL AND related_name IS NOT NULL
+       AND COALESCE(filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')
+       GROUP BY stance`,
+    )
+    .all() as { stance: string; n: number; total: number }[];
 
 /** Conduits pass earmarked individual money through to a candidate; the
  * conduit is the filer, but the money is not the conduit's own. */

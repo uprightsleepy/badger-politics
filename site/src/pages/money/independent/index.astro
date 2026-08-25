@@ -1,12 +1,17 @@
 ---
 import Base from "../../../layouts/Base.astro";
-import { independentExpenditures, conduitFlows } from "../../../lib/db";
+import { independentExpenditures, independentExpenditureTotals, conduitFlows } from "../../../lib/db";
 import { fmtMoney, fmtDate } from "../../../lib/format";
 
 const spends = independentExpenditures(800);
 const conduits = conduitFlows(60);
-const forTotal = spends.filter((s) => s.stance === "FOR").reduce((t, s) => t + s.amount, 0);
-const againstTotal = spends.filter((s) => s.stance === "AGAINST").reduce((t, s) => t + s.amount, 0);
+// totals cover every filing, not just the rows listed below
+const totals = independentExpenditureTotals();
+const sumOf = (stance: string) => totals.find((t) => t.stance === stance)?.total ?? 0;
+const countOf = (stance: string) => totals.find((t) => t.stance === stance)?.n ?? 0;
+const forTotal = sumOf("FOR");
+const againstTotal = sumOf("AGAINST");
+const filingCount = countOf("FOR") + countOf("AGAINST");
 // group by the race the filing names, so a reader sees a contest at once
 const byRace = new Map<string, typeof spends>();
 for (const s of spends) {
@@ -33,7 +38,7 @@ const races = [...byRace.entries()]
     expensive than the candidates' filings suggest.
   </p>
 
-  {spends.length === 0 ? (
+  {filingCount === 0 ? (
     <p class="mt-6 rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-700">
       No express advocacy is recorded in the filings we hold for this period.
       Committees register only after crossing the state's reporting
@@ -47,9 +52,15 @@ const races = [...byRace.entries()]
         <p><span class="block text-xs text-navy-600">Spent opposing</span>
           <span class="text-xl font-bold text-badger-700">{fmtMoney(againstTotal)}</span></p>
         <p><span class="block text-xs text-navy-600">Filings</span>
-          <span class="text-xl font-bold">{spends.length.toLocaleString()}</span></p>
+          <span class="text-xl font-bold">{filingCount.toLocaleString()}</span></p>
       </div>
 
+      {spends.length < filingCount && (
+        <p class="mt-2 text-xs text-navy-600">
+          Totals above cover all {filingCount.toLocaleString()} filings; the
+          races below list the {spends.length.toLocaleString()} most recent.
+        </p>
+      )}
       {races.map(({ race, rows, total }) => (
         <section class="mt-6">
           <h2 class="text-xl font-bold">{race}</h2>

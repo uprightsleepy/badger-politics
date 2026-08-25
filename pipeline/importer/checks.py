@@ -148,15 +148,25 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
         ),
         # express advocacy is a claim about a named candidate: a stance with
         # no target is unattributable and must never render
-        # third-party express advocacy is a claim about a named candidate.
-        # (Candidate committees also file stanced rows for their own ads and
-        # name no target; those are excluded here and never shown as
-        # independent expenditure.)
-        "third-party express advocacy without a named target": (
-            "SELECT COUNT(*) FROM cf_transactions"
-            " WHERE stance IS NOT NULL"
-            " AND COALESCE(filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')"
+        # A stance alone does not make a row candidate advocacy: referendum
+        # committees advocate on ballot questions, and parties/PACs flag
+        # ordinary vendor payments the same way. Both legitimately name no
+        # candidate, so requiring one would fail on correct data. What does
+        # hold — and what the display depends on — is that the candidate and
+        # the race travel together: a row naming either names both.
+        # scoped to third-party filers: those are the rows shown as
+        # independent expenditure. A candidate committee's own stanced
+        # spending is never presented that way, so its gaps cannot mislead.
+        "advocacy naming a race but not the candidate": (
+            "SELECT COUNT(*) FROM cf_transactions WHERE stance IS NOT NULL"
+            " AND related_office IS NOT NULL"
             " AND (related_name IS NULL OR related_name = '')"
+            " AND COALESCE(filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')"
+        ),
+        "advocacy naming a candidate but not the race": (
+            "SELECT COUNT(*) FROM cf_transactions WHERE stance IS NOT NULL"
+            " AND related_name IS NOT NULL AND related_office IS NULL"
+            " AND COALESCE(filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')"
         ),
         # a conduit pass-through whose final recipient is missing would be
         # shown as the conduit's own money
