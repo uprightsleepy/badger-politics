@@ -4,6 +4,7 @@ import {
   seatTerms, sittingPeople, electionFor, electionHistoryFor, lastMarginFor,
 } from "../../lib/db";
 import { partyStyle, personSlug, monthYear, chamberName } from "../../lib/format";
+import { safeHref } from "../../lib/html";
 import { mergeServiceSpans } from "../../lib/service";
 
 export function getStaticPaths() {
@@ -106,7 +107,7 @@ const lineage = [...byPerson.entries()]
           </div>
           {s.end_label && (
             <p class="text-xs text-navy-600">
-              {s.end_url ? <a href={s.end_url} class="inline-block py-1 underline">{s.end_label}</a> : <span class="inline-block py-1">{s.end_label}</span>}
+              {safeHref(s.end_url) ? <a href={safeHref(s.end_url)} class="inline-block py-1 underline">{s.end_label}</a> : <span class="inline-block py-1">{s.end_label}</span>}
             </p>
           )}
         </li>

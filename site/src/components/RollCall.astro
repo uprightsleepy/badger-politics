@@ -1,6 +1,7 @@
 ---
 import PartyChip from "./PartyChip.astro";
 import { chamberName, personSlug } from "../lib/format";
+import { safeHref } from "../lib/html";
 import type { VoteEvent } from "../lib/db";
 import { voteRecordsFor } from "../lib/db";
 interface Props { event: VoteEvent; compact?: boolean; headingLevel?: "h2" | "h3" }
@@ -30,8 +31,8 @@ const groups = [
       {event.yes_count != null && ` ${event.yes_count}–${event.no_count ?? 0}`}
     </span>
     <span class="text-sm text-navy-600">{event.date}</span>
-    {event.source_url && (
-      <a href={event.source_url} class="text-sm underline">official source</a>
+    {safeHref(event.source_url) && (
+      <a href={safeHref(event.source_url)} class="text-sm underline">official source</a>
     )}
     {!compact && <a href={`/votes/${event.id}/`} class="text-sm underline">full page</a>}
   </div>
