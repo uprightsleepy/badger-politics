@@ -31,8 +31,12 @@ def fetch_github_dir(repo_path: str, dest: Path) -> int:
 
     dest.mkdir(parents=True, exist_ok=True)
     for entry in entries:
+        # the name is remote JSON used as a filename: never let it escape dest
+        name = entry["name"]
+        if "/" in name or "\\" in name or ".." in name:
+            raise RuntimeError(f"unsafe filename from GitHub listing: {name!r}")
         response = http.get(entry["download_url"], timeout=30)
         response.raise_for_status()
-        (dest / entry["name"]).write_bytes(response.content)
+        (dest / name).write_bytes(response.content)
         time.sleep(0.1)
     return len(entries)
