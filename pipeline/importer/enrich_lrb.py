@@ -30,8 +30,17 @@ ANALYSIS_END = re.compile(
     r"the\s+people\s+of\s+the\s+state\s+of\s+wisconsin[\s\S]{0,40}?"
     r"represented\s+in\s+senate\s+and\s+assembly"
     r"|for\s+further\s+information\s+see\s+the"
-    r"|fiscal\s+estimate",
-    re.I,
+    r"|fiscal\s+estimate"
+    # resolutions have no enacting clause; their text opens with the
+    # preamble or resolving clause. (The documents' own anchors, e.g.
+    # "SJR2,2,4", are unusable: they also punctuate bill analyses.)
+    r"|^(?:whereas,|resolved\s+by\s+the|now,\s+therefore)",
+    re.I | re.M,
+)
+
+
+TRAILING_ANCHORS = re.compile(
+    r"(?:\n[ \t]*(?:[A-Z]{2,3}\d+(?:,\d+)+|\d+))+[ \t]*$"
 )
 
 
@@ -58,6 +67,9 @@ def extract_analysis(page_html: str) -> str | None:
     if cut:
         text = text[: cut.start()]
     text = re.sub(r"[ \t]+", " ", text).strip()
+    # drop the document anchors and line numbers ("SJR2,2,4", "3") that
+    # sit between the analysis and the text following it
+    text = TRAILING_ANCHORS.sub("", text).strip()
     return text or None
 
 
