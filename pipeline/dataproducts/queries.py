@@ -7,6 +7,7 @@ through these helpers, not raw SQL.
 
 from __future__ import annotations
 
+import itertools
 import json
 import sqlite3
 from pathlib import Path
@@ -88,6 +89,65 @@ def vote_records_for(conn: sqlite3.Connection, vote_event_id: str) -> list[dict]
             (vote_event_id,),
         )
     ]
+
+
+def vote_records_grouped(conn: sqlite3.Connection):
+    """(vote_event_id, records) streamed from one ordered scan; each
+    record dict is shaped exactly like vote_records_for's rows."""
+    cursor = conn.execute(
+        "SELECT r.vote_event_id, r.person_id, r.option,"
+        " p.name, p.party, p.district, p.chamber"
+        " FROM vote_records r JOIN people p ON p.id = r.person_id"
+        " ORDER BY r.vote_event_id, p.name"
+    )
+    for event_id, rows in itertools.groupby(cursor, key=lambda r: r["vote_event_id"]):
+        yield event_id, [
+            {k: r[k] for k in
+             ("person_id", "option", "name", "party", "district", "chamber")}
+            for r in rows
+        ]
+
+
+def actions_for_session(conn: sqlite3.Connection, session_id: str) -> dict[str, list[dict]]:
+    """bill_id -> actions for one session, from one ordered scan; row
+    shape and per-bill order match actions_for exactly."""
+    cursor = conn.execute(
+        "SELECT a.bill_id, a.date, a.chamber, a.description, a.classification"
+        " FROM actions a JOIN bills b ON b.id = a.bill_id"
+        f" WHERE b.session_id = ? AND {exportable('b.')}"
+        " ORDER BY a.bill_id, a.date, a.id",
+        (session_id,),
+    )
+    return {
+        bill_id: [
+            {k: r[k] for k in ("date", "chamber", "description", "classification")}
+            for r in rows
+        ]
+        for bill_id, rows in itertools.groupby(cursor, key=lambda r: r["bill_id"])
+    }
+
+
+def sponsors_for_session(conn: sqlite3.Connection, session_id: str) -> dict[str, list[dict]]:
+    """bill_id -> sponsors for one session, from one ordered scan; row
+    shape and per-bill order match sponsors_for exactly."""
+    cursor = conn.execute(
+        "SELECT s.bill_id, s.name, s.person_id, s.classification, s.is_primary,"
+        " p.party, p.district, p.chamber"
+        " FROM sponsorships s LEFT JOIN people p ON p.id = s.person_id"
+        " JOIN bills b ON b.id = s.bill_id"
+        f" WHERE b.session_id = ? AND {exportable('b.')}"
+        " ORDER BY s.bill_id, s.is_primary DESC, s.name",
+        (session_id,),
+    )
+    return {
+        bill_id: [
+            {k: r[k] for k in
+             ("name", "person_id", "classification", "is_primary",
+              "party", "district", "chamber")}
+            for r in rows
+        ]
+        for bill_id, rows in itertools.groupby(cursor, key=lambda r: r["bill_id"])
+    }
 
 
 def votes_by_person(
