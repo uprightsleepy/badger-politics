@@ -14,7 +14,7 @@ import {
   electionFor,
   currentSessions,
 } from "../../lib/db";
-import { billSlug, personSlug } from "../../lib/format";
+import { billSlug, committeeSlug, personSlug } from "../../lib/format";
 import { buildHeatDays } from "../../lib/service";
 
 export const GET: APIRoute = () => {
@@ -45,7 +45,7 @@ export const GET: APIRoute = () => {
       committees: committeesFor(p.id).map((c) => ({
         name: c.name,
         role: c.role,
-        slug: c.id.split("/").pop(),
+        slug: committeeSlug(c.id),
       })),
       attendance: { total: totalVotes, missed: missedVotes },
       authored: {

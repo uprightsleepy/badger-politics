@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { allCommittees } from "../../lib/db";
-import { personSlug } from "../../lib/format";
+import { committeeSlug, personSlug } from "../../lib/format";
 
 const committees = allCommittees();
 const groups = [
@@ -27,7 +27,7 @@ const groups = [
       <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
         {g.rows.map((c) => (
           <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2">
-            <a href={`/committees/${c.id.split("/").pop()}/`} class="min-w-0 flex-1 truncate py-1 font-semibold underline">
+            <a href={`/committees/${committeeSlug(c.id)}/`} class="min-w-0 flex-1 truncate py-1 font-semibold underline">
               {c.name}
             </a>
             {c.chair_name && (
