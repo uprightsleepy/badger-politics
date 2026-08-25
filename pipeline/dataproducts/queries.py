@@ -73,13 +73,9 @@ def sponsors_for(conn: sqlite3.Connection, bill_id: str) -> list[dict]:
     ]
 
 
-def vote_events(conn: sqlite3.Connection, bill_id: str | None = None) -> list[dict]:
+def vote_events(conn: sqlite3.Connection) -> list[dict]:
     query = f"SELECT * FROM vote_events WHERE {EXPORTABLE}"
-    params: tuple = ()
-    if bill_id:
-        query += " AND bill_id = ?"
-        params = (bill_id,)
-    return [dict(r) for r in conn.execute(query + " ORDER BY date, id", params)]
+    return [dict(r) for r in conn.execute(query + " ORDER BY date, id")]
 
 
 def vote_records_for(conn: sqlite3.Connection, vote_event_id: str) -> list[dict]:
