@@ -140,6 +140,31 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             " AND COALESCE(nv_count,0)=0 AND NOT EXISTS"
             " (SELECT 1 FROM vote_records r WHERE r.vote_event_id = e.id)"
         ),
+        # every committee transaction must trace to a known filer, or the
+        # money is attributed to a committee we cannot name
+        "cf transactions -> committee registry": (
+            "SELECT COUNT(*) FROM cf_transactions t LEFT JOIN cf_committees c"
+            " ON c.entity_id = t.filer_entity_id WHERE c.entity_id IS NULL"
+        ),
+        # express advocacy is a claim about a named candidate: a stance with
+        # no target is unattributable and must never render
+        # third-party express advocacy is a claim about a named candidate.
+        # (Candidate committees also file stanced rows for their own ads and
+        # name no target; those are excluded here and never shown as
+        # independent expenditure.)
+        "third-party express advocacy without a named target": (
+            "SELECT COUNT(*) FROM cf_transactions"
+            " WHERE stance IS NOT NULL"
+            " AND COALESCE(filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')"
+            " AND (related_name IS NULL OR related_name = '')"
+        ),
+        # a conduit pass-through whose final recipient is missing would be
+        # shown as the conduit's own money
+        "conduit rows with no final recipient": (
+            "SELECT COUNT(*) FROM cf_transactions"
+            " WHERE filer_type = 'Conduit' AND direction = 'OUTGOING'"
+            " AND (final_recipient_name IS NULL OR final_recipient_name = '')"
+        ),
         # statewide rows only ever carry the five constitutional offices,
         # and a parsed statewide contest below real turnout is a bad parse
         "statewide races carry only known offices": (

@@ -1327,6 +1327,136 @@ export const keyVotesFor = (personId: string) => {
     .map((r) => ({ ...r, kinds: keys.get(r.vote_event_id)! }));
 };
 
+/** ---- Committee money: PACs, conduits, parties, independent expenditures ---- */
+
+export interface CfCommittee {
+  entity_id: number;
+  name: string;
+  committee_type: string | null;
+  assigned_id: string | null;
+}
+
+/** entity id -> registration type, so a PAC, a party transfer and a
+ * conduit pass-through are never shown as the same kind of donor. */
+let _cfTypes: Map<number, CfCommittee> | undefined;
+export const cfCommittees = (): Map<number, CfCommittee> =>
+  (_cfTypes ??= new Map(
+    (prep("SELECT * FROM cf_committees").all() as CfCommittee[]).map((c) => [c.entity_id, c]),
+  ));
+
+export const cfTypeOf = (entityId: number | null): string | null =>
+  entityId == null ? null : cfCommittees().get(entityId)?.committee_type ?? null;
+
+/** Committees with enough activity to deserve a page, newest money first. */
+export const cfCommitteesWithPages = (minTotal = 5000) =>
+  prep(
+      `SELECT c.entity_id, c.name, c.committee_type, c.assigned_id,
+              SUM(CASE WHEN t.direction = 'INCOMING' THEN t.amount ELSE 0 END) AS raised,
+              SUM(CASE WHEN t.direction = 'OUTGOING' THEN t.amount ELSE 0 END) AS spent,
+              COUNT(*) AS n
+       FROM cf_committees c JOIN cf_transactions t ON t.filer_entity_id = c.entity_id
+       WHERE c.committee_type NOT IN ('State Candidate', 'Federal Candidate')
+       GROUP BY c.entity_id HAVING raised + spent >= ?
+       ORDER BY raised + spent DESC`,
+    )
+    .all(minTotal) as (CfCommittee & { raised: number; spent: number; n: number })[];
+
+/** One committee's money: totals, top donors, top recipients. */
+export const cfCommitteeFor = (entityId: number) => {
+  const committee = prep("SELECT * FROM cf_committees WHERE entity_id = ?")
+    .get(entityId) as CfCommittee | undefined;
+  if (!committee) return null;
+  const totals = prep(
+      `SELECT COALESCE(SUM(CASE WHEN direction = 'INCOMING' THEN amount END), 0) AS raised,
+              COALESCE(SUM(CASE WHEN direction = 'OUTGOING' THEN amount END), 0) AS spent,
+              COUNT(*) AS n, MIN(date) AS first, MAX(date) AS last
+       FROM cf_transactions WHERE filer_entity_id = ?`,
+    ).get(entityId) as {
+      raised: number; spent: number; n: number; first: string | null; last: string | null;
+    };
+  const side = (direction: "INCOMING" | "OUTGOING") =>
+    prep(
+        `SELECT other_entity_id AS entityId, MAX(other_name) AS name,
+                MAX(other_type) AS type, SUM(amount) AS total, COUNT(*) AS n
+         FROM cf_transactions
+         WHERE filer_entity_id = ? AND direction = ? AND other_name IS NOT NULL
+         GROUP BY COALESCE(other_entity_id, other_name)
+         ORDER BY total DESC LIMIT 20`,
+      )
+      .all(entityId, direction) as {
+        entityId: number | null; name: string; type: string | null;
+        total: number; n: number;
+      }[];
+  return {
+    committee,
+    ...totals,
+    donors: side("INCOMING"),
+    payees: side("OUTGOING"),
+    advocacy: prep(
+        `SELECT date, amount, stance, related_name, related_office, related_district, purpose
+         FROM cf_transactions WHERE filer_entity_id = ? AND stance IS NOT NULL
+         ORDER BY date DESC LIMIT 100`,
+      ).all(entityId) as {
+        date: string; amount: number; stance: string; related_name: string | null;
+        related_office: string | null; related_district: string | null; purpose: string | null;
+      }[],
+  };
+};
+
+/** Express advocacy: money spent for or against candidates by someone
+ * other than the candidate. It never appears in a candidate's own
+ * filings, which is exactly why it is worth surfacing separately.
+ * Candidate committees also file stanced rows for their own ads; those
+ * are the candidate's own spending, not third-party advocacy, and are
+ * excluded here so the two are never conflated. */
+export const independentExpenditures = (limit = 500) =>
+  prep(
+      `SELECT t.date, t.amount, t.stance, t.related_name, t.related_office,
+              t.related_district, t.purpose, t.filer_entity_id,
+              c.name AS filer_name, c.committee_type AS filer_type
+       FROM cf_transactions t
+       LEFT JOIN cf_committees c ON c.entity_id = t.filer_entity_id
+       WHERE t.stance IS NOT NULL
+       AND COALESCE(t.filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')
+       ORDER BY t.date DESC, t.amount DESC LIMIT ?`,
+    )
+    .all(limit) as {
+      date: string; amount: number; stance: string; related_name: string | null;
+      related_office: string | null; related_district: string | null;
+      purpose: string | null; filer_entity_id: number;
+      filer_name: string | null; filer_type: string | null;
+    }[];
+
+/** Express advocacy naming one legislator, matched on the committee's
+ * own related-entity name (exact, never a guess). */
+export const advocacyForName = (name: string) =>
+  prep(
+      `SELECT t.date, t.amount, t.stance, t.related_office, t.related_district,
+              c.name AS filer_name, c.committee_type AS filer_type
+       FROM cf_transactions t
+       LEFT JOIN cf_committees c ON c.entity_id = t.filer_entity_id
+       WHERE t.stance IS NOT NULL AND t.related_name = ?
+       AND COALESCE(t.filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')
+       ORDER BY t.date DESC`,
+    )
+    .all(name) as {
+      date: string; amount: number; stance: string; related_office: string | null;
+      related_district: string | null; filer_name: string | null; filer_type: string | null;
+    }[];
+
+/** Conduits pass earmarked individual money through to a candidate; the
+ * conduit is the filer, but the money is not the conduit's own. */
+export const conduitFlows = (limit = 200) =>
+  prep(
+      `SELECT c.name AS conduit, t.final_recipient_name AS recipient,
+              SUM(t.amount) AS total, COUNT(*) AS n
+       FROM cf_transactions t JOIN cf_committees c ON c.entity_id = t.filer_entity_id
+       WHERE t.final_recipient_name IS NOT NULL
+       GROUP BY c.name, t.final_recipient_name
+       ORDER BY total DESC LIMIT ?`,
+    )
+    .all(limit) as { conduit: string; recipient: string; total: number; n: number }[];
+
 export const sessionStats = (sessionId: string) =>
   prep(
       `SELECT COUNT(*) AS bills,

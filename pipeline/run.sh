@@ -44,6 +44,11 @@ python -m scraper.fetch_cfis transactions     # nightly delta (past months cache
 python -m scraper.fetch_cfis audit --sample 3 # rotating amendment check on history
 python -m importer.import_cfis _data/cfis ../data/wi.sqlite
 
+# non-candidate committee money: PACs, parties, conduits, and express
+# advocacy. Same feed as above, windowed by date rather than committee.
+python -m scraper.fetch_cf_committees --since 2025-01
+python -m importer.import_cf_committees _data/cfis ../data/wi.sqlite
+
 python -m scraper.fetch_lobbying --refresh    # per-bill registered principals
 python -m importer.import_lobbying _data/lobbying ../data/wi.sqlite
 

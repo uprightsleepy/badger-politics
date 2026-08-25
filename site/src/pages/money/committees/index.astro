@@ -1,7 +1,7 @@
 ---
 import Base from "../../../layouts/Base.astro";
 import OrgLogo from "../../../components/OrgLogo.astro";
-import { donorCommittees } from "../../../lib/db";
+import { donorCommittees, cfTypeOf } from "../../../lib/db";
 import { fmtMoney } from "../../../lib/format";
 
 const committees = donorCommittees();
@@ -34,6 +34,11 @@ const committees = donorCommittees();
         <a href={`/money/committees/${c.entityId}/`} class="flex items-center gap-3 px-4 py-2 hover:bg-navy-50">
           <OrgLogo entityId={c.entityId} name={c.name} />
           <span class="min-w-0 flex-1 truncate underline">{c.name}</span>
+          {cfTypeOf(c.entityId) && (
+            <span class="hidden shrink-0 rounded-full bg-navy-50 px-2 py-0.5 text-xs text-navy-700 sm:inline">
+              {cfTypeOf(c.entityId)}
+            </span>
+          )}
           <span class="sr-only shrink-0 text-xs text-navy-600 sm:not-sr-only sm:inline">
             {c.recipients} legislator{c.recipients > 1 ? "s" : ""}
           </span>

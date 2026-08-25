@@ -252,6 +252,44 @@ CREATE TABLE contributions (
 );
 CREATE INDEX idx_contributions_person ON contributions (person_id, date);
 
+-- CFIS committee registry: the type behind every filer and counterparty,
+-- so a PAC, a conduit, and a party transfer are never conflated.
+CREATE TABLE cf_committees (
+    entity_id      INTEGER PRIMARY KEY,
+    name           TEXT NOT NULL,
+    committee_type TEXT,
+    assigned_id    TEXT   -- CFIS's own committee number
+);
+CREATE INDEX idx_cf_committees_type ON cf_committees (committee_type);
+
+-- Money filed by committees that are not one candidate's own: PAC and
+-- party receipts and spending, plus independent expenditures (which carry
+-- a for/against stance and the race they target). Candidate-committee
+-- receipts stay in `contributions` with their verified person mapping.
+CREATE TABLE cf_transactions (
+    id                   INTEGER PRIMARY KEY,  -- CFIS transaction id
+    filer_entity_id      INTEGER NOT NULL,
+    filer_type           TEXT,
+    direction            TEXT CHECK (direction IN ('INCOMING', 'OUTGOING')),
+    date                 TEXT,
+    amount               REAL NOT NULL,
+    other_entity_id      INTEGER,  -- counterparty: donor in, payee out
+    other_name           TEXT,
+    other_type           TEXT,
+    -- express advocacy: FOR/AGAINST a named candidate in a named race
+    stance               TEXT CHECK (stance IN ('FOR', 'AGAINST') OR stance IS NULL),
+    related_name         TEXT,
+    related_office       TEXT,
+    related_district     TEXT,
+    -- conduits pass earmarked money through: the true recipient
+    final_recipient_id   INTEGER,
+    final_recipient_name TEXT,
+    purpose              TEXT
+);
+CREATE INDEX idx_cf_tx_filer ON cf_transactions (filer_entity_id, date);
+CREATE INDEX idx_cf_tx_stance ON cf_transactions (stance);
+CREATE INDEX idx_cf_tx_other ON cf_transactions (other_entity_id);
+
 -- Build metadata, e.g. key='data_through' for the site footer freshness badge.
 CREATE TABLE meta (
     key   TEXT PRIMARY KEY,
