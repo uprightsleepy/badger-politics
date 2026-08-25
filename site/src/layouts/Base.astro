@@ -189,13 +189,10 @@ const NAV_DIRECT: [string, string][] = [
     </script>
 
     <script>
+      import { savedDistrict } from "../lib/district";
+
       // "Your reps" chip: district saved by /my-reps lives in localStorage only
-      let saved: { ad: number; sd: number } | null = null;
-      try {
-        saved = JSON.parse(localStorage.getItem("bp-district") ?? "null");
-      } catch {
-        localStorage.removeItem("bp-district");
-      }
+      const saved = savedDistrict();
       if (saved) {
         const { ad, sd } = saved;
         document.querySelectorAll("[data-nav-my-reps]").forEach((link) => {

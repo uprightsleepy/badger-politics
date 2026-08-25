@@ -80,14 +80,11 @@ const groups = [
 </div>
 
 <script>
+  import { savedDistrict } from "../lib/district";
+
   // Pin the saved district's reps in every roll call on the page. Lives in
   // the component so bill pages and standalone vote pages both get it.
-  let saved: { ad: number; sd: number } | null = null;
-  try {
-    saved = JSON.parse(localStorage.getItem("bp-district") ?? "null");
-  } catch {
-    localStorage.removeItem("bp-district");
-  }
+  const saved = savedDistrict();
   if (saved) {
     const { ad, sd } = saved;
     document.querySelectorAll("[data-rollcall]").forEach((block) => {

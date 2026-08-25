@@ -71,6 +71,7 @@ import Base from "../layouts/Base.astro";
   </div>
 
   <script>
+    import { savedDistrict } from "../lib/district";
     import { esc } from "../lib/html";
 
     const statusEl = document.getElementById("status")!;
@@ -295,9 +296,9 @@ import Base from "../layouts/Base.astro";
       (document.getElementById("addr") as HTMLInputElement).focus();
     });
 
-    const saved = localStorage.getItem("bp-district");
+    const saved = savedDistrict();
     if (saved) {
-      loadData().then(() => show(JSON.parse(saved)));
+      loadData().then(() => show(saved));
     }
 
     // polling place: user-entered, device-only
