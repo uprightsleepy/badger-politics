@@ -1366,6 +1366,14 @@ export const cfCommitteeFor = (entityId: number) => {
   const committee = prep("SELECT * FROM cf_committees WHERE entity_id = ?")
     .get(entityId) as CfCommittee | undefined;
   if (!committee) return null;
+  // We collect a candidate committee's receipts through the verified
+  // legislator map, not this table, so its rows here are only the stray
+  // stanced ones. Totalling those would present a fraction of the
+  // committee's money as all of it.
+  if (committee.committee_type === "State Candidate"
+      || committee.committee_type === "Federal Candidate") {
+    return null;
+  }
   const totals = prep(
       `SELECT COALESCE(SUM(CASE WHEN direction = 'INCOMING' THEN amount END), 0) AS raised,
               COALESCE(SUM(CASE WHEN direction = 'OUTGOING' THEN amount END), 0) AS spent,
