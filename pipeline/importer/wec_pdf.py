@@ -113,7 +113,7 @@ def parse_tracking(pdf_path: Path) -> list[dict[str, str]]:
                     records.append(
                         {
                             "office": office,
-                            "incumbent": incumbent.split("(Filed")[0].strip(),
+                            "incumbent": incumbent,
                             "incumbent_noncandidacy": str(int(noncandidacy)),
                             "candidate": " ".join(name_words),
                             "party": " ".join(party_words),
