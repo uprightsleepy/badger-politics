@@ -21,9 +21,10 @@ from pathlib import Path
 
 import requests
 
+from scraper.http import session
+
 BASE = "https://docs.legis.wisconsin.gov"
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "subjects"
-USER_AGENT = "BadgerPolitics/1.0 (badgerpolitics.org; hphil.work@gmail.com)"
 DELAY = 0.5
 MAX_PAGES = 800  # safety valve far above any real index size
 
@@ -95,8 +96,7 @@ def main(argv: list[str]) -> int:
     today = date.today()
     current_biennium = today.year if today.year % 2 else today.year - 1
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    http = requests.Session()
-    http.headers["User-Agent"] = USER_AGENT
+    http = session()
     for year in range(since, current_biennium + 1, 2):
         out = DATA_DIR / f"subjects-{year}.json"
         # historical bienniums are immutable; the current one refreshes
