@@ -141,7 +141,7 @@ import Base from "../layouts/Base.astro";
       const au = full.authored;
       const authoredLine =
         au.total > 0
-          ? `Authored ${au.total} bills this session: ${au.enacted} became law, ${au.vetoed} vetoed, ${au.noHearing} died without a hearing.`
+          ? `Led ${au.total} bills this session: ${au.enacted} became law, ${au.vetoed} vetoed, ${au.noHearing} died without a hearing. Signed onto ${au.signedOn.toLocaleString()} more.`
           : "";
       const ballotLine =
         full.election?.cycle_year === 2026
