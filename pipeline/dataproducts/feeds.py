@@ -76,7 +76,7 @@ def build_feeds(
         if not actions:
             continue
         session = bill["session_id"]
-        slug = bill_slug(bill)
+        slug = bill_slug(bill["identifier"])
         page = f"{SITE}/bills/{session}/{slug}"
         path = f"/feeds/bills/{bill['id']}.xml"
         root = _feed(
@@ -163,7 +163,7 @@ def build_feeds(
                 f"{SITE}/feeds/weekly.xml#{bill_id}-{date}-{i}",
                 f"{identifier}: {desc[:100]}",
                 _stamp(date),
-                f"{SITE}/bills/{session_id}/{identifier.replace(' ', '').lower()}",
+                f"{SITE}/bills/{session_id}/{bill_slug(identifier)}",
                 f"{identifier} — {(title or '')[:150]}: {desc}",
             )
         _write(root, feeds_dir / "weekly.xml")

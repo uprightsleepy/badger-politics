@@ -31,8 +31,8 @@ def write_json(path: Path, payload: dict | list) -> None:
     )
 
 
-def bill_slug(bill: dict) -> str:
-    return bill["identifier"].replace(" ", "").lower()
+def bill_slug(identifier: str) -> str:
+    return identifier.replace(" ", "").lower()
 
 
 def person_slug(person_id: str) -> str:
@@ -101,7 +101,10 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
                 "actions": session_actions.get(bill["id"], []),
                 "votes": events_by_bill.get(bill["id"], []),
             }
-            write_json(api / "bills" / session_id / f"{bill_slug(bill)}.json", payload)
+            write_json(
+                api / "bills" / session_id / f"{bill_slug(bill['identifier'])}.json",
+                payload,
+            )
             files += 1
 
     write_json(
