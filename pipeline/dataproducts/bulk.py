@@ -40,6 +40,13 @@ CSV_TABLES = {
 }
 
 
+def _dump_csv(cursor: sqlite3.Cursor, path: Path) -> None:
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        writer.writerow([d[0] for d in cursor.description])
+        writer.writerows(cursor)
+
+
 def export_csvs(conn: sqlite3.Connection, exports_dir: Path) -> int:
     files = 0
     for session in queries.sessions(conn):
@@ -47,21 +54,10 @@ def export_csvs(conn: sqlite3.Connection, exports_dir: Path) -> int:
         session_dir.mkdir(parents=True, exist_ok=True)
         for table, query in CSV_TABLES.items():
             cursor = conn.execute(query, (session["id"],))
-            columns = [d[0] for d in cursor.description]
-            with (session_dir / f"{table}.csv").open(
-                "w", newline="", encoding="utf-8"
-            ) as fh:
-                writer = csv.writer(fh)
-                writer.writerow(columns)
-                writer.writerows(cursor)
+            _dump_csv(cursor, session_dir / f"{table}.csv")
             files += 1
     # people are session-independent
-    cursor = conn.execute("SELECT * FROM people")
-    columns = [d[0] for d in cursor.description]
-    with (exports_dir / "people.csv").open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.writer(fh)
-        writer.writerow(columns)
-        writer.writerows(cursor)
+    _dump_csv(conn.execute("SELECT * FROM people"), exports_dir / "people.csv")
     return files + 1
 
 
