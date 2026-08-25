@@ -3,9 +3,13 @@
  * sessions render; default is the current biennium. `all` renders history
  * (Phase 6 merges a prebuilt historical artifact instead). */
 import Database from "better-sqlite3";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
-const DB_PATH = fileURLToPath(new URL("../../../data/wi.sqlite", import.meta.url));
+// Resolved from the working directory (always site/ for astro and the
+// verify scripts), not from import.meta.url: the bundler decides how
+// deeply this module is chunked, so a module-relative path silently
+// moves with it.
+const DB_PATH = resolve(process.cwd(), "../data/wi.sqlite");
 const db = new Database(DB_PATH, { readonly: true, fileMustExist: true });
 
 // better-sqlite3 has no implicit statement cache: each prepare() is a full
