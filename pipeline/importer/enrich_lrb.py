@@ -22,10 +22,15 @@ from scraper.http import USER_AGENT
 CACHE_DIR = Path(__file__).resolve().parents[1] / "_data" / "lrb_cache"
 
 ANALYSIS_START = re.compile(r"analysis by the legislative reference bureau", re.I)
-# The bill body begins with the enacting clause; earlier stop: fiscal estimate.
+# The analysis ends at the enacting clause, or earlier at the boilerplate
+# pointer to the fiscal estimate ("For further information see the state /
+# local / state and local fiscal estimate..."). Whitespace is flexible
+# because these phrases wrap across the document's source lines.
 ANALYSIS_END = re.compile(
-    r"(the people of the state of wisconsin.*represented in senate and assembly"
-    r"|for further information see the state|fiscal estimate)",
+    r"the\s+people\s+of\s+the\s+state\s+of\s+wisconsin[\s\S]{0,40}?"
+    r"represented\s+in\s+senate\s+and\s+assembly"
+    r"|for\s+further\s+information\s+see\s+the"
+    r"|fiscal\s+estimate",
     re.I,
 )
 
@@ -38,17 +43,21 @@ def extract_analysis(page_html: str) -> str | None:
         for text in tree.xpath("//body//text()")
         if text.strip()
     ]
-    start = end = None
+    start = None
     for i, block in enumerate(blocks):
-        if start is None and ANALYSIS_START.search(block):
+        if ANALYSIS_START.search(block):
             start = i + 1
-        elif start is not None and ANALYSIS_END.search(block):
-            end = i
             break
     if start is None:
         return None
-    section = blocks[start:end]
-    text = re.sub(r"[ \t]+", " ", "\n".join(section)).strip()
+    # search the joined text, not block by block: a terminator split across
+    # source lines matches no single block, so its leading words would be
+    # kept as a dangling fragment ("For further information see the / state")
+    text = "\n".join(blocks[start:])
+    cut = ANALYSIS_END.search(text)
+    if cut:
+        text = text[: cut.start()]
+    text = re.sub(r"[ \t]+", " ", text).strip()
     return text or None
 
 
