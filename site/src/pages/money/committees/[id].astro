@@ -116,34 +116,37 @@ const kind = cfTypeOf(committee.entityId);
         <p><span class="block text-xs text-navy-600">Transactions</span>
           <span class="text-xl font-bold">{own.n.toLocaleString()}</span></p>
       </div>
-      <div class="mt-4 grid gap-6 sm:grid-cols-2">
-        {own.donors.length > 0 && (
+      <div class="mt-4 grid gap-6 lg:grid-cols-2">
+        {([
+          ["Largest itemized donors to it", own.donors, true],
+          ["Largest payees", own.payees, false],
+        ] as [string, typeof own.donors, boolean][]).map(([heading, rows, showType]) => rows.length > 0 && (
           <div class="min-w-0">
-            <h3 class="font-bold">Largest itemized donors to it</h3>
-            <ul class="mt-1 space-y-0.5 text-sm">
-              {own.donors.slice(0, 12).map((d) => (
-                <li class="flex items-baseline gap-2">
-                  <span class="min-w-0 flex-1 truncate">{d.name}</span>
-                  {d.type && <span class="shrink-0 text-xs text-navy-600">{d.type}</span>}
-                  <span class="shrink-0 font-semibold">{fmtMoney(d.total)}</span>
-                </li>
-              ))}
-            </ul>
+            <h3 class="font-bold">{heading} · {rows.length}</h3>
+            <div
+              class="mt-1 max-h-96 overflow-y-auto rounded-lg border border-navy-100 bg-white"
+              role="region"
+              tabindex="0"
+              aria-label={heading}
+            >
+              <ul class="divide-y divide-navy-100 text-sm">
+                {rows.map((d) => (
+                  <li class="flex items-baseline gap-3 px-3 py-1.5">
+                    <span class="min-w-0 flex-1 truncate" title={d.name}>{d.name}</span>
+                    {showType && (
+                      <span class="hidden w-20 shrink-0 text-right text-xs text-navy-600 sm:block">
+                        {d.type ?? ""}
+                      </span>
+                    )}
+                    <span class="w-28 shrink-0 text-right font-semibold tabular-nums">
+                      {fmtMoney(d.total)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-        )}
-        {own.payees.length > 0 && (
-          <div class="min-w-0">
-            <h3 class="font-bold">Largest payees</h3>
-            <ul class="mt-1 space-y-0.5 text-sm">
-              {own.payees.slice(0, 12).map((d) => (
-                <li class="flex items-baseline gap-2">
-                  <span class="min-w-0 flex-1 truncate">{d.name}</span>
-                  <span class="shrink-0 font-semibold">{fmtMoney(d.total)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        ))}
       </div>
     </section>
   )}

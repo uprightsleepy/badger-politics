@@ -1381,7 +1381,7 @@ export const cfCommitteeFor = (entityId: number) => {
          FROM cf_transactions
          WHERE filer_entity_id = ? AND direction = ? AND other_name IS NOT NULL
          GROUP BY COALESCE(other_entity_id, other_name)
-         ORDER BY total DESC LIMIT 20`,
+         ORDER BY total DESC LIMIT 50`,
       )
       .all(entityId, direction) as {
         entityId: number | null; name: string; type: string | null;
