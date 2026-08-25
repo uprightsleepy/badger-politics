@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 import sqlite3
 from pathlib import Path
 
@@ -43,10 +44,17 @@ def people(conn: sqlite3.Connection) -> list[dict]:
     return _rows(conn, "SELECT * FROM people ORDER BY chamber, district")
 
 
+# the only shapes callers may splice into SELECT: '*' or a comma list of
+# plain column names — anything else is a programming error, not data
+_COLUMNS_RE = re.compile(r"^\*$|^[a-z_]+(, ?[a-z_]+)*$")
+
+
 def bills(
     conn: sqlite3.Connection, session_id: str | None = None, columns: str = "*"
 ) -> list[dict]:
-    query = f"SELECT {columns} FROM bills WHERE {EXPORTABLE}"  # noqa: S608 - callers pass literals
+    if not _COLUMNS_RE.fullmatch(columns):
+        raise ValueError(f"bills(columns=...) must be '*' or column names: {columns!r}")
+    query = f"SELECT {columns} FROM bills WHERE {EXPORTABLE}"  # noqa: S608 - allowlisted above
     params: tuple = ()
     if session_id:
         query += " AND session_id = ?"
