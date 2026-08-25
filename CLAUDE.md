@@ -10,6 +10,15 @@ openstates-scrapers (wi) → SQLite → Astro static build → Firebase Hosting.
 - Site dev: `cd site && npm run dev`   Build: `npm run build`
 - Tests: `uv run pytest pipeline/tests`
 - Infra: `cd infra && tofu plan` (never apply without asking)
+- Deploy dev: `cd pipeline && ./run.sh --local` (FB_PROJECT defaults to badgerpolitics-dev)
+- Deploy prod: `FB_PROJECT=badgerpolitics-prod ./run.sh` (explicit on purpose)
+- Site only: `firebase deploy --only hosting --project badgerpolitics-dev`
+
+## Deploy targets
+- `badgerpolitics-dev` -> https://badgerpolitics-dev.web.app
+- `badgerpolitics-prod` -> https://badgerpolitics-prod.web.app, badgerpolitics.org (www 301s to apex; .com 301s via Porkbun forwarding)
+- Snapshots: `gs://badgerpolitics-prod-snapshots/snapshots/` (private, 30-day lifecycle)
+- run.sh defaults to dev; prod requires setting FB_PROJECT explicitly.
 
 ## Hard rules
 - SQLite is the only database. Never introduce Cloud SQL/Firestore/Postgres.

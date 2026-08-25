@@ -1,10 +1,24 @@
 #!/usr/bin/env bash
-# The entire nightly job: scrape -> import -> enrich -> check (-> build -> deploy).
+# The entire nightly job: scrape -> import -> enrich -> check -> build -> deploy.
 # Flags: --local (skip GCS snapshot upload), --skip-deploy (skip firebase deploy).
-# Later-phase steps stay commented until implemented; nothing fails silently.
 set -euo pipefail
 
 cd "$(dirname "$0")"
+
+LOCAL=0
+SKIP_DEPLOY=0
+for arg in "$@"; do
+  case "$arg" in
+    --local) LOCAL=1 ;;
+    --skip-deploy) SKIP_DEPLOY=1 ;;
+    *) echo "unknown flag: $arg" >&2; exit 2 ;;
+  esac
+done
+
+# Deploy target defaults to dev: promoting to prod is always explicit, so a
+# stray or automated run can never overwrite the live site.
+FB_PROJECT="${FB_PROJECT:-badgerpolitics-dev}"
+BUCKET="${BUCKET:-badgerpolitics-prod-snapshots}"
 
 # --- Phase 1: scrape + import (never run two scrapes concurrently) ---
 python -m scraper.scrape bills            # os-update wi bills --scrape --fastmode
@@ -50,8 +64,20 @@ python -m dataproducts.build ../data/wi.sqlite ../site/public/
 
 # --- Phase 5+: site build, deploy ---
 # BUILD_SESSIONS=all: every session gets pages so profile links to
-# historical bills and votes always resolve (dev builds default partial)
-# (cd ../site && BUILD_SESSIONS=all npm run build)
-# npx pagefind --site ../site/dist
-# firebase deploy --only hosting --project "$FB_PROJECT" --non-interactive
-# gsutil cp ../data/wi.sqlite "gs://$BUCKET/snapshots/wi-$(date +%F).sqlite"
+# historical bills and votes always resolve (dev builds default partial).
+# npm run build also runs pagefind, so the index matches what was built.
+(cd ../site && BUILD_SESSIONS=all npm run build)
+
+if [ "$SKIP_DEPLOY" -eq 0 ]; then
+  # runs from the repo root: firebase.json maps hosting to site/dist
+  (cd .. && firebase deploy --only hosting --project "$FB_PROJECT" --non-interactive)
+else
+  echo "skipping firebase deploy (--skip-deploy)"
+fi
+
+if [ "$LOCAL" -eq 0 ]; then
+  # gcloud storage, not gsutil: gsutil is pinned to Python <=3.12
+  gcloud storage cp ../data/wi.sqlite     "gs://$BUCKET/snapshots/wi-$(date +%F).sqlite"
+else
+  echo "skipping snapshot upload (--local)"
+fi
