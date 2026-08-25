@@ -26,7 +26,11 @@ def run(archives_dir: Path, db_path: Path) -> int:
         conn.execute("DELETE FROM lobbying_interests")
         for path in files:
             m = SESSION_RE.search(path.name)
-            session_year = m.group(1) if m else ""
+            if m is None:
+                # an unparseable archive name would silently no-op the
+                # whole file's registrations; fail loud instead
+                raise RuntimeError(f"unrecognized lobbying archive name: {path.name}")
+            session_year = m.group(1)
             lob_session = path.stem.split("-", 1)[1]
             batch = []
             for item in json.loads(path.read_text(encoding="utf-8")):
