@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { sittingPeople } from "../../lib/db";
-import { partyStyle } from "../../lib/format";
+import { partyLetter, partyStyle } from "../../lib/format";
 
 const holders = new Map(sittingPeople().map((p) => [`${p.chamber}-${p.district}`, p]));
 const ASSEMBLY = Array.from({ length: 99 }, (_, i) => i + 1);
@@ -39,7 +39,7 @@ const SENATE = Array.from({ length: 33 }, (_, i) => i + 1);
                     <>
                       <span class="min-w-0 flex-1 truncate underline">{holder.name}</span>
                       <span class={`shrink-0 rounded px-1 text-xs ${partyStyle(holder.party)}`}>
-                        {holder.party?.[0] ?? "?"}
+                        {partyLetter(holder.party)}
                       </span>
                     </>
                   ) : (
