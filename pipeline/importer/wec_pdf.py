@@ -34,16 +34,8 @@ def parse_tracking(pdf_path: Path) -> list[dict[str, str]]:
     records: list[dict[str, str]] = []
     office = incumbent = ""
     noncandidacy = False
-    pending: dict[str, str] | None = None
     party_x = status_x = campaign_x = None
     in_tracking = False
-
-    def flush() -> None:
-        nonlocal pending
-        if pending:
-            records.append(pending)
-            pending = None
-
     remaining = 0
     for page in doc:
         text = page.get_text()
@@ -79,11 +71,9 @@ def parse_tracking(pdf_path: Path) -> list[dict[str, str]]:
                                   "Receipt #", TRACKING_TITLE, "2026 General")):
                 continue
             if "Office Subtotal" in joined:
-                flush()
                 office, incumbent, noncandidacy = "", "", False
                 continue
             if texts[0] == "Office" and ":" in texts[1]:
-                flush()
                 office, incumbent, noncandidacy = "", "", False
                 # same row: office name (left region) + 'Incumbent:' + name
                 inc_idx = next(
@@ -101,7 +91,7 @@ def parse_tracking(pdf_path: Path) -> list[dict[str, str]]:
             # continuation rows for wrapped office/incumbent names
             if office and not any(x >= status_x for x, _ in row) and all(
                 x < party_x for x, _ in row
-            ) and pending is None and not joined[:1].isdigit():
+            ) and not joined[:1].isdigit():
                 candidate_words = [t for x, t in row if x < party_x]
                 maybe = " ".join(candidate_words)
                 if maybe.isupper() or maybe.isdigit():  # office names are ALL CAPS
@@ -120,7 +110,6 @@ def parse_tracking(pdf_path: Path) -> list[dict[str, str]]:
                     t for x, t in row if party_x - 2 <= x < campaign_x - 2
                 ]
                 if status_words and status_words[0] in STATUSES and name_words:
-                    flush()
                     records.append(
                         {
                             "office": office,
@@ -131,7 +120,6 @@ def parse_tracking(pdf_path: Path) -> list[dict[str, str]]:
                             "ballot_status": status_words[0],
                         }
                     )
-    flush()
     doc.close()
 
     if not records:
