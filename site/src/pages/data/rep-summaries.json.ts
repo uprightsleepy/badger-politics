@@ -14,7 +14,7 @@ import {
   electionFor,
   currentSessions,
 } from "../../lib/db";
-import { personSlug } from "../../lib/format";
+import { billSlug, personSlug } from "../../lib/format";
 import { buildHeatDays } from "../../lib/service";
 
 export const GET: APIRoute = () => {
@@ -61,6 +61,7 @@ export const GET: APIRoute = () => {
         date: v.date,
         option: v.option,
         identifier: v.identifier,
+        slug: billSlug(v.identifier),
         title: v.title,
         session: v.session_id,
         event: v.vote_event_id,
