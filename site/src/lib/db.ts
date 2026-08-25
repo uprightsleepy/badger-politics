@@ -145,11 +145,13 @@ export const voteRecordsFor = (voteEventId: string) =>
 export const people = (): Person[] =>
   prep("SELECT * FROM people ORDER BY name").all() as Person[];
 
+// memoized: the district pages ask for the roster once per seat
+let _sitting: Person[] | undefined;
 export const sittingPeople = (): Person[] =>
-  prep(
+  (_sitting ??= prep(
       "SELECT * FROM people WHERE current_role IN ('Representative', 'Senator') ORDER BY chamber, district",
     )
-    .all() as Person[];
+    .all() as Person[]);
 
 export const personVotes = (personId: string, limit: number) =>
   prep(
@@ -417,12 +419,8 @@ export const voteSplit = (voteEventId: string) => {
 /** Sessions of the newest biennium, regardless of BUILD_SESSIONS. */
 export const currentSessions = (): Session[] => {
   const sessions = allSessions();
-  const by = (id: string) => {
-    const y = Number(id.slice(0, 4));
-    return y % 2 ? y : y - 1;
-  };
-  const newest = Math.max(...sessions.map((s) => by(s.id)));
-  return sessions.filter((s) => by(s.id) === newest);
+  const newest = Math.max(...sessions.map((s) => bienniumOf(s.id)));
+  return sessions.filter((s) => bienniumOf(s.id) === newest);
 };
 
 /** Bills before (or past) the governor this biennium, plus veto-override
@@ -521,8 +519,7 @@ const _nameIndexes = new Map<string, Record<string, Map<string, string | null>>>
 export const sessionNameIndex = (sessionId: string) => {
   const cached = _nameIndexes.get(sessionId);
   if (cached) return cached;
-  const year = Number(sessionId.slice(0, 4));
-  const by = year % 2 ? year : year - 1;
+  const by = bienniumOf(sessionId);
   const start = `${by}-01-01`;
   const end = `${by + 2}-01-01`;
   const rows = prep(
@@ -644,8 +641,19 @@ export const partyAgreement = (personId: string, party: string | null) => {
 /** Official WEC general-election results for one seat, newest first.
  * Percentages use the canvass's own Total Votes Cast where present, so
  * they match the certified report exactly. */
+const _electionHistory = new Map<string, ReturnType<typeof queryElectionHistory>>();
 export const electionHistoryFor = (chamber: string | null, district: number | null) => {
   if (!chamber || district == null) return [];
+  const key = `${chamber}|${district}`;
+  let cached = _electionHistory.get(key);
+  if (!cached) {
+    cached = queryElectionHistory(chamber, district);
+    _electionHistory.set(key, cached);
+  }
+  return cached;
+};
+
+const queryElectionHistory = (chamber: string, district: number) => {
   const rows = prep(
       `SELECT year, candidate, party, votes, total_cast FROM election_history
        WHERE chamber = ? AND district = ? ORDER BY year DESC, votes DESC`,
@@ -716,7 +724,6 @@ export const termsFor = (personId: string) =>
     }[];
 
 import { OPEN_END, OPEN_START } from "./sentinels";
-export { OPEN_END };
 
 const officeEntryFor = (personId: string): string => {
   const terms = termsFor(personId);
