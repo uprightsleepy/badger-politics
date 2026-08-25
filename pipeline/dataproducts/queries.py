@@ -108,6 +108,22 @@ def vote_records_grouped(conn: sqlite3.Connection):
         ]
 
 
+def actions_grouped(conn: sqlite3.Connection):
+    """(bill_id, actions) for every exportable bill with actions, streamed
+    in bill-id order from one scan; row shape matches actions_for."""
+    cursor = conn.execute(
+        "SELECT a.bill_id, a.date, a.chamber, a.description, a.classification"
+        " FROM actions a JOIN bills b ON b.id = a.bill_id"
+        f" WHERE {exportable('b.')}"
+        " ORDER BY a.bill_id, a.date, a.id"
+    )
+    for bill_id, rows in itertools.groupby(cursor, key=lambda r: r["bill_id"]):
+        yield bill_id, [
+            {k: r[k] for k in ("date", "chamber", "description", "classification")}
+            for r in rows
+        ]
+
+
 def actions_for_session(conn: sqlite3.Connection, session_id: str) -> dict[str, list[dict]]:
     """bill_id -> actions for one session, from one ordered scan; row
     shape and per-bill order match actions_for exactly."""
