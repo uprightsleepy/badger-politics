@@ -35,3 +35,5 @@ site/public/logos/
 # OS / editor
 .DS_Store
 Thumbs.db
+firebase-debug.log
+.firebase/

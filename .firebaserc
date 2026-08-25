@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "badgerpolitics-dev",
+    "dev": "badgerpolitics-dev",
+    "prod": "badgerpolitics-prod"
+  }
+}
