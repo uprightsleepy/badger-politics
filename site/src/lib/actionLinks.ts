@@ -5,9 +5,7 @@
  * Ambiguous or unknown names stay plain text. */
 import { sessionNameIndex } from "./db";
 import { personSlug } from "./format";
-
-const esc = (s: string) =>
-  s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+import { esc } from "./html";
 
 const TITLE_RE = /\b(Representative|Senator)s?\s+/g;
 // one printed name: optional initial, then one or two capitalized words

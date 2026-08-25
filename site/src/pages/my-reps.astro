@@ -71,6 +71,8 @@ import Base from "../layouts/Base.astro";
   </div>
 
   <script>
+    import { esc } from "../lib/html";
+
     const statusEl = document.getElementById("status")!;
     const resultEl = document.getElementById("result")!;
     const repsEl = document.getElementById("reps")!;
@@ -118,8 +120,6 @@ import Base from "../layouts/Base.astro";
       return null;
     }
 
-    const esc = (s: string) =>
-      s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
     function repCard(seat: string, districtHref: string, slim: any, full: any): string {
       if (!slim) return "";

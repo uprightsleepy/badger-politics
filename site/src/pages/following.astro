@@ -33,9 +33,7 @@ import Base from "../layouts/Base.astro";
 
   <script>
     import { getFollows, toggleFollow, lastSeen, markSeen } from "../scripts/follows";
-
-    const esc = (s: string) => s.replace(/[<>&"]/g, (c) =>
-      ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]!);
+    import { esc } from "../lib/html";
 
     async function billRow(id: string, seen: string | null): Promise<string> {
       const [session, slug] = [id.slice(0, id.indexOf("-")), id.slice(id.indexOf("-") + 1)];
