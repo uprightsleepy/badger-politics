@@ -73,6 +73,10 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
 
   <script is:inline type="module">
     // Thin custom UI over the Pagefind API.
+    // is:inline (needed for the runtime /pagefind/ import) can't reach the
+    // bundled lib/html escaper, so this one script carries its own copy
+    const esc = (s) =>
+      s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
     const input = document.getElementById("q");
     const box = document.getElementById("search-results");
     const status = document.getElementById("search-status");
@@ -123,8 +127,8 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
         ? good
             .map(
               (r) => `
-        <a href="${r.url}" class="block rounded-lg border border-navy-100 bg-white p-3 hover:border-navy-600">
-          <span class="font-bold">${r.meta?.title ?? r.url}</span>
+        <a href="${esc(r.url)}" class="block rounded-lg border border-navy-100 bg-white p-3 hover:border-navy-600">
+          <span class="font-bold">${esc(r.meta?.title ?? r.url)}</span>
           <span class="mt-0.5 block text-sm text-navy-700">…${r.excerpt}…</span>
         </a>`,
             )
