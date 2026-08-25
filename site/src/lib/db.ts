@@ -3,9 +3,13 @@
  * sessions render; default is the current biennium. `all` renders history
  * (Phase 6 merges a prebuilt historical artifact instead). */
 import Database from "better-sqlite3";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
-const DB_PATH = fileURLToPath(new URL("../../../data/wi.sqlite", import.meta.url));
+// Resolved from the working directory (always site/ for astro and the
+// verify scripts), not from import.meta.url: the bundler decides how
+// deeply this module is chunked, so a module-relative path silently
+// moves with it.
+const DB_PATH = resolve(process.cwd(), "../data/wi.sqlite");
 const db = new Database(DB_PATH, { readonly: true, fileMustExist: true });
 
 // better-sqlite3 has no implicit statement cache: each prepare() is a full
@@ -174,8 +178,27 @@ export const personVotes = (personId: string, limit: number) =>
     session_id: string;
   }[];
 
-export const personSponsorships = (personId: string) =>
-  prep(
+/** bill id -> its lead author. The introduction line's order is the
+ * Legislature's own ranking (its author index prints a description "only
+ * under the first and second author"), and the scraper preserves that
+ * order, so the first-listed primary sponsor is the lead author. One scan
+ * serves every legislator page. */
+let _leadAuthors: Map<string, string | null> | undefined;
+const leadAuthors = (): Map<string, string | null> => {
+  if (_leadAuthors) return _leadAuthors;
+  _leadAuthors = new Map();
+  const rows = prep(
+    "SELECT bill_id, person_id FROM sponsorships WHERE is_primary = 1 ORDER BY rowid",
+  ).all() as { bill_id: string; person_id: string | null }[];
+  for (const r of rows) {
+    if (!_leadAuthors.has(r.bill_id)) _leadAuthors.set(r.bill_id, r.person_id);
+  }
+  return _leadAuthors;
+};
+
+export const personSponsorships = (personId: string) => {
+  const leads = leadAuthors();
+  const rows = prep(
       `SELECT s.is_primary, s.classification, b.id AS bill_id, b.identifier,
               b.title, b.status, b.session_id, b.died_without_hearing
        FROM sponsorships s JOIN bills b ON b.id = s.bill_id
@@ -191,6 +214,17 @@ export const personSponsorships = (personId: string) =>
     session_id: string;
     died_without_hearing: number;
   }[];
+  // three official roles: lead author (first on the bill), coauthor (same
+  // house, signed on), cosponsor (the other house)
+  return rows.map((r) => ({
+    ...r,
+    role: leads.get(r.bill_id) === personId
+      ? "lead"
+      : r.classification === "cosponsor"
+        ? "cosponsor"
+        : "coauthor",
+  }));
+};
 
 const _elections = new Map<string, ReturnType<typeof queryElection>>();
 export const electionFor = (personId: string) => {

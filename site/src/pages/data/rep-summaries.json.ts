@@ -29,9 +29,12 @@ export const GET: APIRoute = () => {
     const totalVotes = heat.reduce((s, d) => s + d.total, 0);
     const missedVotes = heat.reduce((s, d) => s + Math.max(0, d.total - d.cast - d.nv), 0);
 
-    const authored = personSponsorships(p.id).filter(
-      (s) => s.is_primary && sessionIds.has(s.session_id),
+    // "led" = lead author only; co-signing is counted separately below
+    const sponsorships = personSponsorships(p.id).filter((s) =>
+      sessionIds.has(s.session_id),
     );
+    const authored = sponsorships.filter((s) => s.role === "lead");
+    const signedOn = sponsorships.length - authored.length;
     const election = electionFor(p.id);
 
     const entry = {
@@ -50,6 +53,7 @@ export const GET: APIRoute = () => {
       attendance: { total: totalVotes, missed: missedVotes },
       authored: {
         total: authored.length,
+        signedOn,
         enacted: authored.filter((s) => s.status === "enacted").length,
         vetoed: authored.filter((s) => s.status === "vetoed").length,
         noHearing: authored.filter((s) => s.died_without_hearing === 1).length,
