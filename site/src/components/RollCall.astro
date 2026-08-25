@@ -1,6 +1,7 @@
 ---
 import PartyChip from "./PartyChip.astro";
-import { chamberName, personSlug } from "../lib/format";
+import { chamberName, fmtDate, personSlug } from "../lib/format";
+import { safeHref } from "../lib/html";
 import type { VoteEvent } from "../lib/db";
 import { voteRecordsFor } from "../lib/db";
 interface Props { event: VoteEvent; compact?: boolean; headingLevel?: "h2" | "h3" }
@@ -29,9 +30,9 @@ const groups = [
       {event.result === "pass" ? "Passed" : "Failed"}
       {event.yes_count != null && ` ${event.yes_count}–${event.no_count ?? 0}`}
     </span>
-    <span class="text-sm text-navy-600">{event.date}</span>
-    {event.source_url && (
-      <a href={event.source_url} class="text-sm underline">official source</a>
+    <span class="text-sm text-navy-600">{fmtDate(event.date)}</span>
+    {safeHref(event.source_url) && (
+      <a href={safeHref(event.source_url)} class="text-sm underline">official source</a>
     )}
     {!compact && <a href={`/votes/${event.id}/`} class="text-sm underline">full page</a>}
   </div>
@@ -79,14 +80,11 @@ const groups = [
 </div>
 
 <script>
+  import { savedDistrict } from "../lib/district";
+
   // Pin the saved district's reps in every roll call on the page. Lives in
   // the component so bill pages and standalone vote pages both get it.
-  let saved: { ad: number; sd: number } | null = null;
-  try {
-    saved = JSON.parse(localStorage.getItem("bp-district") ?? "null");
-  } catch {
-    localStorage.removeItem("bp-district");
-  }
+  const saved = savedDistrict();
   if (saved) {
     const { ad, sd } = saved;
     document.querySelectorAll("[data-rollcall]").forEach((block) => {

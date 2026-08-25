@@ -36,9 +36,10 @@ def _ticket(candidate: str) -> str:
 SUBTOTAL_RE = re.compile(r"(sub)?totals?:\s*$", re.I)
 
 
-def _walk_contests(path: Path, contest_re: re.Pattern):
-    """Yield (year, match, parties, candidates, sums, total_cast, counties)
-    per contest.
+def _walk_contests(path: Path):
+    """Yield (kind, year, match, parties, candidates, sums, total_cast,
+    counties) per contest, in one pass over the workbook — kind is
+    'leg' or 'statewide' by which title pattern opened the contest.
 
     Columns anchor absolutely on the 'Total Votes Cast' header (canvass
     rows are ragged, so length arithmetic misaligns). Subtotal rows are
@@ -48,6 +49,7 @@ def _walk_contests(path: Path, contest_re: re.Pattern):
     (county, per-candidate votes) instead of discarded."""
     wb = load_workbook(path, read_only=True)
     year: int | None = None
+    kind: str | None = None
     match: re.Match | None = None
     base: int | None = None
     parties: list[str | None] = []
@@ -58,12 +60,13 @@ def _walk_contests(path: Path, contest_re: re.Pattern):
     counties: list[tuple[str, list[int]]] = []
 
     def snapshot():
-        return (year, match, list(parties), list(candidates), list(totals),
-                total_cast, list(counties))
+        return (kind, year, match, list(parties), list(candidates),
+                list(totals), total_cast, list(counties))
 
-    def reset(m):
-        nonlocal match, base, parties, candidates, totals, total_cast, county, counties
-        match, base, parties, candidates = m, None, [], []
+    def reset(k, m):
+        nonlocal kind, match, base, parties, candidates
+        nonlocal totals, total_cast, county, counties
+        kind, match, base, parties, candidates = k, m, None, [], []
         totals, total_cast, county, counties = [], 0, None, []
 
     for ws in wb.worksheets:
@@ -75,11 +78,14 @@ def _walk_contests(path: Path, contest_re: re.Pattern):
                 m = YEAR_RE.match(first)
                 if m:
                     year = int(m.group(1))
-            m = contest_re.match(first)
+            m = CONTEST_RE.match(first)
+            new_kind = "leg" if m else "statewide"
+            if m is None:
+                m = STATEWIDE_RE.match(first)
             if m:
                 if match and candidates:
                     yield snapshot()
-                reset(m)
+                reset(new_kind, m)
                 continue
             if match is None:
                 continue
@@ -131,7 +137,7 @@ def _walk_contests(path: Path, contest_re: re.Pattern):
                                 f"/{total_cast} != Office Totals {official}/{cast}"
                             )
                         yield snapshot()
-                        reset(None)
+                        reset(None, None)
                     continue
                 if first:
                     # canonical county casing ('Fond du Lac', not 'Fond Du Lac')
@@ -148,44 +154,45 @@ def _walk_contests(path: Path, contest_re: re.Pattern):
     wb.close()
 
 
-def parse_workbook(path: Path) -> list[tuple[int, str, int, str, str | None, int, int]]:
-    rows_out: list[tuple[int, str, int, str, str | None, int, int]] = []
-    for year, m, parties, candidates, totals, cast, _ in _walk_contests(path, CONTEST_RE):
+def parse_all(path: Path):
+    """One walk per workbook: (legislative rows, statewide rows, county rows)."""
+    leg_rows: list[tuple[int, str, int, str, str | None, int, int]] = []
+    sw_rows: list[tuple[int, str, str, str | None, int, int]] = []
+    county_rows: list[tuple[int, str, str, str, str | None, int]] = []
+    for kind, year, m, parties, candidates, totals, cast, counties in _walk_contests(
+        path
+    ):
         if year is None:
             raise RuntimeError(f"{path.name}: contest found before year header")
-        chamber = "upper" if m.group(1).upper().startswith("STATE SEN") else "lower"
-        district = int(m.group(2))
         for i, candidate in enumerate(candidates):
             if not candidate or candidate.upper() == "SCATTERING":
                 continue
-            rows_out.append(
-                (year, chamber, district, " ".join(str(candidate).split()),
-                 parties[i], totals[i], cast)
-            )
-    return rows_out
+            if kind == "leg":
+                chamber = "upper" if m.group(1).upper().startswith("STATE SEN") else "lower"
+                leg_rows.append(
+                    (year, chamber, int(m.group(2)),
+                     " ".join(str(candidate).split()), parties[i], totals[i], cast)
+                )
+            else:
+                office = m.group(1).upper()
+                sw_rows.append(
+                    (year, office, _ticket(candidate), parties[i], totals[i], cast)
+                )
+                for county, values in counties:
+                    county_rows.append(
+                        (year, office, county, _ticket(candidate), parties[i], values[i])
+                    )
+    return leg_rows, sw_rows, county_rows
+
+
+def parse_workbook(path: Path) -> list[tuple[int, str, int, str, str | None, int, int]]:
+    return parse_all(path)[0]
 
 
 def parse_statewide(path: Path):
     """Returns (candidate rows incl. total_cast, county rows)."""
-    rows_out: list[tuple[int, str, str, str | None, int, int]] = []
-    county_rows: list[tuple[int, str, str, str, str | None, int]] = []
-    for year, m, parties, candidates, totals, cast, counties in _walk_contests(
-        path, STATEWIDE_RE
-    ):
-        if year is None:
-            raise RuntimeError(f"{path.name}: contest found before year header")
-        office = m.group(1).upper()
-        for i, candidate in enumerate(candidates):
-            if not candidate or candidate.upper() == "SCATTERING":
-                continue
-            rows_out.append(
-                (year, office, _ticket(candidate), parties[i], totals[i], cast)
-            )
-            for county, values in counties:
-                county_rows.append(
-                    (year, office, county, _ticket(candidate), parties[i], values[i])
-                )
-    return rows_out, county_rows
+    _, sw_rows, county_rows = parse_all(path)
+    return sw_rows, county_rows
 
 
 def run(xlsx_dir: Path, db_path: Path) -> int:
@@ -193,8 +200,7 @@ def run(xlsx_dir: Path, db_path: Path) -> int:
     statewide_rows: list[tuple] = []
     county_rows: list[tuple] = []
     for path in sorted(xlsx_dir.glob("*.xlsx")):
-        rows = parse_workbook(path)
-        sw, counties = parse_statewide(path)
+        rows, sw, counties = parse_all(path)
         print(f"{path.name}: {len(rows)} candidate rows"
               + (f", {len(sw)} statewide" if sw else ""))
         all_rows.extend(rows)

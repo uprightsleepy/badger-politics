@@ -31,8 +31,8 @@ def write_json(path: Path, payload: dict | list) -> None:
     )
 
 
-def bill_slug(bill: dict) -> str:
-    return bill["identifier"].replace(" ", "").lower()
+def bill_slug(identifier: str) -> str:
+    return identifier.replace(" ", "").lower()
 
 
 def person_slug(person_id: str) -> str:
@@ -49,10 +49,13 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
     files += 2
 
     # one pass over all roll calls serves both the /votes/ tree and the
-    # per-bill payloads; grouping preserves the query's (date, id) order
+    # per-bill payloads; grouping preserves the query's (date, id) order.
+    # One grouped scan replaces a per-event query; the lists live exactly
+    # as long as events_by_bill kept them before (shared objects, no copy).
+    records_by_event = dict(queries.vote_records_grouped(conn))
     events_by_bill: dict[str, list[dict]] = {}
     for event in queries.vote_events(conn):
-        records = queries.vote_records_for(conn, event["id"])
+        records = records_by_event.get(event["id"], [])
         write_json(api / "votes" / f"{event['id']}.json", {**event, "records": records})
         files += 1
         events_by_bill.setdefault(event["bill_id"], []).append(
@@ -87,15 +90,21 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
         write_json(api / "bills" / session_id / "index.json", index)
         files += 1
 
+        # two grouped scans per session replace two queries per bill
+        session_sponsors = queries.sponsors_for_session(conn, session_id)
+        session_actions = queries.actions_for_session(conn, session_id)
         for bill in session_bills:
             payload = {
                 **{k: bill[k] for k in bill.keys() if k != "session_id"},
                 "session": session_id,
-                "sponsors": queries.sponsors_for(conn, bill["id"]),
-                "actions": queries.actions_for(conn, bill["id"]),
+                "sponsors": session_sponsors.get(bill["id"], []),
+                "actions": session_actions.get(bill["id"], []),
                 "votes": events_by_bill.get(bill["id"], []),
             }
-            write_json(api / "bills" / session_id / f"{bill_slug(bill)}.json", payload)
+            write_json(
+                api / "bills" / session_id / f"{bill_slug(bill['identifier'])}.json",
+                payload,
+            )
             files += 1
 
     write_json(

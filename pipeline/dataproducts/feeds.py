@@ -48,8 +48,13 @@ def _stamp(date: str | None) -> str:
     return f"{date or '1970-01-01'}T00:00:00Z"
 
 
+_ensured_dirs: set[Path] = set()  # builds only add directories, never remove
+
+
 def _write(root: ET.Element, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.parent not in _ensured_dirs:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _ensured_dirs.add(path.parent)
     ET.ElementTree(root).write(path, encoding="utf-8", xml_declaration=True)
 
 
@@ -59,13 +64,19 @@ def build_feeds(
     feeds_dir = out / "feeds"
     files = 0
 
+    # bills and the grouped actions scan are both ordered by bill id, so a
+    # streaming merge-join replaces one actions query per bill
     bill_columns = "id, identifier, title, session_id, latest_action_date"
+    grouped_actions = queries.actions_grouped(conn)
+    group = next(grouped_actions, None)
     for bill in queries.bills(conn, columns=bill_columns):
-        actions = queries.actions_for(conn, bill["id"])
+        while group is not None and group[0] < bill["id"]:
+            group = next(grouped_actions, None)
+        actions = group[1] if group is not None and group[0] == bill["id"] else []
         if not actions:
             continue
         session = bill["session_id"]
-        slug = bill_slug(bill)
+        slug = bill_slug(bill["identifier"])
         page = f"{SITE}/bills/{session}/{slug}"
         path = f"/feeds/bills/{bill['id']}.xml"
         root = _feed(
@@ -152,7 +163,7 @@ def build_feeds(
                 f"{SITE}/feeds/weekly.xml#{bill_id}-{date}-{i}",
                 f"{identifier}: {desc[:100]}",
                 _stamp(date),
-                f"{SITE}/bills/{session_id}/{identifier.replace(' ', '').lower()}",
+                f"{SITE}/bills/{session_id}/{bill_slug(identifier)}",
                 f"{identifier} — {(title or '')[:150]}: {desc}",
             )
         _write(root, feeds_dir / "weekly.xml")

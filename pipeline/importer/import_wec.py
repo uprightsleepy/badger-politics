@@ -100,14 +100,18 @@ def match_candidate(person_name: str, rows: list[dict]) -> list[dict]:
     return loose if len(loose) == 1 else []
 
 
-def load_candidates(csv_path: Path) -> dict[tuple[str, int], list[dict]]:
+def _read_rows(csv_path: Path) -> list[dict]:
+    """One parse of the candidates CSV, with the column-drift check."""
     with csv_path.open(encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
         if reader.fieldnames != EXPECTED_COLUMNS:
             raise RuntimeError(
                 f"WEC drift: CSV columns {reader.fieldnames} != {EXPECTED_COLUMNS}"
             )
-        rows = list(reader)
+        return list(reader)
+
+
+def _seats(rows: list[dict]) -> dict[tuple[str, int], list[dict]]:
     seats: dict[tuple[str, int], list[dict]] = {}
     for row in rows:
         m = OFFICE_RE.match(row["office"])
@@ -120,14 +124,13 @@ def load_candidates(csv_path: Path) -> dict[tuple[str, int], list[dict]]:
     return seats
 
 
-def load_statewide(csv_path: Path) -> list[dict]:
-    with csv_path.open(encoding="utf-8") as fh:
-        rows = list(csv.DictReader(fh))
-    return [r for r in rows if r["office"] in STATEWIDE_OFFICES]
+def load_candidates(csv_path: Path) -> dict[tuple[str, int], list[dict]]:
+    return _seats(_read_rows(csv_path))
 
 
 def overlay(csv_path: Path, db_path: Path, cycle: int) -> int:
-    seats = load_candidates(csv_path)
+    csv_rows = _read_rows(csv_path)
+    seats = _seats(csv_rows)
     if not seats:
         raise RuntimeError("WEC drift: no legislative seats in CSV")
 
@@ -180,7 +183,7 @@ def overlay(csv_path: Path, db_path: Path, cycle: int) -> int:
                 (on_ballot, json.dumps(opponents), person_id, cycle),
             )
             updated += 1
-        statewide = load_statewide(csv_path)
+        statewide = [r for r in csv_rows if r["office"] in STATEWIDE_OFFICES]
         conn.execute("DELETE FROM statewide_races")
         conn.executemany(
             "INSERT INTO statewide_races (office, incumbent, incumbent_noncandidacy,"

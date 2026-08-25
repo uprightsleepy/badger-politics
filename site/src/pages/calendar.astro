@@ -56,6 +56,8 @@ import { fmtDate } from "../lib/format";
   </div>
 
   <script>
+    import { esc, safeHref } from "../lib/html";
+
     let events: Record<
       string,
       { type: string; label: string; detail?: string; url?: string;
@@ -85,7 +87,12 @@ import { fmtDate } from "../lib/format";
 
     function linksBlock(links: { label: string; url: string }[]): string {
       const anchors = links
-        .map((l) => `<a class="py-1 font-semibold underline" target="_blank" rel="noopener" href="${l.url}">${l.label} ↗</a>`)
+        .map((l) => {
+          const href = safeHref(l.url);
+          return href
+            ? `<a class="py-1 font-semibold underline" target="_blank" rel="noopener" href="${esc(href)}">${esc(l.label)} ↗</a>`
+            : `<span class="font-semibold">${esc(l.label)}</span>`;
+        })
         .join("");
       return `<p class="mt-1 flex flex-wrap gap-x-4 gap-y-1">${anchors}</p>` + pollingBlock();
     }
@@ -99,14 +106,16 @@ import { fmtDate } from "../lib/format";
         ? list
             .map((e) => {
               const emoji = e.type === "election" ? '<span aria-hidden="true">🗳️ </span>' : "";
-              // the title carries the official-notice link itself
-              const title = e.url
-                ? `<a class="py-1 font-semibold underline" target="_blank" rel="noopener" href="${e.url}">${emoji}${e.label}<span class="sr-only"> official notice, opens in a new tab</span></a>`
-                : `<span class="font-semibold">${emoji}${e.label}</span>`;
+              // the title carries the official-notice link itself; the
+              // label, detail, and url are scraped data and never trusted
+              const href = safeHref(e.url);
+              const title = href
+                ? `<a class="py-1 font-semibold underline" target="_blank" rel="noopener" href="${esc(href)}">${emoji}${esc(e.label)}<span class="sr-only"> official notice, opens in a new tab</span></a>`
+                : `<span class="font-semibold">${emoji}${esc(e.label)}</span>`;
               return `
         <li class="rounded border ${e.type === "election" ? "border-gold-500 bg-gold-100" : "border-navy-100"} p-2">
           ${title}
-          ${e.detail ? `<span class="text-navy-600"> · ${e.detail}</span>` : ""}
+          ${e.detail ? `<span class="text-navy-600"> · ${esc(e.detail)}</span>` : ""}
           ${e.links?.length ? linksBlock(e.links) : ""}
           ${e.type === "hearing" ? `<p class="mt-1 text-xs text-navy-600">Confirm against the official notice before attending.</p>` : ""}
         </li>`;

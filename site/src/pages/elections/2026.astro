@@ -5,7 +5,7 @@ import {
   sittingPeople, electionFor, personIdByName, statewideRaces, statewideHistory,
   lastMarginFor, statewideCountiesFor,
 } from "../../lib/db";
-import { personSlug } from "../../lib/format";
+import { partyLetter, personSlug } from "../../lib/format";
 const seats = sittingPeople()
   .map((p) => ({
     person: p,
@@ -151,7 +151,7 @@ const statewide = OFFICES.map(([key, label]) => {
           {o.last.length > 0 && (
             <p class="mt-2 border-t border-navy-100 pt-2 text-xs text-navy-600">
               {o.last[0].year} result: {o.last.slice(0, 2).map((h) =>
-                `${h.candidate} (${h.party?.[0] ?? "?"}) ${h.votes.toLocaleString()}`
+                `${h.candidate} (${partyLetter(h.party)}) ${h.votes.toLocaleString()}`
               ).join(" — ")}
             </p>
           )}
@@ -178,7 +178,7 @@ const statewide = OFFICES.map(([key, label]) => {
                       <th scope="col" class="py-1 pr-2 font-semibold">County</th>
                       {o.countyTable.columns.map((c) => (
                         <th scope="col" class="py-1 pr-2 text-right font-semibold">
-                          {shortName(c.candidate)} ({c.party?.[0] ?? "?"})
+                          {shortName(c.candidate)} ({partyLetter(c.party)})
                         </th>
                       ))}
                     </tr>
@@ -239,7 +239,7 @@ const statewide = OFFICES.map(([key, label]) => {
                         ) : (
                           o.name
                         )}
-                        {` (${o.party?.[0] ?? "?"})`}
+                        {` (${partyLetter(o.party)})`}
                       </>
                     );
                   })}

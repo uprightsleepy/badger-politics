@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { lawBienniums, lawsFor } from "../../lib/db";
-import { billSlug, chamberName } from "../../lib/format";
+import { billSlug, chamberName, shortTitle } from "../../lib/format";
 
 export function getStaticPaths() {
   return lawBienniums().map(({ biennium }) => ({
@@ -45,7 +45,7 @@ const fmtApproved = (raw: string | null): string => {
         >
           {law.identifier}
         </a>
-        <span class="min-w-0 flex-1 basis-64">{law.title?.replace(/^Relating to: /, "")}</span>
+        <span class="min-w-0 flex-1 basis-64">{shortTitle(law.title)}</span>
         <span class="shrink-0 text-xs text-navy-600">
           approved {fmtApproved(law.approved)}
         </span>

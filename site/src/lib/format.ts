@@ -30,6 +30,13 @@ export const partyStyle = (party: string | null): string =>
 export const partyLetter = (party: string | null): string =>
   party ? party[0] : "?";
 
+/** Bill titles all open "Relating to: ..."; strip it for compact rows. */
+export const shortTitle = (title: string | null): string =>
+  (title ?? "").replace(/^Relating to: /, "");
+
+/** Committee page slug: the tail of the scraped committee id. */
+export const committeeSlug = (id: string): string => id.split("/").pop()!;
+
 export const roleAbbr = (chamber: string | null): string =>
   chamber === "upper" ? "SD" : "AD";
 

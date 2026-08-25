@@ -4,7 +4,7 @@ interface Props { href: string | null; title?: string }
 const { href, title } = Astro.props;
 ---
 {href ? (
-  <a href={href} class="min-w-0 flex-1 truncate py-1 underline"><slot /></a>
+  <a href={href} class="min-w-0 flex-1 truncate py-1 underline" title={title}><slot /></a>
 ) : (
   <span class="min-w-0 flex-1 truncate py-1" title={title}><slot /></span>
 )}

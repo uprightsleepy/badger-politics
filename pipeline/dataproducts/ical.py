@@ -61,18 +61,25 @@ def _fold(line: str) -> str:
     return "\r\n".join(out)
 
 
-def _calendar(name: str, events: list[list[str]]) -> str:
-    lines = [
+# the preamble around the calendar name never varies; fold it once, not
+# once per generated file
+_FOLDED_HEAD = "\r\n".join(
+    _fold(line)
+    for line in (
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
         "PRODID:-//Badger Politics//badgerpolitics.org//EN",
-        f"X-WR-CALNAME:{_escape(name)}",
-        *VTIMEZONE.splitlines(),
-    ]
+    )
+)
+_FOLDED_TZ = "\r\n".join(_fold(line) for line in VTIMEZONE.splitlines())
+
+
+def _calendar(name: str, events: list[list[str]]) -> str:
+    parts = [_FOLDED_HEAD, _fold(f"X-WR-CALNAME:{_escape(name)}"), _FOLDED_TZ]
     for event in events:
-        lines.extend(event)
-    lines.append("END:VCALENDAR")
-    return "\r\n".join(_fold(line) for line in lines) + "\r\n"
+        parts.extend(_fold(line) for line in event)
+    parts.append("END:VCALENDAR")
+    return "\r\n".join(parts) + "\r\n"
 
 
 def hearing_uid(hearing: dict) -> str:

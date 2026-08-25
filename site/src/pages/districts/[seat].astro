@@ -3,7 +3,8 @@ import Base from "../../layouts/Base.astro";
 import {
   seatTerms, sittingPeople, electionFor, electionHistoryFor, lastMarginFor,
 } from "../../lib/db";
-import { partyStyle, personSlug, monthYear, chamberName } from "../../lib/format";
+import { partyLetter, partyStyle, personSlug, monthYear, chamberName } from "../../lib/format";
+import { safeHref } from "../../lib/html";
 import { mergeServiceSpans } from "../../lib/service";
 
 export function getStaticPaths() {
@@ -68,7 +69,7 @@ const lineage = [...byPerson.entries()]
         <p class="mt-1 text-sm text-navy-700">
           {election.cycle_year === 2026
             ? election.on_ballot === 1
-              ? `On the November 2026 ballot${opponents.length ? ` — challenged by ${opponents.map((o) => `${o.name} (${o.party?.[0] ?? "?"})`).join(", ")}` : ", unopposed so far"}`
+              ? `On the November 2026 ballot${opponents.length ? ` — challenged by ${opponents.map((o) => `${o.name} (${partyLetter(o.party)})`).join(", ")}` : ", unopposed so far"}`
               : election.on_ballot === 0
                 ? "Not running in November 2026"
                 : `Seat next on the ballot in November ${election.cycle_year}`
@@ -101,12 +102,12 @@ const lineage = [...byPerson.entries()]
         <li class="rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
           <div class="flex flex-wrap items-baseline gap-x-3">
             <a href={`/legislators/${personSlug(s.person_id)}/`} class="min-w-0 py-1 font-bold underline">{s.name}</a>
-            <span class={`shrink-0 rounded px-1 text-xs ${partyStyle(s.party)}`}>{s.party?.[0] ?? "?"}</span>
+            <span class={`shrink-0 rounded px-1 text-xs ${partyStyle(s.party)}`}>{partyLetter(s.party)}</span>
             <span class="shrink-0 text-navy-700">{monthYear(s.start)} to {s.end ? monthYear(s.end) : "present"}</span>
           </div>
           {s.end_label && (
             <p class="text-xs text-navy-600">
-              {s.end_url ? <a href={s.end_url} class="inline-block py-1 underline">{s.end_label}</a> : <span class="inline-block py-1">{s.end_label}</span>}
+              {safeHref(s.end_url) ? <a href={safeHref(s.end_url)} class="inline-block py-1 underline">{s.end_label}</a> : <span class="inline-block py-1">{s.end_label}</span>}
             </p>
           )}
         </li>
@@ -131,7 +132,7 @@ const lineage = [...byPerson.entries()]
               {h.candidates.map((c) => (
                 <li class="flex flex-wrap items-baseline gap-x-3">
                   <span class="min-w-0 flex-1">{c.candidate}</span>
-                  <span class={`shrink-0 rounded px-1 text-xs ${partyStyle(c.party)}`}>{c.party?.[0] ?? "?"}</span>
+                  <span class={`shrink-0 rounded px-1 text-xs ${partyStyle(c.party)}`}>{partyLetter(c.party)}</span>
                   <span class="w-20 shrink-0 text-right tabular-nums">{c.votes.toLocaleString()}</span>
                   <span class="w-14 shrink-0 text-right tabular-nums text-navy-600">
                     {h.total ? `${((c.votes / h.total) * 100).toFixed(1)}%` : ""}

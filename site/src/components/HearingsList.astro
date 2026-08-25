@@ -1,11 +1,11 @@
 ---
 /** The hearings list section, shared by the calendar page. */
 import { upcomingHearings, recentHearings, findBillByIdentifier, allCommittees } from "../lib/db";
-import { fmtDate, fmtTime, hearingDisplayName, billSlug, personSlug } from "../lib/format";
+import { committeeSlug, fmtDate, fmtTime, hearingDisplayName, billSlug, personSlug } from "../lib/format";
+import { safeHref } from "../lib/html";
 const today = new Date().toISOString().slice(0, 10);
 const upcoming = upcomingHearings(today);
-const recent = recentHearings(30);
-const shown = upcoming.length ? upcoming : recent;
+const shown = upcoming.length ? upcoming : recentHearings(30);
 const heading = upcoming.length ? "Upcoming committee hearings" : "Recent committee hearings";
 // schedule-feed committees without a roster have no page; don't link them
 const committeePages = new Set(allCommittees().map((c) => c.id));
@@ -29,20 +29,20 @@ const committeePages = new Set(allCommittees().map((c) => c.id));
         <li class="rounded-lg border border-navy-100 bg-white px-4 py-3 text-sm">
           <div class="flex flex-wrap items-baseline gap-x-3">
             {h.committee_id && committeePages.has(h.committee_id) ? (
-              <a href={`/committees/${h.committee_id.split("/").pop()}/`} class="py-1 font-bold underline">{name}</a>
+              <a href={`/committees/${committeeSlug(h.committee_id)}/`} class="py-1 font-bold underline">{name}</a>
             ) : (
               <span class="font-bold">{name}</span>
             )}
             <span class="text-navy-600">{fmtDate(h.date)} {h.time && `· ${fmtTime(h.time)}`}</span>
             {h.location && <span class="text-navy-600">{h.location}</span>}
             <span class="ml-auto flex flex-wrap gap-x-3 gap-y-1">
-              {h.video_url && (
-                <a href={h.video_url} class="py-1 font-semibold underline" aria-label={`Watch ${name} hearing from ${fmtDate(h.date)} on WisconsinEye`}>
+              {safeHref(h.video_url) && (
+                <a href={safeHref(h.video_url)} class="py-1 font-semibold underline" aria-label={`Watch ${name} hearing from ${fmtDate(h.date)} on WisconsinEye`}>
                   Watch on WisconsinEye
                 </a>
               )}
               <a href={`/calendar/hearings/${uid}.ics`} class="py-1 underline" aria-label={`Add ${name} hearing on ${fmtDate(h.date)} to calendar`}>Add to calendar</a>
-              {h.source_url && <a href={h.source_url} class="py-1 underline" aria-label={`Official notice for ${name} hearing on ${fmtDate(h.date)}`}>Official notice</a>}
+              {safeHref(h.source_url) && <a href={safeHref(h.source_url)} class="py-1 underline" aria-label={`Official notice for ${name} hearing on ${fmtDate(h.date)}`}>Official notice</a>}
             </span>
           </div>
           {h.chair_name && (

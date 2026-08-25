@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { vetoTracker, vetoMessageUrl } from "../../lib/db";
-import { billSlug, chamberName, fmtDate } from "../../lib/format";
+import { billSlug, chamberName, fmtDate, shortTitle } from "../../lib/format";
 const bienniums = vetoTracker();
 ---
 
@@ -64,7 +64,7 @@ const bienniums = vetoTracker();
                     <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="w-20 shrink-0 font-semibold underline">
                       {v.identifier}
                     </a>
-                    <span class="min-w-0 flex-1 truncate">{v.title?.replace(/^Relating to: /, "")}</span>
+                    <span class="min-w-0 flex-1 truncate">{shortTitle(v.title)}</span>
                     {msg && (
                       <a href={msg} class="shrink-0 py-1 text-xs underline">veto message</a>
                     )}
@@ -89,7 +89,7 @@ const bienniums = vetoTracker();
                   <a href={`/bills/${l.session_id}/${billSlug(l.identifier)}/`} class="w-20 shrink-0 font-semibold underline">
                     {l.identifier}
                   </a>
-                  <span class="min-w-0 flex-1 truncate">{l.title?.replace(/^Relating to: /, "")}</span>
+                  <span class="min-w-0 flex-1 truncate">{shortTitle(l.title)}</span>
                   {msg && (
                     <a href={msg} class="shrink-0 py-1 text-xs underline">veto message</a>
                   )}

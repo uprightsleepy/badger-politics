@@ -7,8 +7,10 @@ const server = await serveDist(8931);
 const browser = await launchBrowser();
 const page = await browser.newPage();
 const results = [];
-const check = (name, ok, detail = "") =>
-  results.push({ name, ok, detail }) && console.log(`${ok ? "PASS" : "FAIL"}: ${name} ${detail}`);
+const check = (name, ok, detail = "") => {
+  results.push({ name, ok, detail });
+  console.log(`${ok ? "PASS" : "FAIL"}: ${name} ${detail}`);
+};
 
 // track whether the GoatCounter script is requested
 let goatRequested = false;

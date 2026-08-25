@@ -2,11 +2,11 @@
 import Base from "../../layouts/Base.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import { allCommittees, committeeFor } from "../../lib/db";
-import { chamberName, personSlug, fmtDate, fmtTime, roleAbbr } from "../../lib/format";
+import { chamberName, committeeSlug, personSlug, fmtDate, fmtTime, roleAbbr } from "../../lib/format";
 
 export function getStaticPaths() {
   return allCommittees().map((c) => ({
-    params: { id: c.id.split("/").pop() },
+    params: { id: committeeSlug(c.id) },
     props: { committeeId: c.id },
   }));
 }

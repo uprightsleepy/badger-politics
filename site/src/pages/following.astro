@@ -33,9 +33,7 @@ import Base from "../layouts/Base.astro";
 
   <script>
     import { getFollows, toggleFollow, lastSeen, markSeen } from "../scripts/follows";
-
-    const esc = (s: string) => s.replace(/[<>&"]/g, (c) =>
-      ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]!);
+    import { esc } from "../lib/html";
 
     async function billRow(id: string, seen: string | null): Promise<string> {
       const [session, slug] = [id.slice(0, id.indexOf("-")), id.slice(id.indexOf("-") + 1)];
@@ -43,7 +41,7 @@ import Base from "../layouts/Base.astro";
         const b = await (await fetch(`/api/v1/bills/${session}/${slug}.json`)).json();
         const changed = seen && b.latest_action_date && b.latest_action_date > seen;
         return `<li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2${changed ? " border-l-4 border-moss-600" : ""}">
-          <a href="/bills/${session}/${slug}/" class="w-20 shrink-0 py-1 font-bold underline">${esc(b.identifier)}</a>
+          <a href="/bills/${esc(session)}/${esc(slug)}/" class="w-20 shrink-0 py-1 font-bold underline">${esc(b.identifier)}</a>
           <span class="min-w-0 flex-1 truncate">${esc(b.title ?? "")}</span>
           ${changed ? `<span class="shrink-0 rounded-full bg-moss-50 px-2 py-0.5 text-xs font-semibold text-moss-600">new action</span>` : ""}
           <span class="shrink-0 text-xs text-navy-600">${esc(b.latest_action_desc ?? "")} (${esc(b.latest_action_date ?? "")})</span>

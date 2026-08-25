@@ -19,9 +19,10 @@ from pathlib import Path
 
 import requests
 
+from scraper.http import session
+
 API = "https://wiseye.org/wp-json/wp/v2/posts"
 DATA_PATH = Path(__file__).resolve().parents[1] / "_data" / "wiseye" / "videos.json"
-USER_AGENT = "BadgerPolitics/1.0 (badgerpolitics.org; hphil.work@gmail.com)"
 DELAY = 10  # their robots.txt crawl-delay
 
 
@@ -52,8 +53,7 @@ def fetch_pages(http: requests.Session, params: dict) -> list[dict]:
 
 
 def main(argv: list[str]) -> int:
-    http = requests.Session()
-    http.headers["User-Agent"] = USER_AGENT
+    http = session()
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     existing: dict[str, dict] = {}
     if DATA_PATH.exists():
