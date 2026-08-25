@@ -5,8 +5,18 @@ import { fmtDate } from "../lib/format";
 interface Props {
   title: string;
   description?: string;
+  /** Share-card image; pages may override the sitewide card. */
+  image?: string;
 }
-const { title, description = "Free, independent tracking of the Wisconsin Legislature. Every bill, every vote, and every committee graveyard." } = Astro.props;
+const {
+  title,
+  description = "Free, independent tracking of the Wisconsin Legislature. Every bill, every vote, and every committee graveyard.",
+  image = "/og.png",
+} = Astro.props;
+// absolute URLs: crawlers and chat apps will not resolve relative ones
+const pageUrl = new URL(Astro.url.pathname, Astro.site).href;
+const imageUrl = new URL(image, Astro.site).href;
+const fullTitle = `${title} · Badger Politics`;
 const dataThrough = meta().data_through;
 // two different freshness facts: the newest action the Legislature has
 // recorded, and when we last pulled the records to look
@@ -51,9 +61,26 @@ const NAV_DIRECT: [string, string][] = [
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} · Badger Politics</title>
+    <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href={pageUrl} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Badger Politics" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={pageUrl} />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Badger Politics — Wisconsin's Legislature, in plain sight." />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={imageUrl} />
   </head>
   <body class="min-h-screen bg-paper text-ink antialiased">
     <a

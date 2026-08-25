@@ -37,3 +37,4 @@ site/public/logos/
 Thumbs.db
 firebase-debug.log
 .firebase/
+site/scripts/.og.svg
