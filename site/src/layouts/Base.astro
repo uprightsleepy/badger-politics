@@ -7,11 +7,16 @@ interface Props {
   description?: string;
   /** Share-card image; pages may override the sitewide card. */
   image?: string;
+  /** Index this page's main content for search. Off for roll-call pages,
+   * which are name lists whose substance lives on the bill and member
+   * pages already. */
+  searchable?: boolean;
 }
 const {
   title,
   description = "Free, independent tracking of the Wisconsin Legislature. Every bill, every vote, and every committee graveyard.",
   image = "/og.png",
+  searchable = true,
 } = Astro.props;
 // absolute URLs: crawlers and chat apps will not resolve relative ones
 const pageUrl = new URL(Astro.url.pathname, Astro.site).href;
@@ -53,7 +58,6 @@ const NAV_GROUPS: { label: string; items: [string, string][] }[] = [
 const NAV_DIRECT: [string, string][] = [
   ["/calendar/", "Calendar"],
   ["/elections/2026/", "2026 Ballot"],
-  ["/following/", "Following"],
 ];
 ---
 
@@ -108,12 +112,25 @@ const NAV_DIRECT: [string, string][] = [
             <div class="absolute right-0 top-full z-50 mt-2 max-h-[80vh] w-72 overflow-y-auto rounded-lg border border-navy-700 bg-navy-900 p-2 shadow-lg">
               <!-- the site's primary action leads; it was previously last,
                    below the fold on a phone -->
+              <form action="/" method="get" class="px-1 pb-2">
+                <label class="sr-only" for="nav-search">Search the site</label>
+                <input
+                  id="nav-search"
+                  type="search"
+                  name="q"
+                  placeholder="Search bills, people, laws…"
+                  class="w-full rounded-lg border border-navy-600 bg-navy-800 px-3 py-2 text-sm text-white placeholder:text-navy-300"
+                />
+              </form>
               <a
                 href="/my-reps/"
                 data-nav-my-reps
                 class="block rounded-lg bg-gold-500 px-3 py-2.5 text-center font-bold text-navy-900 hover:bg-gold-600"
               >
                 Find my legislators
+              </a>
+              <a href="/following/" class="mt-1 block rounded-lg border border-navy-600 px-3 py-2 text-center font-semibold hover:bg-navy-800">
+                Following
               </a>
 
               <!-- categories collapse so every one is visible at once
@@ -172,7 +189,7 @@ const NAV_DIRECT: [string, string][] = [
       </nav>
     </header>
 
-    <main id="main" tabindex="-1" class="mx-auto max-w-5xl px-4 py-8 focus:outline-none">
+    <main id="main" tabindex="-1" class="mx-auto max-w-5xl px-4 py-8 focus:outline-none" {...(searchable ? { "data-pagefind-body": true } : {})}>
       <slot />
     </main>
 
