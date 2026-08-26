@@ -105,25 +105,45 @@ const NAV_DIRECT: [string, string][] = [
               </svg>
               Menu
             </summary>
-            <ul class="absolute right-0 top-full z-50 mt-2 max-h-[80vh] w-60 space-y-1 overflow-y-auto rounded-lg border border-navy-700 bg-navy-900 p-2 shadow-lg">
+            <div class="absolute right-0 top-full z-50 mt-2 max-h-[80vh] w-72 overflow-y-auto rounded-lg border border-navy-700 bg-navy-900 p-2 shadow-lg">
+              <!-- the site's primary action leads; it was previously last,
+                   below the fold on a phone -->
+              <a
+                href="/my-reps/"
+                data-nav-my-reps
+                class="block rounded-lg bg-gold-500 px-3 py-2.5 text-center font-bold text-navy-900 hover:bg-gold-600"
+              >
+                Find my legislators
+              </a>
+
+              <!-- categories collapse so every one is visible at once
+                   instead of a fifteen-item scroll -->
               {NAV_GROUPS.map((g) => (
-                <>
-                  <li aria-hidden="true" class="px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-gold-500">{g.label}</li>
-                  {g.items.map(([href, label]) => (
-                    <li><a href={href} class="block rounded px-3 py-2 hover:bg-navy-800">{label}</a></li>
-                  ))}
-                </>
+                <details data-nav-group class="group mt-1 border-t border-navy-700 pt-1">
+                  <summary class="flex cursor-pointer list-none items-center justify-between rounded px-3 py-2 font-semibold hover:bg-navy-800 [&::-webkit-details-marker]:hidden">
+                    {g.label}
+                    <svg width="12" height="12" viewBox="0 0 10 10" aria-hidden="true" class="shrink-0 transition-transform group-open:rotate-180">
+                      <path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                  </summary>
+                  <ul class="pb-1">
+                    {g.items.map(([href, label]) => (
+                      <li>
+                        <a href={href} class="block rounded py-2 pl-6 pr-3 text-sm hover:bg-navy-800">{label}</a>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               ))}
-              <li aria-hidden="true" class="border-t border-navy-700 pt-1"></li>
-              {NAV_DIRECT.map(([href, label]) => (
-                <li><a href={href} class="block rounded px-3 py-2 hover:bg-navy-800">{label}</a></li>
-              ))}
-              <li>
-                <a href="/my-reps/" data-nav-my-reps class="block rounded bg-navy-700 px-3 py-2 font-semibold hover:bg-navy-600">
-                  Find my legislators
-                </a>
-              </li>
-            </ul>
+
+              <ul class="mt-1 border-t border-navy-700 pt-1">
+                {NAV_DIRECT.map(([href, label]) => (
+                  <li>
+                    <a href={href} class="block rounded px-3 py-2 hover:bg-navy-800">{label}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </details>
           <div class="hidden flex-wrap items-center gap-x-6 gap-y-2 md:flex">
             {NAV_GROUPS.map((g) => (
