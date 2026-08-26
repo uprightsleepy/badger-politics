@@ -3,6 +3,10 @@ name: deploy
 # Deploys the site from a commit on main, never from whatever happens to be
 # sitting in a local dist/. A Hosting release replaces the entire site, so
 # every gate below runs before the release, not after.
+#
+# A push releases to dev. Production is a deliberate promotion, run by hand
+# once dev looks right -- this is a public record, so nothing reaches
+# constituents because someone pushed a work-in-progress commit.
 on:
   push:
     branches: [main]
@@ -15,21 +19,24 @@ on:
       target:
         description: "Firebase project to release to"
         type: choice
-        options: [badgerpolitics-dev, badgerpolitics-prod]
-        default: badgerpolitics-dev
+        options: [badgerpolitics-prod, badgerpolitics-dev]
+        default: badgerpolitics-prod
 
 permissions:
   contents: read
   id-token: write # mint the OIDC token for Workload Identity
 
-# One release at a time. Two overlapping deploys would race to publish
-# different builds, and the loser wins whichever finishes last.
+# One release at a time per target, so an automatic dev deploy never
+# delays a promotion to production. Two overlapping releases to the same
+# target would race, and whichever finished last would win.
 concurrency:
-  group: deploy-site
+  group: deploy-${{ inputs.target || 'badgerpolitics-dev' }}
   cancel-in-progress: false
 
 env:
   SNAPSHOT_BUCKET: badgerpolitics-prod-snapshots
+  # a push has no inputs, so it lands on dev by default
+  TARGET: ${{ inputs.target || 'badgerpolitics-dev' }}
 
 jobs:
   deploy:
@@ -37,8 +44,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment:
-      name: ${{ inputs.target || 'badgerpolitics-prod' }}
-      url: https://badgerpolitics.org
+      name: ${{ inputs.target || 'badgerpolitics-dev' }}
+      url: >-
+        ${{ (inputs.target || 'badgerpolitics-dev') == 'badgerpolitics-prod'
+        && 'https://badgerpolitics.org'
+        || 'https://badgerpolitics-dev.web.app' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -152,18 +162,24 @@ jobs:
         run: |
           npx --yes firebase-tools@14 deploy \
             --only hosting \
-            --project "${{ inputs.target || 'badgerpolitics-prod' }}" \
+            --project "$TARGET" \
             --non-interactive \
             --message "${GITHUB_SHA::8} via ${GITHUB_RUN_ID}"
 
       # Proves the release is actually serving, not just that the API
-      # accepted it. Runs against the public URL, not the local build.
+      # accepted it. Runs against the public URL, not the local build, and
+      # against whichever target was released.
       - name: Smoke-test what is live
-        if: ${{ (inputs.target || 'badgerpolitics-prod') == 'badgerpolitics-prod' }}
         run: |
           set -euo pipefail
-          base=https://badgerpolitics.org
-          for path in / /bills/2025/ /my-reps/ /money/ /legislators/; do
+          if [ "$TARGET" = "badgerpolitics-prod" ]; then
+            base=https://badgerpolitics.org
+          else
+            base=https://badgerpolitics-dev.web.app
+          fi
+          echo "smoke-testing $base"
+          for path in / /bills/2025/ /my-reps/ /money/ /legislators/ \
+                      /feeds/weekly.xml /api/v1/meta.json; do
             code=$(curl -sS -o /dev/null -w '%{http_code}' --retry 3 --retry-delay 5 "$base$path")
             echo "$path -> $code"
             [ "$code" = "200" ]
@@ -177,4 +193,4 @@ jobs:
         if: failure()
         run: |
           echo "::notice::If a release went out and is bad, roll back with:"
-          echo "::notice::npx firebase-tools@14 hosting:rollback --project badgerpolitics-prod"
+          echo "::notice::npx firebase-tools@14 hosting:rollback --project $TARGET"

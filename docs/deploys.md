@@ -26,9 +26,13 @@ release a build that does not match the database that produced it.
 | Trigger | Workflow | What happens |
 | --- | --- | --- |
 | Pull request | `ci.yml` | Ruff, pytest, schema applies, site typecheck, workflow guards, `tofu validate`. No secrets, no deploy. |
-| Push to `main` touching `site/**` | `deploy.yml` | Build → preflight → verify → release to prod → smoke-test the live URL. |
-| Manual (`workflow_dispatch`) | `deploy.yml` | Same, with a choice of dev or prod. |
+| Push to `main` touching `site/**` | `deploy.yml` | Full gate chain, then release to **dev**. |
+| Manual (`workflow_dispatch`) | `deploy.yml` | Same chain, released to the target you pick. Defaults to **prod** — this is how production is promoted. |
 | Nightly (Cloud Run, pending) | `pipeline/run.sh` | Scrape → import → checks → build → preflight → deploy → snapshot. |
+
+Production is never released by pushing. A push rehearses on dev; you
+promote when dev looks right. This is a public record, so nothing reaches
+constituents as a side effect of committing.
 
 ## The gates, in order
 
@@ -44,21 +48,35 @@ release a build that does not match the database that produced it.
    disclaimer on the homepage. It derives its expectations from the data,
    so it never needs updating when the counts change.
 3. **Site verification** — `links`, `responsive`, `a11y`, `verify`.
-4. **Post-release smoke test** — hits the public URL, asserts 200s, and
-   checks that HTML is still served with `must-revalidate`. A page cached
-   for an hour once hid a broken deploy for exactly that long.
+4. **Post-release smoke test** — hits the released target's public URL,
+   asserts 200s on pages, a feed and an API file, and checks that HTML is
+   still served with `must-revalidate`. A page cached for an hour once hid
+   a broken deploy for exactly that long.
+
+The gates are also where three latent defects surfaced the first time this
+ran: `npm ci --ignore-scripts` leaves `better-sqlite3` unloadable, the
+browser harnesses could not start on Linux, and the JSON API, Atom feeds
+and calendars were never generated outside `run.sh` — so a site-only build
+would have released with all 20,580 of those links broken.
 
 ## Credentials
 
 There is no service-account key anywhere. GitHub Actions federates into
 `gha-site-deployer@badgerpolitics-prod.iam.gserviceaccount.com` through
-Workload Identity, with two conditions on the trust:
+Workload Identity, restricted in two places:
 
-- the token's `repository` claim must be `uprightsleepy/badger-politics`
-- the token's `ref` claim must be `refs/heads/main`
+- the provider refuses to exchange a token whose `repository` claim is not
+  `uprightsleepy/badger-politics`, so no other repo can reach the pool
+- the service account is bound to a single principal built from a mapped
+  attribute combining both claims: `uprightsleepy/badger-politics@refs/heads/main`
 
-A pull request runs with `refs/pull/N/merge`, so it cannot assume the
-identity even from inside this repository. The service account holds
+A pull request runs with `refs/pull/N/merge`, which produces a different
+principal that holds no roles, so it cannot assume the identity even from
+inside this repository. Note the restriction has to live in the principal,
+not in an IAM condition: mapped attributes are not visible to IAM
+conditions during impersonation, so a condition on
+`request.auth.claims['attribute.ref']` is silently always false and denies
+every deploy. The service account holds
 `firebasehosting.admin` on the prod project and *read-only* access to the
 snapshot bucket, so a compromised run can publish a site but cannot alter
 or delete the database.
