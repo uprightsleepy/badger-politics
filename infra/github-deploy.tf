@@ -106,3 +106,11 @@ output "deployer_service_account" {
   description = "Service account the workflow impersonates"
   value       = google_service_account.deployer.email
 }
+
+# The dev project is the rehearsal target: workflow_dispatch can release
+# there to prove a change before main releases to production.
+resource "google_project_iam_member" "deployer_hosting_dev" {
+  project = local.dev_project
+  role    = "roles/firebasehosting.admin"
+  member  = "serviceAccount:${google_service_account.deployer.email}"
+}
