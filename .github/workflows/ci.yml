@@ -36,6 +36,69 @@ jobs:
           sqlite3 data/wi.sqlite < pipeline/importer/schema.sql
           sqlite3 data/wi.sqlite ".tables"
 
+  site:
+    name: site typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      # A pull request has no credentials, so it cannot reach the SQLite
+      # snapshot the real build reads. An empty database with the real
+      # schema still type-checks every query and component.
+      - name: Empty database with the real schema
+        run: |
+          mkdir -p data
+          sqlite3 data/wi.sqlite < pipeline/importer/schema.sql
+      # --ignore-scripts blocks arbitrary install scripts from the whole
+      # dependency tree; better-sqlite3 is a native module and genuinely
+      # needs to build, so it is rebuilt by name rather than by lifting the
+      # blanket ban.
+      - name: Install (locked, no lifecycle scripts)
+        working-directory: site
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild better-sqlite3
+      - name: Typecheck
+        working-directory: site
+        run: npx --yes astro check --minimumSeverity error
+      - name: Harness scripts parse
+        working-directory: site
+        run: |
+          set -euo pipefail
+          for f in scripts/*.mjs scripts/lib/*.mjs; do
+            node --check "$f"
+          done
+
+  actions:
+    name: workflows pinned + least privilege
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No workflow may grant blanket write
+        run: |
+          set -euo pipefail
+          # a workflow with no permissions block inherits the repo default,
+          # which can be read-write on every scope
+          for f in .github/workflows/*.yml; do
+            grep -q '^permissions:' "$f" || { echo "::error file=$f::no permissions block"; exit 1; }
+            grep -qE '^\s*contents:\s*write' "$f" && { echo "::error file=$f::grants contents:write"; exit 1; }
+            echo "ok $f"
+          done
+      - name: Deploy workflow never triggers on pull_request
+        run: |
+          set -euo pipefail
+          # a PR-triggered deploy would publish unreviewed code, and with
+          # pull_request_target it would do so with repository secrets
+          if grep -qE '^\s*pull_request(_target)?:' .github/workflows/deploy.yml; then
+            echo "::error::deploy.yml is reachable from a pull request"
+            exit 1
+          fi
+          echo "ok deploy.yml is push/dispatch only"
+
   infra:
     name: tofu validate
     runs-on: ubuntu-latest

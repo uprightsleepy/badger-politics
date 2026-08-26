@@ -73,6 +73,11 @@ python -m dataproducts.build ../data/wi.sqlite ../site/public/
 # npm run build also runs pagefind, so the index matches what was built.
 (cd ../site && BUILD_SESSIONS=all npm run build)
 
+# A Hosting release replaces the whole site, so a build that came up short
+# deletes every page it omits. Assert the built tree against the database
+# that produced it before anything is published.
+(cd ../site && node scripts/preflight.mjs)
+
 if [ "$SKIP_DEPLOY" -eq 0 ]; then
   # runs from the repo root: firebase.json maps hosting to site/dist
   (cd .. && firebase deploy --only hosting --project "$FB_PROJECT" --non-interactive)
@@ -81,8 +86,10 @@ else
 fi
 
 if [ "$LOCAL" -eq 0 ]; then
+  # Compressed: the snapshot goes 397MB -> ~90MB, and CI pulls one on every
+  # deploy, so uncompressed egress alone would eat most of the cost ceiling.
   # gcloud storage, not gsutil: gsutil is pinned to Python <=3.12
-  gcloud storage cp ../data/wi.sqlite     "gs://$BUCKET/snapshots/wi-$(date +%F).sqlite"
+  gzip -6 -c ../data/wi.sqlite | gcloud storage cp - "gs://$BUCKET/snapshots/wi-$(date +%F).sqlite.gz"
 else
   echo "skipping snapshot upload (--local)"
 fi

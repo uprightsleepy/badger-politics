@@ -35,7 +35,10 @@ openstates-scrapers (wi) → SQLite → Astro static build → Firebase Hosting.
 - The static JSON API and all exports are provenance-filtered: source='legiscan' rows never leave the SQLite.
 - Interact with openstates-scrapers ONLY as a subprocess CLI (os-update). Never `import` their modules into our Apache-2.0 code (GPL boundary).
 - Vote attribution: match against a session-scoped roster; any ambiguous surname is a hard failure, never a best guess.
-- Dependencies are hash-pinned (uv.lock / package-lock.json); `npm ci --ignore-scripts` in the pipeline image. No deploy ever runs from a PR.
+- Dependencies are hash-pinned (uv.lock / package-lock.json); `npm ci --ignore-scripts`
+  everywhere, then `npm rebuild better-sqlite3` by name (the flag leaves that native
+  module with no binary; rebuilding one named package still blocks every other
+  package's install scripts). No deploy ever runs from a PR.
 - LTSB GeoJSON is the authoritative district source; Census is geocoding only.
 
 ## Gotchas

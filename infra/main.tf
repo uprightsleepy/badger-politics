@@ -9,6 +9,16 @@
 #   - Cloud Monitoring log-based alert on job failure -> email
 
 locals {
-  project_id = "wi-bills-prod"
-  region     = "us-central1"
+  # the deploy projects that actually exist; the nightly job will live in
+  # prod alongside the bucket it snapshots to
+  prod_project    = "badgerpolitics-prod"
+  dev_project     = "badgerpolitics-dev"
+  region          = "us-central1"
+  snapshot_bucket = "badgerpolitics-prod-snapshots"
+  github_repo     = "uprightsleepy/badger-politics"
+}
+
+provider "google" {
+  project = local.prod_project
+  region  = local.region
 }

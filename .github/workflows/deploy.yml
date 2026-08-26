@@ -1,0 +1,169 @@
+name: deploy
+
+# Deploys the site from a commit on main, never from whatever happens to be
+# sitting in a local dist/. A Hosting release replaces the entire site, so
+# every gate below runs before the release, not after.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "firebase.json"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Firebase project to release to"
+        type: choice
+        options: [badgerpolitics-dev, badgerpolitics-prod]
+        default: badgerpolitics-dev
+
+permissions:
+  contents: read
+  id-token: write # mint the OIDC token for Workload Identity
+
+# One release at a time. Two overlapping deploys would race to publish
+# different builds, and the loser wins whichever finishes last.
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+env:
+  SNAPSHOT_BUCKET: badgerpolitics-prod-snapshots
+
+jobs:
+  deploy:
+    name: build, verify, release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: ${{ inputs.target || 'badgerpolitics-prod' }}
+      url: https://badgerpolitics.org
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - id: auth
+        name: Federate into GCP (no stored key)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve the newest snapshot
+        id: snap
+        run: |
+          set -euo pipefail
+          latest=$(gcloud storage ls "gs://${SNAPSHOT_BUCKET}/snapshots/*.sqlite.gz" \
+                   | sort | tail -1)
+          if [ -z "$latest" ]; then
+            echo "::error::no snapshot in gs://${SNAPSHOT_BUCKET}/snapshots/"
+            exit 1
+          fi
+          echo "object=$latest" >> "$GITHUB_OUTPUT"
+          echo "key=$(basename "$latest")" >> "$GITHUB_OUTPUT"
+          echo "Using $latest"
+
+      # The snapshot is ~90 MB compressed and changes once a night, so a
+      # same-day rerun should not pay egress for it twice.
+      # No restore-keys: an approximate match would silently ship the
+      # wrong night's data. Either this exact snapshot is cached, or it is
+      # downloaded again.
+      - name: Restore cached snapshot
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: data/wi.sqlite.gz
+          key: snapshot-${{ steps.snap.outputs.key }}
+
+      - name: Download the snapshot
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          gcloud storage cp "${{ steps.snap.outputs.object }}" data/wi.sqlite.gz
+
+      - name: Expand the snapshot
+        run: gunzip -c data/wi.sqlite.gz > data/wi.sqlite
+
+      - name: Confirm the database is intact
+        run: |
+          set -euo pipefail
+          # a truncated download still produces a file; only a real query proves it
+          sqlite3 data/wi.sqlite "PRAGMA quick_check;" | grep -qx ok
+          bills=$(sqlite3 data/wi.sqlite "SELECT COUNT(*) FROM bills;")
+          echo "snapshot holds $bills bills"
+          # guards against releasing a site built from an empty or partial db
+          [ "$bills" -ge 15000 ]
+
+      # --ignore-scripts blocks arbitrary install scripts from the whole
+      # dependency tree; better-sqlite3 is a native module and genuinely
+      # needs to build, so it is rebuilt by name rather than by lifting the
+      # blanket ban.
+      - name: Install (locked, no lifecycle scripts)
+        working-directory: site
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild better-sqlite3
+
+      - name: Build every session
+        working-directory: site
+        env:
+          BUILD_SESSIONS: all
+          LOGO_DEV_TOKEN: ${{ secrets.LOGO_DEV_TOKEN }}
+        run: npm run build
+
+      # The gate that matters: a Hosting release replaces the whole site, so
+      # a build missing 21 of 23 sessions would delete ~38,000 live pages.
+      - name: Preflight — build completeness
+        working-directory: site
+        run: node scripts/preflight.mjs
+
+      - name: Verify the built site
+        working-directory: site
+        env:
+          BROWSER_PATH: /usr/bin/google-chrome
+        run: |
+          set -euo pipefail
+          node scripts/links.mjs
+          node scripts/responsive.mjs
+          node scripts/a11y.mjs
+          node scripts/verify.mjs
+
+      - name: Release
+        run: |
+          npx --yes firebase-tools@14 deploy \
+            --only hosting \
+            --project "${{ inputs.target || 'badgerpolitics-prod' }}" \
+            --non-interactive \
+            --message "${GITHUB_SHA::8} via ${GITHUB_RUN_ID}"
+
+      # Proves the release is actually serving, not just that the API
+      # accepted it. Runs against the public URL, not the local build.
+      - name: Smoke-test what is live
+        if: ${{ (inputs.target || 'badgerpolitics-prod') == 'badgerpolitics-prod' }}
+        run: |
+          set -euo pipefail
+          base=https://badgerpolitics.org
+          for path in / /bills/2025/ /my-reps/ /money/ /legislators/; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --retry 3 --retry-delay 5 "$base$path")
+            echo "$path -> $code"
+            [ "$code" = "200" ]
+          done
+          # a cached-forever HTML page is the bug that hid a broken deploy for hours
+          cc=$(curl -sSI "$base/" | tr -d '\r' | awk -F': ' 'tolower($1)=="cache-control"{print $2}')
+          echo "Cache-Control: $cc"
+          case "$cc" in *must-revalidate*) ;; *) echo "::error::HTML is not revalidating"; exit 1 ;; esac
+
+      - name: Roll back guidance
+        if: failure()
+        run: |
+          echo "::notice::If a release went out and is bad, roll back with:"
+          echo "::notice::npx firebase-tools@14 hosting:rollback --project badgerpolitics-prod"

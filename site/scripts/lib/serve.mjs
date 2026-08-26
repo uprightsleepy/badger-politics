@@ -29,10 +29,16 @@ export const serveDist = async (port) => {
   return server;
 };
 
+// CI runners ship Chrome at a path the workflow exports; a local Windows
+// checkout falls back to Edge, which is always present.
+const EDGE = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
+
 export const launchBrowser = () =>
   puppeteer.launch({
-    executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+    executablePath: process.env.BROWSER_PATH ?? EDGE,
     headless: true,
+    // the sandbox needs kernel namespaces the GitHub runner does not grant
+    args: process.env.CI ? ["--no-sandbox", "--disable-dev-shm-usage"] : [],
   });
 
 /** First legislator profile linked from the index, or null. */
