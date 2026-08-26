@@ -2,7 +2,7 @@
 import Base from "../../layouts/Base.astro";
 import RollCall from "../../components/RollCall.astro";
 import { builtSessions, billsFor, votesFor, voteSplit } from "../../lib/db";
-import { billSlug } from "../../lib/format";
+import { billSlug, chamberName, clip, fmtDate, shortTitle } from "../../lib/format";
 
 export function getStaticPaths() {
   return builtSessions().flatMap((session) =>
@@ -16,9 +16,24 @@ export function getStaticPaths() {
 }
 const { event, bill, sessionId } = Astro.props;
 const split = voteSplit(event.id);
+
+// Every one of these pages carried the sitewide fallback description, and
+// motions repeat across votes, so the tally and date are what make a given
+// roll call identifiable in a result listing.
+const motion = event.motion ?? "vote";
+const tally = event.yes_count != null ? `${event.yes_count}-${event.no_count ?? 0}` : "";
+const outcome = event.result === "pass" ? "Passed" : "Failed";
+const seoTitle = `${bill.identifier} roll call, ${fmtDate(event.date)}: ${clip(motion, 26)}`;
+const seoDescription = [
+  `${chamberName(event.chamber)} roll call on ${bill.identifier}, ${fmtDate(event.date)}.`,
+  `${motion}: ${outcome}${tally ? ` ${tally}` : ""}.`,
+  `How every member voted. ${shortTitle(bill.title)}`,
+]
+  .filter(Boolean)
+  .join(" ");
 ---
 
-<Base title={`Roll call: ${bill.identifier} · ${event.motion ?? "vote"}`} searchable={false}>
+<Base title={seoTitle} description={seoDescription} searchable={false} noindex>
   <p class="text-sm text-navy-600">
     <a href={`/bills/${sessionId}/${billSlug(bill.identifier)}/`} class="underline">
       ← {bill.identifier}: {bill.title?.slice(0, 90)}

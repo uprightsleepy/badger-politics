@@ -11,17 +11,24 @@ interface Props {
    * which are name lists whose substance lives on the bill and member
    * pages already. */
   searchable?: boolean;
+  /** Keep the page out of search engines while leaving it crawlable and
+   * linkable. Same reasoning as `searchable`, applied outward. */
+  noindex?: boolean;
 }
 const {
   title,
   description = "Free, independent tracking of the Wisconsin Legislature. Every bill, every vote, and every committee graveyard.",
   image = "/og.png",
   searchable = true,
+  noindex = false,
 } = Astro.props;
 // absolute URLs: crawlers and chat apps will not resolve relative ones
 const pageUrl = new URL(Astro.url.pathname, Astro.site).href;
 const imageUrl = new URL(image, Astro.site).href;
-const fullTitle = `${title} · Badger Politics`;
+// Search engines cut a title around 60 characters. On a long page title
+// the suffix is the part that gets dropped, so drop it deliberately rather
+// than letting it be truncated to "· Badger Poli…".
+const fullTitle = title.length > 42 ? title : `${title} · Badger Politics`;
 const dataThrough = meta().data_through;
 // two different freshness facts: the newest action the Legislature has
 // recorded, and when we last pulled the records to look
@@ -70,6 +77,9 @@ const NAV_DIRECT: [string, string][] = [
     <meta name="description" content={description} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={pageUrl} />
+    {/* follow, not none: these pages still pass authority on to the bills
+        and members they link to. */}
+    {noindex && <meta name="robots" content="noindex, follow" />}
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Badger Politics" />

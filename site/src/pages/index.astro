@@ -1,5 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
+import JsonLd from "../components/JsonLd.astro";
 import StatusBadge from "../components/StatusBadge.astro";
 import { builtSessions, sessionStats, recentlyActedBills } from "../lib/db";
 import { billSlug, fmtDate, shortTitle } from "../lib/format";
@@ -9,7 +10,34 @@ const stats = sessionStats(current.id);
 const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
 ---
 
-<Base title="Wisconsin politics, in plain language">
+<Base
+  title="Wisconsin politics, in plain language"
+  description="Track every Wisconsin bill, vote, veto and campaign contribution. Free, independent, and built entirely from official public records."
+>
+  <JsonLd
+    data={{
+      "@type": "WebSite",
+      name: "Badger Politics",
+      url: "https://badgerpolitics.org/",
+      description:
+        "Free, independent tracking of the Wisconsin Legislature: every bill, every vote, and every committee graveyard.",
+      inLanguage: "en-US",
+      isAccessibleForFree: true,
+      publisher: {
+        "@type": "Organization",
+        name: "Badger Politics",
+        url: "https://badgerpolitics.org/",
+      },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: "https://badgerpolitics.org/?q={search_term_string}",
+        },
+        "query-input": "required name=search_term_string",
+      },
+    }}
+  />
   <section class="py-8 text-center">
     <h1 class="mx-auto max-w-2xl text-4xl font-bold tracking-tight">
       What is the Wisconsin Legislature doing?

@@ -18,8 +18,10 @@ import {
   vetoMessageUrl,
 } from "../../../lib/db";
 import {
-  billSlug, fmtDate, personSlug, chamberName, subjectDisplay, subjectSlug,
+  billSlug, clip, fmtDate, personSlug, chamberName, sessionYear, shortTitle,
+  subjectDisplay, subjectSlug, STATUS_LABELS,
 } from "../../../lib/format";
+import JsonLd from "../../../components/JsonLd.astro";
 import { linkifyAction } from "../../../lib/actionLinks";
 
 export function getStaticPaths() {
@@ -51,11 +53,49 @@ const vetoMsg = bill.status === "vetoed" || bill.status === "enacted"
   ? vetoMessageUrl(bill.id) : null;
 const partialVeto = actions.some((a) => /partial veto/i.test(a.description));
 const isBill = bill.classification === "bill";
+
+// "AB 656 (2025)" alone tells a searcher nothing; almost nobody searches a
+// bill number. Lead with the identifier for those who do, then the subject
+// for everyone else. The year disambiguates a number that recurs each
+// biennium.
+const subject = shortTitle(bill.title);
+const seoTitle = subject
+  ? `${bill.identifier} (${sessionYear(bill.session_id)}): ${clip(subject, 40)}`
+  : `${bill.identifier} (${sessionName})`;
+// status and session make the near-identical housekeeping bills distinct
+const seoDescription = [
+  `${sessionName}.`,
+  `${STATUS_LABELS[bill.status ?? ""] ?? "Introduced"}.`,
+  subject,
+]
+  .filter(Boolean)
+  .join(" ");
 const passedChamberName = bill.chamber === "upper" ? "Senate" : "Assembly";
 const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
 ---
 
-<Base title={`${bill.identifier} (${sessionName})`} description={bill.title ?? undefined}>
+<Base title={seoTitle} description={seoDescription}>
+  <JsonLd
+    data={{
+      "@type": "Legislation",
+      name: `${bill.identifier}: ${subject}`,
+      legislationIdentifier: bill.identifier,
+      legislationType: bill.classification ?? "bill",
+      legislationJurisdiction: "Wisconsin, United States",
+      legislationLegislatedBy: {
+        "@type": "GovernmentOrganization",
+        name: "Wisconsin State Legislature",
+      },
+      ...(bill.status === "enacted" ? { legislationPassedBy: {
+        "@type": "GovernmentOrganization",
+        name: "Wisconsin State Legislature",
+      } } : {}),
+      inLanguage: "en-US",
+      isBasedOn: bill.text_url ?? undefined,
+      about: subjects.map((s) => subjectDisplay(s.subject)),
+      description: seoDescription,
+    }}
+  />
   <article class="mx-auto max-w-3xl">
     <p class="text-sm text-navy-600">
       <a href="/bills/" class="underline">Bills</a> · {sessionName}

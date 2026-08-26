@@ -1,0 +1,12 @@
+# Badger Politics — a public record of the Wisconsin Legislature.
+# Everything here is derived from public records and is free to crawl,
+# quote, and reuse. There is also a JSON API and bulk downloads at
+# https://badgerpolitics.org/data/ — please prefer those over scraping.
+
+User-agent: *
+Allow: /
+
+# Generated views with no standalone content of their own.
+Disallow: /following/
+
+Sitemap: https://badgerpolitics.org/sitemap-index.xml

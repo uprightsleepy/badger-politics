@@ -41,6 +41,19 @@ export const partyStyle = (party: string | null): string =>
 export const partyLetter = (party: string | null): string =>
   party ? party[0] : "?";
 
+/** Trim to a word boundary for a <title>, which search engines cut around
+ * 60 characters including the site name. Truncating mid-word looks broken
+ * in a result listing; an ellipsis at a space does not. */
+export const clip = (text: string, max: number): string => {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return (space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[,;:.\s]+$/, "") + "…";
+};
+
+/** The four-digit year a session id starts with: "2025" -> 2025. */
+export const sessionYear = (sessionId: string): string => sessionId.slice(0, 4);
+
 /** Bill titles all open "Relating to: ..."; strip it for compact rows. */
 export const shortTitle = (title: string | null): string =>
   (title ?? "")

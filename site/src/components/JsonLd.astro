@@ -1,0 +1,17 @@
+---
+/** Structured data. Search engines have first-class types for exactly what
+ * this site publishes — Legislation, Person, Organization — and emitting
+ * them is what lets a bill appear as a bill rather than as an anonymous
+ * page. Nothing here is asserted that the page does not also show. */
+interface Props {
+  data: Record<string, unknown>;
+}
+const { data } = Astro.props;
+// `</script>` inside a JSON string would close the tag early; escaping the
+// angle bracket is the standard fix and stays valid JSON.
+const json = JSON.stringify({ "@context": "https://schema.org", ...data }).replace(
+  /</g,
+  "\\u003c",
+);
+---
+<script type="application/ld+json" is:inline set:html={json} />

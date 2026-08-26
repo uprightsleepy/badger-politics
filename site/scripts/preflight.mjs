@@ -153,6 +153,18 @@ for (const p of products) {
   }
 }
 
+// --- discoverability ------------------------------------------------------
+// A missing sitemap or robots.txt breaks nothing a visitor can see, which
+// is exactly why it would go unnoticed on a 44,000-page site.
+for (const f of ["robots.txt", "sitemap-index.xml"]) {
+  if (!(await exists(f))) fail(`missing ${f}`);
+  else pass(`${f} present`);
+}
+const robots = await readFile(join(DIST, "robots.txt"), "utf-8").catch(() => "");
+if (!robots.includes("sitemap-index.xml")) {
+  fail("robots.txt does not point at the sitemap");
+}
+
 // --- pages that must never 404 --------------------------------------------
 let missingPages = 0;
 for (const p of [
