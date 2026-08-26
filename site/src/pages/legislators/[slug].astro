@@ -31,6 +31,7 @@ import {
   fmtMoney,
   monthYear,
   billSlug,
+  shortTitle,
   STATUS_LABELS,
   STATUS_STYLES,
 } from "../../lib/format";
@@ -382,7 +383,7 @@ const tally = TALLY_ORDER.map((status) => ({
                     <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-16 shrink-0 py-1 font-semibold underline">
                       {s.identifier}
                     </a>
-                    <span class="min-w-0 flex-1 truncate">{s.title}</span>
+                    <span class="min-w-0 flex-1 truncate">{shortTitle(s.title)}</span>
                     <span class="shrink-0 text-xs text-navy-600">{s.session_id}</span>
                   </li>
                 ))}
@@ -416,7 +417,7 @@ const tally = TALLY_ORDER.map((status) => ({
                     <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-16 shrink-0 py-1 font-semibold underline">
                       {s.identifier}
                     </a>
-                    <span class="min-w-0 flex-1 truncate">{s.title}</span>
+                    <span class="min-w-0 flex-1 truncate">{shortTitle(s.title)}</span>
                     <span class="shrink-0 text-xs text-navy-600">{s.session_id}</span>
                   </li>
                 ))}
@@ -565,7 +566,7 @@ const tally = TALLY_ORDER.map((status) => ({
                 <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-navy-100 pb-1">
                   <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{v.date ? fmtDate(v.date) : ""}</span>
                   <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="w-20 shrink-0 font-bold underline">{v.identifier}</a>
-                  <span class="min-w-0 flex-1 basis-56 truncate">{v.motion ?? v.title}</span>
+                  <span class="min-w-0 flex-1 basis-56 truncate">{v.motion ?? shortTitle(v.title)}</span>
                   {v.kinds.map((k) => (
                     <span class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${KEY_VOTE_STYLES[k] ?? "bg-navy-50"}`}>{k}</span>
                   ))}
@@ -604,7 +605,7 @@ const tally = TALLY_ORDER.map((status) => ({
                 <li class="flex flex-wrap items-baseline gap-x-3 border-t border-navy-100 pt-1 text-sm">
                   <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{v.date ? fmtDate(v.date) : ""}</span>
                   <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="w-20 shrink-0 font-bold underline">{v.identifier}</a>
-                  <span class="min-w-0 flex-1 truncate">{v.motion ?? v.title}</span>
+                  <span class="min-w-0 flex-1 truncate">{v.motion ?? shortTitle(v.title)}</span>
                   <span class="shrink-0 text-xs text-navy-700">
                     Voted {v.option === "yes" ? "Aye" : "Nay"}; {partyPlural} split {v.split.yes} Aye–{v.split.no} Nay
                   </span>

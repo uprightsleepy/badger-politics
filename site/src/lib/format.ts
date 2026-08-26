@@ -9,6 +9,17 @@ export const STATUS_LABELS: Record<string, string> = {
   failed_sjr1: "Died at session end",
 };
 
+export const STATUS_SHORT: Record<string, string> = {
+  introduced: "Introduced",
+  in_committee: "In committee",
+  passed_chamber: "Passed 1 house",
+  passed: "Passed both",
+  adopted: "Adopted",
+  enacted: "Law",
+  vetoed: "Vetoed",
+  failed_sjr1: "Died",
+};
+
 export const STATUS_STYLES: Record<string, string> = {
   introduced: "bg-navy-50 text-navy-700",
   in_committee: "bg-gold-100 text-navy-800",
@@ -32,7 +43,10 @@ export const partyLetter = (party: string | null): string =>
 
 /** Bill titles all open "Relating to: ..."; strip it for compact rows. */
 export const shortTitle = (title: string | null): string =>
-  (title ?? "").replace(/^Relating to: /, "");
+  (title ?? "")
+    // 273 titles carry a double space after the prefix; some omit it entirely
+    .replace(/^\s*relating to:\s*/i, "")
+    .replace(/^./, (c) => c.toUpperCase());
 
 /** Committee page slug: the tail of the scraped committee id. */
 export const committeeSlug = (id: string): string => id.split("/").pop()!;

@@ -2,7 +2,7 @@
 import Base from "../../layouts/Base.astro";
 import StatusBadge from "../../components/StatusBadge.astro";
 import { allSubjects, billsForSubject } from "../../lib/db";
-import { billSlug, fmtDate, subjectDisplay, subjectSlug } from "../../lib/format";
+import { billSlug, fmtDate, shortTitle, subjectDisplay, subjectSlug } from "../../lib/format";
 
 export function getStaticPaths() {
   // distinct index terms can slug identically; one page carries them all
@@ -39,7 +39,7 @@ const sessions = [...new Set(unique.map((b) => b.session_id))];
       <li class="text-sm">
         <a href={`/bills/${b.session_id}/${billSlug(b.identifier)}/`} class="flex items-center gap-3 px-4 py-2.5 hover:bg-navy-50">
           <span class="w-20 shrink-0 font-bold underline">{b.identifier}</span>
-          <span class="min-w-0 flex-1 truncate">{b.title}</span>
+          <span class="min-w-0 flex-1 truncate">{shortTitle(b.title)}</span>
           <StatusBadge status={b.status} />
           <span class="hidden w-16 shrink-0 text-right text-xs text-navy-600 sm:block">{b.session_id}</span>
         </a>

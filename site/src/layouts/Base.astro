@@ -288,7 +288,11 @@ const NAV_DIRECT: [string, string][] = [
             const slugs = [reps.assembly[ad]?.slug, reps.senate[sd]?.slug].filter(Boolean);
             for (const slug of slugs) {
               document.querySelectorAll<HTMLAnchorElement>(`a[href="/legislators/${slug}/"]`).forEach((a) => {
-                if (a.closest("[data-vote-row]") || a.closest("nav")) return;
+                if (
+                  a.closest("[data-vote-row]") ||
+                  a.closest("nav") ||
+                  a.closest("[data-no-rep-highlight]")
+                ) return;
                 a.classList.add("bg-gold-100", "rounded", "px-1", "font-semibold");
                 const sr = document.createElement("span");
                 sr.className = "sr-only";

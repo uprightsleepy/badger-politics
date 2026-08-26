@@ -1,5 +1,6 @@
 ---
 import Base from "../../../layouts/Base.astro";
+import FilterBar from "../../../components/FilterBar.astro";
 import OrgLogo from "../../../components/OrgLogo.astro";
 import { donorCommittees, cfTypeOf } from "../../../lib/db";
 import { fmtMoney } from "../../../lib/format";
@@ -18,16 +19,12 @@ const committees = donorCommittees();
     legislators while in office, from Ethics Commission filings. Each links
     to its full recipient list.
   </p>
-  <div class="mt-4">
-    <label class="mb-1 block text-sm font-semibold" for="committee-filter">Filter committees by name</label>
-    <input
-      type="search"
-      id="committee-filter"
-      placeholder="Filter by name…"
-      class="w-full max-w-md rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm"
-    />
-    <p id="committee-filter-status" role="status" class="mt-2 text-sm text-navy-600"></p>
-  </div>
+  <FilterBar
+    id="committee-filter"
+    statusId="committee-filter-status"
+    label="Filter committees by name"
+    placeholder="Filter by name…"
+  />
   <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
     {committees.map((c) => (
       <li data-committee-row data-text={c.name.toLowerCase()}>

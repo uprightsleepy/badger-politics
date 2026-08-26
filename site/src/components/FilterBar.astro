@@ -1,0 +1,29 @@
+---
+/** Sticky filter for a long list. These pages run tens of screens on a
+ * phone, so a filter that scrolls away only helps before you start
+ * looking. The live count sits beside the field rather than under it, to
+ * keep the bar one line tall. */
+interface Props {
+  id: string;
+  statusId: string;
+  label: string;
+  placeholder: string;
+}
+const { id, statusId, label, placeholder } = Astro.props;
+---
+<div
+  class="sticky top-0 z-20 -mx-4 border-b border-navy-100 bg-paper/95 px-4 py-3 backdrop-blur"
+  data-pagefind-ignore
+>
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+    <label class="sr-only" for={id}>{label}</label>
+    <input
+      type="search"
+      id={id}
+      placeholder={placeholder}
+      class="min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm sm:max-w-md sm:flex-none sm:basis-96"
+    />
+    <p id={statusId} role="status" class="shrink-0 text-sm text-navy-600"></p>
+  </div>
+  <slot />
+</div>

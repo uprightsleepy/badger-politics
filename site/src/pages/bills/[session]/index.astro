@@ -1,8 +1,9 @@
 ---
 import Base from "../../../layouts/Base.astro";
+import FilterBar from "../../../components/FilterBar.astro";
 import StatusBadge from "../../../components/StatusBadge.astro";
 import { builtSessions, billsFor } from "../../../lib/db";
-import { billSlug, fmtDate } from "../../../lib/format";
+import { billSlug, fmtDate, shortTitle } from "../../../lib/format";
 
 export function getStaticPaths() {
   return builtSessions().map((session) => ({
@@ -24,23 +25,19 @@ const bills = billsFor(session.id);
       </span>
     )}
   </p>
-  <div class="mt-4">
-    <label class="sr-only" for="bill-filter">Filter bills by number or title</label>
-    <input
-      type="search"
-      id="bill-filter"
-      placeholder="Filter by number or title…"
-      class="w-full max-w-md rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm"
-    />
-    <p id="filter-status" role="status" class="mt-2 text-sm text-navy-600"></p>
-  </div>
+  <FilterBar
+    id="bill-filter"
+    statusId="filter-status"
+    label="Filter bills by number or title"
+    placeholder="Filter by number or title…"
+  />
   <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white">
     {bills.map((b) => (
       <li class="text-sm" data-bill-row data-status={b.status} data-text={`${b.identifier} ${b.title ?? ""}`.toLowerCase()}>
         <a href={`/bills/${session.id}/${billSlug(b.identifier)}/`} class="flex items-center gap-3 px-4 py-2.5 hover:bg-navy-50">
           <span class="w-20 shrink-0 font-bold underline">{b.identifier}</span>
-          <span class="min-w-0 flex-1 truncate">{b.title}</span>
-          <StatusBadge status={b.status} />
+          <span class="min-w-0 flex-1 truncate">{shortTitle(b.title)}</span>
+          <StatusBadge status={b.status} short />
           <span class="hidden w-24 shrink-0 text-right text-xs text-navy-600 sm:block">
             {fmtDate(b.latest_action_date)}
           </span>
@@ -65,7 +62,7 @@ const bills = billsFor(session.id);
       const note = document.createElement("p");
       note.className = "mt-2 text-sm text-navy-700";
       note.innerHTML = `Showing only bills with status “${statusFilter.replace(/_/g, " ")}”. <a class="underline" href="?">Show all</a>`;
-      document.getElementById("bill-filter")!.parentElement!.appendChild(note);
+      document.getElementById("bill-filter")!.closest("div.sticky")!.appendChild(note);
       apply();
     }
   </script>

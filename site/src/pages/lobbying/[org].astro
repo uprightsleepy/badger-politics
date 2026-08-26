@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { lobbyingOrgs, orgLobbying, allSessions } from "../../lib/db";
-import { billSlug, STATUS_LABELS } from "../../lib/format";
+import { STATUS_LABELS, billSlug, shortTitle } from "../../lib/format";
 
 export function getStaticPaths() {
   return lobbyingOrgs().map((o) => ({
@@ -38,7 +38,7 @@ for (const r of rows) {
         {sessionRows.map((r) => (
           <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
             <a href={`/bills/${r.session_id}/${billSlug(r.identifier)}/`} class="w-20 shrink-0 py-1 font-bold underline">{r.identifier}</a>
-            <span class="min-w-0 flex-1 truncate">{r.title}</span>
+            <span class="min-w-0 flex-1 truncate">{shortTitle(r.title)}</span>
             <span class="shrink-0 text-xs text-navy-600">{r.status ? (STATUS_LABELS[r.status] ?? r.status) : ""}</span>
             {r.source_url && (
               <a href={r.source_url} class="shrink-0 py-1 text-xs underline">official record<span class="sr-only"> (opens in a new tab)</span></a>

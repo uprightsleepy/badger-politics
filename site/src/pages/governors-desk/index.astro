@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { governorsDesk, governorInfo } from "../../lib/db";
-import { billSlug, fmtDate, partyStyle } from "../../lib/format";
+import { billSlug, fmtDate, partyStyle, shortTitle } from "../../lib/format";
 
 const desk = governorsDesk();
 const gov = governorInfo();
@@ -86,7 +86,7 @@ const billRow = (b: {
         {desk.awaiting.map(billRow).map((r) => (
           <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
             <a href={r.href} class="w-20 shrink-0 font-bold underline">{r.label}</a>
-            <span class="min-w-0 flex-1 truncate">{r.title}</span>
+            <span class="min-w-0 flex-1 truncate">{shortTitle(r.title)}</span>
             {r.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(r.date)}</span>}
           </li>
         ))}
@@ -111,7 +111,7 @@ const billRow = (b: {
           <li class="rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
             <div class="flex flex-wrap items-baseline gap-x-3">
               <a href={`/bills/${o.session_id}/${billSlug(o.identifier)}/`} class="w-20 shrink-0 font-bold underline">{o.identifier}</a>
-              <span class="min-w-0 flex-1 truncate">{o.title}</span>
+              <span class="min-w-0 flex-1 truncate">{shortTitle(o.title)}</span>
               {o.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(o.date)}</span>}
             </div>
             <div class="flex flex-wrap items-baseline gap-x-3 text-xs text-navy-700">
@@ -135,7 +135,7 @@ const billRow = (b: {
       {desk.vetoed.map(billRow).map((r) => (
         <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
           <a href={r.href} class="w-20 shrink-0 font-bold underline">{r.label}</a>
-          <span class="min-w-0 flex-1 truncate">{r.title}</span>
+          <span class="min-w-0 flex-1 truncate">{shortTitle(r.title)}</span>
           {r.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(r.date)}</span>}
         </li>
       ))}
@@ -150,7 +150,7 @@ const billRow = (b: {
       {desk.enacted.map(billRow).map((r) => (
         <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
           <a href={r.href} class="w-20 shrink-0 font-bold underline">{r.label}</a>
-          <span class="min-w-0 flex-1 truncate">{r.title}</span>
+          <span class="min-w-0 flex-1 truncate">{shortTitle(r.title)}</span>
           {r.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(r.date)}</span>}
         </li>
       ))}

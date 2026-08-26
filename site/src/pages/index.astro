@@ -2,7 +2,7 @@
 import Base from "../layouts/Base.astro";
 import StatusBadge from "../components/StatusBadge.astro";
 import { builtSessions, sessionStats, recentlyActedBills } from "../lib/db";
-import { billSlug, fmtDate } from "../lib/format";
+import { billSlug, fmtDate, shortTitle } from "../lib/format";
 const sessions = builtSessions();
 const current = sessions.find((s) => s.id === "2025") ?? sessions[0];
 const stats = sessionStats(current.id);
@@ -61,7 +61,7 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
           <a href={`/bills/${b.session_id}/${billSlug(b.identifier)}/`} class="w-20 shrink-0 font-bold underline">
             {b.identifier}
           </a>
-          <span class="min-w-0 flex-1 truncate">{b.title}</span>
+          <span class="min-w-0 flex-1 truncate">{shortTitle(b.title)}</span>
           <StatusBadge status={b.status} />
           <span class="hidden w-24 shrink-0 text-right text-xs text-navy-600 sm:block">
             {fmtDate(b.latest_action_date)}

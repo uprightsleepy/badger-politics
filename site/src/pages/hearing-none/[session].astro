@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { builtSessions, graveyardFor, graveyardBills, sessionStats, personIdByName } from "../../lib/db";
-import { billSlug, personSlug } from "../../lib/format";
+import { billSlug, personSlug, shortTitle } from "../../lib/format";
 
 export function getStaticPaths() {
   return builtSessions().map((session) => ({
@@ -57,7 +57,7 @@ const stats = sessionStats(session.id);
                 <a href={`/bills/${session.id}/${billSlug(b.identifier)}/`} class="shrink-0 font-semibold underline">
                   {b.identifier}
                 </a>
-                <span class="truncate">{b.title}</span>
+                <span class="truncate">{shortTitle(b.title)}</span>
               </li>
             ))}
           </ul>

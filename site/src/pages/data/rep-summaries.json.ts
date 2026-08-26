@@ -64,6 +64,9 @@ export const GET: APIRoute = () => {
       recentVotes: personVotes(p.id, 5).map((v) => ({
         date: v.date,
         option: v.option,
+        // the same bill can appear twice in a day (suspension, then passage);
+        // the motion is what tells the two rows apart
+        motion: v.motion,
         identifier: v.identifier,
         slug: billSlug(v.identifier),
         title: v.title,

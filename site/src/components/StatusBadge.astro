@@ -1,8 +1,11 @@
 ---
-import { STATUS_LABELS, STATUS_STYLES } from "../lib/format";
-interface Props { status: string | null }
-const { status } = Astro.props;
-const label = STATUS_LABELS[status ?? ""] ?? "Introduced";
+import { STATUS_LABELS, STATUS_SHORT, STATUS_STYLES } from "../lib/format";
+// `short` is for dense rows: the full label is wide enough to squeeze a
+// bill's own title down to a couple of characters on a phone.
+interface Props { status: string | null; short?: boolean }
+const { status, short = false } = Astro.props;
+const labels = short ? STATUS_SHORT : STATUS_LABELS;
+const label = labels[status ?? ""] ?? "Introduced";
 const style = STATUS_STYLES[status ?? ""] ?? "bg-navy-50 text-navy-700";
 ---
 <span class={`inline-block shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${style}`}>{label}</span>
