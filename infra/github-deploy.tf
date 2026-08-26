@@ -32,10 +32,15 @@ resource "google_iam_workload_identity_pool_provider" "github" {
   workload_identity_pool_provider_id = "github-oidc"
   display_name                       = "GitHub OIDC"
 
+  # repository_ref is a single mapped attribute combining both claims, so
+  # the binding below can name "this repo on this branch" as one principal.
+  # Conditioning on request.auth.claims does not work here: mapped
+  # attributes are not exposed to IAM conditions during impersonation, so
+  # such a condition is simply always false.
   attribute_mapping = {
-    "google.subject"       = "assertion.sub"
-    "attribute.repository" = "assertion.repository"
-    "attribute.ref"        = "assertion.ref"
+    "google.subject"           = "assertion.sub"
+    "attribute.repository"     = "assertion.repository"
+    "attribute.repository_ref" = "assertion.repository + '@' + assertion.ref"
   }
 
   # First gate: the token must come from this repository. Without this, any
@@ -54,22 +59,18 @@ resource "google_service_account" "deployer" {
   description  = "Reads a SQLite snapshot and releases Firebase Hosting. No write access to data."
 }
 
-# Second gate: only main may impersonate the deployer. A pull request runs
-# with a ref of refs/pull/N/merge, so it cannot assume this identity even
-# though it comes from the right repository -- deploys never run from a PR.
+# Second gate: only this repository on main may impersonate the deployer.
+# A pull request runs with a ref of refs/pull/N/merge, which produces a
+# different repository_ref and therefore a principal that holds no roles --
+# deploys cannot run from a PR.
 resource "google_service_account_iam_member" "deployer_wif" {
   service_account_id = google_service_account.deployer.name
   role               = "roles/iam.workloadIdentityUser"
   member = join("", [
     "principalSet://iam.googleapis.com/",
     google_iam_workload_identity_pool.github.name,
-    "/attribute.repository/${local.github_repo}",
+    "/attribute.repository_ref/${local.github_repo}@refs/heads/main",
   ])
-  condition {
-    title       = "main branch only"
-    description = "Blocks pull requests and every other ref from deploying"
-    expression  = "request.auth.claims['attribute.ref'] == 'refs/heads/main'"
-  }
 }
 
 # Release Firebase Hosting. Deliberately not roles/editor: the deployer can
