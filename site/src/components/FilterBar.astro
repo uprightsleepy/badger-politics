@@ -2,14 +2,23 @@
 /** Sticky filter for a long list. These pages run tens of screens on a
  * phone, so a filter that scrolls away only helps before you start
  * looking. The live count sits beside the field rather than under it, to
- * keep the bar one line tall. */
+ * keep the bar short.
+ *
+ * Facet chips carry their own counts and hide rows rather than dropping
+ * them, so the whole list stays in the page and in search. */
 interface Props {
   id: string;
   statusId: string;
   label: string;
   placeholder: string;
+  facetAttr?: string;
+  facetLabel?: string;
+  facets?: { key: string; label: string; count: number }[];
 }
-const { id, statusId, label, placeholder } = Astro.props;
+const { id, statusId, label, placeholder, facetAttr, facetLabel, facets } = Astro.props;
+const chips = facets?.filter((f) => f.count > 0) ?? [];
+const total = chips.reduce((sum, f) => sum + f.count, 0);
+const CHIP = "shrink-0 rounded-full border px-3 py-1 text-xs font-semibold";
 ---
 <div
   class="sticky top-0 z-20 -mx-4 border-b border-navy-100 bg-paper/95 px-4 py-3 backdrop-blur"
@@ -25,5 +34,29 @@ const { id, statusId, label, placeholder } = Astro.props;
     />
     <p id={statusId} role="status" class="shrink-0 text-sm text-navy-600"></p>
   </div>
+  {chips.length > 1 && (
+    <div class="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={facetLabel}>
+      <button
+        type="button"
+        data-facet=""
+        data-facet-for={facetAttr}
+        aria-pressed="true"
+        class={`${CHIP} border-navy-800 bg-navy-800 text-white`}
+      >
+        All {total.toLocaleString()}
+      </button>
+      {chips.map((f) => (
+        <button
+          type="button"
+          data-facet={f.key}
+          data-facet-for={facetAttr}
+          aria-pressed="false"
+          class={`${CHIP} border-navy-100 bg-white`}
+        >
+          {f.label} {f.count.toLocaleString()}
+        </button>
+      ))}
+    </div>
+  )}
   <slot />
 </div>

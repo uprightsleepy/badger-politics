@@ -6,6 +6,21 @@ import { donorCommittees, cfTypeOf } from "../../../lib/db";
 import { fmtMoney } from "../../../lib/format";
 
 const committees = donorCommittees();
+// chip order follows the list's own weighting, biggest group first
+// 513 of these donors never appear in the harvested registry, so their type
+// is a coverage gap, not a category. It is named as one, and sorted last
+// however large it is.
+const UNKNOWN = "Type unknown";
+const typeCounts = new Map<string, number>();
+for (const c of committees) {
+  const key = cfTypeOf(c.entityId) ?? UNKNOWN;
+  typeCounts.set(key, (typeCounts.get(key) ?? 0) + 1);
+}
+const typeFacets = [...typeCounts]
+  .sort((a, b) =>
+    a[0] === UNKNOWN ? 1 : b[0] === UNKNOWN ? -1 : b[1] - a[1],
+  )
+  .map(([key, count]) => ({ key, label: key, count }));
 ---
 
 <Base
@@ -24,10 +39,13 @@ const committees = donorCommittees();
     statusId="committee-filter-status"
     label="Filter committees by name"
     placeholder="Filter by name…"
+    facetAttr="ctype"
+    facetLabel="Filter by the kind of committee"
+    facets={typeFacets}
   />
   <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
     {committees.map((c) => (
-      <li data-committee-row data-text={c.name.toLowerCase()}>
+      <li data-committee-row data-ctype={cfTypeOf(c.entityId) ?? UNKNOWN} data-text={c.name.toLowerCase()}>
         <a href={`/money/committees/${c.entityId}/`} class="flex items-center gap-3 px-4 py-2 hover:bg-navy-50">
           <OrgLogo entityId={c.entityId} name={c.name} />
           <span class="min-w-0 flex-1 truncate underline">{c.name}</span>
@@ -54,6 +72,7 @@ const committees = donorCommittees();
       status: "committee-filter-status",
       noMatch: "committee-no-match",
       noun: "committees",
+      facetAttr: "ctype",
     });
   </script>
 </Base>
