@@ -1,0 +1,25 @@
+---
+/** A bounded, scrollable list. Edge shadows (see .scroll-body in
+ * global.css) signal more content on touch devices that draw no
+ * scrollbar; the hint line says so in words for everyone else. */
+interface Props {
+  label: string;
+  max?: string;
+  count?: number;
+  hint?: string;
+}
+const { label, max = "max-h-96", count, hint } = Astro.props;
+---
+<div
+  class:list={["scroll-body rounded-lg border border-navy-100 bg-white", max]}
+  role="region"
+  tabindex="0"
+  aria-label={label}
+>
+  <slot />
+</div>
+{(count != null || hint) && (
+  <p class="scroll-hint mt-1">
+    {hint ?? `Scrollable — ${count?.toLocaleString()} in the list.`}
+  </p>
+)}

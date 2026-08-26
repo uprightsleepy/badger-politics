@@ -1,6 +1,7 @@
 ---
 import Base from "../../../layouts/Base.astro";
 import { independentExpenditures, independentExpenditureTotals, conduitFlows } from "../../../lib/db";
+import ScrollPanel from "../../../components/ScrollPanel.astro";
 import { fmtMoney, fmtDate } from "../../../lib/format";
 
 const spends = independentExpenditures(800);
@@ -12,12 +13,40 @@ const countOf = (stance: string) => totals.find((t) => t.stance === stance)?.n ?
 const forTotal = sumOf("FOR");
 const againstTotal = sumOf("AGAINST");
 const filingCount = countOf("FOR") + countOf("AGAINST");
-// group by the race the filing names, so a reader sees a contest at once
-const byRace = new Map<string, typeof spends>();
+// One ad buy is filed twice — supporting one candidate and opposing the
+// other — with the same filer, date and amount. Showing both as separate
+// rows doubles the apparent number of filings, so pair them into one.
+type Spend = (typeof spends)[number];
+interface Card {
+  date: string; amount: number; filer_name: string | null; filer_type: string | null;
+  office: string | null; district: string | null;
+  supporting: string[]; opposing: string[];
+}
+const cards: Card[] = [];
+const pairKey = (s: Spend) =>
+  [s.date, s.amount, s.filer_entity_id, s.related_office, s.related_district].join("|");
+const index = new Map<string, Card>();
 for (const s of spends) {
-  const race = [s.related_office, s.related_district].filter(Boolean).join(" ") || "Race not named in the filing";
+  const key = pairKey(s);
+  let card = index.get(key);
+  if (!card) {
+    card = {
+      date: s.date, amount: s.amount, filer_name: s.filer_name, filer_type: s.filer_type,
+      office: s.related_office, district: s.related_district, supporting: [], opposing: [],
+    };
+    index.set(key, card);
+    cards.push(card);
+  }
+  const side = s.stance === "FOR" ? card.supporting : card.opposing;
+  if (s.related_name && !side.includes(s.related_name)) side.push(s.related_name);
+}
+
+// group by the race the filing names, so a reader sees a contest at once
+const byRace = new Map<string, Card[]>();
+for (const c of cards) {
+  const race = [c.office, c.district].filter(Boolean).join(" ") || "Race not named in the filing";
   if (!byRace.has(race)) byRace.set(race, []);
-  byRace.get(race)!.push(s);
+  byRace.get(race)!.push(c);
 }
 const races = [...byRace.entries()]
   .map(([race, rows]) => ({ race, rows, total: rows.reduce((t, r) => t + r.amount, 0) }))
@@ -62,28 +91,45 @@ const races = [...byRace.entries()]
         </p>
       )}
       {races.map(({ race, rows, total }) => (
-        <section class="mt-6">
-          <h2 class="text-xl font-bold">{race}</h2>
-          <p class="mt-1 text-sm text-navy-600">{fmtMoney(total)} across {rows.length} filings</p>
-          <ul class="mt-2 space-y-1">
-            {rows.slice(0, 40).map((s) => (
-              <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
-                <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(s.date)}</span>
-                <span class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${s.stance === "FOR" ? "bg-moss-50 text-moss-600" : "bg-badger-50 text-badger-700"}`}>
-                  {s.stance}
-                </span>
-                <span class="min-w-0 flex-1 truncate">{s.related_name ?? "(candidate not named)"}</span>
-                <span class="shrink-0 text-xs text-navy-600">
-                  {s.filer_name ?? "committee not named"}{s.filer_type ? ` · ${s.filer_type}` : ""}
-                </span>
-                <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(s.amount)}</span>
-              </li>
-            ))}
-          </ul>
-          {rows.length > 40 && (
-            <p class="mt-1 text-xs text-navy-600">Showing the 40 largest of {rows.length} filings.</p>
-          )}
-        </section>
+        <details class="mt-4 rounded-lg border border-navy-100 bg-white" open={total === races[0].total}>
+          <summary class="flex cursor-pointer flex-wrap items-baseline gap-x-3 px-4 py-3">
+            <span class="text-lg font-bold">{race}</span>
+            <span class="text-sm text-navy-600">
+              {fmtMoney(total)} across {rows.length.toLocaleString()} ad buy{rows.length === 1 ? "" : "s"}
+            </span>
+          </summary>
+          <div class="border-t border-navy-100 p-3">
+            <ScrollPanel label={`Spending in ${race}`} max="max-h-[26rem]" count={rows.length}>
+              <ul class="divide-y divide-navy-100">
+                {rows.map((c) => (
+                  <li class="px-3 py-2 text-sm">
+                    <div class="flex flex-wrap items-baseline gap-x-3">
+                      <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(c.date)}</span>
+                      <span class="min-w-0 flex-1 truncate text-xs text-navy-600" title={c.filer_name ?? ""}>
+                        {c.filer_name ?? "committee not named"}{c.filer_type ? ` · ${c.filer_type}` : ""}
+                      </span>
+                      <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(c.amount)}</span>
+                    </div>
+                    <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                      {c.supporting.length > 0 && (
+                        <p class="flex min-w-0 items-baseline gap-1.5">
+                          <span class="shrink-0 rounded-full bg-moss-50 px-2 py-0.5 text-xs font-bold text-moss-600">FOR</span>
+                          <span class="min-w-0 truncate" title={c.supporting.join(", ")}>{c.supporting.join(", ")}</span>
+                        </p>
+                      )}
+                      {c.opposing.length > 0 && (
+                        <p class="flex min-w-0 items-baseline gap-1.5">
+                          <span class="shrink-0 rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">AGAINST</span>
+                          <span class="min-w-0 truncate" title={c.opposing.join(", ")}>{c.opposing.join(", ")}</span>
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </ScrollPanel>
+          </div>
+        </details>
       ))}
     </>
   )}

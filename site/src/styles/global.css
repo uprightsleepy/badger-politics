@@ -66,3 +66,25 @@ html {
     forced-color-adjust: none;
   }
 }
+
+/* Scrollable panels: shadows at the edges signal more content, which is
+   otherwise invisible on touch devices that draw no scrollbar. The cover
+   gradients scroll with the content (background-attachment: local) while
+   the shadows stay fixed, so each shadow hides itself at that end. Pure
+   CSS — it applies to every scroll region, not just ones with a wrapper. */
+.scroll-body {
+  overflow-y: auto;
+  background:
+    linear-gradient(#fff 30%, rgba(255, 255, 255, 0)) center top,
+    linear-gradient(rgba(255, 255, 255, 0), #fff 70%) center bottom,
+    radial-gradient(farthest-side at 50% 0, rgba(22, 35, 58, 0.16), rgba(22, 35, 58, 0)) center top,
+    radial-gradient(farthest-side at 50% 100%, rgba(22, 35, 58, 0.16), rgba(22, 35, 58, 0)) center bottom;
+  background-repeat: no-repeat;
+  background-size: 100% 2.5rem, 100% 2.5rem, 100% 0.55rem, 100% 0.55rem;
+  background-attachment: local, local, scroll, scroll;
+}
+.scroll-hint {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--color-navy-600, #2d4a73);
+}

@@ -607,7 +607,7 @@ export const committeesFor = (personId: string) =>
       `SELECT c.id, c.name, m.role FROM committee_members m
        JOIN committees c ON c.id = m.committee_id
        WHERE m.person_id = ?
-       ORDER BY CASE WHEN m.role LIKE '%chair%' THEN 0 ELSE 1 END, c.name`,
+       ORDER BY CASE WHEN m.role = 'chair' THEN 0 WHEN m.role LIKE 'co-chair%' THEN 1 WHEN m.role LIKE 'vice%' THEN 2 ELSE 3 END, c.name`,
     )
     .all(personId) as { id: string; name: string; role: string }[];
 
@@ -915,10 +915,10 @@ export const moneyOverview = (bounds: Record<string, string> = {}) => {
   const agg = Object.keys(bounds).length
     ? windowedAll<CommitteeAgg>(COMMITTEE_AGG, bounds)
     : committeeAggAll();
-  const topCommittees = [...agg].sort((a, b) => b.total - a.total).slice(0, 15);
+  const topCommittees = [...agg].sort((a, b) => b.total - a.total).slice(0, 20);
   const widestCommittees = [...agg]
     .sort((a, b) => b.recipients - a.recipients || b.total - a.total)
-    .slice(0, 10);
+    .slice(0, 20);
   const topLegislators = windowedAll<{
     id: string; name: string; party: string | null; chamber: string | null;
     district: number | null; total: number; n: number;
@@ -926,7 +926,7 @@ export const moneyOverview = (bounds: Record<string, string> = {}) => {
     `SELECT c.person_id AS id, p.name, p.party, p.chamber, p.district,
             SUM(c.amount) AS total, COUNT(*) AS n
      FROM ${WINDOWED} JOIN people p ON p.id = c.person_id
-     GROUP BY c.person_id ORDER BY total DESC LIMIT 15`,
+     GROUP BY c.person_id ORDER BY total DESC LIMIT 20`,
     bounds,
   );
   const topOccupations = windowedAll<{ occupation: string; total: number; n: number }>(
@@ -1042,7 +1042,7 @@ export const committeeFor = (committeeId: string) => {
               p.current_role
        FROM committee_members m JOIN people p ON p.id = m.person_id
        WHERE m.committee_id = ?
-       ORDER BY CASE WHEN m.role LIKE '%chair%' THEN 0 ELSE 1 END, p.name`,
+       ORDER BY CASE WHEN m.role = 'chair' THEN 0 WHEN m.role LIKE 'co-chair%' THEN 1 WHEN m.role LIKE 'vice%' THEN 2 ELSE 3 END, p.name`,
     )
     .all(committeeId) as {
       id: string; role: string; name: string; party: string | null;

@@ -3,6 +3,7 @@ import OrgLogo from "./OrgLogo.astro";
 import PartyChip from "./PartyChip.astro";
 import MaybeLink from "./MaybeLink.astro";
 import RankedRow from "./RankedRow.astro";
+import ScrollPanel from "./ScrollPanel.astro";
 import { fmtMoney, personSlug, roleAbbr } from "../lib/format";
 import { hasDonorPage } from "../lib/db";
 import type { moneyOverview } from "../lib/db";
@@ -49,7 +50,9 @@ const scope = cycle
       PACs, party and other political committees, ranked by {scope}. Wisconsin
       law bars corporations from giving to candidates directly.
     </p>
-    <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
+    <div class="mt-2">
+      <ScrollPanel label="Top contributing committees" max="max-h-80" count={m.topCommittees.length}>
+        <ol class="space-y-1 p-4 text-sm">
       {m.topCommittees.map((c, i) => (
         <RankedRow rank={i + 1} meta={`${c.recipients} legislator${c.recipients > 1 ? "s" : ""}`} amount={c.total}>
           <OrgLogo entityId={c.entityId} name={c.name} />
@@ -57,6 +60,8 @@ const scope = cycle
         </RankedRow>
       ))}
     </ol>
+      </ScrollPanel>
+    </div>
   </section>
 
   <section class="min-w-0">
@@ -66,7 +71,9 @@ const scope = cycle
         ? `Each member's ${cycle}-cycle receipts, counted only while in office.`
         : "Each legislator's rolling total since they took office, including any runs for other offices. Long tenure and statewide runs both push members up this list."}
     </p>
-    <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
+    <div class="mt-2">
+      <ScrollPanel label="Top fundraising legislators" max="max-h-80" count={m.topLegislators.length}>
+        <ol class="space-y-1 p-4 text-sm">
       {m.topLegislators.map((p, i) => (
         <RankedRow rank={i + 1} meta={`${roleAbbr(p.chamber)} ${p.district}`} amount={p.total}>
           <PartyChip party={p.party} size="sm" />
@@ -74,6 +81,8 @@ const scope = cycle
         </RankedRow>
       ))}
     </ol>
+      </ScrollPanel>
+    </div>
   </section>
 
   <section class="min-w-0">
@@ -114,7 +123,9 @@ const scope = cycle
       Committees ranked by how many members they fund, not by dollars.
       Breadth says something totals miss.
     </p>
-    <ol class="mt-2 space-y-1 rounded-lg border border-navy-100 bg-white p-4 text-sm">
+    <div class="mt-2">
+      <ScrollPanel label="Widest reach" max="max-h-80" count={m.widestCommittees.length}>
+        <ol class="space-y-1 p-4 text-sm">
       {m.widestCommittees.map((c, i) => (
         <RankedRow rank={i + 1} meta={`${c.recipients} of ${m.sitting}`} amount={c.total}>
           <OrgLogo entityId={c.entityId} name={c.name} />
@@ -122,5 +133,7 @@ const scope = cycle
         </RankedRow>
       ))}
     </ol>
+      </ScrollPanel>
+    </div>
   </section>
 </div>
