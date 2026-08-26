@@ -127,7 +127,34 @@ if (!(await exists("pagefind/pagefind-entry.json"))) {
   }
 }
 
+// --- data products come from the Python pipeline, not the site build ------
+// They are gitignored, so a site-only build produces a tree that looks
+// complete and silently drops every feed, API file and calendar.
+const products = [
+  { what: "legislator feeds", dir: ["feeds", "legislators"], min: counts[1].expected },
+  { what: "bill feeds", dir: ["feeds", "bills"], min: 1 },
+  { what: "JSON API", dir: ["api", "v1"], min: 1 },
+  { what: "calendars", dir: ["calendar"], min: 1 },
+];
+for (const p of products) {
+  let n = 0;
+  try {
+    n = (await readdir(join(DIST, ...p.dir))).length;
+  } catch {
+    n = 0;
+  }
+  if (n < p.min) {
+    fail(
+      `${p.what}: ${n} files in ${p.dir.join("/")}, expected at least ${p.min}. ` +
+        `Run \`python -m dataproducts.build\` before building the site.`,
+    );
+  } else {
+    pass(`${p.what}: ${n} files`);
+  }
+}
+
 // --- pages that must never 404 --------------------------------------------
+let missingPages = 0;
 for (const p of [
   "index.html",
   "404.html",
@@ -137,9 +164,12 @@ for (const p of [
   "money/index.html",
   "about/index.html",
 ]) {
-  if (!(await exists(p))) fail(`missing ${p}`);
+  if (!(await exists(p))) {
+    fail(`missing ${p}`);
+    missingPages++;
+  }
 }
-if (!failures) pass("landing pages present");
+if (!missingPages) pass("landing pages present");
 
 // --- the disclaimer is a hard rule, so assert it shipped -------------------
 const home = await readFile(join(DIST, "index.html"), "utf-8").catch(() => "");

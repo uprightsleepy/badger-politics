@@ -113,6 +113,17 @@ jobs:
           npm ci --ignore-scripts
           npm rebuild better-sqlite3
 
+      # The JSON API, Atom feeds and calendars are generated from the same
+      # SQLite, are gitignored, and are linked from ordinary pages. Without
+      # this step the build succeeds and the release quietly drops all of
+      # them -- 20,580 links, caught by the link check the first time CI ran.
+      - uses: astral-sh/setup-uv@v5
+      - name: Generate the data products
+        working-directory: pipeline
+        run: |
+          uv sync --locked
+          uv run python -m dataproducts.build ../data/wi.sqlite ../site/public/
+
       - name: Build every session
         working-directory: site
         env:
