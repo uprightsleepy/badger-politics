@@ -6,7 +6,9 @@
 User-agent: *
 Allow: /
 
-# Generated views with no standalone content of their own.
-Disallow: /following/
+# Nothing is disallowed. /following/ is a device-local view with no
+# standalone content, but it carries `noindex` rather than a block: a
+# blocked page can still be indexed from inbound links, and a crawler that
+# cannot fetch it never sees the noindex.
 
 Sitemap: https://badgerpolitics.org/sitemap-index.xml

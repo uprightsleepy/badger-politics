@@ -74,7 +74,14 @@ const passedChamberName = bill.chamber === "upper" ? "Senate" : "Assembly";
 const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
 ---
 
-<Base title={seoTitle} description={seoDescription}>
+<Base
+  title={seoTitle}
+  description={seoDescription}
+  breadcrumbs={[
+    { name: "Bills", url: "/bills/" },
+    { name: sessionName, url: `/bills/${bill.session_id}/` },
+  ]}
+>
   <JsonLd
     data={{
       "@type": "Legislation",

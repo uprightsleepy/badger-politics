@@ -14,6 +14,10 @@ interface Props {
   /** Keep the page out of search engines while leaving it crawlable and
    * linkable. Same reasoning as `searchable`, applied outward. */
   noindex?: boolean;
+  /** Ancestor trail, nearest-last, excluding this page. Emitted as
+   * BreadcrumbList so a result shows its place in the site rather than a
+   * bare URL. */
+  breadcrumbs?: { name: string; url: string }[];
 }
 const {
   title,
@@ -21,7 +25,24 @@ const {
   image = "/og.png",
   searchable = true,
   noindex = false,
+  breadcrumbs,
 } = Astro.props;
+const crumbJson = breadcrumbs?.length
+  ? JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        ...breadcrumbs.map((c, i) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          name: c.name,
+          item: new URL(c.url, Astro.site).href,
+        })),
+        // the current page closes the trail with no `item`, per schema.org
+        { "@type": "ListItem", position: breadcrumbs.length + 1, name: title },
+      ],
+    }).replace(/</g, "\\u003c")
+  : null;
 // absolute URLs: crawlers and chat apps will not resolve relative ones
 const pageUrl = new URL(Astro.url.pathname, Astro.site).href;
 const imageUrl = new URL(image, Astro.site).href;
@@ -80,6 +101,9 @@ const NAV_DIRECT: [string, string][] = [
     {/* follow, not none: these pages still pass authority on to the bills
         and members they link to. */}
     {noindex && <meta name="robots" content="noindex, follow" />}
+    {crumbJson && (
+      <script type="application/ld+json" is:inline set:html={crumbJson} />
+    )}
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Badger Politics" />

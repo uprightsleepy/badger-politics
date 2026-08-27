@@ -3,7 +3,9 @@ import Base from "../../layouts/Base.astro";
 import { builtSessions, sessionStats } from "../../lib/db";
 const sessions = builtSessions();
 ---
-<Base title="Hearing None">
+<Base
+  description="Bills that died at the end of a Wisconsin legislative session without ever receiving a public hearing, by session and by committee."
+  title="Hearing None">
   <h1 class="text-3xl font-bold">Hearing: none</h1>
   <p class="mt-2 max-w-3xl text-navy-700">
     Most bills never get voted down. They die in a committee that never gave

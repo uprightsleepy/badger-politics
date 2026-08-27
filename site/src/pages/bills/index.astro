@@ -5,7 +5,9 @@ const built = new Set(builtSessions().map((s) => s.id));
 const sessions = allSessions();
 ---
 
-<Base title="Bills by session">
+<Base
+  description="Every bill and resolution before the Wisconsin Legislature, by session, with status, sponsors and roll-call votes from the official record."
+  title="Bills by session">
   <h1 class="text-2xl font-bold">Bills by session</h1>
   <ul class="mt-4 space-y-2">
     {sessions.map((s) => {

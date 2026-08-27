@@ -10,6 +10,7 @@ import JsonLd from "../../components/JsonLd.astro";
 import {
   people,
   personVotes,
+  personVoteCount,
   personSponsorships,
   electionFor,
   chamberVoteDays,
@@ -46,8 +47,14 @@ export function getStaticPaths() {
   }));
 }
 const { person } = Astro.props;
-const votes = personVotes(person.id, 3000);
+// Bounded on purpose. Rendering a whole career put 8,213 list items and
+// 2.9 MB into one document; `details` hides rows visually but still ships
+// every byte. The complete record is paged at /votes/ and /bills/.
+const PREVIEW = 50;
+const votes = personVotes(person.id, 200);
+const voteTotal = personVoteCount(person.id);
 const sponsorships = personSponsorships(person.id);
+const recordBase = `/legislators/${personSlug(person.id)}`;
 const election = electionFor(person.id);
 const sitting = person.current_role === "Representative" || person.current_role === "Senator";
 const opponents = election?.opponents.filter((o) => o.ballot_status !== "Deny") ?? [];
@@ -154,6 +161,7 @@ const tally = TALLY_ORDER.map((status) => ({
 
 <Base
   title={`${person.name}${person.district != null ? `, ${roleAbbr(person.chamber)} ${person.district}` : ""}`}
+  breadcrumbs={[{ name: "Legislators", url: "/legislators/" }]}
   description={`${person.current_role ?? "Former legislator"}, ${chamberName(person.chamber)} District ${person.district}. Votes, sponsored bills, committees, attendance and campaign money — from official records.`}
 >
   <JsonLd
@@ -398,7 +406,7 @@ const tally = TALLY_ORDER.map((status) => ({
                 aria-label={`${STATUS_LABELS[t.status]} bills`}
               >
               <ul class="space-y-1 p-3 text-sm">
-                {t.bills.map((s) => (
+                {t.bills.slice(0, PREVIEW).map((s) => (
                   <li class="flex items-center gap-2">
                     <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-16 shrink-0 py-1 font-semibold underline">
                       {s.identifier}
@@ -408,6 +416,13 @@ const tally = TALLY_ORDER.map((status) => ({
                   </li>
                 ))}
               </ul>
+              {t.bills.length > PREVIEW && (
+                <p class="border-t border-navy-100 px-3 py-2 text-xs">
+                  <a href={`${recordBase}/bills/1/`} class="underline">
+                    Showing {PREVIEW} of {t.bills.length.toLocaleString()} — see the full record
+                  </a>
+                </p>
+              )}
               </div>
             </details>
           ))}
@@ -432,7 +447,7 @@ const tally = TALLY_ORDER.map((status) => ({
               aria-label={`${label} bills`}
             >
               <ul class="space-y-1 p-3 text-sm">
-                {bills.map((s) => (
+                {bills.slice(0, PREVIEW).map((s) => (
                   <li class="flex items-center gap-2">
                     <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-16 shrink-0 py-1 font-semibold underline">
                       {s.identifier}
@@ -442,6 +457,13 @@ const tally = TALLY_ORDER.map((status) => ({
                   </li>
                 ))}
               </ul>
+              {bills.length > PREVIEW && (
+                <p class="border-t border-navy-100 px-3 py-2 text-xs">
+                  <a href={`${recordBase}/bills/1/`} class="underline">
+                    Showing {PREVIEW} of {bills.length.toLocaleString()} — see the full record
+                  </a>
+                </p>
+              )}
             </div>
           </details>
         </section>
@@ -689,7 +711,7 @@ const tally = TALLY_ORDER.map((status) => ({
       )}
 
       <section class="mt-6">
-        <h2 class="text-xl font-bold">Vote history · {votes.length.toLocaleString()}</h2>
+        <h2 class="text-xl font-bold">Vote history · {voteTotal.toLocaleString()}</h2>
         <div
           class="mt-2 max-h-[32rem] overflow-y-auto rounded-lg border border-navy-100 bg-white scroll-body"
           role="region"
@@ -700,22 +722,13 @@ const tally = TALLY_ORDER.map((status) => ({
             {votes.slice(0, 200).map((v) => <VoteRow v={v} />)}
           </ul>
         </div>
-        {votes.length > 200 && (
-          <details class="mt-2 rounded-lg border border-navy-100 bg-white">
-            <summary class="cursor-pointer px-3 py-2 text-sm font-semibold">
-              Show all {votes.length.toLocaleString()} votes ({(votes.length - 200).toLocaleString()} more)
-            </summary>
-            <div
-              class="max-h-[32rem] overflow-y-auto border-t border-navy-100 scroll-body"
-              role="region"
-              tabindex="0"
-              aria-label="Earlier votes"
-            >
-              <ul class="space-y-1 p-3 text-sm">
-                {votes.slice(200).map((v) => <VoteRow v={v} />)}
-              </ul>
-            </div>
-          </details>
+        {voteTotal > votes.length && (
+          <p class="mt-2 text-sm">
+            <a href={`${recordBase}/votes/1/`} class="inline-block py-1 underline">
+              Showing the most recent {votes.length} — see all
+              {" "}{voteTotal.toLocaleString()} votes →
+            </a>
+          </p>
         )}
       </section>
     </div>

@@ -1,0 +1,23 @@
+---
+/** The bill-row list, shared by the session index, its later pages and the
+ * per-status pages, so all three stay identical as the row design changes. */
+import StatusBadge from "./StatusBadge.astro";
+import { billSlug, fmtDate, shortTitle } from "../lib/format";
+import type { Bill } from "../lib/db";
+interface Props { bills: Bill[]; sessionId: string }
+const { bills, sessionId } = Astro.props;
+---
+<ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white">
+  {bills.map((b) => (
+    <li class="text-sm" data-bill-row data-status={b.status} data-text={`${b.identifier} ${b.title ?? ""}`.toLowerCase()}>
+      <a href={`/bills/${sessionId}/${billSlug(b.identifier)}/`} class="flex items-center gap-3 px-4 py-2.5 hover:bg-navy-50">
+        <span class="w-20 shrink-0 font-bold underline">{b.identifier}</span>
+        <span class="min-w-0 flex-1 truncate">{shortTitle(b.title)}</span>
+        <StatusBadge status={b.status} short />
+        <span class="hidden w-24 shrink-0 text-right text-xs text-navy-600 sm:block">
+          {fmtDate(b.latest_action_date)}
+        </span>
+      </a>
+    </li>
+  ))}
+</ul>

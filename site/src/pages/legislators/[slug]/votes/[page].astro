@@ -1,0 +1,71 @@
+---
+/** A member's complete voting record, paged. The profile shows the most
+ * recent 200; a long career runs to thousands, and putting them all in one
+ * document produced a 2.9 MB page. These are noindex like roll calls --
+ * derived lists whose substance lives on the bill pages -- but crawlable,
+ * so they give search engines a link path into old sessions. */
+import Base from "../../../../layouts/Base.astro";
+import VoteRow from "../../../../components/VoteRow.astro";
+import { people, personVoteCount, personVotesPage } from "../../../../lib/db";
+import { chamberName, personSlug, roleAbbr } from "../../../../lib/format";
+
+const PER_PAGE = 200;
+
+export function getStaticPaths() {
+  return people().flatMap((p) => {
+    const total = personVoteCount(p.id);
+    const pages = Math.max(1, Math.ceil(total / 200));
+    return Array.from({ length: pages }, (_, i) => ({
+      params: { slug: personSlug(p.id), page: String(i + 1) },
+      props: { person: p, page: i + 1, pages, total },
+    }));
+  });
+}
+
+const { person, page, pages, total } = Astro.props;
+const rows = personVotesPage(person.id, PER_PAGE, (page - 1) * PER_PAGE);
+const base = `/legislators/${personSlug(person.id)}`;
+const seat = person.district != null ? `, ${roleAbbr(person.chamber)} ${person.district}` : "";
+const first = (page - 1) * PER_PAGE + 1;
+const last = Math.min(page * PER_PAGE, total);
+---
+
+<Base
+  title={`${person.name}${seat} — every vote, page ${page} of ${pages}`}
+  description={`Votes ${first.toLocaleString()}–${last.toLocaleString()} of ${total.toLocaleString()} cast by ${person.name} in the Wisconsin ${chamberName(person.chamber)}, from the official roll calls.`}
+  noindex
+  searchable={false}
+  breadcrumbs={[
+    { name: "Legislators", url: "/legislators/" },
+    { name: person.name, url: `${base}/` },
+  ]}
+>
+  <p class="text-sm text-navy-600">
+    <a href={`${base}/`} class="underline">← {person.name}</a>
+  </p>
+  <h1 class="mt-1 text-2xl font-bold">Every recorded vote</h1>
+  <p class="mt-1 text-sm text-navy-600">
+    {total.toLocaleString()} roll calls, oldest sessions last. Showing
+    {" "}{first.toLocaleString()}–{last.toLocaleString()}.
+  </p>
+
+  <ul class="mt-4 space-y-1 rounded-lg border border-navy-100 bg-white p-3 text-sm">
+    {rows.map((v) => <VoteRow v={v} />)}
+  </ul>
+
+  {pages > 1 && (
+    <nav class="mt-4 flex flex-wrap items-center gap-3 text-sm" aria-label="Vote record pages">
+      {page > 1 && (
+        <a class="rounded-lg border border-navy-100 bg-white px-3 py-2 underline" href={`${base}/votes/${page - 1}/`}>
+          ← Newer
+        </a>
+      )}
+      <span class="text-navy-600">Page {page} of {pages}</span>
+      {page < pages && (
+        <a class="rounded-lg border border-navy-100 bg-white px-3 py-2 underline" href={`${base}/votes/${page + 1}/`}>
+          Older →
+        </a>
+      )}
+    </nav>
+  )}
+</Base>

@@ -1,0 +1,74 @@
+---
+/** One status within a session — "bills that became law in 2025-26", and
+ * so on. These are the pages the filter chips used to produce only in the
+ * browser: same view, but a real URL that can be shared, linked and
+ * crawled. A rest param keeps page 1 at the bare path. */
+import Base from "../../../../../layouts/Base.astro";
+import BillList from "../../../../../components/BillList.astro";
+import Pager from "../../../../../components/Pager.astro";
+import { builtSessions, billsFor } from "../../../../../lib/db";
+import { STATUS_LABELS } from "../../../../../lib/format";
+
+const PER_PAGE = 200;
+
+export function getStaticPaths() {
+  return builtSessions().flatMap((session) => {
+    const byStatus = new Map<string, number>();
+    for (const b of billsFor(session.id)) {
+      const key = b.status ?? "introduced";
+      byStatus.set(key, (byStatus.get(key) ?? 0) + 1);
+    }
+    return [...byStatus].flatMap(([status, total]) => {
+      // literal, not PER_PAGE: getStaticPaths is hoisted out of this scope
+      const pages = Math.max(1, Math.ceil(total / 200));
+      return Array.from({ length: pages }, (_, i) => ({
+        params: {
+          session: session.id,
+          status,
+          page: i === 0 ? undefined : String(i + 1),
+        },
+        props: { session, status, page: i + 1, pages, total },
+      }));
+    });
+  });
+}
+
+const { session, status, page, pages, total } = Astro.props;
+const bills = billsFor(session.id)
+  .filter((b) => (b.status ?? "introduced") === status)
+  .slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+const name = session.name ?? session.id;
+const label = STATUS_LABELS[status] ?? status;
+const base = `/bills/${session.id}/status/${status}/`;
+const first = (page - 1) * PER_PAGE + 1;
+const last = Math.min(page * PER_PAGE, total);
+---
+
+<Base
+  title={`${label} · ${name}${page > 1 ? ` · page ${page}` : ""}`}
+  description={`The ${total.toLocaleString()} bills of the ${name} with the status "${label}", from each bill's official history.`}
+  breadcrumbs={[
+    { name: "Bills", url: "/bills/" },
+    { name, url: `/bills/${session.id}/` },
+  ]}
+>
+  <p class="text-sm text-navy-600">
+    <a href={`/bills/${session.id}/`} class="underline">← {name}</a>
+  </p>
+  <h1 class="mt-1 text-2xl font-bold">{label} · {name}</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-600">
+    {total.toLocaleString()} of this session's proposals.
+    {pages > 1 && ` Showing ${first.toLocaleString()}–${last.toLocaleString()}.`}
+    {" "}<a href={`/bills/${session.id}/`} class="underline">All proposals</a>
+  </p>
+
+  <BillList bills={bills} sessionId={session.id} />
+
+  <Pager
+    page={page}
+    pages={pages}
+    href={(n) => (n === 1 ? base : `${base}${n}/`)}
+    label={`${label} pages`}
+  />
+</Base>

@@ -1,0 +1,58 @@
+---
+/** Pages 2..N of a session's bills. Self-canonical: these hold different
+ * bills from page 1, so canonicalising them away would tell search engines
+ * those bills do not exist. */
+import Base from "../../../../layouts/Base.astro";
+import BillList from "../../../../components/BillList.astro";
+import Pager from "../../../../components/Pager.astro";
+import { builtSessions, billsFor } from "../../../../lib/db";
+
+const PER_PAGE = 200;
+
+export function getStaticPaths() {
+  return builtSessions().flatMap((session) => {
+    const total = billsFor(session.id).length;
+    // literal, not PER_PAGE: getStaticPaths is hoisted out of this scope
+    const pages = Math.ceil(total / 200);
+    // page 1 is the session index itself
+    return Array.from({ length: Math.max(0, pages - 1) }, (_, i) => ({
+      params: { session: session.id, page: String(i + 2) },
+      props: { session, page: i + 2, pages },
+    }));
+  });
+}
+
+const { session, page, pages } = Astro.props;
+const all = billsFor(session.id);
+const bills = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+const first = (page - 1) * PER_PAGE + 1;
+const last = Math.min(page * PER_PAGE, all.length);
+const name = session.name ?? session.id;
+---
+
+<Base
+  title={`Bills · ${name} · page ${page}`}
+  description={`Bills ${first.toLocaleString()}–${last.toLocaleString()} of ${all.length.toLocaleString()} in the ${name}, with status and latest action from the official record.`}
+  breadcrumbs={[
+    { name: "Bills", url: "/bills/" },
+    { name, url: `/bills/${session.id}/` },
+  ]}
+>
+  <p class="text-sm text-navy-600">
+    <a href={`/bills/${session.id}/`} class="underline">← {name}</a>
+  </p>
+  <h1 class="mt-1 text-2xl font-bold">{name}</h1>
+  <p class="mt-1 text-sm text-navy-600">
+    Showing {first.toLocaleString()}–{last.toLocaleString()} of
+    {" "}{all.length.toLocaleString()} proposals.
+  </p>
+
+  <BillList bills={bills} sessionId={session.id} />
+
+  <Pager
+    page={page}
+    pages={pages}
+    href={(n) => (n === 1 ? `/bills/${session.id}/` : `/bills/${session.id}/page/${n}/`)}
+    label="Bill list pages"
+  />
+</Base>

@@ -1,0 +1,85 @@
+---
+/** Every bill a member led or signed onto, paged. Sponsorships, not votes,
+ * are what made profile pages enormous: one member carries 6,276 of them.
+ * Same policy as the vote pages -- noindex, but crawlable, so old bills
+ * keep a link path. */
+import Base from "../../../../layouts/Base.astro";
+import { people, personSponsorshipCount, personSponsorshipsPage } from "../../../../lib/db";
+import { billSlug, chamberName, personSlug, roleAbbr, shortTitle } from "../../../../lib/format";
+
+const PER_PAGE = 200;
+
+const ROLE_LABEL: Record<string, string> = {
+  lead: "Lead author",
+  coauthor: "Coauthor",
+  cosponsor: "Cosponsor",
+};
+
+export function getStaticPaths() {
+  return people().flatMap((p) => {
+    const total = personSponsorshipCount(p.id);
+    const pages = Math.max(1, Math.ceil(total / 200));
+    return Array.from({ length: pages }, (_, i) => ({
+      params: { slug: personSlug(p.id), page: String(i + 1) },
+      props: { person: p, page: i + 1, pages, total },
+    }));
+  });
+}
+
+const { person, page, pages, total } = Astro.props;
+const rows = personSponsorshipsPage(person.id, PER_PAGE, (page - 1) * PER_PAGE);
+const base = `/legislators/${personSlug(person.id)}`;
+const seat = person.district != null ? `, ${roleAbbr(person.chamber)} ${person.district}` : "";
+const first = (page - 1) * PER_PAGE + 1;
+const last = Math.min(page * PER_PAGE, total);
+---
+
+<Base
+  title={`${person.name}${seat} — every bill, page ${page} of ${pages}`}
+  description={`Bills ${first.toLocaleString()}–${last.toLocaleString()} of ${total.toLocaleString()} that ${person.name} led or signed onto in the Wisconsin ${chamberName(person.chamber)}, from each bill's official history.`}
+  noindex
+  searchable={false}
+  breadcrumbs={[
+    { name: "Legislators", url: "/legislators/" },
+    { name: person.name, url: `${base}/` },
+  ]}
+>
+  <p class="text-sm text-navy-600">
+    <a href={`${base}/`} class="underline">← {person.name}</a>
+  </p>
+  <h1 class="mt-1 text-2xl font-bold">Every bill led or signed</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-600">
+    {total.toLocaleString()} in total, newest first. Signing on adds a name
+    to a bill; it is not the same as leading it. Showing
+    {" "}{first.toLocaleString()}–{last.toLocaleString()}.
+  </p>
+
+  <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+    {rows.map((s) => (
+      <li class="flex items-center gap-3 px-4 py-2">
+        <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-20 shrink-0 font-semibold underline">
+          {s.identifier}
+        </a>
+        <span class="min-w-0 flex-1 truncate">{shortTitle(s.title)}</span>
+        <span class="shrink-0 text-xs text-navy-600">{ROLE_LABEL[s.role] ?? s.role}</span>
+        <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">{s.session_id}</span>
+      </li>
+    ))}
+  </ul>
+
+  {pages > 1 && (
+    <nav class="mt-4 flex flex-wrap items-center gap-3 text-sm" aria-label="Bill record pages">
+      {page > 1 && (
+        <a class="rounded-lg border border-navy-100 bg-white px-3 py-2 underline" href={`${base}/bills/${page - 1}/`}>
+          ← Newer
+        </a>
+      )}
+      <span class="text-navy-600">Page {page} of {pages}</span>
+      {page < pages && (
+        <a class="rounded-lg border border-navy-100 bg-white px-3 py-2 underline" href={`${base}/bills/${page + 1}/`}>
+          Older →
+        </a>
+      )}
+    </nav>
+  )}
+</Base>

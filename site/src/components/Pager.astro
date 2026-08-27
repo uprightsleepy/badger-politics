@@ -1,0 +1,43 @@
+---
+/** Crawlable pagination. Ordinary <a href> links, because crawlers do not
+ * click filter chips or "load more" buttons, and because a page that needs
+ * JavaScript to reach its own second page is not much of a public record.
+ * Page 2+ are self-canonical: they hold different bills, so pointing them
+ * at page 1 would tell search engines those bills do not exist. */
+interface Props {
+  page: number;
+  pages: number;
+  /** Given a page number, the path for it. Page 1 is usually the bare URL. */
+  href: (page: number) => string;
+  label: string;
+}
+const { page, pages, href, label } = Astro.props;
+
+// first, last, and a window around the current page — enough to navigate
+// without printing eighty links on a long session
+const window = new Set<number>([1, pages, page - 1, page, page + 1]);
+const shown = [...window].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+const LINK = "rounded-lg border border-navy-100 bg-white px-3 py-2 hover:bg-navy-50";
+---
+{pages > 1 && (
+  <nav class="mt-4 flex flex-wrap items-center gap-2 text-sm" aria-label={label}>
+    {page > 1 && (
+      <a class={`${LINK} font-semibold`} rel="prev" href={href(page - 1)}>← Previous</a>
+    )}
+    {shown.map((n, i) => (
+      <>
+        {i > 0 && shown[i - 1] !== n - 1 && <span class="px-1 text-navy-600">…</span>}
+        {n === page ? (
+          <span class="rounded-lg bg-navy-800 px-3 py-2 font-semibold text-white" aria-current="page">
+            {n}
+          </span>
+        ) : (
+          <a class={LINK} href={href(n)}>{n}</a>
+        )}
+      </>
+    ))}
+    {page < pages && (
+      <a class={`${LINK} font-semibold`} rel="next" href={href(page + 1)}>Next →</a>
+    )}
+  </nav>
+)}

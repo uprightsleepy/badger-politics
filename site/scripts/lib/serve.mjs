@@ -1,7 +1,9 @@
 /** Shared harness plumbing: dist path, static server, browser launch, and
  * sample-page pickers. Ports stay per-harness so parallel runs never collide. */
+import { existsSync } from "node:fs";
 import { createServer } from "node:http";
-import { readFile, readdir } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
@@ -29,17 +31,46 @@ export const serveDist = async (port) => {
   return server;
 };
 
-// CI runners ship Chrome at a path the workflow exports; a local Windows
-// checkout falls back to Edge, which is always present.
-const EDGE = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
+// CI exports BROWSER_PATH. Locally, try Chrome before Edge: Edge 151
+// exits 0 the instant puppeteer launches it, which surfaces only as
+// "Failed to launch the browser process: Code: 0". Chrome at the same
+// version drives fine.
+const LOCAL_BROWSERS = [
+  "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+  "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+];
 
-export const launchBrowser = () =>
-  puppeteer.launch({
-    executablePath: process.env.BROWSER_PATH ?? EDGE,
+const findBrowser = () => {
+  if (process.env.BROWSER_PATH) return process.env.BROWSER_PATH;
+  const found = LOCAL_BROWSERS.find((p) => existsSync(p));
+  if (!found) {
+    throw new Error(
+      "No browser found. Set BROWSER_PATH, or install one of: " +
+        LOCAL_BROWSERS.join(", "),
+    );
+  }
+  return found;
+};
+
+export const launchBrowser = async () => {
+  // A fresh profile per run. Sharing one with the developer's own browser
+  // makes the launch hand off to it and exit 0; sharing a fixed temp path
+  // between runs leaves a lock behind whenever a run is killed. Either way
+  // the harness fails for reasons unrelated to the site.
+  const userDataDir = await mkdtemp(join(tmpdir(), "bp-harness-"));
+  const browser = await puppeteer.launch({
+    executablePath: findBrowser(),
     headless: true,
+    userDataDir,
     // the sandbox needs kernel namespaces the GitHub runner does not grant
     args: process.env.CI ? ["--no-sandbox", "--disable-dev-shm-usage"] : [],
   });
+  browser.on("disconnected", () => {
+    rm(userDataDir, { recursive: true, force: true }).catch(() => {});
+  });
+  return browser;
+};
 
 /** First legislator profile linked from the index, or null. */
 export const firstLegislatorHref = async () => {

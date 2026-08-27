@@ -1487,3 +1487,57 @@ export const sessionStats = (sessionId: string) =>
        FROM bills WHERE session_id = ?`,
     )
     .get(sessionId) as { bills: number; enacted: number; vetoed: number; graveyard: number };
+
+/** Paged slices for the per-member full-record pages. The profile itself
+ * shows a bounded preview; these carry the rest without putting every row
+ * of a twenty-year career into one document. Counting and slicing happen
+ * in SQLite so a build never holds the whole history in memory. */
+export const personVoteCount = (personId: string): number =>
+  (prep("SELECT COUNT(*) AS n FROM vote_records WHERE person_id = ?").get(personId) as {
+    n: number;
+  }).n;
+
+export const personVotesPage = (personId: string, limit: number, offset: number) =>
+  prep(
+      `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result,
+              b.id AS bill_id, b.identifier, b.title, b.session_id
+       FROM vote_records r
+       JOIN vote_events e ON e.id = r.vote_event_id
+       JOIN bills b ON b.id = e.bill_id
+       WHERE r.person_id = ? ORDER BY e.date DESC, e.id LIMIT ? OFFSET ?`,
+    )
+    .all(personId, limit, offset) as {
+    option: string; vote_event_id: string; date: string | null; motion: string | null;
+    result: string | null; bill_id: string; identifier: string; title: string | null;
+    session_id: string;
+  }[];
+
+export const personSponsorshipCount = (personId: string): number =>
+  (prep(
+      "SELECT COUNT(*) AS n FROM sponsorships s JOIN bills b ON b.id = s.bill_id" +
+        " WHERE s.person_id = ? AND b.source != 'legiscan'",
+    ).get(personId) as { n: number }).n;
+
+export const personSponsorshipsPage = (personId: string, limit: number, offset: number) => {
+  const leads = leadAuthors();
+  const rows = prep(
+      `SELECT s.is_primary, s.classification, b.id AS bill_id, b.identifier,
+              b.title, b.status, b.session_id
+       FROM sponsorships s JOIN bills b ON b.id = s.bill_id
+       WHERE s.person_id = ? AND b.source != 'legiscan'
+       ORDER BY b.id DESC LIMIT ? OFFSET ?`,
+    )
+    .all(personId, limit, offset) as {
+    is_primary: number; classification: string; bill_id: string; identifier: string;
+    title: string | null; status: string | null; session_id: string;
+  }[];
+  return rows.map((r) => ({
+    ...r,
+    role:
+      leads.get(r.bill_id) === personId
+        ? "lead"
+        : r.classification === "cosponsor"
+          ? "cosponsor"
+          : "coauthor",
+  }));
+};

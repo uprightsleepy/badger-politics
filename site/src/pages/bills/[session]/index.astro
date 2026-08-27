@@ -1,9 +1,16 @@
 ---
+/** Page 1 of a session's bills. This used to render all 2,749 proposals in
+ * one 2 MB document behind a client-side filter. Filter chips are now real
+ * links to per-status pages: same one-tap behaviour, but each view is a
+ * shareable URL a crawler can reach, and no page carries the whole session. */
 import Base from "../../../layouts/Base.astro";
+import BillList from "../../../components/BillList.astro";
 import FilterBar from "../../../components/FilterBar.astro";
-import StatusBadge from "../../../components/StatusBadge.astro";
+import Pager from "../../../components/Pager.astro";
 import { builtSessions, billsFor } from "../../../lib/db";
-import { billSlug, fmtDate, shortTitle, STATUS_SHORT } from "../../../lib/format";
+import { STATUS_SHORT } from "../../../lib/format";
+
+const PER_PAGE = 200;
 
 export function getStaticPaths() {
   return builtSessions().map((session) => ({
@@ -11,20 +18,24 @@ export function getStaticPaths() {
     props: { session },
   }));
 }
+
 const { session } = Astro.props;
 const bills = billsFor(session.id);
-// chip order follows the list's own weighting, biggest group first
-const statusCounts = new Map<string, number>();
+const pages = Math.max(1, Math.ceil(bills.length / PER_PAGE));
+
+const counts = new Map<string, number>();
 for (const b of bills) {
   const key = b.status ?? "introduced";
-  statusCounts.set(key, (statusCounts.get(key) ?? 0) + 1);
+  counts.set(key, (counts.get(key) ?? 0) + 1);
 }
-const statusFacets = [...statusCounts]
-  .sort((a, b) => b[1] - a[1])
-  .map(([key, count]) => ({ key, label: STATUS_SHORT[key] ?? key, count }));
+const statuses = [...counts].sort((a, b) => b[1] - a[1]);
 ---
 
-<Base title={`Bills · ${session.name ?? session.id}`}>
+<Base
+  title={`Bills · ${session.name ?? session.id}`}
+  description={`All ${bills.length.toLocaleString()} bills and resolutions of the ${session.name ?? session.id}, with status, latest action and links to every roll call.`}
+  breadcrumbs={[{ name: "Bills", url: "/bills/" }]}
+>
   <h1 class="text-2xl font-bold">{session.name ?? session.id}</h1>
   <p class="mt-1 text-sm text-navy-600">
     {bills.length.toLocaleString()} proposals
@@ -34,40 +45,47 @@ const statusFacets = [...statusCounts]
       </span>
     )}
   </p>
+
   <FilterBar
     id="bill-filter"
     statusId="filter-status"
-    label="Filter bills by number or title"
-    placeholder="Filter by number or title…"
-    facetAttr="status"
-    facetLabel="Filter by what happened to the bill"
-    facets={statusFacets}
-  />
-  <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white">
-    {bills.map((b) => (
-      <li class="text-sm" data-bill-row data-status={b.status} data-text={`${b.identifier} ${b.title ?? ""}`.toLowerCase()}>
-        <a href={`/bills/${session.id}/${billSlug(b.identifier)}/`} class="flex items-center gap-3 px-4 py-2.5 hover:bg-navy-50">
-          <span class="w-20 shrink-0 font-bold underline">{b.identifier}</span>
-          <span class="min-w-0 flex-1 truncate">{shortTitle(b.title)}</span>
-          <StatusBadge status={b.status} short />
-          <span class="hidden w-24 shrink-0 text-right text-xs text-navy-600 sm:block">
-            {fmtDate(b.latest_action_date)}
-          </span>
+    label="Filter this page by number or title"
+    placeholder="Filter this page…"
+  >
+    <div class="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Filter by what happened to the bill">
+      <span class="shrink-0 rounded-full border border-navy-800 bg-navy-800 px-3 py-1 text-xs font-semibold text-white">
+        All {bills.length.toLocaleString()}
+      </span>
+      {statuses.map(([key, n]) => (
+        <a
+          href={`/bills/${session.id}/status/${key}/`}
+          class="shrink-0 rounded-full border border-navy-100 bg-white px-3 py-1 text-xs font-semibold hover:bg-navy-50"
+        >
+          {STATUS_SHORT[key] ?? key} {n.toLocaleString()}
         </a>
-      </li>
-    ))}
-  </ul>
+      ))}
+    </div>
+  </FilterBar>
+
+  <BillList bills={bills.slice(0, PER_PAGE)} sessionId={session.id} />
   <p id="no-match" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600"></p>
+
+  <Pager
+    page={1}
+    pages={pages}
+    href={(n) => (n === 1 ? `/bills/${session.id}/` : `/bills/${session.id}/page/${n}/`)}
+    label="Bill list pages"
+  />
+
   <script>
     import { initRowFilter } from "../../../scripts/rowFilter";
-    // free text plus the status chips, which also honour an inbound ?status=
+    // scoped to the rows on this page; the status views are their own URLs
     initRowFilter({
       input: "bill-filter",
       rows: "[data-bill-row]",
       status: "filter-status",
       noMatch: "no-match",
-      noun: "bills",
-      facetAttr: "status",
+      noun: "bills on this page",
     });
   </script>
 </Base>

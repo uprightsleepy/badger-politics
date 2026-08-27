@@ -22,6 +22,7 @@ const roleLabel = (role: string) =>
 <Base
   title={committee.name}
   description={`${chamberName(committee.chamber) || "Joint"} committee: members, hearings, and bills that died here without a hearing.`}
+  breadcrumbs={[{ name: "Committees", url: "/committees/" }]}
 >
   <p class="text-sm text-navy-600"><a href="/committees/" class="underline">Committees</a></p>
   <h1 class="mt-1 text-2xl font-bold">
