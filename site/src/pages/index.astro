@@ -2,12 +2,22 @@
 import Base from "../layouts/Base.astro";
 import JsonLd from "../components/JsonLd.astro";
 import StatusBadge from "../components/StatusBadge.astro";
-import { builtSessions, sessionStats, recentlyActedBills } from "../lib/db";
+import { builtSessions, sessionFunnel, recentlyActedBills } from "../lib/db";
 import { billSlug, fmtDate, shortTitle } from "../lib/format";
 const sessions = builtSessions();
 const current = sessions.find((s) => s.id === "2025") ?? sessions[0];
-const stats = sessionStats(current.id);
-const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
+const recent = recentlyActedBills(sessions.map((s) => s.id), 6);
+const funnel = sessionFunnel(current.id);
+const sessionName = current.name ?? current.id;
+// Cumulative stages: each is a subset of the one above, so the bar widths
+// show the drop-off rather than four unrelated counters.
+const stages = [
+  { label: "Introduced", n: funnel.introduced, href: `/bills/${current.id}/`, tone: "bg-navy-600" },
+  { label: "Passed one chamber", n: funnel.passedOne, href: `/bills/${current.id}/status/passed_chamber/`, tone: "bg-navy-600" },
+  { label: "Passed both chambers", n: funnel.passedBoth, href: `/bills/${current.id}/status/passed/`, tone: "bg-navy-600" },
+  { label: "Became law", n: funnel.enacted, href: `/bills/${current.id}/status/enacted/`, tone: "bg-moss-600" },
+];
+const pct = (n) => Math.max(1.5, (n / funnel.introduced) * 100);
 ---
 
 <Base
@@ -38,65 +48,146 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
       },
     }}
   />
-  <section class="py-8 text-center">
-    <h1 class="mx-auto max-w-2xl text-4xl font-bold tracking-tight">
-      What is the Wisconsin Legislature doing?
+  <section class="py-8">
+    <h1 class="max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
+      Wisconsin politics, without the Capitol jargon.
     </h1>
-    <p class="mx-auto mt-3 max-w-xl text-lg text-navy-700">
-      Every bill, every vote, and every committee graveyard. Plain language,
-      updated nightly from official records.
+    <p class="mt-3 max-w-2xl text-lg text-navy-700">
+      Bills, votes, lawmakers, money and elections &mdash; built from official
+      state records and explained in plain language.
     </p>
-    <div class="mx-auto mt-6 max-w-xl text-left">
-      <label class="sr-only" for="q">Search bills</label>
-      <input
-        id="q"
-        type="search"
-        placeholder="Search bills. Try “child marriage” or “AB 656”"
-        class="w-full rounded-lg border border-navy-100 bg-white px-4 py-3 shadow-sm"
-        autocomplete="off"
-      />
-      <p id="search-status" role="status" class="sr-only"></p>
-      <div id="search-results" class="mt-2 space-y-2"></div>
+
+    <div class="mt-6 grid gap-4 lg:grid-cols-2">
+      <div class="rounded-lg border border-navy-100 bg-white p-4">
+        <h2 class="font-bold">Start with your address</h2>
+        <p class="mt-1 text-sm text-navy-700">
+          See your two legislators, how they voted, what they sponsored and who
+          funds them &mdash; then every page marks them for you.
+        </p>
+        <a
+          href="/my-reps/"
+          class="mt-3 inline-block rounded-lg bg-navy-800 px-4 py-2.5 font-semibold text-white hover:bg-navy-700"
+        >
+          Find my legislators
+        </a>
+        <p class="mt-2 flex items-start gap-1.5 text-xs text-navy-600">
+          <svg class="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 1.5 3.5 4v5.2c0 4 2.8 7.7 6.5 8.8 3.7-1.1 6.5-4.8 6.5-8.8V4L10 1.5Zm0 2.1 4.5 1.7v4.9c0 3-2 5.9-4.5 6.8-2.5-.9-4.5-3.8-4.5-6.8V5.3L10 3.6Z"/></svg>
+          <span>
+            <strong>Private by design.</strong> Your address goes to the U.S.
+            Census geocoder to identify your district and is never stored. The
+            district stays in this browser.
+          </span>
+        </p>
+      </div>
+
+      <div class="rounded-lg border border-navy-100 bg-white p-4">
+        <h2 class="font-bold">Or look something up</h2>
+        <p class="mt-1 text-sm text-navy-700">
+          Search every bill, legislator, committee and campaign donor.
+        </p>
+        <div class="mt-3">
+          <label class="sr-only" for="q">Search bills, people and committees</label>
+          <input
+            id="q"
+            type="search"
+            placeholder="Try child care, property tax, or AB 656"
+            class="w-full rounded-lg border border-navy-100 bg-white px-4 py-2.5"
+            autocomplete="off"
+          />
+          <p id="search-status" role="status" class="sr-only"></p>
+          <div id="search-results" class="mt-2 space-y-2"></div>
+        </div>
+      </div>
     </div>
-    <p class="mt-4 text-sm">
-      <a href="/my-reps/" class="font-semibold text-navy-700 underline">
-        Enter your address once
-      </a>
-      and every page shows how <em>your</em> legislators voted.
+  </section>
+
+  <section id="my-reps-home" class="mt-2 hidden">
+    <h2 class="text-xl font-bold">Your representatives</h2>
+    <div id="my-reps-cards" class="mt-2 grid gap-3 sm:grid-cols-2" data-no-rep-highlight></div>
+    <p class="mt-2 text-sm">
+      <a href="/my-reps/" class="underline">Full profiles and recent votes &rarr;</a>
     </p>
   </section>
 
-  <section class="grid gap-3 sm:grid-cols-3">
-    <a href={`/bills/${current.id}/`} class="rounded-lg border border-navy-100 bg-white p-4 text-center hover:border-navy-600">
-      <div class="text-3xl font-bold">{stats.bills.toLocaleString()}</div>
-      <div class="text-sm text-navy-600">proposals this session →</div>
-    </a>
-    <a href={`/bills/${current.id}/?status=enacted`} class="rounded-lg border border-navy-100 bg-white p-4 text-center hover:border-moss-600">
-      <div class="text-3xl font-bold text-moss-600">{stats.enacted}</div>
-      <div class="text-sm text-navy-600">became law →</div>
-    </a>
-    <a href={`/hearing-none/${current.id}/`} class="rounded-lg border border-badger-600/30 bg-badger-50 p-4 text-center hover:border-badger-600">
-      <div class="text-3xl font-bold text-badger-700">{stats.graveyard.toLocaleString()}</div>
-      <div class="text-sm text-badger-700">died without a hearing →</div>
+  <section class="mt-10">
+    <h2 class="text-xl font-bold">
+      What happened to {funnel.introduced.toLocaleString()} proposals?
+    </h2>
+    <p class="mt-1 max-w-3xl text-sm text-navy-600">
+      The {sessionName}, by outcome. Each stage is a subset of the one above
+      it, counted from the official bill histories.
+    </p>
+    <ul class="mt-3 space-y-2">
+      {stages.map((st) => (
+        <li>
+          <a href={st.href} class="block rounded-lg border border-navy-100 bg-white px-4 py-2.5 hover:border-navy-600">
+            <span class="flex items-baseline justify-between gap-3 text-sm">
+              <span class="font-semibold">{st.label}</span>
+              <span class="font-bold tabular-nums">{st.n.toLocaleString()}</span>
+            </span>
+            <span class="mt-1.5 block h-2 w-full overflow-hidden rounded-full bg-navy-50">
+              <span class={`block h-full rounded-full ${st.tone}`} style={`width:${pct(st.n)}%`}></span>
+            </span>
+          </a>
+        </li>
+      ))}
+    </ul>
+    <a
+      href={`/hearing-none/${current.id}/`}
+      class="mt-3 block rounded-lg border border-badger-600/30 bg-badger-50 px-4 py-3 hover:border-badger-600"
+    >
+      <span class="block text-sm font-bold text-badger-700">
+        {funnel.noHearing.toLocaleString()} never got a public hearing
+      </span>
+      <span class="mt-0.5 block text-sm text-navy-700">
+        Most proposals are not voted down &mdash; they are never taken up at
+        all. A committee chair alone decides whether a bill is heard. See
+        where they died &rarr;
+      </span>
     </a>
   </section>
 
   <section class="mt-10">
-    <h2 class="text-xl font-bold">Recently acted on</h2>
-    <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white">
+    <h2 class="text-xl font-bold">Latest activity</h2>
+    <p class="mt-1 text-sm text-navy-600">
+      The most recent action on any bill, from the official histories.
+    </p>
+    <ul class="mt-3 grid gap-2 sm:grid-cols-2">
       {recent.map((b) => (
-        <li class="flex items-center gap-3 px-4 py-2.5 text-sm">
-          <a href={`/bills/${b.session_id}/${billSlug(b.identifier)}/`} class="w-20 shrink-0 font-bold underline">
-            {b.identifier}
+        <li>
+          <a
+            href={`/bills/${b.session_id}/${billSlug(b.identifier)}/`}
+            class="flex h-full flex-col gap-1.5 rounded-lg border border-navy-100 bg-white p-3 hover:border-navy-600"
+          >
+            <span class="flex items-center gap-2">
+              <span class="font-bold underline">{b.identifier}</span>
+              <StatusBadge status={b.status} short />
+              <span class="ml-auto text-xs text-navy-600">{fmtDate(b.latest_action_date)}</span>
+            </span>
+            <span class="line-clamp-2 text-sm leading-snug text-navy-700">{shortTitle(b.title)}</span>
           </a>
-          <span class="min-w-0 flex-1 truncate">{shortTitle(b.title)}</span>
-          <StatusBadge status={b.status} />
-          <span class="hidden w-24 shrink-0 text-right text-xs text-navy-600 sm:block">
-            {fmtDate(b.latest_action_date)}
-          </span>
         </li>
       ))}
     </ul>
+    <p class="mt-3 text-sm">
+      <a href={`/bills/${current.id}/`} class="underline">
+        All {funnel.introduced.toLocaleString()} proposals this session &rarr;
+      </a>
+    </p>
+  </section>
+
+  <section class="mt-10 rounded-lg border border-navy-100 bg-white p-4">
+    <h2 class="font-bold">Official records. No ads. No tracking.</h2>
+    <ul class="mt-2 grid gap-x-6 gap-y-1 text-sm text-navy-700 sm:grid-cols-2">
+      <li>Rebuilt nightly from Wisconsin state sources</li>
+      <li>Every page links to the official record</li>
+      <li>Your address is never stored</li>
+      <li>Corrections are public; the data is free to reuse</li>
+    </ul>
+    <p class="mt-2 text-sm">
+      <a href="/about/" class="underline">How Badger Politics works</a> &middot;
+      <a href="/data/" class="underline">Data &amp; API</a>
+    </p>
   </section>
 
   <script is:inline type="module">
@@ -187,4 +278,68 @@ const recent = recentlyActedBills(sessions.map((s) => s.id), 8);
       }
     });
   </script>
+
+<script>
+  import { savedDistrict } from "../lib/district";
+  import { esc } from "../lib/html";
+  import { partyLetter, partyStyle } from "../lib/format";
+
+  // Returning visitors get their own two legislators on the front page.
+  // Everything here is read from localStorage and a static JSON file; the
+  // site never learns who is asking.
+  const saved = savedDistrict();
+  if (saved) {
+    const section = document.getElementById("my-reps-home")!;
+    const cards = document.getElementById("my-reps-cards")!;
+    Promise.all([
+      fetch("/data/reps.json").then((r) => r.json()),
+      fetch("/data/rep-summaries.json").then((r) => r.json()).catch(() => null),
+    ])
+      .then(([reps, summaries]) => {
+        const seats: [string, string, any, any][] = [
+          [`Assembly District ${saved.ad}`, `/districts/assembly-${saved.ad}/`,
+           reps.assembly?.[saved.ad], summaries?.assembly?.[saved.ad]],
+          [`Senate District ${saved.sd}`, `/districts/senate-${saved.sd}/`,
+           reps.senate?.[saved.sd], summaries?.senate?.[saved.sd]],
+        ];
+        const html = seats
+          .filter(([, , slim]) => slim)
+          .map(([seat, districtHref, slim, full]) => {
+            const party = slim.party ?? null;
+            const stat = (value: number, label: string) =>
+              `<div><p class="text-lg font-bold tabular-nums">${value.toLocaleString()}</p>` +
+              `<p class="text-xs leading-tight text-navy-600">${esc(label)}</p></div>`;
+            const stats = full
+              ? `<div class="mt-3 grid grid-cols-3 gap-2">` +
+                stat(full.attendance?.missed ?? 0, "Floor votes missed") +
+                stat(full.authored?.total ?? 0, "Bills led") +
+                stat(full.authored?.signedOn ?? 0, "Bills cosigned") +
+                `</div>`
+              : "";
+            const latest = full?.recentVotes?.[0];
+            const lastVote = latest
+              ? `<p class="mt-3 border-t border-navy-100 pt-2 text-sm text-navy-700">Most recent vote: ` +
+                `<strong>${latest.option === "yes" ? "Aye" : latest.option === "no" ? "Nay" : "No vote"}</strong> on ` +
+                `<a class="underline" href="/bills/${esc(latest.session)}/${esc(latest.slug)}/">${esc(latest.identifier)}</a></p>`
+              : "";
+            return (
+              `<div class="rounded-lg border border-navy-100 bg-white p-4">` +
+              `<div class="flex items-start gap-3">` +
+              `<div class="min-w-0 flex-1">` +
+              `<a class="inline-block py-1 text-xs font-semibold uppercase tracking-wide text-navy-600 hover:underline" href="${esc(districtHref)}">${esc(seat)}</a>` +
+              `<p class="mt-0.5"><a class="text-lg font-bold leading-tight hover:underline" href="/legislators/${esc(slim.slug)}/">${esc(slim.name)}</a></p>` +
+              `</div>` +
+              `<span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${partyStyle(party)}" role="img" aria-label="${esc(party ?? "party unknown")}"><span aria-hidden="true">${esc(partyLetter(party))}</span></span>` +
+              `</div>${stats}${lastVote}</div>`
+            );
+          })
+          .join("");
+        if (html) {
+          cards.innerHTML = html;
+          section.classList.remove("hidden");
+        }
+      })
+      .catch(() => {});
+  }
+</script>
 </Base>

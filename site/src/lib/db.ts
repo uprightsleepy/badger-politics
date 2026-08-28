@@ -1541,3 +1541,24 @@ export const personSponsorshipsPage = (personId: string, limit: number, offset: 
           : "coauthor",
   }));
 };
+
+/** What became of a session's proposals, as stages a reader can follow.
+ * Every number is a status count from the official histories -- nothing is
+ * modelled or estimated, and the stages are cumulative, so each is a
+ * subset of the one above it. */
+export const sessionFunnel = (sessionId: string) => {
+  const r = prep(
+      `SELECT COUNT(*) AS introduced,
+              SUM(CASE WHEN status IN ('passed_chamber','passed','enacted','vetoed','adopted')
+                       THEN 1 ELSE 0 END) AS passedOne,
+              SUM(CASE WHEN status IN ('passed','enacted','vetoed') THEN 1 ELSE 0 END) AS passedBoth,
+              SUM(CASE WHEN status = 'enacted' THEN 1 ELSE 0 END) AS enacted,
+              SUM(died_without_hearing) AS noHearing
+       FROM bills WHERE session_id = ? AND source != 'legiscan'`,
+    )
+    .get(sessionId) as {
+    introduced: number; passedOne: number; passedBoth: number;
+    enacted: number; noHearing: number;
+  };
+  return r;
+};
