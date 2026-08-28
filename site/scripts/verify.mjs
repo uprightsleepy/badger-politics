@@ -20,10 +20,13 @@ page.on("request", (r) => {
 });
 
 // 1. search: "child marriage" -> AB 656
+// 30s, not 10: the first search loads Pagefind's WASM and index shards for
+// 23,000 pages. That is comfortable locally and marginal on a loaded CI
+// runner, where it timed out and read as a broken search.
 await page.goto("http://127.0.0.1:8931/", { waitUntil: "networkidle2" });
-await page.waitForSelector("#q", { timeout: 10000 });
+await page.waitForSelector("#q", { timeout: 30000 });
 await page.type("#q", "child marriage");
-await page.waitForSelector("#search-results a", { timeout: 10000 });
+await page.waitForSelector("#search-results a", { timeout: 30000 });
 await new Promise((r) => setTimeout(r, 800));
 const hits = await page.$$eval("#search-results a", (as) =>
   as.slice(0, 5).map((a) => ({ text: a.textContent.trim(), href: a.getAttribute("href") })),
@@ -41,7 +44,7 @@ await page.$eval("#q", (el) => (el.value = ""));
 await page.type("#q", "pedophiles");
 await page.waitForFunction(
   () => document.getElementById("search-results").textContent.includes("No bills match"),
-  { timeout: 10000 },
+  { timeout: 30000 },
 ).catch(() => {});
 const degenerateLinks = await page.$$eval("#search-results a", (as) => as.length);
 check("search 'pedophiles' returns no junk matches", degenerateLinks === 0, `${degenerateLinks} links`);
@@ -76,7 +79,7 @@ check(
 await page.goto("http://127.0.0.1:8931/legislators/", { waitUntil: "networkidle2" });
 await page.waitForFunction(
   () => [...document.querySelectorAll("a")].some((a) => a.classList.contains("bg-gold-100")),
-  { timeout: 10000 },
+  { timeout: 30000 },
 ).catch(() => {});
 const highlighted = await page.$$eval("a.bg-gold-100", (as) => as.map((a) => a.textContent.trim()));
 check(
