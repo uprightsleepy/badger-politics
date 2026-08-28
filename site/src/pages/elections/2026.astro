@@ -94,6 +94,29 @@ const statewide = OFFICES.map(([key, label]) => {
 
 <Base title="2026 elections" description="Everything on Wisconsin's November 2026 ballot: all five statewide constitutional offices and every legislative seat, with incumbents, retirements, and qualified candidates.">
   <h1 class="text-2xl font-bold">On the ballot: November 3, 2026</h1>
+
+  {/* A voter wants their own ballot, not all 132 seats. Filled in from the
+      district saved in this browser; the prompt shows until then. */}
+  <section id="my-ballot" class="mt-4 rounded-lg border border-navy-100 bg-white p-4">
+    <h2 class="font-bold">Your ballot</h2>
+    <div id="my-ballot-empty">
+      <p class="mt-1 max-w-2xl text-sm text-navy-700">
+        Every voter in Wisconsin sees the five statewide offices below. Which
+        legislative races you see depends on where you live.
+      </p>
+      <a
+        href="/my-reps/"
+        class="mt-3 inline-block rounded-lg bg-navy-800 px-4 py-2.5 font-semibold text-white hover:bg-navy-700"
+      >
+        Find my races
+      </a>
+      <p class="mt-2 text-xs text-navy-600">
+        Your address goes to the U.S. Census geocoder to identify your
+        district and is never stored.
+      </p>
+    </div>
+    <div id="my-ballot-body" class="hidden" data-no-rep-highlight></div>
+  </section>
   <p class="mt-2 max-w-3xl text-navy-700">
     All five statewide constitutional offices, all 99 Assembly seats, and the
     17 odd-numbered Senate seats are on the ballot. Candidate status comes
@@ -251,4 +274,104 @@ const statewide = OFFICES.map(([key, label]) => {
       </ul>
     </section>
   ))}
+
+<script>
+  import { savedDistrict } from "../../lib/district";
+  import { esc } from "../../lib/html";
+  import { partyLetter, partyStyle } from "../../lib/format";
+
+  const saved = savedDistrict();
+  if (saved) {
+    fetch("/data/ballot-2026.json")
+      .then((r) => r.json())
+      .then((data) => {
+        const empty = document.getElementById("my-ballot-empty")!;
+        const body = document.getElementById("my-ballot-body")!;
+
+        const chip = (party: string | null) =>
+          `<span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${partyStyle(
+            party,
+          )}" role="img" aria-label="${esc(party ?? "party unknown")}"><span aria-hidden="true">${esc(
+            partyLetter(party),
+          )}</span></span>`;
+
+        const race = (label: string, r: any) => {
+          if (!r) return "";
+          if (!r.onBallot) {
+            return (
+              `<div class="rounded-lg border border-navy-100 bg-paper p-3">` +
+              `<p class="text-xs font-semibold uppercase tracking-wide text-navy-600">${esc(label)}</p>` +
+              `<p class="mt-1 text-sm">Not on the ballot this year.` +
+              (r.incumbent
+                ? ` Currently held by <a class="underline" href="/legislators/${esc(
+                    r.incumbent.slug,
+                  )}/">${esc(r.incumbent.name)}</a>.`
+                : "") +
+              `</p></div>`
+            );
+          }
+          // The incumbent is a candidate too when they are running; an open
+          // seat is worth calling out because it is the likeliest to change.
+          const names = [
+            ...(r.incumbentRunning && r.incumbent
+              ? [{ name: r.incumbent.name, party: r.incumbent.party, incumbent: true }]
+              : []),
+            ...r.candidates.map((c: any) => ({ ...c, incumbent: false })),
+          ];
+          const open = !r.incumbentRunning;
+          return (
+            `<div class="rounded-lg border border-navy-100 bg-paper p-3">` +
+            `<p class="text-xs font-semibold uppercase tracking-wide text-navy-600">${esc(label)}` +
+            (open ? ` <span class="text-badger-700">· open seat</span>` : "") +
+            `</p>` +
+            (names.length
+              ? `<ul class="mt-1.5 space-y-1 text-sm">` +
+                names
+                  .map(
+                    (c: any) =>
+                      `<li class="flex items-center gap-2">${chip(c.party)}<span>${esc(
+                        c.name,
+                      )}${c.incumbent ? ' <span class="text-xs text-navy-600">(incumbent)</span>' : ""}</span></li>`,
+                  )
+                  .join("") +
+                `</ul>`
+              : `<p class="mt-1 text-sm text-navy-600">No approved candidates on file yet.</p>`) +
+            `</div>`
+          );
+        };
+
+        const statewide = Object.entries(data.statewide ?? {})
+          .map(
+            ([office, cands]: [string, any]) =>
+              `<div class="rounded-lg border border-navy-100 bg-paper p-3">` +
+              `<p class="text-xs font-semibold uppercase tracking-wide text-navy-600">${esc(office)}</p>` +
+              `<ul class="mt-1.5 space-y-1 text-sm">` +
+              cands
+                .map(
+                  (c: any) =>
+                    `<li class="flex items-center gap-2">${chip(c.party)}<span>${esc(c.name)}</span></li>`,
+                )
+                .join("") +
+              `</ul></div>`,
+          )
+          .join("");
+
+        body.innerHTML =
+          `<p class="mt-1 text-sm text-navy-700">Assembly District ${saved.ad}, Senate District ${saved.sd}. ` +
+          `Saved in this browser only. <a class="underline" href="/my-reps/">Change</a></p>` +
+          `<div class="mt-3 grid gap-2 sm:grid-cols-2">` +
+          race(`Assembly District ${saved.ad}`, data.assembly?.[saved.ad]) +
+          race(`Senate District ${saved.sd}`, data.senate?.[saved.sd]) +
+          `</div>` +
+          (statewide
+            ? `<p class="mt-4 text-xs font-semibold uppercase tracking-wide text-navy-600">Statewide, for every voter</p>` +
+              `<div class="mt-1.5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">${statewide}</div>`
+            : "") +
+          `<p class="mt-3 text-xs text-navy-600">Candidates are those the Wisconsin Elections Commission has approved for the ballot. Filings can still change before the deadline.</p>`;
+        empty.classList.add("hidden");
+        body.classList.remove("hidden");
+      })
+      .catch(() => {});
+  }
+</script>
 </Base>
