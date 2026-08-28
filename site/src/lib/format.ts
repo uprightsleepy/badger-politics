@@ -1,3 +1,5 @@
+import PERSON_SLUGS from "../data/person-slugs.json";
+
 export const STATUS_LABELS: Record<string, string> = {
   introduced: "Introduced",
   in_committee: "In committee",
@@ -113,7 +115,18 @@ export const hearingDisplayName = (h: {
 export const billSlug = (identifier: string): string =>
   identifier.replace(/\s+/g, "").toLowerCase();
 
+/** A member's URL slug, from the committed map in src/data.
+ *
+ * These were opaque uuids. The map is a file rather than a derivation so a
+ * slug outlives the name that produced it: a member who changes their name
+ * keeps their URL, and every link and citation keeps working. Anyone not
+ * in the map (a person added since it was last generated) falls back to
+ * the old uuid form, which still resolves. */
 export const personSlug = (personId: string): string =>
+  PERSON_SLUGS[personId] ?? personId.replace(/^legacy\//, "legacy-").split("/").pop()!;
+
+/** The uuid form a person's page used to live at, for the redirect map. */
+export const legacyPersonSlug = (personId: string): string =>
   personId.replace(/^legacy\//, "legacy-").split("/").pop()!;
 
 /** '13:01' (already America/Chicago) -> '1:01 PM' */

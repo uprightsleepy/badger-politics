@@ -35,8 +35,19 @@ def bill_slug(identifier: str) -> str:
     return identifier.replace(" ", "").lower()
 
 
+# The site and the data products have to agree on a person's slug, or the
+# Atom feed a page links to does not exist. Both read this one committed
+# map; see importer/person_slugs.py for why it is a file and not a rule.
+_SLUGS_PATH = Path(__file__).resolve().parents[2] / "site" / "src" / "data" / "person-slugs.json"
+try:
+    _PERSON_SLUGS: dict[str, str] = json.loads(_SLUGS_PATH.read_text(encoding="utf-8"))
+except (OSError, ValueError):
+    _PERSON_SLUGS = {}
+
+
 def person_slug(person_id: str) -> str:
-    return person_id.rsplit("/", 1)[-1]
+    """Name slug where one is on file, the old uuid tail otherwise."""
+    return _PERSON_SLUGS.get(person_id) or person_id.rsplit("/", 1)[-1]
 
 
 def build_api(conn: sqlite3.Connection, out: Path) -> int:
