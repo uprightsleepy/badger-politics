@@ -52,8 +52,23 @@ export const buildHeatDays = (
   for (const chamber of ["lower", "upper"] as const) {
     const chamberTerms = terms.filter((t) => t.chamber === chamber);
     if (!chamberTerms.length) continue;
+    // A term's end date is inclusive: members do cast votes on their last
+    // day, 117 of them on record. The exception is a member who moves
+    // between chambers, where one term ends and the next begins on the
+    // same date. Counting both left them sitting in the chamber they had
+    // just left, so the chamber's votes that day showed as missed. Dan
+    // Knodl's Senate term ended and his Assembly term began on 2025-01-06,
+    // which gave him two tiles for that day and two phantom absences. No
+    // member has ever voted in the chamber they were leaving on such a
+    // day, so the ending term simply does not claim it.
+    const handover = (t: TermRow) =>
+      t.end != null && terms.some((o) => o.chamber !== t.chamber && o.start === t.end);
     const inTerm = (date: string) =>
-      chamberTerms.some((t) => date >= t.start && date <= (t.end ?? OPEN_END));
+      chamberTerms.some(
+        (t) =>
+          date >= t.start &&
+          (handover(t) ? date < (t.end ?? OPEN_END) : date <= (t.end ?? OPEN_END)),
+      );
     const spanStart = chamberTerms[0].start;
     const spanEnd = chamberTerms.reduce(
       (max, t) => ((t.end ?? OPEN_END) > max ? (t.end ?? OPEN_END) : max), "0");
