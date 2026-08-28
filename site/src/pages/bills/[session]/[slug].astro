@@ -18,7 +18,7 @@ import {
   vetoMessageUrl,
 } from "../../../lib/db";
 import {
-  billSlug, clip, fmtDate, personSlug, chamberName, sessionYear, shortTitle,
+  billSlug, clip, fmtDate, lrbParagraphs, personSlug, chamberName, sessionYear, shortTitle,
   subjectDisplay, subjectSlug, STATUS_LABELS,
 } from "../../../lib/format";
 import JsonLd from "../../../components/JsonLd.astro";
@@ -232,7 +232,7 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
           aria-label="Legislative Reference Bureau analysis"
         >
           <div class="space-y-3 p-4 leading-relaxed">
-            {bill.lrb_analysis.split(/\n+/).slice(0, 40).map((para) => <p>{para}</p>)}
+            {lrbParagraphs(bill.lrb_analysis).slice(0, 40).map((para) => <p>{para}</p>)}
           </div>
         </div>
       </section>

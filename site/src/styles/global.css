@@ -79,7 +79,10 @@ html {
      default; one that shows the page through it needs `scroll-on-paper`. */
   --scroll-cover: #fff;
   overflow-y: auto;
-  background:
+  /* background-image, not the background shorthand: the shorthand resets
+     background-color, which silently wiped Tailwind bg-white off every
+     panel that had it and left the white fade painting over the page. */
+  background-image:
     linear-gradient(var(--scroll-cover) 30%, rgba(255, 255, 255, 0)) center top,
     linear-gradient(rgba(255, 255, 255, 0), var(--scroll-cover) 70%) center bottom,
     radial-gradient(farthest-side at 50% 0, rgba(22, 35, 58, 0.16), rgba(22, 35, 58, 0)) center top,

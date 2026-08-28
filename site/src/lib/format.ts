@@ -61,6 +61,35 @@ export const shortTitle = (title: string | null): string =>
     .replace(/^\s*relating to:\s*/i, "")
     .replace(/^./, (c) => c.toUpperCase());
 
+/** Reflow an LRB analysis into paragraphs.
+ *
+ * The source hard-wraps mid-sentence, so a newline is usually a soft wrap,
+ * not a paragraph: splitting on every one produced paragraphs reading
+ * "on" and "for". Only 195 of 18,054 analyses use a blank line, so that
+ * cannot be the separator either. A line that does not end a sentence is
+ * joined to the next; one that does ends the paragraph. Analyses that
+ * arrive with whole paragraphs per line are unaffected, since each already
+ * ends in a full stop. */
+export const lrbParagraphs = (analysis: string): string[] => {
+  const paras: string[] = [];
+  let current: string[] = [];
+  for (const raw of analysis.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) {
+      if (current.length) paras.push(current.join(" "));
+      current = [];
+      continue;
+    }
+    current.push(line);
+    if (/[.:;?!]["')\]]?$/.test(line)) {
+      paras.push(current.join(" "));
+      current = [];
+    }
+  }
+  if (current.length) paras.push(current.join(" "));
+  return paras.filter(Boolean);
+};
+
 /** Committee page slug: the tail of the scraped committee id. */
 export const committeeSlug = (id: string): string => id.split("/").pop()!;
 
