@@ -38,7 +38,7 @@
         ]
       },
       {
-        "comment": "Security headers. HSTS is already supplied by Firebase. The CSP is the one to watch: /my-reps loads the Census geocoder via JSONP, and GoatCounter's counter comes from gc.zgo.at, so both are allow-listed by host rather than the policy being loosened.",
+        "comment": "Security headers. HSTS is already supplied by Firebase. Three things in this CSP are load-bearing and were each verified against the dev site: Pagefind compiles WebAssembly, so script-src needs 'wasm-unsafe-eval' or site search dies silently; /my-reps injects a script from the Census geocoder; and GoatCounter's counter comes from gc.zgo.at.",
         "source": "**",
         "headers": [
           {
@@ -55,7 +55,7 @@
           },
           {
             "key": "Content-Security-Policy",
-            "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://gc.zgo.at https://geocoding.geo.census.gov; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://badgerpolitics.goatcounter.com; manifest-src 'self'"
+            "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://gc.zgo.at https://geocoding.geo.census.gov; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://badgerpolitics.goatcounter.com; manifest-src 'self'"
           }
         ]
       }
