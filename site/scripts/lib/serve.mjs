@@ -87,3 +87,25 @@ export const moneyLegislatorHref = async () => {
   }
   return null;
 };
+
+
+/** Keep a harness independent of third-party hosts.
+ *
+ * The legislator directory shows 131 member portraits served from 16
+ * outside hosts. Waiting for those made the accessibility and layout
+ * gates depend on how fast docs.legis and a dozen campaign sites answer a
+ * CI runner, which produced 30s navigation timeouts reported as failures.
+ * These harnesses read the DOM and layout, not the pixels.
+ *
+ * Deliberately NOT used by scripts/csp.mjs: that one runs against the
+ * deployed site to check the Content-Security-Policy, where a blocked
+ * image is exactly the condition under test.
+ */
+export const blockThirdPartyAssets = async (page) => {
+  await page.setRequestInterception(true);
+  page.on("request", (req) => {
+    const external = !req.url().startsWith("http://127.0.0.1");
+    if (external && ["image", "font", "media"].includes(req.resourceType())) req.abort();
+    else req.continue();
+  });
+};

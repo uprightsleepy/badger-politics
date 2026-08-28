@@ -3,7 +3,7 @@
  * degradation). Usage: node scripts/responsive.mjs [--shots DIR] */
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { serveDist, launchBrowser, moneyLegislatorHref } from "./lib/serve.mjs";
+import { serveDist, launchBrowser, moneyLegislatorHref, blockThirdPartyAssets } from "./lib/serve.mjs";
 
 const server = await serveDist(8935);
 
@@ -29,21 +29,13 @@ if (shotsDir) await mkdir(shotsDir, { recursive: true });
 
 const browser = await launchBrowser();
 const page = await browser.newPage();
-  await page.setRequestInterception(true);
-  page.on("request", (req) => {
-    // Member portraits come from 16 third-party hosts. A local harness
-    // should not fail because one of them is slow; axe and the overflow
-    // checks read layout and the DOM, not the pixels.
-    const external = !req.url().startsWith("http://127.0.0.1");
-    if (external && ["image", "font", "media"].includes(req.resourceType())) req.abort();
-    else req.continue();
-  });
+  await blockThirdPartyAssets(page);
 
 let failures = 0;
 for (const width of WIDTHS) {
   await page.setViewport({ width, height: 900, deviceScaleFactor: 1 });
   for (const path of PAGES) {
-    await page.goto(`http://127.0.0.1:8935${path}`, { waitUntil: "networkidle2", timeout: 30000 });
+    await page.goto(`http://127.0.0.1:8935${path}`, { waitUntil: "networkidle2", timeout: 60000 });
     const overflow = await page.evaluate(() => {
       const doc = document.documentElement;
       const spill = Math.max(doc.scrollWidth, document.body.scrollWidth) - window.innerWidth;

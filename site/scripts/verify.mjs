@@ -1,11 +1,12 @@
 /** Phase 5 acceptance verification: drives the built site in headless Edge.
  * Usage: node scripts/verify.mjs  (serves dist/ itself on :8931) */
-import { serveDist, launchBrowser } from "./lib/serve.mjs";
+import { serveDist, launchBrowser, blockThirdPartyAssets } from "./lib/serve.mjs";
 
 const server = await serveDist(8931);
 
 const browser = await launchBrowser();
 const page = await browser.newPage();
+await blockThirdPartyAssets(page);
 const results = [];
 const check = (name, ok, detail = "") => {
   results.push({ name, ok, detail });
@@ -51,7 +52,7 @@ await page.type("#addr", "7120 W National Ave, West Allis, WI");
 await page.click("#addr-form button[type=submit]");
 await page.waitForFunction(
   () => !document.getElementById("result").classList.contains("hidden"),
-  { timeout: 30000 },
+  { timeout: 60000 },
 );
 const repsText = await page.$eval("#reps", (el) => el.textContent);
 check("West Allis -> Assembly D14 Tenorio", repsText.includes("Angelito Tenorio"), "");

@@ -3,8 +3,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  DIST, serveDist, launchBrowser, firstLegislatorHref, moneyLegislatorHref,
-} from "./lib/serve.mjs";
+  DIST, serveDist, launchBrowser, firstLegislatorHref, moneyLegislatorHref, blockThirdPartyAssets } from "./lib/serve.mjs";
 
 const server = await serveDist(8933);
 
@@ -39,12 +38,7 @@ const axeSource = await readFile(
 );
 const browser = await launchBrowser();
 const page = await browser.newPage();
-await page.setRequestInterception(true);
-page.on("request", (req) => {
-  const external = !req.url().startsWith("http://127.0.0.1");
-  if (external && ["image", "font", "media"].includes(req.resourceType())) req.abort();
-  else req.continue();
-});
+  await blockThirdPartyAssets(page);
 // include one legislator page with full cards, and one whose money card
 // carries the timeline chart (coverage differs between the two)
 const legHref = await firstLegislatorHref();
