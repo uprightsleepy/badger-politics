@@ -14,7 +14,9 @@ const sessionName = current.name ?? current.id;
 const stages = [
   { label: "Introduced", n: funnel.introduced, href: `/bills/${current.id}/`, tone: "bg-navy-600" },
   { label: "Passed one chamber", n: funnel.passedOne, href: `/bills/${current.id}/status/passed_chamber/`, tone: "bg-navy-600" },
-  { label: "Passed both chambers", n: funnel.passedBoth, href: `/bills/${current.id}/status/passed/`, tone: "bg-navy-600" },
+  // no single status page: clearing both chambers splits into enacted,
+  // vetoed and awaiting signature, which is what the governor's desk shows
+  { label: "Passed both chambers", n: funnel.passedBoth, href: "/governors-desk/", tone: "bg-navy-600" },
   { label: "Became law", n: funnel.enacted, href: `/bills/${current.id}/status/enacted/`, tone: "bg-moss-600" },
 ];
 const pct = (n) => Math.max(1.5, (n / funnel.introduced) * 100);
