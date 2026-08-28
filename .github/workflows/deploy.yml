@@ -189,6 +189,21 @@ jobs:
           echo "Cache-Control: $cc"
           case "$cc" in *must-revalidate*) ;; *) echo "::error::HTML is not revalidating"; exit 1 ;; esac
 
+      # The CSP only exists once Firebase serves it, so it cannot be tested
+      # before a release. It broke site search the first time it shipped --
+      # Pagefind compiles WebAssembly -- with no symptom a visitor could see.
+      - name: Check the CSP against the released site
+        working-directory: site
+        env:
+          BROWSER_PATH: /usr/bin/google-chrome
+        run: |
+          set -euo pipefail
+          if [ "$TARGET" = "badgerpolitics-prod" ]; then
+            node scripts/csp.mjs https://badgerpolitics.org
+          else
+            node scripts/csp.mjs https://badgerpolitics-dev.web.app
+          fi
+
       - name: Roll back guidance
         if: failure()
         run: |

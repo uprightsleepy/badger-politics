@@ -1,7 +1,15 @@
-/** Temporary: does the Content-Security-Policy break anything on the live
- * dev site? A CSP failure is silent to a visitor — the address lookup just
- * stops working — so this listens for the browser's own violation events
- * rather than eyeballing the page. */
+/** Does the Content-Security-Policy break anything on a deployed site?
+ *
+ * Run against a released URL, not a local build: Firebase serves these
+ * headers, so nothing local exercises them. A CSP failure is invisible to
+ * a visitor — search silently returns nothing, the address lookup silently
+ * stops — so this listens for the browser's own securitypolicyviolation
+ * events and drives the two paths most likely to break: the Census
+ * geocoder, which injects a script from a third host, and Pagefind, which
+ * compiles WebAssembly.
+ *
+ * Usage: node scripts/csp.mjs https://badgerpolitics-dev.web.app
+ */
 import { launchBrowser } from "./lib/serve.mjs";
 
 const BASE = process.argv[2] ?? "https://badgerpolitics-dev.web.app";
