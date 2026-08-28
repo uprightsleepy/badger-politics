@@ -39,6 +39,12 @@ const axeSource = await readFile(
 );
 const browser = await launchBrowser();
 const page = await browser.newPage();
+await page.setRequestInterception(true);
+page.on("request", (req) => {
+  const external = !req.url().startsWith("http://127.0.0.1");
+  if (external && ["image", "font", "media"].includes(req.resourceType())) req.abort();
+  else req.continue();
+});
 // include one legislator page with full cards, and one whose money card
 // carries the timeline chart (coverage differs between the two)
 const legHref = await firstLegislatorHref();
@@ -57,7 +63,7 @@ const summary = new Map();
 for (const vp of VIEWPORTS) {
   await page.setViewport({ width: vp.width, height: vp.height });
   for (const path of PAGES) {
-    await page.goto(`http://127.0.0.1:8933${path}`, { waitUntil: "networkidle2", timeout: 30000 });
+    await page.goto(`http://127.0.0.1:8933${path}`, { waitUntil: "networkidle2", timeout: 60000 });
     await page.evaluate(axeSource);
     const results = await page.evaluate(() =>
       axe.run(document, { runOnly: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"] }),

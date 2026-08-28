@@ -29,6 +29,16 @@ if (shotsDir) await mkdir(shotsDir, { recursive: true });
 
 const browser = await launchBrowser();
 const page = await browser.newPage();
+  await page.setRequestInterception(true);
+  page.on("request", (req) => {
+    // Member portraits come from 16 third-party hosts. A local harness
+    // should not fail because one of them is slow; axe and the overflow
+    // checks read layout and the DOM, not the pixels.
+    const external = !req.url().startsWith("http://127.0.0.1");
+    if (external && ["image", "font", "media"].includes(req.resourceType())) req.abort();
+    else req.continue();
+  });
+
 let failures = 0;
 for (const width of WIDTHS) {
   await page.setViewport({ width, height: 900, deviceScaleFactor: 1 });
