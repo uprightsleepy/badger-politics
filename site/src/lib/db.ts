@@ -1562,3 +1562,38 @@ export const sessionFunnel = (sessionId: string) => {
   };
   return r;
 };
+
+/** What a committee did with the bills it handled.
+ *
+ * Two figures, both counted rather than inferred:
+ *   - hearings held, joined on committee_id, so always exact
+ *   - bills that died here without ever getting one
+ *
+ * The second is attributable only when the committee's name is unique.
+ * `bills.committee_at_death` stores a name, not an id, and five names are
+ * shared across chambers (Education, Finance, Organization, Employment
+ * Relations, Review of Administrative Rules). For those, one chamber's
+ * count would silently include the other's, so it returns null and the
+ * page says why. Same rule as the campaign-finance totals: a coverage gap
+ * is stated, never papered over with a number that might be wrong.
+ */
+export const committeeRecord = (committeeId: string) => {
+  const row = prep("SELECT name FROM committees WHERE id = ?").get(committeeId) as
+    | { name: string }
+    | undefined;
+  if (!row) return null;
+  const hearingsHeld = (prep(
+      "SELECT COUNT(*) AS n FROM hearings WHERE committee_id = ?",
+    ).get(committeeId) as { n: number }).n;
+  const sharing = (prep(
+      "SELECT COUNT(*) AS n FROM committees WHERE name = ?",
+    ).get(row.name) as { n: number }).n;
+  const diedUnheard =
+    sharing > 1
+      ? null
+      : (prep(
+          "SELECT COUNT(*) AS n FROM bills WHERE died_without_hearing = 1" +
+            " AND committee_at_death = ? AND source != 'legiscan'",
+        ).get(row.name) as { n: number }).n;
+  return { hearingsHeld, diedUnheard, nameIsShared: sharing > 1 };
+};
