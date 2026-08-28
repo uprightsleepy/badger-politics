@@ -153,24 +153,26 @@ jobs:
           BROWSER_PATH: /usr/bin/google-chrome
         run: |
           set -euo pipefail
-          # The four are independent: links reads dist directly and the
-          # others each serve it on their own port. Running them in
-          # sequence meant waiting for the sum rather than the slowest.
-          pids=""
-          for h in links responsive a11y verify; do
-            node "scripts/$h.mjs" > "/tmp/$h.log" 2>&1 &
-            pids="$pids $!:$h"
-          done
-          failed=0
-          for entry in $pids; do
-            pid="${entry%%:*}"; name="${entry##*:}"
-            if wait "$pid"; then
-              echo "::group::$name passed"; tail -3 "/tmp/$name.log"; echo "::endgroup::"
+          # links needs no browser, so it runs alongside the three that
+          # do. Those run in sequence: three concurrent Chrome instances on
+          # a four-core runner starved each other into a 30s navigation
+          # timeout, which reads as an a11y failure and is not one.
+          node scripts/links.mjs > /tmp/links.log 2>&1 &
+          links_pid=$!
+          browser_failed=0
+          for h in responsive a11y verify; do
+            if node "scripts/$h.mjs" > "/tmp/$h.log" 2>&1; then
+              echo "::group::$h passed"; tail -3 "/tmp/$h.log"; echo "::endgroup::"
             else
-              echo "::error::$name failed"; tail -25 "/tmp/$name.log"; failed=1
+              echo "::error::$h failed"; tail -25 "/tmp/$h.log"; browser_failed=1
             fi
           done
-          exit $failed
+          if wait "$links_pid"; then
+            echo "::group::links passed"; tail -3 /tmp/links.log; echo "::endgroup::"
+          else
+            echo "::error::links failed"; grep -E "BROKEN" /tmp/links.log | head -25; browser_failed=1
+          fi
+          exit $browser_failed
 
       - name: Release
         run: |

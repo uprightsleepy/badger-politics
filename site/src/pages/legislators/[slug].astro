@@ -117,6 +117,16 @@ const committees = committeesFor(person.id);
 // single vote: taking [0] blindly reported "0%" off one roll call. Use the
 // newest session with a real sample, and say which one it is.
 const loyalty = agreement.find((a) => a.n >= 20) ?? null;
+// Only link to sections this member actually has. Money renders for
+// sitting members, key votes and attendance only where there are any, and
+// linking to a heading that was never rendered leaves a dead fragment.
+const jumpLinks: [string, string][] = [
+  ["#bills-led", "Bills they led"],
+  ...(keyVotes.length > 0 ? [["#key-votes", "Key votes"] as [string, string]] : []),
+  ...(sitting ? [["#money", "Campaign money"] as [string, string]] : []),
+  ...(heatYears.length > 0 ? [["#attendance", "Attendance"] as [string, string]] : []),
+  ["#vote-history", "Vote history"],
+];
 const KEY_VOTE_STYLES: Record<string, string> = {
   "became law": "bg-moss-50 text-moss-700",
   "close vote": "bg-gold-100 text-navy-900",
@@ -238,13 +248,7 @@ const tally = TALLY_ORDER.map((status) => ({
   {/* Jump links: these pages run long, and a reader arrives wanting one
       of these answers rather than all of them. */}
   <nav class="mt-3 flex flex-wrap gap-1.5 text-xs" aria-label="Jump to a section">
-    {[
-      ["#bills-led", "Bills they led"],
-      ["#key-votes", "Key votes"],
-      ["#money", "Campaign money"],
-      ["#attendance", "Attendance"],
-      ["#vote-history", "Vote history"],
-    ].map(([href, label]) => (
+    {jumpLinks.map(([href, label]) => (
       <a href={href} class="rounded-full border border-navy-100 bg-white px-3 py-1 font-semibold hover:bg-navy-50">
         {label}
       </a>
