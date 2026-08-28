@@ -1076,14 +1076,16 @@ export const allSubjects = () =>
 
 export const billsForSubject = (subject: string) =>
   prep(
-      `SELECT b.id, b.session_id, b.identifier, b.title, b.status
+      `SELECT b.id, b.session_id, b.identifier, b.title, b.status,
+              b.died_without_hearing, b.latest_action_date
        FROM bill_subjects s JOIN bills b ON b.id = s.bill_id
-       WHERE s.subject = ?
+       WHERE s.subject = ? AND b.source != 'legiscan'
        ORDER BY b.session_id DESC, LENGTH(b.identifier), b.identifier`,
     )
     .all(subject) as {
       id: string; session_id: string; identifier: string;
       title: string | null; status: string | null;
+      died_without_hearing: number; latest_action_date: string | null;
     }[];
 
 export const subjectsForBill = (billId: string) =>

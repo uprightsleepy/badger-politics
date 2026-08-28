@@ -21,7 +21,20 @@ const bills = subjects.flatMap((s) => billsForSubject(s));
 const seen = new Set<string>();
 const unique = bills.filter((b) => !seen.has(b.id) && seen.add(b.id));
 const title = subjectDisplay(subjects[0]);
-const sessions = [...new Set(unique.map((b) => b.session_id))];
+const sessions = [...new Set(unique.map((b) => b.session_id))].sort().reverse();
+
+// What happened to bills on this subject, counted from their statuses.
+// Same stages as the homepage funnel so the two read alike.
+const enacted = unique.filter((b) => b.status === "enacted").length;
+const vetoed = unique.filter((b) => b.status === "vetoed").length;
+const noHearing = unique.filter((b) => b.died_without_hearing === 1).length;
+const current = sessions[0];
+const thisSession = unique.filter((b) => b.session_id === current);
+const pct = (n: number) => (unique.length ? Math.round((n / unique.length) * 100) : 0);
+// most recent activity first, so a reader lands on what is live
+const recent = [...unique]
+  .sort((a, b) => (b.latest_action_date ?? "").localeCompare(a.latest_action_date ?? ""))
+  .slice(0, 12);
 ---
 
 <Base
@@ -30,10 +43,52 @@ const sessions = [...new Set(unique.map((b) => b.session_id))];
 >
   <p class="text-sm text-navy-600"><a href="/subjects/" class="underline">Subjects</a></p>
   <h1 class="mt-1 text-2xl font-bold">{title}</h1>
-  <p class="mt-1 text-sm text-navy-600">
-    {unique.length} bill{unique.length > 1 ? "s" : ""} across {sessions.length} session{sessions.length > 1 ? "s" : ""},
-    from the Legislature's subject index.
+  <p class="mt-1 max-w-3xl text-sm text-navy-600">
+    {unique.length.toLocaleString()} proposal{unique.length === 1 ? "" : "s"} across
+    {" "}{sessions.length} session{sessions.length === 1 ? "" : "s"}, indexed under this
+    term by the Legislature itself. These are its own subject headings, not
+    our categories.
   </p>
+
+  <div class="mt-4 grid gap-2 sm:grid-cols-3">
+    <div class="rounded-lg border border-navy-100 bg-white px-4 py-3">
+      <p class="text-2xl font-bold tabular-nums text-moss-600">{enacted.toLocaleString()}</p>
+      <p class="text-sm text-navy-600">became law ({pct(enacted)}% of them)</p>
+    </div>
+    <div class="rounded-lg border border-navy-100 bg-white px-4 py-3">
+      <p class="text-2xl font-bold tabular-nums">{thisSession.length.toLocaleString()}</p>
+      <p class="text-sm text-navy-600">in the current session</p>
+    </div>
+    <div class="rounded-lg border border-badger-600/30 bg-badger-50 px-4 py-3">
+      <p class="text-2xl font-bold tabular-nums text-badger-700">{noHearing.toLocaleString()}</p>
+      <p class="text-sm text-navy-700">died without a hearing ({pct(noHearing)}%)</p>
+    </div>
+  </div>
+
+  {recent.length > 0 && (
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">Latest activity on this subject</h2>
+      <ul class="mt-2 grid gap-2 sm:grid-cols-2">
+        {recent.map((b) => (
+          <li>
+            <a
+              href={`/bills/${b.session_id}/${billSlug(b.identifier)}/`}
+              class="flex h-full flex-col gap-1.5 rounded-lg border border-navy-100 bg-white p-3 hover:border-navy-600"
+            >
+              <span class="flex items-center gap-2">
+                <span class="font-bold underline">{b.identifier}</span>
+                <StatusBadge status={b.status} short />
+                <span class="ml-auto text-xs text-navy-600">{fmtDate(b.latest_action_date)}</span>
+              </span>
+              <span class="line-clamp-2 text-sm leading-snug text-navy-700">{shortTitle(b.title)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  <h2 class="mt-6 text-xl font-bold">Every proposal on this subject</h2>
   <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white">
     {unique.map((b) => (
       <li class="text-sm">
@@ -46,4 +101,10 @@ const sessions = [...new Set(unique.map((b) => b.session_id))];
       </li>
     ))}
   </ul>
+  <p class="mt-3 text-xs text-navy-600">
+    Counted from each bill's official history.
+    {vetoed > 0 && ` ${vetoed} of these were vetoed by the governor.`}
+    {" "}Subject headings come from the Legislature's own index, so a bill
+    appears here only if the Legislature filed it under this term.
+  </p>
 </Base>
