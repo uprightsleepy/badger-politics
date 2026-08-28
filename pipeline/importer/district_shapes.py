@@ -98,7 +98,11 @@ def main(argv: list[str]) -> int:
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(shapes, separators=(",", ":")) + "\n", encoding="utf-8")
     kb = dest.stat().st_size / 1024
-    print(f"district shapes: {len(shapes) - 2} districts, {kb:.0f} KB (source {src.stat().st_size / 1024:.0f} KB)")
+    src_kb = src.stat().st_size / 1024
+    print(
+        f"district shapes: {len(shapes) - 2} districts, "
+        f"{kb:.0f} KB (source {src_kb:.0f} KB)"
+    )
     return 0
 
 
