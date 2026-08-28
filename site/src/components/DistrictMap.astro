@@ -1,0 +1,34 @@
+---
+/** A district's shape, in place within Wisconsin.
+ *
+ * Paths are precomputed and committed (see importer/district_shapes.py);
+ * the source GeoJSON is 291 KB at survey precision, which is far more than
+ * a thumbnail needs. Every district shares one projection, so position and
+ * size read true against the rest of the state.
+ *
+ * Decorative by design: the page states the district number, its member
+ * and its communities in text, so nothing here is the only route to a
+ * fact. That keeps it useful without becoming a barrier.
+ */
+import SHAPES from "../data/district-shapes.json";
+interface Props { seat: string; label: string }
+const { seat, label } = Astro.props;
+const shapes = SHAPES as Record<string, string>;
+const path = shapes[seat];
+---
+{path && (
+  <figure class="rounded-lg border border-navy-100 bg-white p-3">
+    <svg
+      viewBox={shapes._viewBox}
+      class="mx-auto h-auto w-full max-w-[220px]"
+      role="img"
+      aria-label={`Map of ${label} within Wisconsin`}
+    >
+      <path d={shapes._state} fill="var(--color-navy-50)" stroke="var(--color-navy-100)" stroke-width="0.5" />
+      <path d={path} fill="var(--color-navy-600)" stroke="var(--color-navy-800)" stroke-width="0.8" />
+    </svg>
+    <figcaption class="mt-2 text-center text-xs text-navy-600">
+      {label} within Wisconsin. Boundaries are the Legislature's 2024 maps.
+    </figcaption>
+  </figure>
+)}

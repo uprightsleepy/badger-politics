@@ -1,5 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
+import DistrictMap from "../../components/DistrictMap.astro";
 import {
   seatTerms, sittingPeople, electionFor, electionHistoryFor, lastMarginFor,
 } from "../../lib/db";
@@ -18,6 +19,8 @@ export function getStaticPaths() {
   }));
 }
 const { chamber, district } = Astro.props;
+// the shape map is keyed the way the URL is: assembly-14 / senate-5
+const seatKey = `${chamber === "upper" ? "senate" : "assembly"}-${district}`;
 const seatName = `${chamberName(chamber)} District ${district}`;
 
 const holder = sittingPeople().find((p) => p.chamber === chamber && p.district === district);
@@ -57,6 +60,10 @@ const lineage = [...byPerson.entries()]
 >
   <p class="text-sm text-navy-600"><a href="/districts/" class="underline">← All districts</a></p>
   <h1 class="mt-2 text-2xl font-bold">{seatName}</h1>
+
+  <div class="mt-3 max-w-[240px]">
+    <DistrictMap seat={seatKey} label={seatName} />
+  </div>
 
   {holder ? (
     <div class="mt-3 rounded-lg border border-navy-100 bg-white p-4">
