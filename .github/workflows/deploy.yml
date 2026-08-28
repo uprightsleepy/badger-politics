@@ -153,10 +153,24 @@ jobs:
           BROWSER_PATH: /usr/bin/google-chrome
         run: |
           set -euo pipefail
-          node scripts/links.mjs
-          node scripts/responsive.mjs
-          node scripts/a11y.mjs
-          node scripts/verify.mjs
+          # The four are independent: links reads dist directly and the
+          # others each serve it on their own port. Running them in
+          # sequence meant waiting for the sum rather than the slowest.
+          pids=""
+          for h in links responsive a11y verify; do
+            node "scripts/$h.mjs" > "/tmp/$h.log" 2>&1 &
+            pids="$pids $!:$h"
+          done
+          failed=0
+          for entry in $pids; do
+            pid="${entry%%:*}"; name="${entry##*:}"
+            if wait "$pid"; then
+              echo "::group::$name passed"; tail -3 "/tmp/$name.log"; echo "::endgroup::"
+            else
+              echo "::error::$name failed"; tail -25 "/tmp/$name.log"; failed=1
+            fi
+          done
+          exit $failed
 
       - name: Release
         run: |
