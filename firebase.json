@@ -1,28 +1,62 @@
 {
   "hosting": {
     "public": "site/dist",
-    "ignore": ["**/.*", "**/node_modules/**"],
+    "ignore": [
+      "**/.*",
+      "**/node_modules/**"
+    ],
     "trailingSlash": true,
     "headers": [
       {
         "comment": "Default for every request path, including clean URLs like /lobbying/ that no extension glob can match. Revalidation is a 304 when nothing changed, so a nightly rebuild is picked up the next visit instead of up to an hour later.",
         "source": "**",
         "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=0, must-revalidate"
+          }
         ]
       },
       {
         "comment": "Content-hashed build assets can never change under a given name.",
         "source": "/_astro/**",
         "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
         ]
       },
       {
         "comment": "Pagefind ships hashed index shards alongside its entry script.",
         "source": "/pagefind/**",
         "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=3600" }
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=3600"
+          }
+        ]
+      },
+      {
+        "comment": "Security headers. HSTS is already supplied by Firebase. The CSP is the one to watch: /my-reps loads the Census geocoder via JSONP, and GoatCounter's counter comes from gc.zgo.at, so both are allow-listed by host rather than the policy being loosened.",
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          },
+          {
+            "key": "Permissions-Policy",
+            "value": "geolocation=(self), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()"
+          },
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://gc.zgo.at https://geocoding.geo.census.gov; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://badgerpolitics.goatcounter.com; manifest-src 'self'"
+          }
         ]
       }
     ]
