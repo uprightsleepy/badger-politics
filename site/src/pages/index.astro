@@ -308,11 +308,15 @@ const pct = (n) => Math.max(1.5, (n / funnel.introduced) * 100);
           .filter(([, , slim]) => slim)
           .map(([seat, districtHref, slim, full]) => {
             const party = slim.party ?? null;
+            const uid = `pc-${String(slim.slug).replace(/[^a-z0-9]/gi, "")}`;
             const photo = slim.image
               ? `<img src="${esc(slim.image)}" alt="" width="56" height="56" loading="lazy" decoding="async" class="h-14 w-14 shrink-0 rounded-full border border-navy-100 bg-navy-50 object-cover object-[50%_25%]">`
-              : `<span class="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-navy-100 bg-navy-50 text-lg font-bold text-navy-600" aria-hidden="true">${esc(
-                  slim.name.split(/\s+/).filter((w: string) => /^[A-Za-z]/.test(w)).slice(0, 2).map((w: string) => w[0].toUpperCase()).join(""),
-                )}</span>`;
+              : `<svg viewBox="0 0 48 48" width="56" height="56" class="h-14 w-14 shrink-0 rounded-full border border-navy-100" role="img" aria-label="No official portrait on file for ${esc(slim.name)}">` +
+                `<circle cx="24" cy="24" r="24" fill="var(--color-navy-50)"></circle>` +
+                `<clipPath id="${uid}"><circle cx="24" cy="24" r="24"></circle></clipPath>` +
+                `<g clip-path="url(#${uid})" fill="var(--color-navy-300)">` +
+                `<circle cx="24" cy="19" r="7.5"></circle>` +
+                `<rect x="10" y="30.5" width="28" height="24" rx="12"></rect></g></svg>`;
             const stat = (value: number, label: string) =>
               `<div><p class="text-lg font-bold tabular-nums">${value.toLocaleString()}</p>` +
               `<p class="text-xs leading-tight text-navy-600">${esc(label)}</p></div>`;

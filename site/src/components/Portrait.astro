@@ -1,7 +1,14 @@
 ---
-/** A member's official portrait, or their initials when the state has no
- * photo on file. Sized explicitly so the surrounding layout never shifts
- * while the image loads. */
+/** A member's official portrait.
+ *
+ * Source framing varies a lot, so the crop is biased upward rather than
+ * centred: headshots put the head high, and centring cut faces off in a
+ * grid. Where the state has no photo on file, a neutral silhouette stands
+ * in. It is drawn inline rather than loaded, so it costs no request and
+ * takes the site's own palette instead of a generic grey.
+ *
+ * Sized explicitly so the layout never shifts while an image loads.
+ */
 interface Props {
   src?: string | null;
   name: string;
@@ -9,13 +16,9 @@ interface Props {
   className?: string;
 }
 const { src, name, size = 48, className = "" } = Astro.props;
-const initials = name
-  .split(/\s+/)
-  .filter((w) => /^[A-Za-z]/.test(w))
-  .slice(0, 2)
-  .map((w) => w[0].toUpperCase())
-  .join("");
 const dim = `${size}px`;
+// clipPath ids must be unique in a document, so derive one per member
+const uid = `pc-${name.replace(/[^a-z0-9]/gi, "").toLowerCase()}-${size}`;
 ---
 {src ? (
   <img
@@ -29,9 +32,21 @@ const dim = `${size}px`;
     style={`width:${dim};height:${dim}`}
   />
 ) : (
-  <span
-    class={`inline-flex shrink-0 items-center justify-center rounded-full border border-navy-100 bg-navy-50 font-bold text-navy-600 ${className}`}
-    style={`width:${dim};height:${dim};font-size:${Math.round(size * 0.36)}px`}
-    aria-hidden="true"
-  >{initials}</span>
+  <svg
+    viewBox="0 0 48 48"
+    width={size}
+    height={size}
+    class={`shrink-0 rounded-full border border-navy-100 ${className}`}
+    style={`width:${dim};height:${dim}`}
+    role="img"
+    aria-label={`No official portrait on file for ${name}`}
+  >
+    <circle cx="24" cy="24" r="24" fill="var(--color-navy-50)" />
+    {/* head and shoulders, clipped so the shoulders meet the circle's edge */}
+    <clipPath id={uid}><circle cx="24" cy="24" r="24" /></clipPath>
+    <g clip-path={`url(#${uid})`} fill="var(--color-navy-300)">
+      <circle cx="24" cy="19" r="7.5" />
+      <rect x="10" y="30.5" width="28" height="24" rx="12" />
+    </g>
+  </svg>
 )}
