@@ -135,6 +135,33 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
     )}
 
     <div class="mt-6 rounded-lg border border-navy-100 bg-white p-4">
+      <h2 class="sr-only">At a glance</h2>
+      <dl class="mb-4 grid gap-x-6 gap-y-3 border-b border-navy-100 pb-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Status</dt>
+          <dd class="mt-0.5 font-bold">{STATUS_LABELS[bill.status ?? ""] ?? "Introduced"}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Public hearing</dt>
+          <dd class={`mt-0.5 font-bold ${bill.died_without_hearing === 1 ? "text-badger-700" : ""}`}>
+            {bill.died_without_hearing === 1 ? "Never held" : "See history"}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Introduced by</dt>
+          <dd class="mt-0.5 font-bold">
+            {primary.length > 0
+              ? `${primary[0].name}${primary.length > 1 ? ` +${primary.length - 1}` : ""}`
+              : "Not recorded"}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Last action</dt>
+          <dd class="mt-0.5 font-bold">
+            {bill.latest_action_date ? fmtDate(bill.latest_action_date) : "None recorded"}
+          </dd>
+        </div>
+      </dl>
       <Stepper status={bill.status} chamber={bill.chamber} classification={bill.classification} />
       <p class="mt-2 text-right text-xs text-navy-600">
         Unfamiliar terms? <a href="/glossary/" class="inline-block py-1 underline">Glossary</a>
@@ -146,7 +173,7 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
         <p>
           <strong>This {isBill ? "bill" : "proposal"} is dead.</strong> The
           Legislature's session schedule, set by Senate Joint Resolution 1 at
-          the session's start, fixes a last day for floor action — and any
+          the session's start, fixes a last day for floor action, and any
           proposal still pending on that day fails automatically. That is how
           most {isBill ? "bills" : "proposals"} end. Taking the idea up again
           would require a new {isBill ? "bill" : "proposal"} in a future
@@ -160,7 +187,7 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
           <strong>This {isBill ? "bill" : "proposal"} passed the
           {" "}{passedChamberName} but is dead.</strong> The
           {" "}{otherChamberName} never took it up before the session's floor
-          deadline, so it failed with the session's end — passing one house is
+          deadline, so it failed with the session's end, passing one house is
           not enough. <a href="/glossary/" class="underline">Glossary</a>
         </p>
       </aside>
@@ -184,7 +211,7 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
       <aside class="mt-4 rounded-lg border border-navy-100 bg-navy-50 p-4 text-sm">
         <p>
           <strong>Signed with a partial veto:</strong> the governor struck
-          parts of this bill and signed the rest into law — a power unique to
+          parts of this bill and signed the rest into law, a power unique to
           Wisconsin's governor on appropriation bills.
           {vetoMsg && (
             <>
@@ -308,7 +335,7 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
         {votes.some((v) => /suspend/i.test(v.motion ?? "")) && (
           <p class="mt-1 max-w-3xl text-sm text-navy-600">
             Suspending the rules (to take a vote immediately) needs a
-            two-thirds majority — a higher bar than passing the bill, which
+            two-thirds majority, a higher bar than passing the bill, which
             needs a simple majority. That's why a suspension motion can show
             more Ayes than the passage vote that follows it.
             {" "}<a href="/glossary/" class="underline">Glossary</a>

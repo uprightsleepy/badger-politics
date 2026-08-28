@@ -1,9 +1,18 @@
 ---
 import Base from "../../layouts/Base.astro";
 import PartyChip from "../../components/PartyChip.astro";
-import { sittingPeople } from "../../lib/db";
+import Portrait from "../../components/Portrait.astro";
+import { sittingPeople, electionFor } from "../../lib/db";
 import { personSlug } from "../../lib/format";
 const members = sittingPeople();
+// filtering happens in the browser over rows that are all present, so a
+// filtered view never hides anyone from search engines or from no-JS
+const onBallot = new Map(
+  members.map((m) => {
+    const e = electionFor(m.id);
+    return [m.id, e?.cycle_year === 2026 && e.on_ballot === 1];
+  }),
+);
 const senate = members.filter((m) => m.chamber === "upper");
 const assembly = members.filter((m) => m.chamber === "lower");
 
@@ -28,6 +37,36 @@ function breakdown(rows: typeof members, seatCount: number) {
   <p class="mt-1 text-sm text-navy-600">
     Don't know your district? <a href="/my-reps/" class="underline">Find your legislators</a>.
   </p>
+
+  <div class="sticky top-0 z-20 -mx-4 mt-4 border-b border-navy-100 bg-paper/95 px-4 py-3 backdrop-blur" data-pagefind-ignore>
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <label class="sr-only" for="member-filter">Filter legislators by name or district</label>
+      <input
+        type="search"
+        id="member-filter"
+        placeholder="Name or district number"
+        class="min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm sm:max-w-xs sm:flex-none"
+      />
+      <div class="flex flex-wrap gap-1.5" role="group" aria-label="Filter legislators">
+        {[
+          ["all", "Everyone"],
+          ["party:Republican", "Republicans"],
+          ["party:Democratic", "Democrats"],
+          ["ballot", "On the 2026 ballot"],
+        ].map(([key, label]) => (
+          <button
+            type="button"
+            data-member-facet={key}
+            aria-pressed={key === "all" ? "true" : "false"}
+            class={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${
+              key === "all" ? "border-navy-800 bg-navy-800 text-white" : "border-navy-100 bg-white"
+            }`}
+          >{label}</button>
+        ))}
+      </div>
+      <p id="member-count" role="status" class="text-sm text-navy-600"></p>
+    </div>
+  </div>
   {[
     { label: "Senate", rows: senate, seats: 33 },
     { label: "Assembly", rows: assembly, seats: 99 },
@@ -55,16 +94,91 @@ function breakdown(rows: typeof members, seatCount: number) {
           <span class="ml-auto text-navy-600">{b.majority}</span>
         </p>
       </div>
-      <ul class="mt-2 grid gap-1 rounded-lg border border-navy-100 bg-white p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+      <ul class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {chamber.rows.map((m) => (
-          <li class="flex items-center gap-2">
-            <PartyChip party={m.party} />
-            <a href={`/legislators/${personSlug(m.id)}/`} class="truncate py-1 underline">{m.name}</a>
-            <span class="ml-auto text-xs text-navy-600">D{m.district}</span>
+          <li
+            data-member
+            data-party={m.party ?? ""}
+            data-ballot={onBallot.get(m.id) ? "1" : "0"}
+            data-text={`${m.name} ${m.district ?? ""}`.toLowerCase()}
+          >
+            <a
+              href={`/legislators/${personSlug(m.id)}/`}
+              class="flex h-full items-center gap-3 rounded-lg border border-navy-100 bg-white p-3 hover:border-navy-600"
+            >
+              <Portrait src={m.image_url} name={m.name} size={48} />
+              <span class="min-w-0 flex-1">
+                <span class="block truncate font-semibold">{m.name}</span>
+                <span class="mt-0.5 flex items-center gap-1.5 text-xs text-navy-600">
+                  <PartyChip party={m.party} size="sm" />
+                  District {m.district}
+                  {onBallot.get(m.id) && (
+                    <span class="rounded-full bg-gold-100 px-1.5 py-0.5 font-semibold text-navy-800">
+                      On the ballot
+                    </span>
+                  )}
+                </span>
+              </span>
+            </a>
           </li>
         ))}
       </ul>
+      <p class="mt-2 hidden text-sm text-navy-600" data-empty>No legislators match that filter.</p>
     </section>
     );
   })}
+
+<script>
+  // Filters rows already on the page. Nothing is fetched and nothing is
+  // hidden from a crawler: every member stays in the HTML.
+  const rows = [...document.querySelectorAll<HTMLElement>("[data-member]")];
+  const chips = [...document.querySelectorAll<HTMLButtonElement>("[data-member-facet]")];
+  const input = document.getElementById("member-filter") as HTMLInputElement;
+  const count = document.getElementById("member-count")!;
+  let facet = "all";
+
+  const apply = () => {
+    const q = input.value.trim().toLowerCase();
+    let shown = 0;
+    for (const row of rows) {
+      const matchesText = !q || (row.dataset.text ?? "").includes(q);
+      const matchesFacet =
+        facet === "all" ||
+        (facet === "ballot" && row.dataset.ballot === "1") ||
+        (facet.startsWith("party:") && row.dataset.party === facet.slice(6));
+      const show = matchesText && matchesFacet;
+      row.classList.toggle("hidden", !show);
+      if (show) shown++;
+    }
+    count.textContent = shown === rows.length ? `All ${rows.length} legislators` : `${shown} of ${rows.length}`;
+    for (const el of document.querySelectorAll("[data-empty]")) {
+      el.classList.toggle("hidden", shown > 0);
+    }
+    // hide a chamber heading whose members are all filtered out
+    for (const section of document.querySelectorAll("section")) {
+      const own = [...section.querySelectorAll<HTMLElement>("[data-member]")];
+      if (own.length) {
+        section.classList.toggle("hidden", own.every((r) => r.classList.contains("hidden")));
+      }
+    }
+  };
+
+  for (const chip of chips) {
+    chip.addEventListener("click", () => {
+      facet = chip.dataset.memberFacet ?? "all";
+      for (const c of chips) {
+        const on = c === chip;
+        c.setAttribute("aria-pressed", String(on));
+        c.classList.toggle("border-navy-800", on);
+        c.classList.toggle("bg-navy-800", on);
+        c.classList.toggle("text-white", on);
+        c.classList.toggle("border-navy-100", !on);
+        c.classList.toggle("bg-white", !on);
+      }
+      apply();
+    });
+  }
+  input.addEventListener("input", apply);
+  apply();
+</script>
 </Base>

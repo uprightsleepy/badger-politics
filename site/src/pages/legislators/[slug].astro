@@ -162,7 +162,7 @@ const tally = TALLY_ORDER.map((status) => ({
 <Base
   title={`${person.name}${person.district != null ? `, ${roleAbbr(person.chamber)} ${person.district}` : ""}`}
   breadcrumbs={[{ name: "Legislators", url: "/legislators/" }]}
-  description={`${person.current_role ?? "Former legislator"}, ${chamberName(person.chamber)} District ${person.district}. Votes, sponsored bills, committees, attendance and campaign money — from official records.`}
+  description={`${person.current_role ?? "Former legislator"}, ${chamberName(person.chamber)} District ${person.district}. Votes, sponsored bills, committees, attendance and campaign money, from official records.`}
 >
   <JsonLd
     data={{
@@ -366,7 +366,7 @@ const tally = TALLY_ORDER.map((status) => ({
       <section>
         <h2 class="text-xl font-bold">Bills they led · {primarySponsored.length}</h2>
         <p class="mt-1 max-w-3xl text-sm text-navy-600">
-          Bills where {person.name} is the lead author — the first name on the
+          Bills where {person.name} is the lead author, the first name on the
           bill. Sponsoring a bill means putting it forward: the text itself is
           drafted by the nonpartisan Legislative Reference Bureau. Bills they
           signed onto behind another member are listed below, and bills they
@@ -419,7 +419,7 @@ const tally = TALLY_ORDER.map((status) => ({
               {t.bills.length > PREVIEW && (
                 <p class="border-t border-navy-100 px-3 py-2 text-xs">
                   <a href={`${recordBase}/bills/1/`} class="underline">
-                    Showing {PREVIEW} of {t.bills.length.toLocaleString()} — see the full record
+                    Showing {PREVIEW} of {t.bills.length.toLocaleString()}, see the full record
                   </a>
                 </p>
               )}
@@ -460,7 +460,7 @@ const tally = TALLY_ORDER.map((status) => ({
               {bills.length > PREVIEW && (
                 <p class="border-t border-navy-100 px-3 py-2 text-xs">
                   <a href={`${recordBase}/bills/1/`} class="underline">
-                    Showing {PREVIEW} of {bills.length.toLocaleString()} — see the full record
+                    Showing {PREVIEW} of {bills.length.toLocaleString()}, see the full record
                   </a>
                 </p>
               )}
@@ -669,7 +669,7 @@ const tally = TALLY_ORDER.map((status) => ({
         <section class="mt-6">
           <h2 class="text-xl font-bold">Floor attendance</h2>
           <p class="mt-1 text-sm text-navy-600">
-            Only days the chamber held recorded floor votes are shown — on
+            Only days the chamber held recorded floor votes are shown, on
             every tile below, they either voted or missed:
             {votesTotal.toLocaleString()} votes across {servedHeatDays.length} voting days,
             {missedTotal > 0 ? `${missedTotal} missed` : "none missed"}.
@@ -705,7 +705,7 @@ const tally = TALLY_ORDER.map((status) => ({
                   {" · "}Not in office
                   {b.label && (
                     <>
-                      {" — "}
+                      {", "}
                       {b.url ? <a href={b.url} class="underline">{b.label}</a> : b.label}
                     </>
                   )}
@@ -731,7 +731,7 @@ const tally = TALLY_ORDER.map((status) => ({
         {voteTotal > votes.length && (
           <p class="mt-2 text-sm">
             <a href={`${recordBase}/votes/1/`} class="inline-block py-1 underline">
-              Showing the most recent {votes.length} — see all
+              Showing the most recent {votes.length}, see all
               {" "}{voteTotal.toLocaleString()} votes →
             </a>
           </p>

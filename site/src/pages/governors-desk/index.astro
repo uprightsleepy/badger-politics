@@ -21,7 +21,7 @@ const billRow = (b: {
 
 <Base
   title="Governor's desk"
-  description="Wisconsin bills awaiting the governor's signature, signed into law, vetoed, and veto-override votes — straight from official bill histories."
+  description="Wisconsin bills awaiting the governor's signature, signed into law, vetoed, and veto-override votes, straight from official bill histories."
 >
   <h1 class="text-2xl font-bold">The governor's desk</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
@@ -54,7 +54,7 @@ const billRow = (b: {
                 {" "}({pct(gov.lastElection.runnerUp.votes, gov.lastElection.total)}%)
               </span>
             )}
-            — certified WEC canvass.
+, certified WEC canvass.
           </p>
         )}
         <p>
@@ -115,7 +115,7 @@ const billRow = (b: {
               {o.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(o.date)}</span>}
             </div>
             <div class="flex flex-wrap items-baseline gap-x-3 text-xs text-navy-700">
-              <span class="py-1">{o.motion} — Ayes {o.yes_count}, Noes {o.no_count} ({o.result === "pass" ? "override succeeded" : "override failed"})</span>
+              <span class="py-1">{o.motion}, Ayes {o.yes_count}, Noes {o.no_count} ({o.result === "pass" ? "override succeeded" : "override failed"})</span>
               <a href={`/votes/${o.id}/`} class="py-1 underline">roll call</a>
               {o.source_url && (
                 <a href={o.source_url} class="py-1 underline">official record<span class="sr-only"> (opens in a new tab)</span></a>
