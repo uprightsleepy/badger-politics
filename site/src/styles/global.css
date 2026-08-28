@@ -73,15 +73,23 @@ html {
    the shadows stay fixed, so each shadow hides itself at that end. Pure
    CSS — it applies to every scroll region, not just ones with a wrapper. */
 .scroll-body {
+  /* The fade that hides each end shadow has to match whatever the panel
+     sits on. Hard-coding white painted a pale band across every panel that
+     is transparent over the page. A panel with its own bg-white keeps the
+     default; one that shows the page through it needs `scroll-on-paper`. */
+  --scroll-cover: #fff;
   overflow-y: auto;
   background:
-    linear-gradient(#fff 30%, rgba(255, 255, 255, 0)) center top,
-    linear-gradient(rgba(255, 255, 255, 0), #fff 70%) center bottom,
+    linear-gradient(var(--scroll-cover) 30%, rgba(255, 255, 255, 0)) center top,
+    linear-gradient(rgba(255, 255, 255, 0), var(--scroll-cover) 70%) center bottom,
     radial-gradient(farthest-side at 50% 0, rgba(22, 35, 58, 0.16), rgba(22, 35, 58, 0)) center top,
     radial-gradient(farthest-side at 50% 100%, rgba(22, 35, 58, 0.16), rgba(22, 35, 58, 0)) center bottom;
   background-repeat: no-repeat;
   background-size: 100% 2.5rem, 100% 2.5rem, 100% 0.55rem, 100% 0.55rem;
   background-attachment: local, local, scroll, scroll;
+}
+.scroll-on-paper {
+  --scroll-cover: var(--color-paper);
 }
 .scroll-hint {
   font-size: 0.75rem;

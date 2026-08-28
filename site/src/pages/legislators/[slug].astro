@@ -400,7 +400,7 @@ const tally = TALLY_ORDER.map((status) => ({
                 <span class="text-sm text-navy-600">{t.bills.length} bills</span>
               </summary>
               <div
-                class="max-h-72 overflow-y-auto border-t border-navy-100 scroll-body"
+                class="max-h-72 overflow-y-auto border-t border-navy-100 scroll-body scroll-on-paper"
                 role="region"
                 tabindex="0"
                 aria-label={`${STATUS_LABELS[t.status]} bills`}
@@ -441,7 +441,7 @@ const tally = TALLY_ORDER.map((status) => ({
               Show all {bills.length.toLocaleString()} {label.toLowerCase()} bills
             </summary>
             <div
-              class="max-h-96 overflow-y-auto border-t border-navy-100 scroll-body"
+              class="max-h-96 overflow-y-auto border-t border-navy-100 scroll-body scroll-on-paper"
               role="region"
               tabindex="0"
               aria-label={`${label} bills`}
@@ -609,14 +609,20 @@ const tally = TALLY_ORDER.map((status) => ({
                   <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{v.date ? fmtDate(v.date) : ""}</span>
                   <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="w-20 shrink-0 font-bold underline">{v.identifier}</a>
                   <span class="min-w-0 flex-1 basis-56 truncate">{v.motion ?? shortTitle(v.title)}</span>
-                  {v.kinds.map((k) => (
-                    <span class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${KEY_VOTE_STYLES[k] ?? "bg-navy-50"}`}>{k}</span>
-                  ))}
-                  <span class="shrink-0 text-xs text-navy-700">
+                  {/* A vote can carry two badges ("became law" and "close
+                      vote"). Left to size themselves they push the tally and
+                      link onto a second line, so every column past the motion
+                      is fixed-width and the badges wrap inside their own. */}
+                  <span class="flex w-28 shrink-0 flex-wrap justify-end gap-1">
+                    {v.kinds.map((k) => (
+                      <span class={`rounded-full px-2 py-0.5 text-xs font-semibold ${KEY_VOTE_STYLES[k] ?? "bg-navy-50"}`}>{k}</span>
+                    ))}
+                  </span>
+                  <span class="w-32 shrink-0 text-right text-xs text-navy-700">
                     Voted <strong>{v.option === "yes" ? "Aye" : v.option === "no" ? "Nay" : "did not vote"}</strong>
                     {" "}({v.yes_count}–{v.no_count})
                   </span>
-                  <a href={`/votes/${v.vote_event_id}/`} class="shrink-0 py-1 text-xs underline">roll call</a>
+                  <a href={`/votes/${v.vote_event_id}/`} class="w-16 shrink-0 py-1 text-right text-xs underline">roll call</a>
                 </li>
               ))}
             </ul>

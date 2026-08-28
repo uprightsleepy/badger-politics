@@ -105,7 +105,7 @@ const billRow = (b: {
         No override votes this session.
       </p>
     ) : (
-      <div class="mt-3 max-h-96 overflow-y-auto scroll-body" role="region" tabindex="0" aria-label="Veto-override votes">
+      <div class="mt-3 max-h-96 overflow-y-auto scroll-body scroll-on-paper" role="region" tabindex="0" aria-label="Veto-override votes">
       <ul class="space-y-1">
         {desk.overrides.map((o) => (
           <li class="rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
@@ -130,7 +130,7 @@ const billRow = (b: {
 
   <section class="mt-6">
     <h2 class="text-xl font-bold">Vetoed · {desk.vetoed.length}</h2>
-    <div class="mt-3 max-h-96 overflow-y-auto scroll-body" role="region" tabindex="0" aria-label="Vetoed bills">
+    <div class="mt-3 max-h-96 overflow-y-auto scroll-body scroll-on-paper" role="region" tabindex="0" aria-label="Vetoed bills">
     <ul class="space-y-1">
       {desk.vetoed.map(billRow).map((r) => (
         <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
@@ -145,7 +145,7 @@ const billRow = (b: {
 
   <section class="mt-6">
     <h2 class="text-xl font-bold">Signed into law · {desk.enacted.length}</h2>
-    <div class="mt-3 max-h-96 overflow-y-auto scroll-body" role="region" tabindex="0" aria-label="Bills signed into law">
+    <div class="mt-3 max-h-96 overflow-y-auto scroll-body scroll-on-paper" role="region" tabindex="0" aria-label="Bills signed into law">
     <ul class="space-y-1">
       {desk.enacted.map(billRow).map((r) => (
         <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">

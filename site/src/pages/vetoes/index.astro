@@ -54,7 +54,7 @@ const bienniums = vetoTracker();
           <summary class="cursor-pointer px-3 py-2 text-sm font-semibold">
             Vetoed bills · {b.fullVetoes.length}
           </summary>
-          <div class="max-h-96 overflow-y-auto border-t border-navy-100 scroll-body" role="region" tabindex="0" aria-label={`Bills vetoed in ${b.biennium}–${b.biennium + 1}`}>
+          <div class="max-h-96 overflow-y-auto border-t border-navy-100 scroll-body scroll-on-paper" role="region" tabindex="0" aria-label={`Bills vetoed in ${b.biennium}–${b.biennium + 1}`}>
             <ul class="space-y-1 p-3 text-sm">
               {b.fullVetoes.map((v) => {
                 const msg = vetoMessageUrl(v.bill_id);
