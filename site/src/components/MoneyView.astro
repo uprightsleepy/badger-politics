@@ -20,7 +20,49 @@ const donorHref = (entityId: number) =>
 const scope = cycle
   ? `receipts to today's members during the ${cycle} cycle, while in office`
   : "receipts since each member took office";
+
+// Where the money came from, as shares of one bar. "Other" is whatever the
+// filings classify as neither an individual nor a registered committee
+// (businesses, the candidate themselves, and so on) and is derived rather
+// than queried, so the three always sum to the total shown above.
+const otherTotal = Math.max(0, m.total - m.individualTotal - m.committeeTotal);
+const share = (n: number) => (m.total ? (n / m.total) * 100 : 0);
+const composition = [
+  { label: "Individuals", amount: m.individualTotal, tone: "bg-navy-600" },
+  { label: "Committees and PACs", amount: m.committeeTotal, tone: "bg-moss-600" },
+  { label: "Other sources", amount: otherTotal, tone: "bg-gold-500" },
+].filter((c) => c.amount > 0);
 ---
+
+{m.total > 0 && (
+  <section class="mt-4 rounded-lg border border-navy-100 bg-white p-4">
+    <h3 class="font-bold">Where the money came from</h3>
+    <div
+      class="mt-2 flex h-4 w-full overflow-hidden rounded-full"
+      role="img"
+      aria-label={composition
+        .map((c) => `${c.label} ${Math.round(share(c.amount))}%`)
+        .join(", ")}
+    >
+      {composition.map((c) => (
+        <div class={c.tone} style={`width:${share(c.amount)}%`}></div>
+      ))}
+    </div>
+    <ul class="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
+      {composition.map((c) => (
+        <li class="flex items-baseline gap-2">
+          <span class={`mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full ${c.tone}`} aria-hidden="true"></span>
+          <span class="min-w-0 flex-1">
+            <span class="font-semibold">{c.label}</span>
+            <span class="block text-navy-600">
+              {fmtMoney(c.amount)} · {Math.round(share(c.amount))}%
+            </span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  </section>
+)}
 
 <div class="mt-4 grid gap-3 sm:grid-cols-3">
   <div class="rounded-lg border border-navy-100 bg-white p-4">
