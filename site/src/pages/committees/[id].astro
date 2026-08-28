@@ -45,28 +45,17 @@ const roleLabel = (role: string) =>
             public hearings held, across every session on record
           </p>
         </div>
-        {record.diedUnheard === null ? (
-          <div class="rounded-lg border border-navy-100 bg-paper px-4 py-3">
-            <p class="text-sm font-semibold">Bills that died here: not attributable</p>
-            <p class="mt-0.5 text-sm text-navy-600">
-              More than one committee is named &ldquo;{committee.name}&rdquo;, and the
-              official record stores only the name. Counting them here would
-              include another chamber's bills, so we do not.
-            </p>
-          </div>
-        ) : (
-          <a
-            href={graveyard.length > 0 ? `/hearing-none/${graveyard[0].session_id}/` : "/hearing-none/"}
-            class="rounded-lg border border-badger-600/30 bg-badger-50 px-4 py-3 hover:border-badger-600"
-          >
-            <p class="text-2xl font-bold tabular-nums text-badger-700">
-              {record.diedUnheard.toLocaleString()}
-            </p>
-            <p class="text-sm text-navy-700">
-              bills died here without ever getting one &rarr;
-            </p>
-          </a>
-        )}
+        <a
+          href={graveyard.length > 0 ? `/hearing-none/${graveyard[0].session_id}/` : "/hearing-none/"}
+          class="rounded-lg border border-badger-600/30 bg-badger-50 px-4 py-3 hover:border-badger-600"
+        >
+          <p class="text-2xl font-bold tabular-nums text-badger-700">
+            {record.diedUnheard.toLocaleString()}
+          </p>
+          <p class="text-sm text-navy-700">
+            bills died here without ever getting one &rarr;
+          </p>
+        </a>
       </div>
     </section>
   )}

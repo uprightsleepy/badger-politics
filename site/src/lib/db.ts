@@ -1563,37 +1563,29 @@ export const sessionFunnel = (sessionId: string) => {
   return r;
 };
 
-/** What a committee did with the bills it handled.
- *
- * Two figures, both counted rather than inferred:
- *   - hearings held, joined on committee_id, so always exact
+/** What a committee did with the bills it handled. Two counted figures,
+ * neither inferred:
+ *   - hearings held, joined on committee_id
  *   - bills that died here without ever getting one
  *
- * The second is attributable only when the committee's name is unique.
- * `bills.committee_at_death` stores a name, not an id, and five names are
- * shared across chambers (Education, Finance, Organization, Employment
- * Relations, Review of Administrative Rules). For those, one chamber's
- * count would silently include the other's, so it returns null and the
- * page says why. Same rule as the campaign-finance totals: a coverage gap
- * is stated, never papered over with a number that might be wrong.
+ * The second matches on name *and* chamber. The importer records both
+ * (`committee_at_death`, `committee_chamber_at_death`) precisely so a
+ * same-named committee in the other house is never blamed, and every one
+ * of the 9,465 graveyard bills carries a chamber. Matching on name alone
+ * gave Assembly and Senate Education the same 567 bills.
  */
 export const committeeRecord = (committeeId: string) => {
-  const row = prep("SELECT name FROM committees WHERE id = ?").get(committeeId) as
-    | { name: string }
+  const row = prep("SELECT name, chamber FROM committees WHERE id = ?").get(committeeId) as
+    | { name: string; chamber: string | null }
     | undefined;
   if (!row) return null;
   const hearingsHeld = (prep(
       "SELECT COUNT(*) AS n FROM hearings WHERE committee_id = ?",
     ).get(committeeId) as { n: number }).n;
-  const sharing = (prep(
-      "SELECT COUNT(*) AS n FROM committees WHERE name = ?",
-    ).get(row.name) as { n: number }).n;
-  const diedUnheard =
-    sharing > 1
-      ? null
-      : (prep(
-          "SELECT COUNT(*) AS n FROM bills WHERE died_without_hearing = 1" +
-            " AND committee_at_death = ? AND source != 'legiscan'",
-        ).get(row.name) as { n: number }).n;
-  return { hearingsHeld, diedUnheard, nameIsShared: sharing > 1 };
+  const diedUnheard = (prep(
+      "SELECT COUNT(*) AS n FROM bills WHERE died_without_hearing = 1" +
+        " AND committee_at_death = ? AND source != 'legiscan'" +
+        " AND COALESCE(committee_chamber_at_death, '') = COALESCE(?, '')",
+    ).get(row.name, row.chamber) as { n: number }).n;
+  return { hearingsHeld, diedUnheard };
 };
