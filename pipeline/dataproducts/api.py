@@ -104,6 +104,20 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
         # two grouped scans per session replace two queries per bill
         session_sponsors = queries.sponsors_for_session(conn, session_id)
         session_actions = queries.actions_for_session(conn, session_id)
+        # companion edges are an enrichment; the table may not exist yet
+        companions: dict[str, list[dict]] = {}
+        if conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='bill_companions'"
+        ).fetchone():
+            for row in conn.execute(
+                """SELECT bc.bill_id, b.identifier, b.status FROM bill_companions bc
+                   JOIN bills b ON b.id = bc.companion_bill_id
+                   WHERE b.session_id = ? ORDER BY b.identifier""",
+                (session_id,),
+            ):
+                companions.setdefault(row[0], []).append(
+                    {"identifier": row[1], "status": row[2]}
+                )
         for bill in session_bills:
             payload = {
                 **{k: bill[k] for k in bill.keys() if k != "session_id"},
@@ -111,6 +125,7 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
                 "sponsors": session_sponsors.get(bill["id"], []),
                 "actions": session_actions.get(bill["id"], []),
                 "votes": events_by_bill.get(bill["id"], []),
+                "companions": companions.get(bill["id"], []),
             }
             write_json(
                 api / "bills" / session_id / f"{bill_slug(bill['identifier'])}.json",

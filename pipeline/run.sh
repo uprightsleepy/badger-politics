@@ -62,6 +62,7 @@ python -m scraper.fetch_contacts --refresh    # Capitol office contacts (docs.le
 python -m importer.import_contacts _data/contacts/contacts.json ../data/wi.sqlite
 
 python -m importer.enrich_lrb ../data/wi.sqlite
+python -m importer.enrich_companions ../data/wi.sqlite
 python -m importer.checks ../data/wi.sqlite   # hard gate: abort deploy on failure
 
 # --- Phase 3: static JSON API, feeds, calendars, bulk exports ---

@@ -89,6 +89,28 @@ export const meta = (): Record<string, string> =>
     ),
   ));
 
+/** The bill's officially declared companions: the same legislation
+ * introduced in the other chamber. The edge comes from docs.legis's own
+ * "See Also" cross-reference, never from matching titles -- 2025's AB 1
+ * pairs with SB 18, which title-matching would have gotten wrong. The
+ * table only exists after enrichment, so absence degrades to "no
+ * companions" rather than a build failure. */
+export const companionsFor = (billId: string) => {
+  const has = prep(
+    "SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name='bill_companions'",
+  ).get();
+  if (!has) return [];
+  return prep(
+      `SELECT b.id, b.identifier, b.session_id, b.status, bc.source_url
+       FROM bill_companions bc JOIN bills b ON b.id = bc.companion_bill_id
+       WHERE bc.bill_id = ? ORDER BY b.identifier`,
+    )
+    .all(billId) as {
+    id: string; identifier: string; session_id: string; status: string | null;
+    source_url: string;
+  }[];
+};
+
 export const billsFor = (sessionId: string): Bill[] =>
   prep("SELECT * FROM bills WHERE session_id = ? AND source != 'legiscan' ORDER BY id")
     .all(sessionId) as Bill[];
