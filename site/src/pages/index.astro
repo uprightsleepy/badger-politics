@@ -66,12 +66,31 @@ const pct = (n) => Math.max(1.5, (n / funnel.introduced) * 100);
           See your two legislators, how they voted, what they sponsored, and who
           funds them. After that, every page marks them for you.
         </p>
-        <a
-          href="/my-reps/"
-          class="mt-3 inline-block rounded-lg bg-navy-800 px-4 py-2.5 font-semibold text-white hover:bg-navy-700"
-        >
-          Find my legislators
-        </a>
+        <form id="home-addr-form" class="mt-3 flex flex-wrap gap-2">
+          <label class="sr-only" for="home-addr">Your Wisconsin address</label>
+          <input
+            id="home-addr"
+            type="text"
+            required
+            autocomplete="street-address"
+            placeholder="e.g. 7120 W National Ave, West Allis"
+            class="min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-3 py-2.5"
+          />
+          <button
+            type="submit"
+            class="rounded-lg bg-navy-800 px-4 py-2.5 font-semibold text-white hover:bg-navy-700"
+          >
+            Find
+          </button>
+          <button
+            type="button"
+            id="home-geo"
+            class="rounded-lg border border-navy-100 bg-white px-4 py-2.5 hover:bg-navy-50"
+          >
+            Use my location
+          </button>
+        </form>
+        <p id="home-addr-status" role="status" class="mt-2 text-sm text-navy-700"></p>
         <p class="mt-2 flex items-start gap-1.5 text-xs text-navy-600">
           <svg class="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 1.5 3.5 4v5.2c0 4 2.8 7.7 6.5 8.8 3.7-1.1 6.5-4.8 6.5-8.8V4L10 1.5Zm0 2.1 4.5 1.7v4.9c0 3-2 5.9-4.5 6.8-2.5-.9-4.5-3.8-4.5-6.8V5.3L10 3.6Z"/></svg>
           <span>
@@ -283,14 +302,61 @@ const pct = (n) => Math.max(1.5, (n / funnel.introduced) * 100);
 
 <script>
   import { savedDistrict } from "../lib/district";
+  import { districtAt, districtForAddress, saveDistrict } from "../lib/lookup";
   import { esc } from "../lib/html";
   import { partyLetter, partyStyle } from "../lib/format";
 
   // Returning visitors get their own two legislators on the front page.
   // Everything here is read from localStorage and a static JSON file; the
   // site never learns who is asking.
+  // The lookup completes on this page. Sending someone to /my-reps/ to
+  // finish the homepage's primary action was a needless hand-off.
+  const form = document.getElementById("home-addr-form") as HTMLFormElement | null;
+  const addr = document.getElementById("home-addr") as HTMLInputElement | null;
+  const addrStatus = document.getElementById("home-addr-status");
+  const geoBtn = document.getElementById("home-geo");
+
+  const settle = (d: { ad: number; sd: number }) => {
+    saveDistrict(d);
+    if (addrStatus) {
+      addrStatus.textContent = `Found: Assembly District ${d.ad}, Senate District ${d.sd}.`;
+    }
+    render(d);
+  };
+
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!addr?.value.trim()) return;
+    if (addrStatus) addrStatus.textContent = "Looking up your address…";
+    const result = await districtForAddress(addr.value.trim());
+    if ("error" in result) {
+      if (addrStatus) addrStatus.textContent = result.error;
+      return;
+    }
+    settle(result.district);
+  });
+
+  geoBtn?.addEventListener("click", () => {
+    if (addrStatus) addrStatus.textContent = "Asking your browser for your location…";
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const d = await districtAt(pos.coords.longitude, pos.coords.latitude);
+        if (!d) {
+          if (addrStatus) addrStatus.textContent = "That location isn't inside a Wisconsin district.";
+          return;
+        }
+        settle(d);
+      },
+      () => {
+        if (addrStatus) addrStatus.textContent = "Location unavailable or denied.";
+      },
+    );
+  });
+
   const saved = savedDistrict();
-  if (saved) {
+  if (saved) render(saved);
+
+  function render(saved: { ad: number; sd: number }) {
     const section = document.getElementById("my-reps-home")!;
     const cards = document.getElementById("my-reps-cards")!;
     Promise.all([
