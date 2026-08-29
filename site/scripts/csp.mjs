@@ -36,7 +36,13 @@ await page.evaluateOnNewDocument(() => {
 const check = async (path, after) => {
   violations.length = 0;
   pageErrors.length = 0;
-  await page.goto(`${BASE}${path}`, { waitUntil: "networkidle2", timeout: 45000 });
+  // Not networkidle2: that waits for every allowed third-party image (132
+  // portraits on /legislators/) and times out on a slow night. A CSP
+  // violation fires the instant the browser refuses a request -- blocked
+  // resources never reach the network -- so parse the page, give deferred
+  // scripts a moment to make their attempts, and read the events.
+  await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded", timeout: 45000 });
+  await new Promise((r) => setTimeout(r, 3000));
   if (after) await after();
   const fromEvents = await page.evaluate(() => window.__cspViolations ?? []);
   const all = [...new Set([...violations, ...fromEvents])];
@@ -77,7 +83,10 @@ if (
     await page.type("#addr", "7120 W National Ave, West Allis, WI");
     await page.click("#addr-form button[type=submit]");
     await page.waitForFunction(
-      () => /District|didn't|Couldn't|doesn't/i.test(document.getElementById("status")?.textContent ?? ""),
+      // terminal states only: "Loading your districts" also contains
+      // "district", and matching it read the verdict before the Census
+      // round trip had happened at all
+      () => /Found:|didn't|Couldn't|doesn't/i.test(document.getElementById("status")?.textContent ?? ""),
       { timeout: 30000 },
     ).catch(() => {});
     console.log(
