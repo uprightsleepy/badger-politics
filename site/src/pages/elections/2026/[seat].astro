@@ -94,7 +94,7 @@ const description =
   {results2026 && (
     <section class="mt-4 rounded-lg border border-moss-600/40 bg-white p-4">
       <h2 class="font-bold">Official results</h2>
-      <table class="mt-2 w-full text-sm">
+      <div class="overflow-x-auto"><table class="mt-2 w-full text-sm">
         <caption class="sr-only">Certified 2026 results for {seatName}</caption>
         <tbody>
           {results2026.candidates.map((c) => (
@@ -105,7 +105,7 @@ const description =
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       <p class="mt-1 text-xs text-navy-600">Certified canvass, {results2026.total?.toLocaleString()} ballots cast.</p>
     </section>
   )}
@@ -213,7 +213,7 @@ const description =
                 <span class="ml-2 text-xs font-normal text-navy-600">previous maps</span>
               )}
             </p>
-            <table class="mt-1 w-full">
+            <div class="overflow-x-auto"><table class="mt-1 w-full">
               <caption class="sr-only">{h.year} general election, {seatName}</caption>
               <tbody>
                 {h.candidates.map((c) => (
@@ -224,7 +224,7 @@ const description =
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
         ))}
       </div>

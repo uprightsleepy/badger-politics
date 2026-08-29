@@ -16,6 +16,9 @@ export function getStaticPaths() {
 }
 const { event, bill, sessionId } = Astro.props;
 const split = voteSplit(event.id);
+// the same bill's other roll calls: suspension then passage on one day is
+// common, and the pair reads differently than either vote alone
+const siblings = votesFor(bill.id).filter((v) => v.id !== event.id);
 
 // Every one of these pages carried the sitewide fallback description, and
 // motions repeat across votes, so the tally and date are what make a given
@@ -48,6 +51,19 @@ const seoDescription = [
       ← {bill.identifier}: {bill.title?.slice(0, 90)}
     </a>
   </p>
+  {siblings.length > 0 && (
+    <p class="mt-1 text-xs text-navy-600" data-pagefind-ignore>
+      Other roll calls on this bill:{" "}
+      {siblings.map((v, i) => (
+        <>
+          {i > 0 && " · "}
+          <a href={`/votes/${v.id}/`} class="underline">
+            {chamberName(v.chamber)} {fmtDate(v.date)}{v.motion ? `, ${clip(v.motion, 28)}` : ""}
+          </a>
+        </>
+      ))}
+    </p>
+  )}
   <h1 class="mt-2 flex flex-wrap items-center gap-3 text-2xl font-bold">
     Roll call vote
     {split?.label && (

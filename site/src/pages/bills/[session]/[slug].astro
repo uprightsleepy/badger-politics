@@ -326,10 +326,10 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
         </p>
         <ul class="mt-2 grid gap-x-4 gap-y-1 rounded-lg border border-navy-100 bg-white p-3 text-sm sm:grid-cols-2">
           {lobbying.map((l) => (
-            <li class="truncate">
+            <li class="min-w-0">
               <a
                 href={`https://lobbying.wi.gov/Who/PrincipalInformation/2025REG/Information/${l.principal_id}`}
-                class="hover:underline"
+                class="relative block truncate hover:underline"
               >
                 {l.principal}
               </a>
