@@ -1,0 +1,106 @@
+---
+/** Wisconsin's people in Washington, and how the senators vote.
+ *
+ * A deliberately narrow module: U.S. Senate roll calls for the two
+ * senators, from the Senate's own XML, plus a directory of the House
+ * delegation. It does not track federal bills, hearings, or money --
+ * those live on congress.gov, and the page says so rather than
+ * pretending coverage it does not have.
+ */
+import Base from "../../layouts/Base.astro";
+import SourceStrip from "../../components/SourceStrip.astro";
+import PartyChip from "../../components/PartyChip.astro";
+import { federalMembers, federalVotesFor, federalLatestVoteDate } from "../../lib/db";
+import { fmtDate } from "../../lib/format";
+
+const members = federalMembers();
+const senators = members.filter((m) => m.chamber === "senate");
+const house = members.filter((m) => m.chamber === "house");
+const latest = federalLatestVoteDate();
+const recentFor = (lis: string | null) => (lis ? federalVotesFor(lis).slice(0, 5) : []);
+---
+
+<Base
+  title="Wisconsin's federal delegation"
+  description="How Wisconsin's U.S. senators vote, from the Senate's official roll-call records, plus the state's House delegation."
+  filters={{ type: "Legislator", chamber: "U.S. Congress" }}
+>
+  <h1 class="text-2xl font-bold">Wisconsin in Washington</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    The state's two U.S. senators and eight House members. Senate roll
+    calls come straight from the Senate's official records; every vote
+    links to the source. This module covers floor votes only — federal
+    bills, hearings and campaign money live on
+    <a href="https://www.congress.gov" class="underline">congress.gov</a> and
+    <a href="https://www.fec.gov" class="underline">fec.gov</a>.
+  </p>
+  <SourceStrip
+    sources={[{ label: "U.S. Senate", href: "https://www.senate.gov/legislative/votes_new.htm" }]}
+    through={latest}
+  />
+
+  <section class="mt-6">
+    <h2 class="text-xl font-bold">Senators</h2>
+    <div class="mt-3 grid gap-4 lg:grid-cols-2">
+      {senators.map((s) => {
+        const recent = recentFor(s.lis_id);
+        return (
+          <div class="rounded-lg border border-navy-100 bg-white p-4">
+            <p class="flex flex-wrap items-baseline gap-x-2 text-lg font-bold">
+              <a href={`/federal/${s.slug}/`} class="underline">{s.name}</a>
+              <PartyChip party={s.party} size="sm" />
+              <span class="text-sm font-normal text-navy-600">term ends {s.term_end.slice(0, 4)}</span>
+            </p>
+            {recent.length > 0 && (
+              <ul class="mt-2 divide-y divide-navy-100 text-sm">
+                {recent.map((v) => (
+                  <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1.5">
+                    <span
+                      class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
+                        v.vote_cast === "Yea"
+                          ? "bg-moss-50 text-moss-600"
+                          : v.vote_cast === "Nay"
+                            ? "bg-badger-50 text-badger-700"
+                            : "bg-navy-50 text-navy-600"
+                      }`}
+                    >
+                      {v.vote_cast}
+                    </span>
+                    <span class="min-w-0 flex-1">{v.title ?? v.question}</span>
+                    <span class="shrink-0 text-xs text-navy-600">{fmtDate(v.date)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p class="mt-2 text-sm">
+              <a href={`/federal/${s.slug}/`} class="underline">Every roll call &rarr;</a>
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+
+  <section class="mt-8">
+    <h2 class="text-xl font-bold">House delegation</h2>
+    <p class="mt-1 max-w-3xl text-sm text-navy-600">
+      House roll calls aren't covered here yet; each member links to their
+      official congress.gov record.
+    </p>
+    <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+      {house.map((m) => (
+        <li class="flex flex-wrap items-baseline gap-x-3 px-4 py-2">
+          <span class="w-14 shrink-0 font-bold">WI-{m.district}</span>
+          <PartyChip party={m.party} size="sm" />
+          <span class="min-w-0 flex-1">{m.name}</span>
+          <a
+            href={`https://www.congress.gov/member/${m.slug}/${m.bioguide}`}
+            class="shrink-0 py-1 text-xs underline"
+          >
+            congress.gov &#8599;
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+</Base>

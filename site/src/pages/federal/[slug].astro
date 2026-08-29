@@ -1,0 +1,107 @@
+---
+/** One senator's complete Senate voting record, from the official XML.
+ *
+ * Attribution is the Senate's own LIS member id on every position, so
+ * there is no matching step to get wrong. "Missed" here means recorded
+ * as Not Voting; the Senate has no excused/absent distinction in these
+ * files, and the page says what it counts.
+ */
+import Base from "../../layouts/Base.astro";
+import SourceStrip from "../../components/SourceStrip.astro";
+import PartyChip from "../../components/PartyChip.astro";
+import { federalMembers, federalVotesFor } from "../../lib/db";
+import { fmtDate } from "../../lib/format";
+import { documentUrlFragment } from "../../lib/federal";
+
+export function getStaticPaths() {
+  return federalMembers()
+    .filter((m) => m.chamber === "senate" && m.lis_id)
+    .map((m) => ({ params: { slug: m.slug }, props: { member: m } }));
+}
+
+const { member } = Astro.props;
+const votes = federalVotesFor(member.lis_id!);
+const missed = votes.filter((v) => v.vote_cast === "Not Voting").length;
+const latest = votes[0]?.date ?? null;
+
+const castStyle = (cast: string) =>
+  cast === "Yea"
+    ? "bg-moss-50 text-moss-600"
+    : cast === "Nay"
+      ? "bg-badger-50 text-badger-700"
+      : "bg-navy-50 text-navy-600";
+---
+
+<Base
+  title={`${member.name}, U.S. Senator`}
+  description={`Every U.S. Senate roll call cast by ${member.name} of Wisconsin in the current Congress, from the Senate's official records: ${votes.length} votes, ${missed} missed.`}
+  breadcrumbs={[{ name: "Federal delegation", url: "/federal/" }]}
+  filters={{ type: "Legislator", chamber: "U.S. Senate", party: member.party }}
+>
+  <p class="text-sm text-navy-600">
+    <a href="/federal/" class="underline">&larr; Federal delegation</a>
+  </p>
+  <h1 class="mt-2 flex flex-wrap items-center gap-3 text-2xl font-bold">
+    {member.name}
+    <PartyChip party={member.party} />
+  </h1>
+  <p class="mt-1 text-sm text-navy-700">
+    U.S. Senator for Wisconsin &middot; term ends {member.term_end.slice(0, 4)} &middot;
+    <a href={`https://www.congress.gov/member/${member.slug}/${member.bioguide}`} class="underline">
+      official profile &#8599;
+    </a>
+  </p>
+  <SourceStrip
+    sources={[{ label: "U.S. Senate", href: "https://www.senate.gov/legislative/votes_new.htm" }]}
+    through={latest}
+  />
+
+  <dl class="mt-4 grid max-w-md grid-cols-2 gap-x-6 gap-y-3 rounded-lg border border-navy-100 bg-white p-4 text-sm">
+    <div>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Roll calls, this Congress</dt>
+      <dd class="mt-0.5 text-xl font-bold tabular-nums">{votes.length.toLocaleString()}</dd>
+    </div>
+    <div>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Recorded Not Voting</dt>
+      <dd class={`mt-0.5 text-xl font-bold tabular-nums ${missed > 0 ? "text-badger-700" : "text-moss-600"}`}>
+        {missed.toLocaleString()}
+      </dd>
+    </div>
+  </dl>
+
+  <section class="mt-6">
+    <h2 class="text-xl font-bold">Every roll call</h2>
+    <p class="mt-1 text-sm text-navy-600">
+      Newest first. Each vote links to the Senate's official record; bills
+      link to congress.gov.
+    </p>
+    <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+      {votes.map((v) => (
+        <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2">
+          <span class={`w-14 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.vote_cast)}`}>
+            {v.vote_cast === "Not Voting" ? "NV" : v.vote_cast}
+          </span>
+          <span class="min-w-0 flex-1">
+            {v.title ?? v.question}
+            {v.document && (
+              documentUrlFragment(v.congress, v.document) ? (
+                <a
+                  href={`https://www.congress.gov/bill/${v.congress}th-congress/${documentUrlFragment(v.congress, v.document)}`}
+                  class="ml-1 text-xs underline"
+                >
+                  {v.document}
+                </a>
+              ) : (
+                <span class="ml-1 text-xs text-navy-600">{v.document}</span>
+              )
+            )}
+          </span>
+          <span class="shrink-0 text-xs tabular-nums text-navy-600">
+            {v.result} {v.yeas}&ndash;{v.nays}
+          </span>
+          <a href={v.source_url} class="shrink-0 py-1 text-xs underline">{fmtDate(v.date)} &#8599;</a>
+        </li>
+      ))}
+    </ul>
+  </section>
+</Base>

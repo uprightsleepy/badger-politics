@@ -61,6 +61,9 @@ python -m importer.import_wiseye _data/wiseye/videos.json ../data/wi.sqlite
 python -m scraper.fetch_contacts --refresh    # Capitol office contacts (docs.legis)
 python -m importer.import_contacts _data/contacts/contacts.json ../data/wi.sqlite
 
+python -m scraper.fetch_federal_votes           # U.S. Senate roll calls + roster
+python -m importer.import_federal _data/federal ../data/wi.sqlite
+
 python -m importer.enrich_lrb ../data/wi.sqlite
 python -m importer.enrich_companions ../data/wi.sqlite
 python -m importer.checks ../data/wi.sqlite   # hard gate: abort deploy on failure

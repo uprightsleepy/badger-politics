@@ -111,6 +111,42 @@ export const companionsFor = (billId: string) => {
   }[];
 };
 
+/** Wisconsin's federal delegation and the U.S. Senate roll calls, from
+ * the senate.gov XML the pipeline mirrors. The tables are an enrichment:
+ * when they are absent (an older snapshot), everything degrades to empty
+ * and the federal pages simply do not build. */
+const hasFederal = () =>
+  !!prep("SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name='federal_members'").get();
+
+export interface FederalMember {
+  bioguide: string; lis_id: string | null; name: string; slug: string;
+  party: string; chamber: string; district: number | null;
+  term_start: string; term_end: string;
+}
+export const federalMembers = (): FederalMember[] =>
+  hasFederal()
+    ? (prep("SELECT * FROM federal_members ORDER BY chamber DESC, district").all() as FederalMember[])
+    : [];
+
+export const federalVotesFor = (lisId: string) =>
+  prep(
+      `SELECT v.*, r.vote_cast FROM federal_votes v
+       JOIN federal_vote_records r ON r.vote_id = v.id
+       WHERE r.lis_member_id = ?
+       ORDER BY v.date DESC, v.number DESC`,
+    )
+    .all(lisId) as {
+    id: string; congress: number; session: number; number: number; date: string;
+    question: string | null; result: string | null; title: string | null;
+    yeas: number; nays: number; majority_requirement: string | null;
+    document: string | null; source_url: string; vote_cast: string;
+  }[];
+
+export const federalLatestVoteDate = (): string | null =>
+  hasFederal()
+    ? ((prep("SELECT MAX(date) AS d FROM federal_votes").get() as { d: string | null }).d)
+    : null;
+
 export const billsFor = (sessionId: string): Bill[] =>
   prep("SELECT * FROM bills WHERE session_id = ? AND source != 'legiscan' ORDER BY id")
     .all(sessionId) as Bill[];

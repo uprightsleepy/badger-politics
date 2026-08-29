@@ -246,12 +246,39 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
     return failures
 
 
+def check_federal(conn: sqlite3.Connection) -> list[str]:
+    """Federal tables are an enrichment; when present they must hold the
+    same invariants the importer enforced: stated tallies equal counted
+    positions, and every Senate vote carries exactly two WI senators."""
+    has = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='federal_votes'"
+    ).fetchone()
+    if not has:
+        return []
+    failures = []
+    bad = conn.execute(
+        """SELECT v.id FROM federal_votes v JOIN federal_vote_records r
+             ON r.vote_id = v.id
+           GROUP BY v.id
+           HAVING SUM(r.vote_cast = 'Yea') != v.yeas
+               OR SUM(r.vote_cast = 'Nay') != v.nays
+               OR SUM(r.state = 'WI') != 2"""
+    ).fetchall()
+    for (vote_id,) in bad:
+        failures.append(f"federal vote {vote_id}: tally or WI-count mismatch")
+    members = conn.execute("SELECT COUNT(*) FROM federal_members").fetchone()[0]
+    if members != 10:
+        failures.append(f"federal_members holds {members} rows, expected 10")
+    return failures
+
+
 def run_checks(db_path: Path, counts_file: Path) -> list[str]:
     conn = sqlite3.connect(db_path)
     try:
         failures = check_vote_counts(conn)
         failures += check_bill_counts(conn, counts_file)
         failures += check_referential_integrity(conn)
+        failures += check_federal(conn)
     finally:
         conn.close()
     return failures
