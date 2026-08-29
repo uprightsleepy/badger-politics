@@ -2,24 +2,14 @@
 import Base from "../layouts/Base.astro";
 import JsonLd from "../components/JsonLd.astro";
 import StatusBadge from "../components/StatusBadge.astro";
-import { builtSessions, sessionFunnel, recentlyActedBills } from "../lib/db";
+import BillFlow from "../components/BillFlow.astro";
+import { builtSessions, sessionBillFlow, recentlyActedBills } from "../lib/db";
 import { billSlug, fmtDate, shortTitle } from "../lib/format";
 const sessions = builtSessions();
 const current = sessions.find((s) => s.id === "2025") ?? sessions[0];
 const recent = recentlyActedBills(sessions.map((s) => s.id), 6);
-const funnel = sessionFunnel(current.id);
+const flow = sessionBillFlow(current.id);
 const sessionName = current.name ?? current.id;
-// Cumulative stages: each is a subset of the one above, so the bar widths
-// show the drop-off rather than four unrelated counters.
-const stages = [
-  { label: "Introduced", n: funnel.introduced, href: `/bills/${current.id}/`, tone: "bg-navy-600" },
-  { label: "Passed one chamber", n: funnel.passedOne, href: `/bills/${current.id}/status/passed_chamber/`, tone: "bg-navy-600" },
-  // no single status page: clearing both chambers splits into enacted,
-  // vetoed and awaiting signature, which is what the governor's desk shows
-  { label: "Passed both chambers", n: funnel.passedBoth, href: "/governors-desk/", tone: "bg-navy-600" },
-  { label: "Became law", n: funnel.enacted, href: `/bills/${current.id}/status/enacted/`, tone: "bg-moss-600" },
-];
-const pct = (n) => Math.max(1.5, (n / funnel.introduced) * 100);
 ---
 
 <Base
@@ -132,40 +122,20 @@ const pct = (n) => Math.max(1.5, (n / funnel.introduced) * 100);
 
   <section class="mt-10">
     <h2 class="text-xl font-bold">
-      What happened to {funnel.introduced.toLocaleString()} proposals?
+      What happened to {flow.introduced.toLocaleString()} bills?
     </h2>
     <p class="mt-1 max-w-3xl text-sm text-navy-600">
-      The {sessionName}, by outcome. Each stage is a subset of the one above
-      it, counted from the official bill histories.
+      Every bill of the {sessionName}, traced from introduction to where it
+      stopped. The branches add up to the total at each split, counted from
+      the official bill histories.
     </p>
-    <ul class="mt-3 space-y-2">
-      {stages.map((st) => (
-        <li>
-          <a href={st.href} class="block rounded-lg border border-navy-100 bg-white px-4 py-2.5 hover:border-navy-600">
-            <span class="flex items-baseline justify-between gap-3 text-sm">
-              <span class="font-semibold">{st.label}</span>
-              <span class="font-bold tabular-nums">{st.n.toLocaleString()}</span>
-            </span>
-            <span class="mt-1.5 block h-2 w-full overflow-hidden rounded-full bg-navy-50">
-              <span class={`block h-full rounded-full ${st.tone}`} style={`width:${pct(st.n)}%`}></span>
-            </span>
-          </a>
-        </li>
-      ))}
-    </ul>
-    <a
-      href={`/hearing-none/${current.id}/`}
-      class="mt-3 block rounded-lg border border-badger-600/30 bg-badger-50 px-4 py-3 hover:border-badger-600"
-    >
-      <span class="block text-sm font-bold text-badger-700">
-        {funnel.noHearing.toLocaleString()} never got a public hearing
-      </span>
-      <span class="mt-0.5 block text-sm text-navy-700">
-        Most proposals are not voted down. They are never taken up at all. A
-        committee chair alone decides whether a bill gets heard. See where
-        they died &rarr;
-      </span>
-    </a>
+    <BillFlow flow={flow} session={current.id} />
+    <p class="mt-3 max-w-3xl text-xs text-navy-600">
+      Bills only. The {flow.resolutions.toLocaleString()} resolutions this
+      session are counted separately, because they never go to the governor
+      and cannot become law.
+      <a href={`/bills/${current.id}/`} class="inline-block underline">Browse them all &rarr;</a>
+    </p>
   </section>
 
   <section class="mt-10">
@@ -192,7 +162,7 @@ const pct = (n) => Math.max(1.5, (n / funnel.introduced) * 100);
     </ul>
     <p class="mt-3 text-sm">
       <a href={`/bills/${current.id}/`} class="underline">
-        All {funnel.introduced.toLocaleString()} proposals this session &rarr;
+        All {(flow.introduced + flow.resolutions).toLocaleString()} proposals this session &rarr;
       </a>
     </p>
   </section>

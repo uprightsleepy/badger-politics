@@ -1544,25 +1544,50 @@ export const personSponsorshipsPage = (personId: string, limit: number, offset: 
   }));
 };
 
-/** What became of a session's proposals, as stages a reader can follow.
- * Every number is a status count from the official histories -- nothing is
- * modelled or estimated, and the stages are cumulative, so each is a
- * subset of the one above it. */
-export const sessionFunnel = (sessionId: string) => {
+/** What became of a session's bills, as a flow that balances.
+ *
+ * Bills only. Joint and simple resolutions are counted separately, because
+ * they never reach the governor and cannot become law: a joint resolution
+ * needs both chambers, a simple one needs only its own, and folding all
+ * three together is what made the old cumulative funnel's middle stage
+ * mean two different things at once.
+ *
+ * Every bill lands in exactly one terminal bucket, so the branches sum to
+ * the total at each split and the diagram cannot quietly lose any. Nothing
+ * is modelled: `died` is the explicit "failed pursuant to Senate Joint
+ * Resolution 1" status recorded in the official history, not an inference
+ * drawn from silence, and anything neither finished nor explicitly failed
+ * is counted as still moving rather than called dead.
+ */
+export const sessionBillFlow = (sessionId: string) => {
   const r = prep(
       `SELECT COUNT(*) AS introduced,
-              SUM(CASE WHEN status IN ('passed_chamber','passed','enacted','vetoed','adopted')
-                       THEN 1 ELSE 0 END) AS passedOne,
-              SUM(CASE WHEN status IN ('passed','enacted','vetoed') THEN 1 ELSE 0 END) AS passedBoth,
               SUM(CASE WHEN status = 'enacted' THEN 1 ELSE 0 END) AS enacted,
-              SUM(died_without_hearing) AS noHearing
-       FROM bills WHERE session_id = ? AND source != 'legiscan'`,
+              SUM(CASE WHEN status = 'vetoed' THEN 1 ELSE 0 END) AS vetoed,
+              SUM(CASE WHEN status = 'failed_sjr1' THEN 1 ELSE 0 END) AS died,
+              SUM(CASE WHEN status = 'failed_sjr1' AND died_without_hearing = 1
+                       THEN 1 ELSE 0 END) AS noHearing
+       FROM bills
+       WHERE session_id = ? AND source != 'legiscan' AND classification = 'bill'`,
     )
     .get(sessionId) as {
-    introduced: number; passedOne: number; passedBoth: number;
-    enacted: number; noHearing: number;
+    introduced: number; enacted: number; vetoed: number;
+    died: number; noHearing: number;
   };
-  return r;
+  const resolutions = (
+    prep(
+      `SELECT COUNT(*) AS n FROM bills
+       WHERE session_id = ? AND source != 'legiscan' AND classification != 'bill'`,
+    ).get(sessionId) as { n: number }
+  ).n;
+  const passedBoth = r.enacted + r.vetoed;
+  return {
+    ...r,
+    passedBoth,
+    heard: r.died - r.noHearing,
+    moving: r.introduced - passedBoth - r.died,
+    resolutions,
+  };
 };
 
 /** What a committee did with the bills it handled. Two counted figures,

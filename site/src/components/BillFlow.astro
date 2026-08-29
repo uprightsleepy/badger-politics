@@ -1,0 +1,218 @@
+---
+/** Where a session's bills actually went, drawn as a Sankey at build time.
+ *
+ * A cumulative funnel can only say that each stage is a subset of the one
+ * above it. It cannot say where the bills that dropped out went, which is
+ * the part that matters: almost all of them die in committee without ever
+ * being voted on, and a chart of survivors hides that. A flow has to name
+ * every branch, so the numbers are forced to add up in public.
+ *
+ * Static SVG, no charting library and no client JavaScript. The legend
+ * beneath carries every number as text and every link, and stands alone on
+ * a phone, where a Sankey's labels would be too small to read.
+ */
+interface Props {
+  flow: {
+    introduced: number; enacted: number; vetoed: number; died: number;
+    noHearing: number; passedBoth: number; heard: number; moving: number;
+  };
+  session: string;
+}
+const { flow, session } = Astro.props;
+
+const MOSS = "#3e7051", GOLD = "#a87a1e", NAVY = "#2d4a73";
+const NAVY_LT = "#9fb3cc", BADGER = "#b33a2b", INK = "#1d2e4a";
+
+// Ordered top to bottom. A branch holding a single bucket ends at its own
+// column, which is how the still-moving case draws itself.
+const branches = [
+  {
+    label: "Passed both chambers", n: flow.passedBoth, color: NAVY,
+    leaves: [
+      {
+        key: "enacted", label: "Became law", n: flow.enacted, color: MOSS,
+        href: `/bills/${session}/status/enacted/`,
+        note: "Passed both chambers and signed by the governor.",
+      },
+      {
+        key: "vetoed", label: "Vetoed by the governor", n: flow.vetoed, color: GOLD,
+        href: `/bills/${session}/status/vetoed/`,
+        note: "Cleared the legislature, then stopped at the governor's desk.",
+      },
+    ],
+  },
+  {
+    label: "Still moving", n: flow.moving, color: NAVY_LT,
+    leaves: [
+      {
+        key: "moving", label: "Still moving", n: flow.moving, color: NAVY_LT,
+        href: `/bills/${session}/`,
+        note: "Neither finished nor recorded as failed when this page was built.",
+      },
+    ],
+  },
+  {
+    label: "Died without passing", n: flow.died, color: BADGER,
+    leaves: [
+      {
+        key: "heard", label: "Heard, then went no further", n: flow.heard, color: NAVY_LT,
+        href: `/bills/${session}/status/failed_sjr1/`,
+        note: "Got a public hearing but never finished the trip.",
+      },
+      {
+        key: "nohearing", label: "Never got a public hearing", n: flow.noHearing, color: BADGER,
+        href: `/hearing-none/${session}/`,
+        note: "Not voted down. Never taken up at all: a committee chair alone decides whether a bill gets heard.",
+      },
+    ],
+  },
+].filter((b) => b.n > 0);
+
+// every final bucket, for the legend and the text alternative
+const terminals = branches.flatMap((b) => b.leaves);
+// only branches that actually split are drawn in the third column
+const col2Nodes = branches.flatMap((b) => (b.leaves.length > 1 ? b.leaves : []));
+
+const VB_W = 820, VB_H = 300, PAD = 12, GAP = 11, NODE_W = 11;
+const X0 = 92, X1 = 372, X2 = 616;
+const INNER = VB_H - PAD * 2;
+const maxGaps = Math.max(0, branches.length - 1, col2Nodes.length - 1);
+const scale = (INNER - maxGaps * GAP) / flow.introduced;
+const h = (n: number) => n * scale;
+// centre each column on its own height, so a column that ends early sits
+// level with the others rather than hanging from the top
+const top = (nodes: { n: number }[]) => {
+  const used = nodes.reduce((a, b) => a + h(b.n), 0) + (nodes.length - 1) * GAP;
+  return PAD + (INNER - used) / 2;
+};
+
+let cursor = top(branches);
+const cols1 = branches.map((b) => {
+  const box = { ...b, y: cursor, h: h(b.n) };
+  cursor += box.h + GAP;
+  return box;
+});
+cursor = top(col2Nodes);
+const cols2 = new Map(
+  col2Nodes.map((l) => {
+    const box = { ...l, y: cursor, h: h(l.n) };
+    cursor += box.h + GAP;
+    return [l.key, box];
+  }),
+);
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+const ribbon = (xa: number, ya: number, yb: number, xb: number, yc: number, yd: number) => {
+  const c = (xb - xa) / 2;
+  return (
+    `M${r2(xa)} ${r2(ya)}C${r2(xa + c)} ${r2(ya)} ${r2(xb - c)} ${r2(yc)} ${r2(xb)} ${r2(yc)}` +
+    `L${r2(xb)} ${r2(yd)}C${r2(xb - c)} ${r2(yd)} ${r2(xa + c)} ${r2(yb)} ${r2(xa)} ${r2(yb)}Z`
+  );
+};
+
+const introTop = top([{ n: flow.introduced }]);
+let src = introTop;
+const flows1 = cols1.map((b) => {
+  const path = ribbon(X0 + NODE_W, src, src + b.h, X1, b.y, b.y + b.h);
+  src += b.h;
+  return { path, color: b.color, dim: b.color === BADGER ? 0.28 : 0.4 };
+});
+const flows2 = cols1.flatMap((b) => {
+  if (b.leaves.length < 2) return [];
+  let o = b.y;
+  return b.leaves.map((l) => {
+    const t = cols2.get(l.key)!;
+    const path = ribbon(X1 + NODE_W, o, o + h(l.n), X2, t.y, t.y + t.h);
+    o += h(l.n);
+    return { path, color: l.color, dim: 0.42 };
+  });
+});
+
+const num = (n: number) => n.toLocaleString();
+const pct = (n: number) => Math.round((n / flow.introduced) * 100);
+const alt =
+  `Flow of ${num(flow.introduced)} bills: ` +
+  terminals.map((l) => `${num(l.n)} ${l.label.toLowerCase()}`).join("; ") + ".";
+---
+
+<figure class="mt-4">
+  <svg viewBox={`0 0 ${VB_W} ${VB_H}`} class="hidden w-full sm:block" role="img" aria-label={alt}>
+    {flows1.map((f) => <path d={f.path} fill={f.color} opacity={f.dim} />)}
+    {flows2.map((f) => <path d={f.path} fill={f.color} opacity={f.dim} />)}
+
+    <rect x={X0} y={r2(introTop)} width={NODE_W} height={r2(h(flow.introduced))} fill={INK} rx="2" />
+    {cols1.map((b) => (
+      <rect x={X1} y={r2(b.y)} width={NODE_W} height={r2(b.h)} fill={b.color} rx="2" />
+    ))}
+    {[...cols2.values()].map((l) => (
+      <rect x={X2} y={r2(l.y)} width={NODE_W} height={r2(l.h)} fill={l.color} rx="2" />
+    ))}
+
+    {/* a paper halo keeps every label readable where it crosses a ribbon */}
+    <g paint-order="stroke" stroke="#faf8f4" stroke-width="3.5" stroke-linejoin="round">
+      <text
+        x={X0 - 8}
+        y={r2(introTop + h(flow.introduced) / 2 - 2)}
+        text-anchor="end"
+        font-size="13"
+        font-weight="700"
+        fill="#16233a">{num(flow.introduced)}</text>
+      <text
+        x={X0 - 8}
+        y={r2(introTop + h(flow.introduced) / 2 + 11)}
+        text-anchor="end"
+        font-size="10.5"
+        fill="#24395c">bills introduced</text>
+      {cols1.map((b) => (
+        <>
+          <text x={X1 + NODE_W + 8} y={r2(b.y + b.h / 2 - 2)} font-size="12.5" font-weight="700" fill="#16233a">
+            {num(b.n)}
+          </text>
+          <text x={X1 + NODE_W + 8} y={r2(b.y + b.h / 2 + 10)} font-size="10.5" fill="#24395c">
+            {b.label}
+          </text>
+        </>
+      ))}
+      {[...cols2.values()].map((l) => (
+        <>
+          <text x={X2 + NODE_W + 8} y={r2(l.y + l.h / 2 - 2)} font-size="12.5" font-weight="700" fill="#16233a">
+            {num(l.n)}
+          </text>
+          <text x={X2 + NODE_W + 8} y={r2(l.y + l.h / 2 + 10)} font-size="10.5" fill="#24395c">
+            {l.label}
+          </text>
+        </>
+      ))}
+    </g>
+  </svg>
+
+  <ul class="mt-4 grid gap-2 sm:grid-cols-2">
+    {terminals.map((l) => (
+      <li>
+        <a
+          href={l.href}
+          class={`block h-full rounded-lg border px-4 py-2.5 ${
+            l.key === "nohearing"
+              ? "border-badger-600/30 bg-badger-50 hover:border-badger-600"
+              : "border-navy-100 bg-white hover:border-navy-600"
+          }`}
+        >
+          <span class="flex items-baseline justify-between gap-3 text-sm">
+            <span class="flex items-center gap-2 font-semibold">
+              <span class="h-2.5 w-2.5 shrink-0 rounded-full" style={`background:${l.color}`}></span>
+              {l.label}
+            </span>
+            <span class="font-bold tabular-nums">{num(l.n)}</span>
+          </span>
+          <span class="mt-1.5 block h-1.5 w-full overflow-hidden rounded-full bg-navy-50">
+            <span
+              class="block h-full rounded-full"
+              style={`width:${Math.max(1.5, (l.n / flow.introduced) * 100)}%;background:${l.color}`}
+            ></span>
+          </span>
+          <span class="mt-1 block text-xs text-navy-600">{pct(l.n)}% of all bills. {l.note}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</figure>
