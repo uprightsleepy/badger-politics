@@ -122,7 +122,11 @@ def import_votes(conn, data_dir: Path) -> tuple[int, int]:
                 source_url,
             ),
         )
-        counted = {"Yea": 0, "Nay": 0}
+        # impeachment trials record Guilty / Not Guilty; the Senate's own
+        # count block files them under yeas and nays respectively
+        yea_set = {"Yea", "Guilty"}
+        nay_set = {"Nay", "Not Guilty"}
+        counted = {"yea": 0, "nay": 0}
         wi = 0
         member_rows = []
         for m in root.findall("members/member"):
@@ -138,16 +142,18 @@ def import_votes(conn, data_dir: Path) -> tuple[int, int]:
                     cast,
                 )
             )
-            if cast in counted:
-                counted[cast] += 1
+            if cast in yea_set:
+                counted["yea"] += 1
+            elif cast in nay_set:
+                counted["nay"] += 1
             if state == "WI":
                 wi += 1
         # the same reconciliation the state importer enforces: the stated
         # tally and the counted positions must agree, or the run dies
-        if counted["Yea"] != yeas or counted["Nay"] != nays:
+        if counted["yea"] != yeas or counted["nay"] != nays:
             raise SystemExit(
                 f"{vote_id}: stated {yeas}-{nays} but counted "
-                f"{counted['Yea']}-{counted['Nay']}"
+                f"{counted['yea']}-{counted['nay']}"
             )
         if wi != 2:
             raise SystemExit(f"{vote_id}: expected 2 WI senators, found {wi}")

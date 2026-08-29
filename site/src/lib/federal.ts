@@ -18,3 +18,9 @@ export const documentUrlFragment = (_congress: number, document: string): string
   const path = DOC_PATHS[document.slice(0, at)];
   return path ? `${path}/${document.slice(at + 1)}` : null;
 };
+
+/** "112th (2011-12)": the first year of a Congress is 1789 + 2(n-1). */
+export const congressLabel = (congress: number): string => {
+  const start = 1789 + (congress - 1) * 2;
+  return `${congress}th (${start}–${String(start + 1).slice(2)})`;
+};

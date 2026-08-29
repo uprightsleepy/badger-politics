@@ -1,17 +1,20 @@
 ---
-/** One senator's complete Senate voting record, from the official XML.
+/** One senator's Senate record, career-deep: every Congress they have
+ * served, from the Senate's own per-vote XML.
  *
- * Attribution is the Senate's own LIS member id on every position, so
- * there is no matching step to get wrong. "Missed" here means recorded
- * as Not Voting; the Senate has no excused/absent distinction in these
- * files, and the page says what it counts.
+ * Attribution is the Senate's LIS member id on every position, so there
+ * is no matching step to get wrong. "Missed" means recorded as Not
+ * Voting -- the Senate's files make no excused/absent distinction, and
+ * the page says what it counts. The full roll-call list lives on
+ * paginated pages; this one carries the summary a constituent actually
+ * asks for: how much, how often missed, and what lately.
  */
 import Base from "../../layouts/Base.astro";
 import SourceStrip from "../../components/SourceStrip.astro";
 import PartyChip from "../../components/PartyChip.astro";
-import { federalMembers, federalVotesFor } from "../../lib/db";
+import { federalMembers, federalVotesFor, federalCongressStats } from "../../lib/db";
 import { fmtDate } from "../../lib/format";
-import { documentUrlFragment } from "../../lib/federal";
+import { documentUrlFragment, congressLabel } from "../../lib/federal";
 
 export function getStaticPaths() {
   return federalMembers()
@@ -21,8 +24,11 @@ export function getStaticPaths() {
 
 const { member } = Astro.props;
 const votes = federalVotesFor(member.lis_id!);
-const missed = votes.filter((v) => v.vote_cast === "Not Voting").length;
+const byCongress = federalCongressStats(member.lis_id!);
+const missed = byCongress.reduce((s, c) => s + c.missed, 0);
 const latest = votes[0]?.date ?? null;
+const sinceYear = byCongress.at(-1)?.first.slice(0, 4);
+const recent = votes.slice(0, 25);
 
 const castStyle = (cast: string) =>
   cast === "Yea"
@@ -34,7 +40,7 @@ const castStyle = (cast: string) =>
 
 <Base
   title={`${member.name}, U.S. Senator`}
-  description={`Every U.S. Senate roll call cast by ${member.name} of Wisconsin in the current Congress, from the Senate's official records: ${votes.length} votes, ${missed} missed.`}
+  description={`${member.name}'s complete U.S. Senate voting record since ${sinceYear}, from the Senate's official roll calls: ${votes.length.toLocaleString()} votes, ${missed} missed.`}
   breadcrumbs={[{ name: "Federal delegation", url: "/federal/" }]}
   filters={{ type: "Legislator", chamber: "U.S. Senate", party: member.party }}
 >
@@ -46,7 +52,7 @@ const castStyle = (cast: string) =>
     <PartyChip party={member.party} />
   </h1>
   <p class="mt-1 text-sm text-navy-700">
-    U.S. Senator for Wisconsin &middot; term ends {member.term_end.slice(0, 4)} &middot;
+    U.S. Senator for Wisconsin since {sinceYear} &middot; term ends {member.term_end.slice(0, 4)} &middot;
     <a href={`https://www.congress.gov/member/${member.slug}/${member.bioguide}`} class="underline">
       official profile &#8599;
     </a>
@@ -58,27 +64,53 @@ const castStyle = (cast: string) =>
 
   <dl class="mt-4 grid max-w-md grid-cols-2 gap-x-6 gap-y-3 rounded-lg border border-navy-100 bg-white p-4 text-sm">
     <div>
-      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Roll calls, this Congress</dt>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Roll calls since {sinceYear}</dt>
       <dd class="mt-0.5 text-xl font-bold tabular-nums">{votes.length.toLocaleString()}</dd>
     </div>
     <div>
       <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Recorded Not Voting</dt>
       <dd class={`mt-0.5 text-xl font-bold tabular-nums ${missed > 0 ? "text-badger-700" : "text-moss-600"}`}>
         {missed.toLocaleString()}
+        <span class="text-sm font-normal text-navy-600">
+          {" "}({((missed / Math.max(votes.length, 1)) * 100).toFixed(1)}%)
+        </span>
       </dd>
     </div>
   </dl>
 
   <section class="mt-6">
-    <h2 class="text-xl font-bold">Every roll call</h2>
-    <p class="mt-1 text-sm text-navy-600">
-      Newest first. Each vote links to the Senate's official record; bills
-      link to congress.gov.
-    </p>
+    <h2 class="text-xl font-bold">Congress by Congress</h2>
+    <div class="mt-2 max-w-xl overflow-x-auto">
+      <table class="w-full rounded-lg border border-navy-100 bg-white text-sm">
+        <caption class="sr-only">{member.name}'s roll calls and missed votes per Congress</caption>
+        <thead>
+          <tr class="text-left text-xs font-semibold uppercase tracking-wide text-navy-600">
+            <th scope="col" class="px-4 py-2">Congress</th>
+            <th scope="col" class="px-4 py-2 text-right">Roll calls</th>
+            <th scope="col" class="px-4 py-2 text-right">Missed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {byCongress.map((c) => (
+            <tr class="border-t border-navy-100">
+              <td class="px-4 py-1.5">{congressLabel(c.congress)}</td>
+              <td class="px-4 py-1.5 text-right tabular-nums">{c.total.toLocaleString()}</td>
+              <td class={`px-4 py-1.5 text-right tabular-nums ${c.missed > 0 ? "text-badger-700" : "text-navy-600"}`}>
+                {c.missed.toLocaleString()}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="mt-6">
+    <h2 class="text-xl font-bold">Latest roll calls</h2>
     <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
-      {votes.map((v) => (
+      {recent.map((v) => (
         <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2">
-          <span class={`w-14 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.vote_cast)}`}>
+          <span class={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.vote_cast)}`}>
             {v.vote_cast === "Not Voting" ? "NV" : v.vote_cast}
           </span>
           <span class="min-w-0 flex-1">
@@ -103,5 +135,10 @@ const castStyle = (cast: string) =>
         </li>
       ))}
     </ul>
+    <p class="mt-2 text-sm">
+      <a href={`/federal/${member.slug}/votes/`} class="font-semibold underline">
+        All {votes.length.toLocaleString()} roll calls since {sinceYear} &rarr;
+      </a>
+    </p>
   </section>
 </Base>

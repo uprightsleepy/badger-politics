@@ -27,9 +27,14 @@ from scraper.http import USER_AGENT
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "federal"
 
-# congress, session, calendar year. Append the next pair when a new
-# session starts; old sessions stay for backfill.
-SESSIONS: list[tuple[int, int, int]] = [(119, 1, 2025), (119, 2, 2026)]
+# congress, session, calendar year. Starts at the 112th (2011): Ron
+# Johnson's first Congress, so both sitting senators' entire Senate
+# careers are covered (Baldwin joined in the 113th). Append the next
+# pair when a new session starts. Per-vote files are immutable, so the
+# backfill costs one pass and the cache carries it forever.
+SESSIONS: list[tuple[int, int, int]] = [
+    (c, s, 2009 + (c - 111) * 2 + (s - 1)) for c in range(112, 120) for s in (1, 2)
+]
 
 MENU_URL = "https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_{c}_{s}.xml"
 VOTE_URL = (

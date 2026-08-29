@@ -1,0 +1,98 @@
+---
+/** The complete roll-call history, paginated the way the state
+ * legislators' vote pages are. A rest param keeps page 1 at the bare
+ * path. Excluded from site search: fifteen years of motion text would
+ * drown every other result for a senator's name. */
+import Base from "../../../../layouts/Base.astro";
+import PartyChip from "../../../../components/PartyChip.astro";
+import Pager from "../../../../components/Pager.astro";
+import { federalMembers, federalVotesFor } from "../../../../lib/db";
+import { fmtDate } from "../../../../lib/format";
+import { documentUrlFragment } from "../../../../lib/federal";
+
+const PER_PAGE = 250;
+
+export function getStaticPaths() {
+  return federalMembers()
+    .filter((m) => m.chamber === "senate" && m.lis_id)
+    .flatMap((m) => {
+      const total = federalVotesFor(m.lis_id!).length;
+      // literal, not PER_PAGE: getStaticPaths is hoisted out of this scope
+      const pages = Math.max(1, Math.ceil(total / 250));
+      return Array.from({ length: pages }, (_, i) => ({
+        params: { slug: m.slug, page: i === 0 ? undefined : String(i + 1) },
+        props: { member: m, page: i + 1, pages },
+      }));
+    });
+}
+
+const { member, page, pages } = Astro.props;
+const all = federalVotesFor(member.lis_id!);
+const votes = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+const base = `/federal/${member.slug}/votes/`;
+
+const castStyle = (cast: string) =>
+  cast === "Yea"
+    ? "bg-moss-50 text-moss-600"
+    : cast === "Nay"
+      ? "bg-badger-50 text-badger-700"
+      : "bg-navy-50 text-navy-600";
+---
+
+<Base
+  title={`${member.name}: every Senate roll call${page > 1 ? `, page ${page}` : ""}`}
+  description={`Every U.S. Senate roll call cast by ${member.name} of Wisconsin, from the Senate's official records. Page ${page} of ${pages}.`}
+  searchable={false}
+  breadcrumbs={[
+    { name: "Federal delegation", url: "/federal/" },
+    { name: member.name, url: `/federal/${member.slug}/` },
+  ]}
+>
+  <p class="text-sm text-navy-600">
+    <a href={`/federal/${member.slug}/`} class="underline">&larr; {member.name}</a>
+  </p>
+  <h1 class="mt-2 flex flex-wrap items-center gap-3 text-2xl font-bold">
+    Every roll call
+    <PartyChip party={member.party} />
+  </h1>
+  <p class="mt-1 text-sm text-navy-700">
+    {all.length.toLocaleString()} votes, newest first. Each links to the
+    Senate's official record; bills link to congress.gov.
+  </p>
+
+  <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+    {votes.map((v) => (
+      <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2">
+        <span class={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.vote_cast)}`}>
+          {v.vote_cast === "Not Voting" ? "NV" : v.vote_cast}
+        </span>
+        <span class="min-w-0 flex-1">
+          {v.title ?? v.question}
+          {v.document && (
+            documentUrlFragment(v.congress, v.document) ? (
+              <a
+                href={`https://www.congress.gov/bill/${v.congress}th-congress/${documentUrlFragment(v.congress, v.document)}`}
+                class="ml-1 text-xs underline"
+              >
+                {v.document}
+              </a>
+            ) : (
+              <span class="ml-1 text-xs text-navy-600">{v.document}</span>
+            )
+          )}
+        </span>
+        <span class="shrink-0 text-xs tabular-nums text-navy-600">
+          {v.result} {v.yeas}&ndash;{v.nays}
+        </span>
+        <a href={v.source_url} class="shrink-0 py-1 text-xs underline">{fmtDate(v.date)} &#8599;</a>
+      </li>
+    ))}
+  </ul>
+
+  <Pager
+    page={page}
+    pages={pages}
+    href={(n) => (n === 1 ? base : `${base}${n}/`)}
+    label="roll calls"
+  />
+</Base>

@@ -142,6 +142,19 @@ export const federalVotesFor = (lisId: string) =>
     document: string | null; source_url: string; vote_cast: string;
   }[];
 
+/** Per-Congress totals for one senator: cast next to missed, the
+ * "how are they representing us" summary in four columns. */
+export const federalCongressStats = (lisId: string) =>
+  prep(
+      `SELECT v.congress, COUNT(*) AS total,
+              SUM(r.vote_cast = 'Not Voting') AS missed,
+              MIN(v.date) AS first, MAX(v.date) AS last
+       FROM federal_votes v JOIN federal_vote_records r ON r.vote_id = v.id
+       WHERE r.lis_member_id = ?
+       GROUP BY v.congress ORDER BY v.congress DESC`,
+    )
+    .all(lisId) as { congress: number; total: number; missed: number; first: string; last: string }[];
+
 export const federalLatestVoteDate = (): string | null =>
   hasFederal()
     ? ((prep("SELECT MAX(date) AS d FROM federal_votes").get() as { d: string | null }).d)

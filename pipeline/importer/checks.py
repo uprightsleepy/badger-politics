@@ -260,8 +260,8 @@ def check_federal(conn: sqlite3.Connection) -> list[str]:
         """SELECT v.id FROM federal_votes v JOIN federal_vote_records r
              ON r.vote_id = v.id
            GROUP BY v.id
-           HAVING SUM(r.vote_cast = 'Yea') != v.yeas
-               OR SUM(r.vote_cast = 'Nay') != v.nays
+           HAVING SUM(r.vote_cast IN ('Yea', 'Guilty')) != v.yeas
+               OR SUM(r.vote_cast IN ('Nay', 'Not Guilty')) != v.nays
                OR SUM(r.state = 'WI') != 2"""
     ).fetchall()
     for (vote_id,) in bad:

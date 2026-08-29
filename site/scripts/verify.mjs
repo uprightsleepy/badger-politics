@@ -51,14 +51,22 @@ await page.waitForFunction(
 const degenerateLinks = await page.$$eval("#search-results > a", (as) => as.length);
 check("search 'pedophiles' returns no junk matches", degenerateLinks === 0, `${degenerateLinks} links`);
 
-// 2. my-reps: West Allis address -> AD 14 (Tenorio) + SD 5 (Hutton)
-await page.goto("http://127.0.0.1:8931/my-reps/", { waitUntil: "networkidle2" });
-await page.type("#addr", "7120 W National Ave, West Allis, WI");
-await page.click("#addr-form button[type=submit]");
-await page.waitForFunction(
-  () => !document.getElementById("result").classList.contains("hidden"),
-  { timeout: 60000 },
-);
+// 2. my-reps: West Allis address -> AD 14 (Tenorio) + SD 5 (Hutton).
+// One bounded retry: the Census geocoder is a third-party round trip and
+// has twice stalled a run that passed minutes later. The assertion is
+// unchanged -- a second timeout still fails the harness.
+let resolved = false;
+for (let attempt = 0; attempt < 2 && !resolved; attempt++) {
+  await page.goto("http://127.0.0.1:8931/my-reps/", { waitUntil: "networkidle2" });
+  await page.type("#addr", "7120 W National Ave, West Allis, WI");
+  await page.click("#addr-form button[type=submit]");
+  resolved = await page.waitForFunction(
+    () => !document.getElementById("result").classList.contains("hidden"),
+    { timeout: 60000 },
+  ).then(() => true, () => false);
+  if (!resolved) console.log(`geocoder attempt ${attempt + 1} timed out`);
+}
+if (!resolved) throw new Error("my-reps lookup never resolved after 2 attempts");
 const repsText = await page.$eval("#reps", (el) => el.textContent);
 check("West Allis -> Assembly D14 Tenorio", repsText.includes("Angelito Tenorio"), "");
 check("West Allis -> Senate D5 Hutton", repsText.includes("Rob Hutton"), "");
