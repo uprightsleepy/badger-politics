@@ -1,21 +1,33 @@
 /** Device-only follows, same model as districts and polling places: the
- * server never learns what anyone follows. */
+ * server never learns what anyone follows.
+ *
+ * Five kinds share one store. Old two-kind stores migrate silently: any
+ * missing list is simply empty. */
 export interface Follows {
   bills: string[];
   legislators: string[];
+  committees: string[];
+  districts: string[];
+  races: string[];
 }
+export const FOLLOW_KINDS = ["bills", "legislators", "committees", "districts", "races"] as const;
 
 const KEY = "bp-follows";
 const SEEN_KEY = "bp-follows-seen";
 
 export function getFollows(): Follows {
+  let raw: unknown = null;
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) ?? "null");
-    if (raw && Array.isArray(raw.bills) && Array.isArray(raw.legislators)) return raw;
+    raw = JSON.parse(localStorage.getItem(KEY) ?? "null");
   } catch {
     localStorage.removeItem(KEY);
   }
-  return { bills: [], legislators: [] };
+  const out = {} as Follows;
+  for (const kind of FOLLOW_KINDS) {
+    const list = (raw as Record<string, unknown> | null)?.[kind];
+    out[kind] = Array.isArray(list) ? list.filter((x) => typeof x === "string") : [];
+  }
+  return out;
 }
 
 export function isFollowing(kind: keyof Follows, id: string): boolean {

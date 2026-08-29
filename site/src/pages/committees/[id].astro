@@ -1,6 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import SourceStrip from "../../components/SourceStrip.astro";
+import FollowButton from "../../components/FollowButton.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import { allCommittees, committeeFor, committeeRecord } from "../../lib/db";
 import { chamberName, committeeSlug, personSlug, fmtDate, fmtTime, roleAbbr } from "../../lib/format";
@@ -28,9 +29,15 @@ const roleLabel = (role: string) =>
   breadcrumbs={[{ name: "Committees", url: "/committees/" }]}
 >
   <p class="text-sm text-navy-600"><a href="/committees/" class="underline">Committees</a></p>
-  <h1 class="mt-1 text-2xl font-bold">
-    {committee.chamber ? `${chamberName(committee.chamber)} ` : ""}{committee.name}
-  </h1>
+  <div class="mt-1 flex flex-wrap items-center gap-3">
+    <h1 class="text-2xl font-bold">
+      {committee.chamber ? `${chamberName(committee.chamber)} ` : ""}{committee.name}
+    </h1>
+    <span class="ml-auto flex items-center gap-3" data-pagefind-ignore>
+      <FollowButton kind="committees" id={committeeSlug(committee.id)} />
+      <a href={`/feeds/committees/${committeeSlug(committee.id)}.xml`} class="text-xs underline">Atom feed</a>
+    </span>
+  </div>
   <SourceStrip sources={[{ label: "Wisconsin Legislature", href: "https://docs.legis.wisconsin.gov" }]} />
 
   {record && (

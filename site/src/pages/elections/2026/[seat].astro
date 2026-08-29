@@ -14,6 +14,7 @@
  */
 import Base from "../../../layouts/Base.astro";
 import SourceStrip from "../../../components/SourceStrip.astro";
+import FollowButton from "../../../components/FollowButton.astro";
 import PartyChip from "../../../components/PartyChip.astro";
 import Portrait from "../../../components/Portrait.astro";
 import DistrictMap from "../../../components/DistrictMap.astro";
@@ -78,6 +79,9 @@ const description =
         Open seat
       </span>
     )}
+    <span class="ml-auto" data-pagefind-ignore>
+      <FollowButton kind="races" id={seatKey} />
+    </span>
   </div>
   <SourceStrip
     sources={[{ label: "Wisconsin Elections Commission", href: "https://elections.wi.gov" }]}

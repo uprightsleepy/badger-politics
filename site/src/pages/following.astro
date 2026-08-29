@@ -5,102 +5,160 @@ import Base from "../layouts/Base.astro";
 <Base
   noindex
   title="Following"
-  description="Bills and legislators you follow, with what changed since your last visit. Stored on this device only."
+  description="Everything you follow — bills, legislators, committees, districts and races — with what changed since your last visit. Stored on this device only."
 >
   <h1 class="text-2xl font-bold">Following</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
     Follows live in this browser only; the site never learns what you
-    follow. For updates anywhere, every bill and legislator also has an
-    Atom feed you can add to any feed reader.
+    follow. For updates anywhere, bills, legislators and committees also
+    have Atom feeds you can add to any feed reader.
   </p>
+  <p id="follow-changed-note" hidden class="mt-3 max-w-3xl rounded-lg border border-moss-600/40 bg-moss-50 px-4 py-2 text-sm font-semibold text-moss-600"></p>
 
   <div id="follow-empty" hidden class="mt-4 max-w-3xl rounded-lg border border-navy-100 bg-white p-4 text-sm">
-    You aren't following anything yet. Use the Follow button on any bill or
-    legislator page, then check back here to see what changed.
+    You aren't following anything yet. Use the Follow button on any bill,
+    legislator, committee, district or race page, then check back here to
+    see what changed.
   </div>
 
-  <section id="follow-bills-section" hidden class="mt-6">
-    <h2 class="text-xl font-bold">Bills</h2>
-    <p id="follow-changed-note" hidden class="mt-1 text-sm font-semibold text-moss-600"></p>
-    <ul id="follow-bills" class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm"></ul>
-  </section>
-
-  <section id="follow-legislators-section" hidden class="mt-6">
-    <h2 class="text-xl font-bold">Legislators</h2>
-    <ul id="follow-legislators" class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm"></ul>
-  </section>
+  {
+    [
+      ["bills", "Bills"],
+      ["legislators", "Legislators"],
+      ["committees", "Committees"],
+      ["races", "2026 races"],
+      ["districts", "Districts"],
+    ].map(([kind, label]) => (
+      <section id={`follow-${kind}-section`} hidden class="mt-6">
+        <h2 class="text-xl font-bold">{label}</h2>
+        <ul id={`follow-${kind}`} class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm"></ul>
+      </section>
+    ))
+  }
 
   <p id="follow-status" role="status" class="sr-only"></p>
 
   <script>
-    import { getFollows, toggleFollow, lastSeen, markSeen } from "../scripts/follows";
+    import { getFollows, toggleFollow, lastSeen, markSeen, FOLLOW_KINDS } from "../scripts/follows";
     import { esc } from "../lib/html";
 
-    async function billRow(id: string, seen: string | null): Promise<string> {
+    // every kind's row ends the same way
+    const unfollow = (kind: string, id: string) =>
+      `<button type="button" data-unfollow-kind="${esc(kind)}" data-unfollow-id="${esc(id)}" class="ml-auto shrink-0 py-1 text-xs underline">unfollow</button>`;
+    const changedBadge =
+      `<span class="shrink-0 rounded-full bg-moss-50 px-2 py-0.5 text-xs font-semibold text-moss-600">new action</span>`;
+    const row = (changed: boolean, body: string) =>
+      `<li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2${changed ? " border-l-4 border-moss-600" : ""}">${body}</li>`;
+    const seatName = (id: string) => {
+      const [kind, num] = id.split("-");
+      return `${kind === "senate" ? "Senate" : "Assembly"} District ${num}`;
+    };
+
+    async function billRow(id: string, seen: string | null) {
       const [session, slug] = [id.slice(0, id.indexOf("-")), id.slice(id.indexOf("-") + 1)];
       try {
         const b = await (await fetch(`/api/v1/bills/${session}/${slug}.json`)).json();
-        const changed = seen && b.latest_action_date && b.latest_action_date > seen;
-        return `<li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2${changed ? " border-l-4 border-moss-600" : ""}">
-          <a href="/bills/${esc(session)}/${esc(slug)}/" class="w-20 shrink-0 py-1 font-bold underline">${esc(b.identifier)}</a>
-          <span class="min-w-0 flex-1 truncate">${esc(b.title ?? "")}</span>
-          ${changed ? `<span class="shrink-0 rounded-full bg-moss-50 px-2 py-0.5 text-xs font-semibold text-moss-600">new action</span>` : ""}
-          <span class="shrink-0 text-xs text-navy-600">${esc(b.latest_action_desc ?? "")} (${esc(b.latest_action_date ?? "")})</span>
-          <button type="button" data-unfollow-bill="${esc(id)}" class="shrink-0 py-1 text-xs underline">unfollow</button>
-        </li>`;
+        const changed = !!(seen && b.latest_action_date && b.latest_action_date > seen);
+        return { changed, html: row(changed,
+          `<a href="/bills/${esc(session)}/${esc(slug)}/" class="w-20 shrink-0 py-1 font-bold underline">${esc(b.identifier)}</a>
+           <span class="min-w-0 flex-1 truncate">${esc(b.title ?? "")}</span>
+           ${changed ? changedBadge : ""}
+           <span class="shrink-0 text-xs text-navy-600">${esc(b.latest_action_desc ?? "")} (${esc(b.latest_action_date ?? "")})</span>
+           ${unfollow("bills", id)}`) };
       } catch {
-        return `<li class="px-4 py-2 text-navy-600">Couldn't load ${esc(id)}
-          <button type="button" data-unfollow-bill="${esc(id)}" class="ml-2 py-1 text-xs underline">unfollow</button></li>`;
+        return { changed: false, html: row(false, `<span class="text-navy-600">Couldn't load ${esc(id)}</span>${unfollow("bills", id)}`) };
       }
     }
+
+    async function legislatorRow(id: string, seen: string | null) {
+      try {
+        const p = await (await fetch(`/api/v1/legislators/${id}.json`)).json();
+        const last = p.votes?.[0];
+        const changed = !!(seen && last?.date && last.date > seen);
+        return { changed, html: row(changed,
+          `<a href="/legislators/${esc(id)}/" class="min-w-0 flex-1 truncate py-1 font-semibold underline">${esc(p.name ?? id)}</a>
+           ${changed ? changedBadge : ""}
+           ${last ? `<span class="shrink-0 text-xs text-navy-600">last vote ${esc(last.date)} on ${esc(last.bill_id ?? "")}</span>` : ""}
+           ${unfollow("legislators", id)}`) };
+      } catch {
+        return { changed: false, html: row(false,
+          `<a href="/legislators/${esc(id)}/" class="py-1 underline">View profile</a>${unfollow("legislators", id)}`) };
+      }
+    }
+
+    async function committeeRow(id: string, seen: string | null) {
+      // no per-committee JSON; the Atom feed carries the name and the
+      // newest hearing's date, which is all this row needs
+      try {
+        const xml = await (await fetch(`/feeds/committees/${id}.xml`)).text();
+        const name = (xml.match(/<title>([^<]+)<\/title>/)?.[1] ?? id).replace(/ — hearings$/, "");
+        const updated = xml.match(/<entry>.*?<updated>([^<]+)<\/updated>/s)?.[1]?.slice(0, 10);
+        const changed = !!(seen && updated && updated > seen);
+        return { changed, html: row(changed,
+          `<a href="/committees/${esc(id)}/" class="min-w-0 flex-1 truncate py-1 font-semibold underline">${esc(name)}</a>
+           ${changed ? changedBadge : ""}
+           ${updated ? `<span class="shrink-0 text-xs text-navy-600">latest hearing ${esc(updated)}</span>` : ""}
+           ${unfollow("committees", id)}`) };
+      } catch {
+        return { changed: false, html: row(false,
+          `<a href="/committees/${esc(id)}/" class="py-1 underline">${esc(id)}</a>${unfollow("committees", id)}`) };
+      }
+    }
+
+    function raceRow(id: string, ballot: any) {
+      const [kind, num] = id.split("-");
+      const r = ballot?.[kind]?.[num];
+      const names = r
+        ? [...(r.incumbentRunning && r.incumbent ? [r.incumbent.name] : []), ...(r.candidates ?? []).map((c: any) => c.name)]
+        : [];
+      return row(false,
+        `<a href="/elections/2026/${esc(id)}/" class="min-w-0 flex-1 truncate py-1 font-semibold underline">${esc(seatName(id))}</a>
+         ${r && !r.incumbentRunning ? `<span class="shrink-0 rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">open seat</span>` : ""}
+         ${names.length ? `<span class="min-w-0 flex-1 truncate text-xs text-navy-600">${esc(names.join(", "))}</span>` : ""}
+         ${unfollow("races", id)}`);
+    }
+
+    const districtRow = (id: string) =>
+      row(false,
+        `<a href="/districts/${esc(id)}/" class="min-w-0 flex-1 truncate py-1 font-semibold underline">${esc(seatName(id))}</a>
+         ${unfollow("districts", id)}`);
 
     async function render() {
       const follows = getFollows();
       const seen = lastSeen();
-      const empty = document.getElementById("follow-empty")!;
-      const billsSection = document.getElementById("follow-bills-section")!;
-      const legsSection = document.getElementById("follow-legislators-section")!;
-      empty.hidden = follows.bills.length > 0 || follows.legislators.length > 0;
-      billsSection.hidden = follows.bills.length === 0;
-      legsSection.hidden = follows.legislators.length === 0;
+      const total = FOLLOW_KINDS.reduce((n, k) => n + follows[k].length, 0);
+      document.getElementById("follow-empty")!.hidden = total > 0;
 
-      if (follows.bills.length) {
-        const rows = await Promise.all(follows.bills.map((id) => billRow(id, seen)));
-        document.getElementById("follow-bills")!.innerHTML = rows.join("");
-        const changed = document.querySelectorAll("#follow-bills .border-moss-600").length;
-        const note = document.getElementById("follow-changed-note")!;
-        note.hidden = !seen || changed === 0;
-        note.textContent = changed
-          ? `${changed} of your bills ${changed > 1 ? "have" : "has"} new action since your last visit${seen ? ` (${seen})` : ""}.`
-          : "";
-        document.getElementById("follow-status")!.textContent =
-          `${follows.bills.length} followed bills loaded${changed ? `, ${changed} with new action` : ""}.`;
-      }
+      // races share one static file; fetch it once, only when needed
+      const ballot = follows.races.length
+        ? await fetch("/data/ballot-2026.json").then((r) => r.json()).catch(() => null)
+        : null;
 
-      if (follows.legislators.length) {
-        const rows = await Promise.all(follows.legislators.map(async (id) => {
-          try {
-            const p = await (await fetch(`/api/v1/legislators/${id}.json`)).json();
-            return `<li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2">
-              <a href="/legislators/${esc(id)}/" class="min-w-0 flex-1 truncate py-1 font-semibold underline">${esc(p.name ?? id)}</a>
-              <button type="button" data-unfollow-leg="${esc(id)}" class="shrink-0 py-1 text-xs underline">unfollow</button>
-            </li>`;
-          } catch {
-            return `<li class="px-4 py-2"><a href="/legislators/${esc(id)}/" class="underline">View profile</a>
-              <button type="button" data-unfollow-leg="${esc(id)}" class="ml-2 py-1 text-xs underline">unfollow</button></li>`;
-          }
-        }));
-        document.getElementById("follow-legislators")!.innerHTML = rows.join("");
-      }
+      let changedCount = 0;
+      const fill = async (kind: string, htmls: { changed?: boolean; html: string }[] | string[]) => {
+        const list = htmls.map((h) => (typeof h === "string" ? { changed: false, html: h } : h));
+        changedCount += list.filter((h) => h.changed).length;
+        document.getElementById(`follow-${kind}-section`)!.hidden = list.length === 0;
+        document.getElementById(`follow-${kind}`)!.innerHTML = list.map((h) => h.html).join("");
+      };
 
-      document.querySelectorAll<HTMLButtonElement>("[data-unfollow-bill]").forEach((b) =>
+      await fill("bills", await Promise.all(follows.bills.map((id) => billRow(id, seen))));
+      await fill("legislators", await Promise.all(follows.legislators.map((id) => legislatorRow(id, seen))));
+      await fill("committees", await Promise.all(follows.committees.map((id) => committeeRow(id, seen))));
+      await fill("races", follows.races.map((id) => raceRow(id, ballot)));
+      await fill("districts", follows.districts.map(districtRow));
+
+      const note = document.getElementById("follow-changed-note")!;
+      note.hidden = !seen || changedCount === 0;
+      note.textContent = changedCount
+        ? `${changedCount} of the things you follow ${changedCount > 1 ? "have" : "has"} new action since your last visit (${seen}).`
+        : "";
+      document.getElementById("follow-status")!.textContent =
+        `${total} followed item${total === 1 ? "" : "s"} loaded${changedCount ? `, ${changedCount} with new action` : ""}.`;
+
+      document.querySelectorAll<HTMLButtonElement>("[data-unfollow-kind]").forEach((b) =>
         b.addEventListener("click", () => {
-          toggleFollow("bills", b.dataset.unfollowBill!);
-          render();
-        }));
-      document.querySelectorAll<HTMLButtonElement>("[data-unfollow-leg]").forEach((b) =>
-        b.addEventListener("click", () => {
-          toggleFollow("legislators", b.dataset.unfollowLeg!);
+          toggleFollow(b.dataset.unfollowKind as any, b.dataset.unfollowId!);
           render();
         }));
     }

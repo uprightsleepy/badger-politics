@@ -1,6 +1,9 @@
 ---
 /** Device-only follow toggle; state lives in localStorage. */
-interface Props { kind: "bills" | "legislators"; id: string }
+interface Props {
+  kind: "bills" | "legislators" | "committees" | "districts" | "races";
+  id: string;
+}
 const { kind, id } = Astro.props;
 ---
 <button
@@ -18,7 +21,7 @@ const { kind, id } = Astro.props;
 <script>
   import { isFollowing, toggleFollow } from "../scripts/follows";
   document.querySelectorAll<HTMLButtonElement>("[data-follow-kind]").forEach((btn) => {
-    const kind = btn.dataset.followKind as "bills" | "legislators";
+    const kind = btn.dataset.followKind as keyof import("../scripts/follows").Follows;
     const id = btn.dataset.followId!;
     const paint = (on: boolean) => {
       btn.setAttribute("aria-pressed", String(on));

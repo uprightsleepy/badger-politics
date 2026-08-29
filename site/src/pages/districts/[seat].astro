@@ -1,6 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import SourceStrip from "../../components/SourceStrip.astro";
+import FollowButton from "../../components/FollowButton.astro";
 import DistrictMap from "../../components/DistrictMap.astro";
 import {
   seatTerms, sittingPeople, electionFor, electionHistoryFor, lastMarginFor,
@@ -62,7 +63,12 @@ const lineage = [...byPerson.entries()]
   description={`${seatName}: the current member, everyone who has held the seat since 2009, and official election results.`}
 >
   <p class="text-sm text-navy-600"><a href="/districts/" class="underline">← All districts</a></p>
-  <h1 class="mt-2 text-2xl font-bold">{seatName}</h1>
+  <div class="mt-2 flex flex-wrap items-center gap-3">
+    <h1 class="text-2xl font-bold">{seatName}</h1>
+    <span class="ml-auto" data-pagefind-ignore>
+      <FollowButton kind="districts" id={seatKey} />
+    </span>
+  </div>
   <SourceStrip
     sources={[
       { label: "Wisconsin LTSB (2024 boundaries)" },
