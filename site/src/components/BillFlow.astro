@@ -16,9 +16,11 @@
  * Static SVG, no charting library. The interactivity is one small inline
  * script: hovering (or focusing) any part lights the whole path a bill
  * took and quiets the rest, and clicking goes to the bills themselves.
- * All of it is enhancement -- the legend beneath carries every number as
- * text and every link, and stands alone on a phone, where a Sankey's
- * labels would be too small to read.
+ * All of it is enhancement, and nothing in the diagram is the only
+ * route to a fact: every number and link also exists as plain HTML in
+ * the outcome cards, which are shown on phones -- where a Sankey's
+ * labels would be too small to read -- and swapped for the diagram on
+ * wider screens.
  */
 interface Props {
   flow: {
@@ -272,7 +274,7 @@ const alt =
   >
   </div>
 
-  <ul class="mt-4 grid gap-2 sm:grid-cols-2">
+  <ul class="mt-4 grid gap-2 sm:hidden">
     {terminals.map((l) => (
       <li>
         <a
