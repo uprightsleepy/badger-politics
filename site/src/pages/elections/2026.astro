@@ -124,7 +124,8 @@ const statewide = OFFICES.map(([key, label]) => {
   </section>
   <p class="mt-2 max-w-3xl text-navy-700">
     All five statewide constitutional offices, all 99 Assembly seats, and the
-    17 odd-numbered Senate seats are on the ballot. Candidate status comes
+    17 odd-numbered Senate seats are on the ballot. Every legislative seat
+    has its own race page: candidates, the district, and how it has voted. Candidate status comes
     from the Wisconsin Elections Commission's ballot access report. The final
     ballot is certified after the August 11 primary.
   </p>
@@ -240,7 +241,12 @@ const statewide = OFFICES.map(([key, label]) => {
           const opponents = election!.opponents.filter((o) => o.ballot_status !== "Deny");
           return (
             <li class="flex flex-wrap items-baseline gap-x-3 px-4 py-2">
-              <span class="w-10 shrink-0 font-bold">D{person.district}</span>
+              <a
+                href={`/elections/2026/${person.chamber === "upper" ? "senate" : "assembly"}-${person.district}/`}
+                class="w-14 shrink-0 py-1 font-bold underline"
+              >
+                D{person.district}
+              </a>
               <PartyChip party={person.party} />
               <a href={`/legislators/${personSlug(person.id)}/`} class="underline">{person.name}</a>
               {margin?.margin != null && margin.margin < 5 && (

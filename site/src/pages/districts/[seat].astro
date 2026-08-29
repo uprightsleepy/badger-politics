@@ -91,6 +91,9 @@ const lineage = [...byPerson.entries()]
                 ? "Not running in November 2026"
                 : `Seat next on the ballot in November ${election.cycle_year}`
             : `Seat next on the ballot in November ${election.cycle_year}`}
+          {election.cycle_year === 2026 && (
+            <a href={`/elections/2026/${seatKey}/`} class="ml-2 underline">2026 race &rarr;</a>
+          )}
         </p>
       )}
       {lastMargin && (
