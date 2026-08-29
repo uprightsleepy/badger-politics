@@ -61,7 +61,7 @@ const facets = [
           <span class="text-xs text-navy-600">
             Chair:{" "}
             {c.chair_person_id ? (
-              <a href={`/legislators/${personSlug(c.chair_person_id)}/`} class="underline">
+              <a href={`/legislators/${personSlug(c.chair_person_id)}/`} class="inline-block py-1.5 underline">
                 {c.chair_name}
               </a>
             ) : (
@@ -81,7 +81,7 @@ const facets = [
           c.died_here > 0 && (
             <a
               href={`/committees/${committeeSlug(c.id)}/`}
-              class="shrink-0 text-xs tabular-nums text-badger-700 underline"
+              class="inline-block shrink-0 py-1.5 text-xs tabular-nums text-badger-700 underline"
             >
               {c.died_here.toLocaleString()} died here
             </a>
