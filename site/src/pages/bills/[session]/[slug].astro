@@ -77,6 +77,12 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
 <Base
   title={seoTitle}
   description={seoDescription}
+  filters={{
+    type: isBill ? "Bill" : "Resolution",
+    session: sessionName,
+    outcome: STATUS_LABELS[bill.status ?? ""] ?? "Introduced",
+    chamber: passedChamberName,
+  }}
   breadcrumbs={[
     { name: "Bills", url: "/bills/" },
     { name: sessionName, url: `/bills/${bill.session_id}/` },

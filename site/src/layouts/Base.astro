@@ -18,6 +18,11 @@ interface Props {
    * BreadcrumbList so a result shows its place in the site rather than a
    * bare URL. */
   breadcrumbs?: { name: string; url: string }[];
+  /** Search facets for this page, baked into the Pagefind index at build
+   * time ("type: Bill", "session: 2025-2026"). The homepage search UI
+   * offers them as filters; a page without them is still indexed but
+   * only appears in unfiltered results. */
+  filters?: Record<string, string>;
 }
 const {
   title,
@@ -26,6 +31,7 @@ const {
   searchable = true,
   noindex = false,
   breadcrumbs,
+  filters,
 } = Astro.props;
 const crumbJson = breadcrumbs?.length
   ? JSON.stringify({
@@ -224,6 +230,12 @@ const NAV_DIRECT: [string, string][] = [
     </header>
 
     <main id="main" tabindex="-1" class="mx-auto max-w-5xl px-4 py-8 focus:outline-none" {...(searchable ? { "data-pagefind-body": true } : {})}>
+      {/* one element per facet: Pagefind reads the value from content, and
+          the inline colon syntax cannot carry more than one filter */}
+      {searchable && filters &&
+        Object.entries(filters).map(([k, v]) => (
+          <meta content={v} data-pagefind-filter={`${k}[content]`} />
+        ))}
       <slot />
     </main>
 

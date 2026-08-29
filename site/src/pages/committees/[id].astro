@@ -22,6 +22,7 @@ const roleLabel = (role: string) =>
 
 <Base
   title={committee.name}
+  filters={{ type: "Committee", chamber: chamberName(committee.chamber) || "Joint" }}
   description={`${chamberName(committee.chamber) || "Joint"} committee: members, hearings, and bills that died here without a hearing.`}
   breadcrumbs={[{ name: "Committees", url: "/committees/" }]}
 >

@@ -21,6 +21,7 @@ const kind = cfTypeOf(committee.entityId);
 
 <Base
   title={committee.name}
+  filters={{ type: "Campaign money" }}
   description={`${committee.name} has given ${fmtMoney(committee.total)} to ${committee.recipients} sitting Wisconsin legislators.`}
 >
   <p class="text-sm text-navy-600">

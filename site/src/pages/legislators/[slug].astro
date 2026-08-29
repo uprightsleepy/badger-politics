@@ -177,6 +177,11 @@ const tally = TALLY_ORDER.map((status) => ({
 
 <Base
   title={`${person.name}${person.district != null ? `, ${roleAbbr(person.chamber)} ${person.district}` : ""}`}
+  filters={{
+    type: "Legislator",
+    ...(person.party ? { party: person.party } : {}),
+    ...(person.chamber ? { chamber: chamberName(person.chamber) } : {}),
+  }}
   breadcrumbs={[{ name: "Legislators", url: "/legislators/" }]}
   description={`${person.current_role ?? "Former legislator"}, ${chamberName(person.chamber)} District ${person.district}. Votes, sponsored bills, committees, attendance and campaign money, from official records.`}
 >
