@@ -42,10 +42,13 @@ check(
 await page.$eval("#q", (el) => (el.value = ""));
 await page.type("#q", "pedophiles");
 await page.waitForFunction(
-  () => document.getElementById("search-results").textContent.includes("No bills match"),
+  () => document.getElementById("search-results").textContent.includes("Nothing matches"),
   { timeout: 30000 },
 ).catch(() => {});
-const degenerateLinks = await page.$$eval("#search-results a", (as) => as.length);
+// direct children only: the no-result state deliberately offers recovery
+// links (find-my-legislators, official record) inside a nested block, and
+// those are not junk matches
+const degenerateLinks = await page.$$eval("#search-results > a", (as) => as.length);
 check("search 'pedophiles' returns no junk matches", degenerateLinks === 0, `${degenerateLinks} links`);
 
 // 2. my-reps: West Allis address -> AD 14 (Tenorio) + SD 5 (Hutton)
