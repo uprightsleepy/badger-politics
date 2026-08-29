@@ -62,29 +62,29 @@ const castStyle = (cast: string) =>
 
   <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
     {votes.map((v) => (
-      <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2">
-        <span class={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.vote_cast)}`}>
-          {v.vote_cast === "Not Voting" ? "NV" : v.vote_cast}
-        </span>
-        <span class="min-w-0 flex-1">
-          {v.title ?? v.question}
-          {v.document && (
-            documentUrlFragment(v.congress, v.document) ? (
-              <a
-                href={`https://www.congress.gov/bill/${v.congress}th-congress/${documentUrlFragment(v.congress, v.document)}`}
-                class="ml-1 text-xs underline"
-              >
-                {v.document}
-              </a>
-            ) : (
-              <span class="ml-1 text-xs text-navy-600">{v.document}</span>
-            )
-          )}
-        </span>
-        <span class="shrink-0 text-xs tabular-nums text-navy-600">
-          {v.result} {v.yeas}&ndash;{v.nays}
-        </span>
-        <a href={v.source_url} class="shrink-0 py-1 text-xs underline">{fmtDate(v.date)} &#8599;</a>
+<li class="px-4 py-2">
+        <div class="flex items-baseline gap-x-3">
+          <span class={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-bold ${castStyle(v.vote_cast)}`}>
+            {v.vote_cast === "Not Voting" ? "NV" : v.vote_cast}
+          </span>
+          <span class="min-w-0 flex-1">
+            {v.title ?? v.question}
+            {v.document && (
+              documentUrlFragment(v.congress, v.document) ? (
+                <a
+                  href={`https://www.congress.gov/bill/${v.congress}th-congress/${documentUrlFragment(v.congress, v.document)}`}
+                  class="ml-1 whitespace-nowrap text-xs underline"
+                >
+                  {v.document}
+                </a>
+              ) : (
+                <span class="ml-1 whitespace-nowrap text-xs text-navy-600">{v.document}</span>
+              )
+            )}
+          </span>
+          <a href={v.source_url} class="shrink-0 whitespace-nowrap py-1 text-xs underline">{fmtDate(v.date)} &#8599;</a>
+        </div>
+        <p class="mt-0.5 pl-12 text-xs text-navy-600">{v.result} &middot; {v.yeas}&ndash;{v.nays}</p>
       </li>
     ))}
   </ul>
