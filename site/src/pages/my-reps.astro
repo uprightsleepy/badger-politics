@@ -74,54 +74,26 @@ import Base from "../layouts/Base.astro";
     import { savedDistrict } from "../lib/district";
     import { esc } from "../lib/html";
     import { fmtDate, partyLetter, partyStyle, shortTitle } from "../lib/format";
+    import { districtAt, districtForAddress, saveDistrict } from "../lib/lookup";
 
     const statusEl = document.getElementById("status")!;
     const resultEl = document.getElementById("result")!;
     const repsEl = document.getElementById("reps")!;
-    let districts: any = null;
     let reps: any = null;
     let summaries: any = null;
 
+    // The boundaries and the point-in-polygon test live in lib/lookup, shared
+    // with the homepage. What this page loads on its own is the roster it
+    // needs to draw the cards.
     async function loadData() {
-      if (!districts) {
-        statusEl.textContent = "Loading district boundaries…";
-        [districts, reps, summaries] = await Promise.all([
-          fetch("/data/wi-districts-2024.geojson").then((r) => r.json()),
+      if (!reps) {
+        statusEl.textContent = "Loading your districts…";
+        [reps, summaries] = await Promise.all([
           fetch("/data/reps.json").then((r) => r.json()),
           fetch("/data/rep-summaries.json").then((r) => r.json()).catch(() => null),
         ]);
       }
     }
-
-    function pointInRing(x: number, y: number, ring: number[][]): boolean {
-      let inside = false;
-      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const [xi, yi] = ring[i];
-        const [xj, yj] = ring[j];
-        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
-          inside = !inside;
-        }
-      }
-      return inside;
-    }
-
-    function pointInPolygon(x: number, y: number, geom: any): boolean {
-      const polys = geom.type === "Polygon" ? [geom.coordinates] : geom.coordinates;
-      for (const poly of polys) {
-        if (pointInRing(x, y, poly[0]) && !poly.slice(1).some((h: number[][]) => pointInRing(x, y, h))) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    function findDistrict(lng: number, lat: number) {
-      for (const f of districts.features) {
-        if (pointInPolygon(lng, lat, f.geometry)) return f.properties;
-      }
-      return null;
-    }
-
 
     const VOTE_STYLES: Record<string, { label: string; cls: string }> = {
       yes: { label: "Aye", cls: "bg-moss-50 text-moss-600" },
@@ -287,7 +259,7 @@ import Base from "../layouts/Base.astro";
     }
 
     function show(props: { ad: number; sd: number }, announce = false) {
-      localStorage.setItem("bp-district", JSON.stringify(props));
+      saveDistrict(props);
       repsEl.innerHTML = [
         repCard(
           `Assembly District ${props.ad}`,
@@ -313,8 +285,7 @@ import Base from "../layouts/Base.astro";
     }
 
     async function resolvePoint(lng: number, lat: number) {
-      await loadData();
-      const props = findDistrict(lng, lat);
+      const [props] = await Promise.all([districtAt(lng, lat), loadData()]);
       if (props) {
         show(props, true);
       } else {
@@ -323,55 +294,16 @@ import Base from "../layouts/Base.astro";
       }
     }
 
-    // The Census geocoder has no CORS headers; it supports JSONP, which keeps
-    // the no-server architecture (the address goes to census.gov only).
-    function geocode(addr: string): Promise<any> {
-      return new Promise((resolve, reject) => {
-        const cb = "bpGeo" + Date.now();
-        const script = document.createElement("script");
-        const timer = setTimeout(() => {
-          cleanup();
-          reject(new Error("timeout"));
-        }, 15000);
-        function cleanup() {
-          clearTimeout(timer);
-          delete (window as any)[cb];
-          script.remove();
-        }
-        (window as any)[cb] = (data: any) => {
-          cleanup();
-          resolve(data);
-        };
-        script.onerror = () => {
-          cleanup();
-          reject(new Error("load error"));
-        };
-        script.src =
-          "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=jsonp&callback=" +
-          cb +
-          "&address=" +
-          encodeURIComponent(addr);
-        document.head.appendChild(script);
-      });
-    }
-
     document.getElementById("addr-form")!.addEventListener("submit", async (e) => {
       e.preventDefault();
       const addr = (document.getElementById("addr") as HTMLInputElement).value;
       statusEl.textContent = "Looking up address…";
-      try {
-        const data = await geocode(addr);
-        const match = data?.result?.addressMatches?.[0];
-        if (!match) {
-          statusEl.textContent =
-            "Couldn't find that address. Try adding the city, or use your location instead.";
-          return;
-        }
-        await resolvePoint(match.coordinates.x, match.coordinates.y);
-      } catch {
-        statusEl.textContent =
-          "The Census geocoder didn't respond. Try the location button instead.";
+      const [result] = await Promise.all([districtForAddress(addr), loadData()]);
+      if ("error" in result) {
+        statusEl.textContent = result.error;
+        return;
       }
+      show(result.district, true);
     });
 
     document.getElementById("geo-btn")!.addEventListener("click", () => {
