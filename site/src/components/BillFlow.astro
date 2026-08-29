@@ -7,9 +7,12 @@
  * being voted on, and a chart of survivors hides that. A flow has to name
  * every branch, so the numbers are forced to add up in public.
  *
- * Static SVG, no charting library and no client JavaScript. The legend
- * beneath carries every number as text and every link, and stands alone on
- * a phone, where a Sankey's labels would be too small to read.
+ * Static SVG, no charting library. The interactivity is one small inline
+ * script: hovering (or focusing) any part lights the whole path a bill
+ * took and dims the rest, and clicking goes to the bills themselves. All
+ * of it is enhancement -- the legend beneath carries every number as text
+ * and every link, and stands alone on a phone, where a Sankey's labels
+ * would be too small to read.
  */
 interface Props {
   flow: {
@@ -23,11 +26,16 @@ const { flow, session } = Astro.props;
 const MOSS = "#3e7051", GOLD = "#a87a1e", NAVY = "#2d4a73";
 const NAVY_LT = "#9fb3cc", BADGER = "#b33a2b", INK = "#1d2e4a";
 
+const num = (n: number) => n.toLocaleString();
+const pct = (n: number) => Math.round((n / flow.introduced) * 100);
+const tipFor = (label: string, n: number) => `${label}: ${num(n)} bills, ${pct(n)}% of all introduced`;
+
 // Ordered top to bottom. A branch holding a single bucket ends at its own
 // column, which is how the still-moving case draws itself.
 const branches = [
   {
-    label: "Passed both chambers", n: flow.passedBoth, color: NAVY,
+    key: "passed", label: "Passed both chambers", n: flow.passedBoth, color: NAVY,
+    href: "/governors-desk/",
     leaves: [
       {
         key: "enacted", label: "Became law", n: flow.enacted, color: MOSS,
@@ -42,7 +50,8 @@ const branches = [
     ],
   },
   {
-    label: "Still moving", n: flow.moving, color: NAVY_LT,
+    key: "moving", label: "Still moving", n: flow.moving, color: NAVY_LT,
+    href: `/bills/${session}/`,
     leaves: [
       {
         key: "moving", label: "Still moving", n: flow.moving, color: NAVY_LT,
@@ -52,7 +61,8 @@ const branches = [
     ],
   },
   {
-    label: "Died without passing", n: flow.died, color: BADGER,
+    key: "died", label: "Died without passing", n: flow.died, color: BADGER,
+    href: `/bills/${session}/status/failed_sjr1/`,
     leaves: [
       {
         key: "heard", label: "Heard, then went no further", n: flow.heard, color: NAVY_LT,
@@ -69,9 +79,11 @@ const branches = [
 ].filter((b) => b.n > 0);
 
 // every final bucket, for the legend and the text alternative
-const terminals = branches.flatMap((b) => b.leaves);
+const terminals = branches.flatMap((b) => b.leaves.map((l) => ({ ...l, g: b.key })));
 // only branches that actually split are drawn in the third column
-const col2Nodes = branches.flatMap((b) => (b.leaves.length > 1 ? b.leaves : []));
+const col2Nodes = branches.flatMap((b) =>
+  b.leaves.length > 1 ? b.leaves.map((l) => ({ ...l, g: b.key })) : [],
+);
 
 const VB_W = 820, VB_H = 300, PAD = 12, GAP = 11, NODE_W = 11;
 const X0 = 92, X1 = 372, X2 = 616;
@@ -115,7 +127,11 @@ let src = introTop;
 const flows1 = cols1.map((b) => {
   const path = ribbon(X0 + NODE_W, src, src + b.h, X1, b.y, b.y + b.h);
   src += b.h;
-  return { path, color: b.color, dim: b.color === BADGER ? 0.28 : 0.4 };
+  return {
+    path, color: b.color, g: b.key, href: b.href,
+    dim: b.color === BADGER ? 0.28 : 0.4,
+    tip: tipFor(b.label, b.n),
+  };
 });
 const flows2 = cols1.flatMap((b) => {
   if (b.leaves.length < 2) return [];
@@ -124,28 +140,67 @@ const flows2 = cols1.flatMap((b) => {
     const t = cols2.get(l.key)!;
     const path = ribbon(X1 + NODE_W, o, o + h(l.n), X2, t.y, t.y + t.h);
     o += h(l.n);
-    return { path, color: l.color, dim: 0.42 };
+    return {
+      path, color: l.color, g: b.key, l: l.key, href: l.href,
+      dim: 0.42, tip: tipFor(l.label, l.n),
+    };
   });
 });
 
-const num = (n: number) => n.toLocaleString();
-const pct = (n: number) => Math.round((n / flow.introduced) * 100);
 const alt =
   `Flow of ${num(flow.introduced)} bills: ` +
   terminals.map((l) => `${num(l.n)} ${l.label.toLowerCase()}`).join("; ") + ".";
 ---
 
-<figure class="mt-4">
-  <svg viewBox={`0 0 ${VB_W} ${VB_H}`} class="hidden w-full sm:block" role="img" aria-label={alt}>
-    {flows1.map((f) => <path d={f.path} fill={f.color} opacity={f.dim} />)}
-    {flows2.map((f) => <path d={f.path} fill={f.color} opacity={f.dim} />)}
+<figure class="relative mt-4" data-billflow>
+  <svg viewBox={`0 0 ${VB_W} ${VB_H}`} class="hidden w-full sm:block" aria-label={alt}>
+    {flows1.map((f) => (
+      <path
+        class="bf-el bf-ribbon"
+        data-g={f.g}
+        data-tip={f.tip}
+        data-href={f.href}
+        d={f.path}
+        fill={f.color}
+        style={`opacity:${f.dim}`}
+      />
+    ))}
+    {flows2.map((f) => (
+      <path
+        class="bf-el bf-ribbon"
+        data-g={f.g}
+        data-l={f.l}
+        data-tip={f.tip}
+        data-href={f.href}
+        d={f.path}
+        fill={f.color}
+        style={`opacity:${f.dim}`}
+      />
+    ))}
 
     <rect x={X0} y={r2(introTop)} width={NODE_W} height={r2(h(flow.introduced))} fill={INK} rx="2" />
     {cols1.map((b) => (
-      <rect x={X1} y={r2(b.y)} width={NODE_W} height={r2(b.h)} fill={b.color} rx="2" />
+      <a
+        href={b.href}
+        class="bf-el"
+        data-g={b.key}
+        data-tip={tipFor(b.label, b.n)}
+        aria-label={`${b.label}: ${num(b.n)} bills`}
+      >
+        <rect x={X1} y={r2(b.y)} width={NODE_W} height={r2(b.h)} fill={b.color} rx="2" />
+      </a>
     ))}
     {[...cols2.values()].map((l) => (
-      <rect x={X2} y={r2(l.y)} width={NODE_W} height={r2(l.h)} fill={l.color} rx="2" />
+      <a
+        href={l.href}
+        class="bf-el"
+        data-g={l.g}
+        data-l={l.key}
+        data-tip={tipFor(l.label, l.n)}
+        aria-label={`${l.label}: ${num(l.n)} bills`}
+      >
+        <rect x={X2} y={r2(l.y)} width={NODE_W} height={r2(l.h)} fill={l.color} rx="2" />
+      </a>
     ))}
 
     {/* a paper halo keeps every label readable where it crosses a ribbon */}
@@ -164,34 +219,42 @@ const alt =
         font-size="10.5"
         fill="#24395c">bills introduced</text>
       {cols1.map((b) => (
-        <>
+        <g class="bf-el" data-g={b.key}>
           <text x={X1 + NODE_W + 8} y={r2(b.y + b.h / 2 - 2)} font-size="12.5" font-weight="700" fill="#16233a">
             {num(b.n)}
           </text>
           <text x={X1 + NODE_W + 8} y={r2(b.y + b.h / 2 + 10)} font-size="10.5" fill="#24395c">
             {b.label}
           </text>
-        </>
+        </g>
       ))}
       {[...cols2.values()].map((l) => (
-        <>
+        <g class="bf-el" data-g={l.g} data-l={l.key}>
           <text x={X2 + NODE_W + 8} y={r2(l.y + l.h / 2 - 2)} font-size="12.5" font-weight="700" fill="#16233a">
             {num(l.n)}
           </text>
           <text x={X2 + NODE_W + 8} y={r2(l.y + l.h / 2 + 10)} font-size="10.5" fill="#24395c">
             {l.label}
           </text>
-        </>
+        </g>
       ))}
     </g>
   </svg>
+
+  <div
+    class="bf-tip pointer-events-none absolute z-10 rounded-md bg-navy-900 px-2.5 py-1.5 text-xs font-semibold text-white shadow-md"
+    hidden
+  >
+  </div>
 
   <ul class="mt-4 grid gap-2 sm:grid-cols-2">
     {terminals.map((l) => (
       <li>
         <a
           href={l.href}
-          class={`block h-full rounded-lg border px-4 py-2.5 ${
+          data-g={l.g}
+          data-l={l.key}
+          class={`bf-card block h-full rounded-lg border px-4 py-2.5 ${
             l.key === "nohearing"
               ? "border-badger-600/30 bg-badger-50 hover:border-badger-600"
               : "border-navy-100 bg-white hover:border-navy-600"
@@ -216,3 +279,99 @@ const alt =
     ))}
   </ul>
 </figure>
+
+<style>
+  .bf-el {
+    transition: opacity 0.15s ease;
+  }
+  .bf-ribbon {
+    cursor: pointer;
+  }
+  /* while something is hovered or focused, everything off its path recedes */
+  svg.bf-focus .bf-el:not(.bf-hot) {
+    opacity: 0.07 !important;
+  }
+  svg.bf-focus .bf-ribbon.bf-hot {
+    opacity: 0.6 !important;
+  }
+  .bf-card.bf-hot {
+    border-color: var(--color-navy-600);
+  }
+  svg a:focus-visible {
+    outline: 2px solid var(--color-navy-700);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bf-el {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  // Hover, focus and click for the flow. Everything here is enhancement:
+  // the legend already carries every number and link as plain HTML.
+  for (const fig of document.querySelectorAll<HTMLElement>("[data-billflow]")) {
+    const svg = fig.querySelector("svg");
+    const tip = fig.querySelector<HTMLElement>(".bf-tip");
+    if (!svg || !tip) continue;
+
+    // Lighting a leaf lights its whole path: the leaf's own pieces plus the
+    // branch that feeds it. Lighting a branch lights the branch and all its
+    // leaves. Cards participate in both directions.
+    const set = (g: string, l?: string) => {
+      svg.classList.add("bf-focus");
+      for (const e of fig.querySelectorAll<HTMLElement>(".bf-el, .bf-card")) {
+        const eg = (e as HTMLElement).dataset.g;
+        const el = (e as HTMLElement).dataset.l;
+        const hot = l ? el === l || (eg === g && !el) : eg === g;
+        e.classList.toggle("bf-hot", hot);
+      }
+    };
+    const clear = () => {
+      svg.classList.remove("bf-focus");
+      for (const e of fig.querySelectorAll(".bf-hot")) e.classList.remove("bf-hot");
+      tip.hidden = true;
+    };
+
+    const from = (t: EventTarget | null) =>
+      t instanceof Element ? t.closest<HTMLElement>("[data-g]") : null;
+
+    fig.addEventListener("pointerover", (e) => {
+      const t = from(e.target);
+      if (!t) return clear();
+      set(t.dataset.g!, t.dataset.l);
+      if (t.dataset.tip) {
+        tip.textContent = t.dataset.tip;
+        tip.hidden = false;
+      } else {
+        tip.hidden = true;
+      }
+    });
+    fig.addEventListener("pointerout", (e) => {
+      if (!from((e as PointerEvent).relatedTarget)) clear();
+    });
+    fig.addEventListener("pointermove", (e) => {
+      if (tip.hidden) return;
+      const r = fig.getBoundingClientRect();
+      tip.style.left = `${Math.min(e.clientX - r.left + 14, r.width - tip.offsetWidth - 4)}px`;
+      tip.style.top = `${e.clientY - r.top - 34}px`;
+    });
+
+    // keyboard: focusing a node link lights its path the same way
+    fig.addEventListener("focusin", (e) => {
+      const t = from(e.target);
+      if (t) set(t.dataset.g!, t.dataset.l);
+    });
+    fig.addEventListener("focusout", (e) => {
+      if (!from((e as FocusEvent).relatedTarget)) clear();
+    });
+
+    // ribbons are not in the tab order (the node links and cards are), but
+    // a pointer click on one goes to the same place
+    fig.addEventListener("click", (e) => {
+      const p = e.target instanceof Element && e.target.closest<SVGPathElement>("path[data-href]");
+      if (p) window.location.assign(p.dataset.href!);
+    });
+  }
+</script>
