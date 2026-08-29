@@ -1,12 +1,11 @@
 /** Phase 5 acceptance verification: drives the built site in headless Edge.
  * Usage: node scripts/verify.mjs  (serves dist/ itself on :8931) */
-import { serveDist, launchBrowser, blockThirdPartyAssets } from "./lib/serve.mjs";
+import { serveDist, launchBrowser } from "./lib/serve.mjs";
 
 const server = await serveDist(8931);
 
 const browser = await launchBrowser();
 const page = await browser.newPage();
-await blockThirdPartyAssets(page);
 const results = [];
 const check = (name, ok, detail = "") => {
   results.push({ name, ok, detail });
@@ -76,7 +75,9 @@ check(
 );
 
 // 3b. saved reps are highlighted anywhere they appear (legislators index)
-await page.goto("http://127.0.0.1:8931/legislators/", { waitUntil: "networkidle2" });
+// domcontentloaded, not networkidle2: this page loads 131 member
+// portraits from third-party hosts and the check below reads the DOM.
+await page.goto("http://127.0.0.1:8931/legislators/", { waitUntil: "domcontentloaded" });
 await page.waitForFunction(
   () => [...document.querySelectorAll("a")].some((a) => a.classList.contains("bg-gold-100")),
   { timeout: 30000 },
