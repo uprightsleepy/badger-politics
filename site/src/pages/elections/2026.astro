@@ -1,5 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
+import SourceStrip from "../../components/SourceStrip.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import {
   sittingPeople, electionFor, personIdByName, statewideRaces, statewideHistory,
@@ -94,6 +95,10 @@ const statewide = OFFICES.map(([key, label]) => {
 
 <Base title="2026 elections" description="Everything on Wisconsin's November 2026 ballot: all five statewide constitutional offices and every legislative seat, with incumbents, retirements, and qualified candidates.">
   <h1 class="text-2xl font-bold">On the ballot: November 3, 2026</h1>
+  <SourceStrip
+    sources={[{ label: "Wisconsin Elections Commission", href: "https://elections.wi.gov" }]}
+    through={null}
+  />
 
   {/* A voter wants their own ballot, not all 132 seats. Filled in from the
       district saved in this browser; the prompt shows until then. */}

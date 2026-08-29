@@ -982,11 +982,22 @@ export const donorCommitteeFor = (entityId: number) => ({
   byParty: partyTotals("WHERE c.from_entity_id = @entityId", { entityId }),
 });
 
-/** Committees with member counts, for the index. */
+/** Committees for the directory: membership, throughput, and the next
+ * scheduled hearing when one exists. The died-here match is the same
+ * name-and-chamber rule committeeRecord uses, so the directory can never
+ * disagree with a committee's own page. */
 export const allCommittees = () =>
   prep(
       `SELECT c.id, c.name, c.chamber, c.chair_person_id, p.name AS chair_name,
-              COUNT(m.person_id) AS member_count
+              COUNT(m.person_id) AS member_count,
+              (SELECT COUNT(*) FROM hearings h WHERE h.committee_id = c.id) AS hearings_held,
+              (SELECT MIN(h.date) FROM hearings h
+                WHERE h.committee_id = c.id AND h.date >= date('now')) AS next_hearing,
+              (SELECT COUNT(*) FROM bills b
+                WHERE b.died_without_hearing = 1 AND b.source != 'legiscan'
+                AND b.committee_at_death = c.name
+                AND COALESCE(b.committee_chamber_at_death, '') = COALESCE(c.chamber, '')
+              ) AS died_here
        FROM committees c
        LEFT JOIN committee_members m ON m.committee_id = c.id
        LEFT JOIN people p ON p.id = c.chair_person_id
@@ -995,6 +1006,7 @@ export const allCommittees = () =>
     .all() as {
       id: string; name: string; chamber: string | null;
       chair_person_id: string | null; chair_name: string | null; member_count: number;
+      hearings_held: number; next_hearing: string | null; died_here: number;
     }[];
 
 // mirror of importer/committees.py normalize_name, for matching the

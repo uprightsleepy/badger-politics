@@ -1,5 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
+import SourceStrip from "../../components/SourceStrip.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import { allCommittees, committeeFor, committeeRecord } from "../../lib/db";
 import { chamberName, committeeSlug, personSlug, fmtDate, fmtTime, roleAbbr } from "../../lib/format";
@@ -30,6 +31,7 @@ const roleLabel = (role: string) =>
   <h1 class="mt-1 text-2xl font-bold">
     {committee.chamber ? `${chamberName(committee.chamber)} ` : ""}{committee.name}
   </h1>
+  <SourceStrip sources={[{ label: "Wisconsin Legislature", href: "https://docs.legis.wisconsin.gov" }]} />
 
   {record && (
     <section class="mt-4 rounded-lg border border-navy-100 bg-white p-4">

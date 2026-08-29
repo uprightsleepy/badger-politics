@@ -1,5 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
+import SourceStrip from "../../components/SourceStrip.astro";
 import DistrictMap from "../../components/DistrictMap.astro";
 import {
   seatTerms, sittingPeople, electionFor, electionHistoryFor, lastMarginFor,
@@ -56,11 +57,19 @@ const lineage = [...byPerson.entries()]
 
 <Base
   title={seatName}
+  breadcrumbs={[{ name: "Districts", url: "/districts/" }]}
   filters={{ type: "District" }}
   description={`${seatName}: the current member, everyone who has held the seat since 2009, and official election results.`}
 >
   <p class="text-sm text-navy-600"><a href="/districts/" class="underline">← All districts</a></p>
   <h1 class="mt-2 text-2xl font-bold">{seatName}</h1>
+  <SourceStrip
+    sources={[
+      { label: "Wisconsin LTSB (2024 boundaries)" },
+      { label: "Wisconsin Elections Commission", href: "https://elections.wi.gov" },
+    ]}
+    through={null}
+  />
 
   <div class="mt-3 max-w-[240px]">
     <DistrictMap seat={seatKey} label={seatName} />

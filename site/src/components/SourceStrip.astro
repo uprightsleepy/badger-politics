@@ -1,0 +1,57 @@
+---
+/** Provenance beside the facts, not only in the footer.
+ *
+ * One quiet line naming the dataset's official source, when we last
+ * pulled it, and how current the record itself is. The distinction
+ * matters: "pulled" is when Badger looked, "record through" is the
+ * newest action the source had recorded. A page can be an hour old and
+ * still show week-old data, or vice versa; readers deciding whether to
+ * trust a number deserve both dates.
+ *
+ * The optional coverage line is for honestly partial datasets, in the
+ * spirit of the money pages: say what is missing and why, never render
+ * a gap as a zero.
+ */
+import { meta } from "../lib/db";
+import { fmtDate } from "../lib/format";
+
+interface Props {
+  /** The official source(s) of this page's primary dataset. */
+  sources: { label: string; href?: string }[];
+  /** Override for "record through"; defaults to the Legislature's newest
+   * recorded action. Pass null to omit (e.g. boundary data has no daily
+   * record date). */
+  through?: string | null;
+  /** One sentence on what this dataset does not cover, when that is true. */
+  coverage?: string;
+}
+const { sources, through = meta().data_through, coverage } = Astro.props;
+const pulled = meta().imported_at?.slice(0, 10);
+---
+
+<div class="mt-2 text-xs text-navy-600">
+  <p>
+    <span class="font-semibold">Source:</span>{" "}
+    {sources.map((s, i) => (
+      <>
+        {i > 0 && ", "}
+        {s.href ? (
+          <a href={s.href} class="underline">{s.label}</a>
+        ) : (
+          s.label
+        )}
+      </>
+    ))}
+    {pulled && (
+      <span>
+        {" "}&middot; pulled <time datetime={pulled}>{fmtDate(pulled)}</time>
+      </span>
+    )}
+    {through && (
+      <span>
+        {" "}&middot; record through <time datetime={through}>{fmtDate(through)}</time>
+      </span>
+    )}
+  </p>
+  {coverage && <p class="mt-0.5 text-gold-600">{coverage}</p>}
+</div>

@@ -1,5 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
+import SourceStrip from "../../components/SourceStrip.astro";
 import VoteHeatmap from "../../components/VoteHeatmap.astro";
 import MoneyTimeline from "../../components/MoneyTimeline.astro";
 import FollowButton from "../../components/FollowButton.astro";
@@ -214,6 +215,12 @@ const tally = TALLY_ORDER.map((status) => ({
     {person.current_role} · {chamberName(person.chamber)}
     {person.district != null && ` District ${person.district}`}
   </p>
+  <SourceStrip
+    sources={[
+      { label: "Wisconsin Legislature", href: "https://docs.legis.wisconsin.gov" },
+      { label: "Wisconsin Ethics Commission", href: "https://ethics.wi.gov" },
+    ]}
+  />
   {sitting && (
     <dl class="mt-4 grid gap-x-6 gap-y-3 rounded-lg border border-navy-100 bg-white p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
       <div>

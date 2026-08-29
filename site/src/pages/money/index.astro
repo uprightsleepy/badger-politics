@@ -1,5 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
+import SourceStrip from "../../components/SourceStrip.astro";
 import MoneyView from "../../components/MoneyView.astro";
 import { moneyOverview } from "../../lib/db";
 import { fmtDate } from "../../lib/format";
@@ -28,6 +29,10 @@ const defaultView = views.find((v) => v.key === DEFAULT_KEY)!;
   description="Who funds Wisconsin legislators: top committees, top fundraisers, and small-dollar shares, filterable by election cycle."
 >
   <h1 class="text-2xl font-bold">Campaign money</h1>
+  <SourceStrip
+    sources={[{ label: "Wisconsin Ethics Commission (CFIS)", href: "https://cfis.wi.gov" }]}
+    through={all.last ?? null}
+  />
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
     The money invested in Wisconsin's sitting legislators, from Wisconsin
     Ethics Commission filings{all.last && ` through ${fmtDate(all.last)}`}.

@@ -40,6 +40,7 @@ const recent = [...unique]
 <Base
   title={title}
   filters={{ type: "Topic" }}
+  breadcrumbs={[{ name: "Subjects", url: "/subjects/" }]}
   description={`${unique.length} Wisconsin bills indexed under ${title} across ${sessions.length} sessions.`}
 >
   <p class="text-sm text-navy-600"><a href="/subjects/" class="underline">Subjects</a></p>

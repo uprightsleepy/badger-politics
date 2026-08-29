@@ -1,5 +1,6 @@
 ---
 import Base from "../../../layouts/Base.astro";
+import SourceStrip from "../../../components/SourceStrip.astro";
 import FollowButton from "../../../components/FollowButton.astro";
 import StatusBadge from "../../../components/StatusBadge.astro";
 import Stepper from "../../../components/Stepper.astro";
@@ -127,6 +128,9 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
       </span>
     </div>
     <p class="mt-2 text-lg text-navy-700">{bill.title}</p>
+    <SourceStrip
+      sources={[{ label: "Wisconsin Legislature", href: bill.text_url ?? "https://docs.legis.wisconsin.gov" }]}
+    />
     {subjects.length > 0 && (
       <p class="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs" data-pagefind-ignore>
         {subjects.map((s) => (
