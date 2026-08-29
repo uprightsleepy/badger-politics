@@ -17,14 +17,28 @@ rather than each being fitted to its own box.
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 
-WIDTH = 300.0
-HEIGHT = 420.0  # Wisconsin is appreciably taller than it is wide
+HEIGHT = 420.0
+# The viewBox width is derived from the projection, never fixed: stretching
+# each axis to fill a box chosen in advance is what drew Wisconsin at three
+# quarters of its true width.
 # A point every ~0.6 viewBox units is plenty at thumbnail size; the full
 # precision is a survey artefact, not something a reader can see.
 TOLERANCE = 0.6
+
+
+def mercator_y(lat: float) -> float:
+    """Web Mercator's y, in the same units as longitude in radians.
+
+    Meridians converge toward the pole, so degrees of longitude and
+    latitude are not interchangeable units of distance. Mercator is
+    conformal, which is what an outline needs: local shape is preserved
+    everywhere, so the state and every district keep their real form.
+    """
+    return math.log(math.tan(math.pi / 4 + math.radians(lat) / 2))
 
 
 def rings(geometry: dict) -> list[list[list[float]]]:
@@ -70,10 +84,13 @@ def main(argv: list[str]) -> int:
     lats = [c[1] for f in feats for r in rings(f["geometry"]) for c in r]
     min_lon, max_lon, min_lat, max_lat = min(lons), max(lons), min(lats), max(lats)
 
+    # one scale for both axes, so the drawing keeps the projection's shape
+    x0, y0 = math.radians(min_lon), mercator_y(max_lat)
+    scale = HEIGHT / (mercator_y(max_lat) - mercator_y(min_lat))
+    width = (math.radians(max_lon) - x0) * scale
+
     def project(lon: float, lat: float) -> tuple[float, float]:
-        x = (lon - min_lon) / (max_lon - min_lon) * WIDTH
-        y = (max_lat - lat) / (max_lat - min_lat) * HEIGHT
-        return x, y
+        return (math.radians(lon) - x0) * scale, (y0 - mercator_y(lat)) * scale
 
     shapes: dict[str, str] = {}
     senate: dict[int, list[dict]] = {}
@@ -93,7 +110,7 @@ def main(argv: list[str]) -> int:
     global TOLERANCE
     TOLERANCE = 4.0
     shapes["_state"] = "".join(to_path(f["geometry"], project) for f in feats)
-    shapes["_viewBox"] = f"0 0 {WIDTH:.0f} {HEIGHT:.0f}"
+    shapes["_viewBox"] = f"0 0 {width:.0f} {HEIGHT:.0f}"
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(shapes, separators=(",", ":")) + "\n", encoding="utf-8")
