@@ -7,12 +7,18 @@
  * being voted on, and a chart of survivors hides that. A flow has to name
  * every branch, so the numbers are forced to add up in public.
  *
+ * Horizontal reach carries meaning: a path ends where the bill's journey
+ * ended. Dying without a hearing is the shortest trip in the legislature,
+ * so it is the shortest path here; law and veto travelled the whole way,
+ * so they reach the far edge. Ribbons fade toward their destination
+ * rather than sitting as flat blocks, so the eye reads direction.
+ *
  * Static SVG, no charting library. The interactivity is one small inline
  * script: hovering (or focusing) any part lights the whole path a bill
- * took and dims the rest, and clicking goes to the bills themselves. All
- * of it is enhancement -- the legend beneath carries every number as text
- * and every link, and stands alone on a phone, where a Sankey's labels
- * would be too small to read.
+ * took and quiets the rest, and clicking goes to the bills themselves.
+ * All of it is enhancement -- the legend beneath carries every number as
+ * text and every link, and stands alone on a phone, where a Sankey's
+ * labels would be too small to read.
  */
 interface Props {
   flow: {
@@ -25,52 +31,59 @@ const { flow, session } = Astro.props;
 
 const MOSS = "#3e7051", GOLD = "#a87a1e", NAVY = "#2d4a73";
 const NAVY_LT = "#9fb3cc", BADGER = "#b33a2b", INK = "#1d2e4a";
+// a colour part-way toward the paper ground, for the pale end of a ribbon
+const mix = (hex: string, t: number) => {
+  const paper = [0xfa, 0xf8, 0xf4];
+  const c = hex.slice(1).match(/../g)!.map((v) => parseInt(v, 16));
+  return "#" + c.map((v, i) => Math.round(v + (paper[i] - v) * t).toString(16).padStart(2, "0")).join("");
+};
 
 const num = (n: number) => n.toLocaleString();
 const pct = (n: number) => Math.round((n / flow.introduced) * 100);
 const tipFor = (label: string, n: number) => `${label}: ${num(n)} bills, ${pct(n)}% of all introduced`;
 
-// Ordered top to bottom. A branch holding a single bucket ends at its own
-// column, which is how the still-moving case draws itself.
+// Ordered top to bottom. Each node's x is where that outcome actually
+// stopped the bill: committee deaths end early, the governor's desk is the
+// far edge. A branch holding a single bucket ends at its own column.
 const branches = [
   {
-    key: "passed", label: "Passed both chambers", n: flow.passedBoth, color: NAVY,
+    key: "passed", label: "Passed both chambers", n: flow.passedBoth, color: NAVY, x: 420,
     href: "/governors-desk/",
     leaves: [
       {
-        key: "enacted", label: "Became law", n: flow.enacted, color: MOSS,
+        key: "enacted", label: "Became law", n: flow.enacted, color: MOSS, x: 640,
         href: `/bills/${session}/status/enacted/`,
         note: "Passed both chambers and signed by the governor.",
       },
       {
-        key: "vetoed", label: "Vetoed by the governor", n: flow.vetoed, color: GOLD,
+        key: "vetoed", label: "Vetoed by the governor", n: flow.vetoed, color: GOLD, x: 640,
         href: `/bills/${session}/status/vetoed/`,
         note: "Cleared the legislature, then stopped at the governor's desk.",
       },
     ],
   },
   {
-    key: "moving", label: "Still moving", n: flow.moving, color: NAVY_LT,
+    key: "moving", label: "Still moving", n: flow.moving, color: NAVY_LT, x: 600,
     href: `/bills/${session}/`,
     leaves: [
       {
-        key: "moving", label: "Still moving", n: flow.moving, color: NAVY_LT,
+        key: "moving", label: "Still moving", n: flow.moving, color: NAVY_LT, x: 600,
         href: `/bills/${session}/`,
         note: "Neither finished nor recorded as failed when this page was built.",
       },
     ],
   },
   {
-    key: "died", label: "Died without passing", n: flow.died, color: BADGER,
+    key: "died", label: "Died without passing", n: flow.died, color: BADGER, x: 280,
     href: `/bills/${session}/status/failed_sjr1/`,
     leaves: [
       {
-        key: "heard", label: "Heard, then went no further", n: flow.heard, color: NAVY_LT,
+        key: "heard", label: "Heard, then went no further", n: flow.heard, color: NAVY_LT, x: 540,
         href: `/bills/${session}/status/failed_sjr1/`,
         note: "Got a public hearing but never finished the trip.",
       },
       {
-        key: "nohearing", label: "Never got a public hearing", n: flow.noHearing, color: BADGER,
+        key: "nohearing", label: "Never got a public hearing", n: flow.noHearing, color: BADGER, x: 440,
         href: `/hearing-none/${session}/`,
         note: "Not voted down. Never taken up at all: a committee chair alone decides whether a bill gets heard.",
       },
@@ -80,13 +93,13 @@ const branches = [
 
 // every final bucket, for the legend and the text alternative
 const terminals = branches.flatMap((b) => b.leaves.map((l) => ({ ...l, g: b.key })));
-// only branches that actually split are drawn in the third column
+// only branches that actually split are drawn past their own column
 const col2Nodes = branches.flatMap((b) =>
   b.leaves.length > 1 ? b.leaves.map((l) => ({ ...l, g: b.key })) : [],
 );
 
 const VB_W = 820, VB_H = 300, PAD = 12, GAP = 11, NODE_W = 11;
-const X0 = 92, X1 = 372, X2 = 616;
+const X0 = 92;
 const INNER = VB_H - PAD * 2;
 const maxGaps = Math.max(0, branches.length - 1, col2Nodes.length - 1);
 const scale = (INNER - maxGaps * GAP) / flow.introduced;
@@ -124,12 +137,14 @@ const ribbon = (xa: number, ya: number, yb: number, xb: number, yc: number, yd: 
 
 const introTop = top([{ n: flow.introduced }]);
 let src = introTop;
+// each ribbon fades from pale at its source to full colour at its
+// destination, so the eye reads left-to-right motion instead of blocks
 const flows1 = cols1.map((b) => {
-  const path = ribbon(X0 + NODE_W, src, src + b.h, X1, b.y, b.y + b.h);
+  const path = ribbon(X0 + NODE_W, src, src + b.h, b.x, b.y, b.y + b.h);
   src += b.h;
   return {
-    path, color: b.color, g: b.key, href: b.href,
-    dim: b.color === BADGER ? 0.28 : 0.4,
+    path, g: b.key, href: b.href, grad: `bfg1-${b.key}`,
+    x1: X0 + NODE_W, x2: b.x, from: mix(b.color, 0.6), to: b.color,
     tip: tipFor(b.label, b.n),
   };
 });
@@ -138,11 +153,12 @@ const flows2 = cols1.flatMap((b) => {
   let o = b.y;
   return b.leaves.map((l) => {
     const t = cols2.get(l.key)!;
-    const path = ribbon(X1 + NODE_W, o, o + h(l.n), X2, t.y, t.y + t.h);
+    const path = ribbon(b.x + NODE_W, o, o + h(l.n), l.x, t.y, t.y + t.h);
     o += h(l.n);
     return {
-      path, color: l.color, g: b.key, l: l.key, href: l.href,
-      dim: 0.42, tip: tipFor(l.label, l.n),
+      path, g: b.key, l: l.key, href: l.href, grad: `bfg2-${l.key}`,
+      x1: b.x + NODE_W, x2: l.x, from: mix(b.color, 0.45), to: l.color,
+      tip: tipFor(l.label, l.n),
     };
   });
 });
@@ -154,6 +170,15 @@ const alt =
 
 <figure class="relative mt-4" data-billflow>
   <svg viewBox={`0 0 ${VB_W} ${VB_H}`} class="hidden w-full sm:block" aria-label={alt}>
+    <defs>
+      {[...flows1, ...flows2].map((f) => (
+        <linearGradient id={f.grad} gradientUnits="userSpaceOnUse" x1={f.x1} x2={f.x2} y1="0" y2="0">
+          <stop offset="0" stop-color={f.from} />
+          <stop offset="1" stop-color={f.to} />
+        </linearGradient>
+      ))}
+    </defs>
+
     {flows1.map((f) => (
       <path
         class="bf-el bf-ribbon"
@@ -161,8 +186,8 @@ const alt =
         data-tip={f.tip}
         data-href={f.href}
         d={f.path}
-        fill={f.color}
-        style={`opacity:${f.dim}`}
+        fill={`url(#${f.grad})`}
+        style="opacity:0.55"
       />
     ))}
     {flows2.map((f) => (
@@ -173,8 +198,8 @@ const alt =
         data-tip={f.tip}
         data-href={f.href}
         d={f.path}
-        fill={f.color}
-        style={`opacity:${f.dim}`}
+        fill={`url(#${f.grad})`}
+        style="opacity:0.6"
       />
     ))}
 
@@ -187,7 +212,7 @@ const alt =
         data-tip={tipFor(b.label, b.n)}
         aria-label={`${b.label}: ${num(b.n)} bills`}
       >
-        <rect x={X1} y={r2(b.y)} width={NODE_W} height={r2(b.h)} fill={b.color} rx="2" />
+        <rect x={b.x} y={r2(b.y)} width={NODE_W} height={r2(b.h)} fill={b.color} rx="2" />
       </a>
     ))}
     {[...cols2.values()].map((l) => (
@@ -199,7 +224,7 @@ const alt =
         data-tip={tipFor(l.label, l.n)}
         aria-label={`${l.label}: ${num(l.n)} bills`}
       >
-        <rect x={X2} y={r2(l.y)} width={NODE_W} height={r2(l.h)} fill={l.color} rx="2" />
+        <rect x={l.x} y={r2(l.y)} width={NODE_W} height={r2(l.h)} fill={l.color} rx="2" />
       </a>
     ))}
 
@@ -220,20 +245,20 @@ const alt =
         fill="#24395c">bills introduced</text>
       {cols1.map((b) => (
         <g class="bf-el" data-g={b.key}>
-          <text x={X1 + NODE_W + 8} y={r2(b.y + b.h / 2 - 2)} font-size="12.5" font-weight="700" fill="#16233a">
+          <text x={b.x + NODE_W + 8} y={r2(b.y + b.h / 2 - 2)} font-size="12.5" font-weight="700" fill="#16233a">
             {num(b.n)}
           </text>
-          <text x={X1 + NODE_W + 8} y={r2(b.y + b.h / 2 + 10)} font-size="10.5" fill="#24395c">
+          <text x={b.x + NODE_W + 8} y={r2(b.y + b.h / 2 + 10)} font-size="10.5" fill="#24395c">
             {b.label}
           </text>
         </g>
       ))}
       {[...cols2.values()].map((l) => (
         <g class="bf-el" data-g={l.g} data-l={l.key}>
-          <text x={X2 + NODE_W + 8} y={r2(l.y + l.h / 2 - 2)} font-size="12.5" font-weight="700" fill="#16233a">
+          <text x={l.x + NODE_W + 8} y={r2(l.y + l.h / 2 - 2)} font-size="12.5" font-weight="700" fill="#16233a">
             {num(l.n)}
           </text>
-          <text x={X2 + NODE_W + 8} y={r2(l.y + l.h / 2 + 10)} font-size="10.5" fill="#24395c">
+          <text x={l.x + NODE_W + 8} y={r2(l.y + l.h / 2 + 10)} font-size="10.5" fill="#24395c">
             {l.label}
           </text>
         </g>
@@ -281,18 +306,20 @@ const alt =
 </figure>
 
 <style>
+  /* slow enough to read as a change of emphasis, not a flash */
   .bf-el {
-    transition: opacity 0.15s ease;
+    transition: opacity 0.3s ease;
   }
   .bf-ribbon {
     cursor: pointer;
   }
-  /* while something is hovered or focused, everything off its path recedes */
+  /* while something is hovered or focused, everything off its path recedes
+     -- quietly, so the rest of the diagram stays legible underneath */
   svg.bf-focus .bf-el:not(.bf-hot) {
-    opacity: 0.07 !important;
+    opacity: 0.18 !important;
   }
   svg.bf-focus .bf-ribbon.bf-hot {
-    opacity: 0.6 !important;
+    opacity: 0.85 !important;
   }
   .bf-card.bf-hot {
     border-color: var(--color-navy-600);
