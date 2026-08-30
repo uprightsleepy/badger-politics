@@ -163,6 +163,11 @@ const races = [...byRace.entries()]
           </summary>
           <div class="border-t border-navy-100 p-3">
             {summary.length > 0 && (
+              <p class="text-xs font-semibold uppercase tracking-wide text-navy-600">
+                Outside spending, by campaign targeted
+              </p>
+            )}
+            {summary.length > 0 && (
               <ul class="mb-3 max-w-2xl divide-y divide-navy-100 text-sm">
                 {summary.slice(0, 8).map((l) => (
                   <li class="py-2">
@@ -193,7 +198,14 @@ const races = [...byRace.entries()]
                 ))}
               </ul>
             )}
-                        <ScrollPanel label={`Spending in ${race}`} max="max-h-[26rem]" count={rows.length}>
+            {summary.length > 0 && (
+              <p class="mb-3 max-w-2xl text-xs text-navy-600">
+                These are other groups' dollars spent about each campaign —
+                not the campaigns' own fundraising, which lives on each
+                committee's official page.
+              </p>
+            )}
+            <ScrollPanel label={`Spending in ${race}`} max="max-h-[26rem]" count={rows.length}>
               <ul class="divide-y divide-navy-100">
                 {rows.map((c) => (
                   <li class="px-3 py-2 text-sm">
