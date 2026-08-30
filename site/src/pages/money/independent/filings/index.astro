@@ -1,0 +1,120 @@
+---
+/** Every express-advocacy filing we hold, with the Ethics Commission's
+ * own transaction ID on each row.
+ *
+ * This page exists so nobody has to take our aggregates on faith: the
+ * for/against totals are sums over exactly these rows, and each row can
+ * be checked against the Commission's records. Their site has no page
+ * per transaction, so the check goes: open the filer's official
+ * registrant page, open its Transactions tab, and find the ID, date and
+ * amount printed here.
+ */
+import Base from "../../../../layouts/Base.astro";
+import FilterBar from "../../../../components/FilterBar.astro";
+import SourceStrip from "../../../../components/SourceStrip.astro";
+import { independentExpenditures } from "../../../../lib/db";
+import { fmtMoney, fmtDate } from "../../../../lib/format";
+
+// every filing, not a sample: the whole point is completeness
+const filings = independentExpenditures(100000);
+const latest = filings[0]?.date ?? null;
+const officialUrl = (entityId: number) =>
+  `https://campaignfinance.wi.gov/browse-data/registrant/${entityId}`;
+const facets = [
+  { key: "for", label: "Supporting" },
+  { key: "against", label: "Opposing" },
+].map((f) => ({
+  ...f,
+  count: filings.filter((t) => t.stance.toLowerCase() === f.key).length,
+}));
+---
+
+<Base
+  title="Every for/against filing, with its Commission ID"
+  description="All express-advocacy filings in Wisconsin with the Ethics Commission's transaction IDs, so every figure on this site can be checked against campaignfinance.wi.gov."
+  breadcrumbs={[
+    { name: "Money", url: "/money/" },
+    { name: "For & against", url: "/money/independent/" },
+  ]}
+>
+  <p class="text-sm text-navy-600">
+    <a href="/money/independent/" class="underline">&larr; Spending for and against candidates</a>
+  </p>
+  <h1 class="mt-1 text-2xl font-bold">Check our numbers</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    Every for-and-against figure on this site is a sum over the
+    {filings.length.toLocaleString()} filings below, each carrying the
+    Wisconsin Ethics Commission's own transaction ID. To verify a row,
+    open the filer's official page, open its <strong>Transactions</strong>
+    tab, and find the same ID, date and amount. The Commission's site has
+    no page per transaction, so the ID is the join.
+  </p>
+  <SourceStrip
+    sources={[{
+      label: "Wisconsin Ethics Commission filings",
+      href: "https://campaignfinance.wi.gov/browse-data/transactions",
+    }]}
+    through={latest}
+  />
+
+  <div class="mt-4">
+    <FilterBar
+      id="filing-filter"
+      statusId="filing-filter-status"
+      label="Filter filings"
+      placeholder="e.g. Crowley, Believe in Wisconsin, television…"
+      facetAttr="stance"
+      facetLabel="Stance"
+      facets={facets}
+    />
+  </div>
+
+  <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+    {filings.map((t) => (
+      <li
+        data-filing-row
+        data-text={`${t.filer_name ?? ""} ${t.related_name ?? ""} ${t.purpose ?? ""} ${t.other_name ?? ""} ${t.id}`.toLowerCase()}
+        data-stance={t.stance.toLowerCase()}
+        class="px-4 py-2"
+      >
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(t.date)}</span>
+          <span class="min-w-0 flex-1">
+            <a href={officialUrl(t.filer_entity_id)} class="underline">
+              {t.filer_name ?? "committee not named"}
+            </a>
+          </span>
+          <span
+            class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
+              t.stance === "FOR" ? "bg-moss-50 text-moss-600" : "bg-badger-50 text-badger-700"
+            }`}
+          >
+            {t.stance === "FOR" ? "Supporting" : "Opposing"}
+          </span>
+          <span class="min-w-0 flex-1 truncate">{t.related_name}</span>
+          <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(t.amount)}</span>
+        </div>
+        <p class="mt-0.5 pl-0 text-xs text-navy-600 sm:pl-[6.75rem]">
+          Commission transaction ID <span class="font-semibold tabular-nums">{t.id}</span>
+          {t.other_name && <> &middot; paid to {t.other_name}</>}
+          {t.purpose && <> &middot; {t.purpose}</>}
+        </p>
+      </li>
+    ))}
+  </ul>
+  <p id="filing-no-match" class="mt-3 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600">
+    No filings match. Try a shorter word, or clear the stance filter.
+  </p>
+
+  <script>
+    import { initRowFilter } from "../../../../scripts/rowFilter";
+    initRowFilter({
+      input: "filing-filter",
+      rows: "[data-filing-row]",
+      status: "filing-filter-status",
+      noMatch: "filing-no-match",
+      noun: "filings",
+      facetAttr: "stance",
+    });
+  </script>
+</Base>

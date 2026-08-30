@@ -152,6 +152,11 @@ const races = [...byRace.entries()]
           Totals above cover all {filingCount.toLocaleString()} filings; the
           races below list the {spends.length.toLocaleString()} most recent.
         </p>
+      <p class="mt-1 text-sm">
+        <a href="/money/independent/filings/" class="font-semibold underline">
+          Check our numbers: every filing with its Commission ID &rarr;
+        </a>
+      </p>
       )}
       {races.map(({ race, rows, total, summary }) => (
         <details class="mt-4 rounded-lg border border-navy-100 bg-white" open={total === races[0].total}>

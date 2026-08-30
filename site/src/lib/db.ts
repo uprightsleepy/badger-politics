@@ -1525,8 +1525,8 @@ export const cfCommitteeFor = (entityId: number) => {
  * excluded here so the two are never conflated. */
 export const independentExpenditures = (limit = 500) =>
   prep(
-      `SELECT t.date, t.amount, t.stance, t.related_name, t.related_office,
-              t.related_district, t.purpose, t.filer_entity_id,
+      `SELECT t.id, t.date, t.amount, t.stance, t.related_name, t.related_office,
+              t.related_district, t.purpose, t.other_name, t.filer_entity_id,
               c.name AS filer_name, c.committee_type AS filer_type
        FROM cf_transactions t
        LEFT JOIN cf_committees c ON c.entity_id = t.filer_entity_id
@@ -1535,9 +1535,9 @@ export const independentExpenditures = (limit = 500) =>
        ORDER BY t.date DESC, t.amount DESC LIMIT ?`,
     )
     .all(limit) as {
-      date: string; amount: number; stance: string; related_name: string | null;
+      id: number; date: string; amount: number; stance: string; related_name: string | null;
       related_office: string | null; related_district: string | null;
-      purpose: string | null; filer_entity_id: number;
+      purpose: string | null; other_name: string | null; filer_entity_id: number;
       filer_name: string | null; filer_type: string | null;
     }[];
 
