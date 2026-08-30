@@ -1,4 +1,4 @@
-"""Fetch U.S. Senate roll-call votes and the congressional roster.
+"""Fetch U.S. Senate and House roll-call votes and the congressional roster.
 
 The Senate publishes every roll call as XML on senate.gov: a per-session
 menu listing vote numbers, and a per-vote file carrying every senator's
@@ -42,6 +42,14 @@ VOTE_URL = (
 )
 ROSTER_URL = "https://unitedstates.github.io/congress-legislators/legislators-current.json"
 
+# The House numbers roll calls per calendar year with no menu file; the
+# only way to enumerate them is to count up until the next number 404s.
+# 2005 is Gwen Moore's first year, the earliest any current WI member
+# served. Completed years are immutable: the fetch resumes each year at
+# one past its highest cached roll, so a finished year costs one probe.
+HOUSE_YEARS = range(2005, 2027)
+HOUSE_URL = "https://clerk.house.gov/evs/{y}/roll{n:03d}.xml"
+
 
 def fetch(http: requests.Session, url: str) -> bytes:
     response = http.get(url, timeout=60)
@@ -81,6 +89,29 @@ def main(argv: list[str]) -> int:
             )
             fetched += 1
             time.sleep(ns.delay)
+
+    house = DATA_DIR / "house"
+    house.mkdir(exist_ok=True)
+    for year in HOUSE_YEARS:
+        have = [
+            int(p.stem.split("_")[2]) for p in house.glob(f"roll_{year}_*.xml")
+        ]
+        n = max(have, default=0)
+        while True:
+            n += 1
+            dest = house / f"roll_{year}_{n:04d}.xml"
+            url = HOUSE_URL.format(y=year, n=n)
+            response = http.get(url, timeout=60)
+            if response.status_code == 404:
+                break  # past the year's last roll call
+            if response.status_code >= 500:
+                time.sleep(2)  # one retry: transient errors must not
+                response = http.get(url, timeout=60)  # fake a year's end
+            response.raise_for_status()
+            dest.write_bytes(response.content)
+            fetched += 1
+            time.sleep(ns.delay)
+        cached += len(have)
 
     print(f"federal votes: {fetched} fetched, {cached} already cached")
     return 0

@@ -128,14 +128,16 @@ export const federalMembers = (): FederalMember[] =>
     ? (prep("SELECT * FROM federal_members ORDER BY chamber DESC, district").all() as FederalMember[])
     : [];
 
-export const federalVotesFor = (lisId: string) =>
+/** memberKey is the LIS id for senators, the bioguide for House members
+ * -- whichever id that chamber's own files stamp on each position. */
+export const federalVotesFor = (memberKey: string) =>
   prep(
       `SELECT v.*, r.vote_cast FROM federal_votes v
        JOIN federal_vote_records r ON r.vote_id = v.id
-       WHERE r.lis_member_id = ?
+       WHERE r.member_id = ?
        ORDER BY v.date DESC, v.number DESC`,
     )
-    .all(lisId) as {
+    .all(memberKey) as {
     id: string; congress: number; session: number; number: number; date: string;
     question: string | null; result: string | null; title: string | null;
     yeas: number; nays: number; majority_requirement: string | null;
@@ -144,16 +146,16 @@ export const federalVotesFor = (lisId: string) =>
 
 /** Per-Congress totals for one senator: cast next to missed, the
  * "how are they representing us" summary in four columns. */
-export const federalCongressStats = (lisId: string) =>
+export const federalCongressStats = (memberKey: string) =>
   prep(
       `SELECT v.congress, COUNT(*) AS total,
               SUM(r.vote_cast = 'Not Voting') AS missed,
               MIN(v.date) AS first, MAX(v.date) AS last
        FROM federal_votes v JOIN federal_vote_records r ON r.vote_id = v.id
-       WHERE r.lis_member_id = ?
+       WHERE r.member_id = ?
        GROUP BY v.congress ORDER BY v.congress DESC`,
     )
-    .all(lisId) as { congress: number; total: number; missed: number; first: string; last: string }[];
+    .all(memberKey) as { congress: number; total: number; missed: number; first: string; last: string }[];
 
 export const federalLatestVoteDate = (): string | null =>
   hasFederal()

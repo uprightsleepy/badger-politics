@@ -1,10 +1,13 @@
-"""Import U.S. Senate roll calls and the Wisconsin federal delegation.
+"""Import U.S. Senate and House roll calls for Wisconsin's delegation.
 
 Reads the XML mirrored by scraper.fetch_federal_votes. Attribution is by
-LIS member id, which the Senate's own files carry on every position --
-there is no name matching anywhere in this module. The full chamber is
-stored (party context needs it); Wisconsin's rows are just the ones
-where state = 'WI'.
+the chambers' own stable ids -- the Senate's LIS member id, the House's
+bioguide name-id -- so there is no name matching anywhere in this
+module. Senate votes store the full chamber (100 rows each); House votes
+store Wisconsin's rows only, because 435 rows across twenty years of
+roll calls would swell the snapshot for context nothing displays. Both
+chambers' tallies are reconciled against the full membership at import
+time either way.
 
 Hard checks, in the spirit of the state importer: a vote's stated yea
 and nay counts must equal the counted positions, and every vote must
@@ -56,6 +59,29 @@ def document_url(congress: int, doc_type: str | None, doc_number: str | None) ->
     if not path:
         return None
     return f"https://www.congress.gov/bill/{congress}th-congress/{path}/{doc_number}"
+
+
+# the Clerk writes "H R 2913" / "H RES 518" / "S J RES 5"; normalized to
+# the dotted forms the Senate files and congress.gov use
+LEGIS_TYPES = {
+    "HR": "H.R.", "HRES": "H.Res.", "HJRES": "H.J.Res.", "HCONRES": "H.Con.Res.",
+    "S": "S.", "SRES": "S.Res.", "SJRES": "S.J.Res.", "SCONRES": "S.Con.Res.",
+}
+
+
+def normalize_legis_num(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    parts = raw.split()
+    if not parts or not parts[-1].isdigit():
+        return None
+    kind = LEGIS_TYPES.get("".join(parts[:-1]).upper())
+    return f"{kind} {int(parts[-1])}" if kind else None
+
+
+def parse_house_date(raw: str) -> str:
+    """'3-Jun-2026' -> '2026-06-03'."""
+    return datetime.strptime(raw, "%d-%b-%Y").date().isoformat()
 
 
 def slugify(name: str) -> str:
@@ -124,8 +150,8 @@ def import_votes(conn, data_dir: Path) -> tuple[int, int]:
         )
         # impeachment trials record Guilty / Not Guilty; the Senate's own
         # count block files them under yeas and nays respectively
-        yea_set = {"Yea", "Guilty"}
-        nay_set = {"Nay", "Not Guilty"}
+        yea_set = YEA_CASTS
+        nay_set = NAY_CASTS
         counted = {"yea": 0, "nay": 0}
         wi = 0
         member_rows = []
@@ -165,6 +191,79 @@ def import_votes(conn, data_dir: Path) -> tuple[int, int]:
     return votes, records
 
 
+YEA_CASTS = {"Yea", "Aye", "Guilty"}
+NAY_CASTS = {"Nay", "No", "Not Guilty"}
+
+
+def import_house_votes(conn, data_dir: Path) -> tuple[int, int, int]:
+    votes = records = vacated = 0
+    house_dir = data_dir / "house"
+    if not house_dir.is_dir():
+        return 0, 0, 0
+    for path in sorted(house_dir.glob("roll_*.xml")):
+        root = ET.parse(path).getroot()
+        md = root.find("vote-metadata")
+        # a vacated vote (e.g. 2011 roll 484, "vacated by unanimous
+        # consent") has no recorded positions and no question or result:
+        # the official record itself declares it void, so there is
+        # nothing to attribute and nothing honest to display
+        if not root.findall("vote-data/recorded-vote"):
+            vacated += 1
+            continue
+        congress = int(text(md.find("congress")))
+        session = int(text(md.find("session"))[0])  # "2nd" -> 2
+        number = int(text(md.find("rollcall-num")))
+        vote_id = f"h{congress}-{session}-{number}"
+        date = parse_house_date(text(md.find("action-date")))
+        totals = md.find("vote-totals/totals-by-vote")
+        stated_yeas = int(text(totals.find("yea-total")) or 0) if totals is not None else None
+        stated_nays = int(text(totals.find("nay-total")) or 0) if totals is not None else None
+
+        counted_yea = counted_nay = 0
+        wi_rows = []
+        for rv in root.findall("vote-data/recorded-vote"):
+            leg = rv.find("legislator")
+            cast = text(rv.find("vote"))
+            if cast in YEA_CASTS:
+                counted_yea += 1
+            elif cast in NAY_CASTS:
+                counted_nay += 1
+            if leg.get("state") == "WI":
+                wi_rows.append(
+                    (vote_id, leg.get("name-id"), leg.text or leg.get("sort-field"),
+                     leg.get("party"), "WI", cast)
+                )
+        # Speaker elections and quorum calls carry no yea/nay totals; every
+        # ordinary vote's stated totals must match the counted positions
+        if stated_yeas is not None and (counted_yea != stated_yeas or counted_nay != stated_nays):
+            raise SystemExit(
+                f"{vote_id}: stated {stated_yeas}-{stated_nays} but counted "
+                f"{counted_yea}-{counted_nay}"
+            )
+        if not 1 <= len(wi_rows) <= 10:
+            raise SystemExit(f"{vote_id}: {len(wi_rows)} WI members on the roll")
+        conn.execute(
+            "INSERT INTO federal_votes VALUES (?, ?, ?, 'house', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                vote_id, congress, session, number, date,
+                text(md.find("vote-question")),
+                text(md.find("vote-result")),
+                text(md.find("vote-desc")) or text(md.find("vote-question")),
+                stated_yeas if stated_yeas is not None else counted_yea,
+                stated_nays if stated_nays is not None else counted_nay,
+                text(md.find("vote-type")),
+                normalize_legis_num(text(md.find("legis-num"))),
+                f"https://clerk.house.gov/evs/{date[:4]}/roll{number:03d}.xml",
+            ),
+        )
+        conn.executemany(
+            "INSERT INTO federal_vote_records VALUES (?, ?, ?, ?, ?, ?)", wi_rows
+        )
+        votes += 1
+        records += len(wi_rows)
+    return votes, records, vacated
+
+
 def run(data_dir: Path, db_path: Path) -> int:
     import sqlite3
 
@@ -202,8 +301,9 @@ def run(data_dir: Path, db_path: Path) -> int:
             source_url           TEXT NOT NULL
         );
         CREATE TABLE federal_vote_records (
-            vote_id       TEXT NOT NULL REFERENCES federal_votes (id),
-            lis_member_id TEXT NOT NULL,
+            vote_id   TEXT NOT NULL REFERENCES federal_votes (id),
+            -- LIS id for senate rows, bioguide for house rows
+            member_id TEXT NOT NULL,
             last_name     TEXT NOT NULL,
             party         TEXT,
             state         TEXT NOT NULL,
@@ -215,9 +315,13 @@ def run(data_dir: Path, db_path: Path) -> int:
     )
     import_roster(conn, data_dir)
     votes, records = import_votes(conn, data_dir)
+    hvotes, hrecords, vacated = import_house_votes(conn, data_dir)
     conn.commit()
     conn.close()
-    print(f"federal: 10 WI members, {votes} senate votes, {records} positions")
+    print(
+        f"federal: 10 WI members, {votes} senate votes ({records} positions), "
+        f"{hvotes} house votes ({hrecords} WI positions, {vacated} vacated skipped)"
+    )
     return 0
 
 

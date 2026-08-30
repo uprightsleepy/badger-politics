@@ -256,13 +256,24 @@ def check_federal(conn: sqlite3.Connection) -> list[str]:
     if not has:
         return []
     failures = []
+    # senate rows hold the full chamber, so tallies can be recounted; house
+    # rows are WI-only by design, so only their bounds can be checked here
+    # (their tallies were reconciled against the full roll at import)
     bad = conn.execute(
         """SELECT v.id FROM federal_votes v JOIN federal_vote_records r
              ON r.vote_id = v.id
+           WHERE v.chamber = 'senate'
            GROUP BY v.id
            HAVING SUM(r.vote_cast IN ('Yea', 'Guilty')) != v.yeas
                OR SUM(r.vote_cast IN ('Nay', 'Not Guilty')) != v.nays
                OR SUM(r.state = 'WI') != 2"""
+    ).fetchall()
+    bad += conn.execute(
+        """SELECT v.id FROM federal_votes v JOIN federal_vote_records r
+             ON r.vote_id = v.id
+           WHERE v.chamber = 'house'
+           GROUP BY v.id
+           HAVING COUNT(*) < 1 OR COUNT(*) > 10 OR SUM(r.state != 'WI') > 0"""
     ).fetchall()
     for (vote_id,) in bad:
         failures.append(f"federal vote {vote_id}: tally or WI-count mismatch")

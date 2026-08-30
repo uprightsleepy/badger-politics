@@ -14,9 +14,8 @@ const PER_PAGE = 250;
 
 export function getStaticPaths() {
   return federalMembers()
-    .filter((m) => m.chamber === "senate" && m.lis_id)
     .flatMap((m) => {
-      const total = federalVotesFor(m.lis_id!).length;
+      const total = federalVotesFor(m.chamber === "senate" ? m.lis_id! : m.bioguide).length;
       // literal, not PER_PAGE: getStaticPaths is hoisted out of this scope
       const pages = Math.max(1, Math.ceil(total / 250));
       return Array.from({ length: pages }, (_, i) => ({
@@ -27,14 +26,14 @@ export function getStaticPaths() {
 }
 
 const { member, page, pages } = Astro.props;
-const all = federalVotesFor(member.lis_id!);
+const all = federalVotesFor(member.chamber === "senate" ? member.lis_id! : member.bioguide);
 const votes = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 const base = `/federal/${member.slug}/votes/`;
 
 const castStyle = (cast: string) =>
-  cast === "Yea"
+  ["Yea", "Aye", "Guilty"].includes(cast)
     ? "bg-moss-50 text-moss-600"
-    : cast === "Nay"
+    : ["Nay", "No", "Not Guilty"].includes(cast)
       ? "bg-badger-50 text-badger-700"
       : "bg-navy-50 text-navy-600";
 ---
@@ -57,7 +56,7 @@ const castStyle = (cast: string) =>
   </h1>
   <p class="mt-1 text-sm text-navy-700">
     {all.length.toLocaleString()} votes, newest first. Each links to the
-    Senate's official record; bills link to congress.gov.
+    chamber's official record; bills link to congress.gov.
   </p>
 
   <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">

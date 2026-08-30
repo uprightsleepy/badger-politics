@@ -17,32 +17,33 @@ import { fmtDate } from "../../lib/format";
 import { documentUrlFragment, congressLabel } from "../../lib/federal";
 
 export function getStaticPaths() {
-  return federalMembers()
-    .filter((m) => m.chamber === "senate" && m.lis_id)
-    .map((m) => ({ params: { slug: m.slug }, props: { member: m } }));
+  return federalMembers().map((m) => ({ params: { slug: m.slug }, props: { member: m } }));
 }
 
 const { member } = Astro.props;
-const votes = federalVotesFor(member.lis_id!);
-const byCongress = federalCongressStats(member.lis_id!);
+// each chamber's files stamp their own id: LIS for senators, bioguide
+// for House members
+const voteKey = member.chamber === "senate" ? member.lis_id! : member.bioguide;
+const votes = federalVotesFor(voteKey);
+const byCongress = federalCongressStats(voteKey);
 const missed = byCongress.reduce((s, c) => s + c.missed, 0);
 const latest = votes[0]?.date ?? null;
 const sinceYear = byCongress.at(-1)?.first.slice(0, 4);
 const recent = votes.slice(0, 25);
 
 const castStyle = (cast: string) =>
-  cast === "Yea"
+  ["Yea", "Aye", "Guilty"].includes(cast)
     ? "bg-moss-50 text-moss-600"
-    : cast === "Nay"
+    : ["Nay", "No", "Not Guilty"].includes(cast)
       ? "bg-badger-50 text-badger-700"
       : "bg-navy-50 text-navy-600";
 ---
 
 <Base
-  title={`${member.name}, U.S. Senator`}
+  title={`${member.name}, ${member.chamber === "senate" ? "U.S. Senator" : `U.S. Representative, WI-${member.district}`}`}
   description={`${member.name}'s complete U.S. Senate voting record since ${sinceYear}, from the Senate's official roll calls: ${votes.length.toLocaleString()} votes, ${missed} missed.`}
   breadcrumbs={[{ name: "Federal delegation", url: "/federal/" }]}
-  filters={{ type: "Legislator", chamber: "U.S. Senate", party: member.party }}
+  filters={{ type: "Legislator", chamber: member.chamber === "senate" ? "U.S. Senate" : "U.S. House", party: member.party }}
 >
   <p class="text-sm text-navy-600">
     <a href="/federal/" class="underline">&larr; Federal delegation</a>
@@ -52,13 +53,19 @@ const castStyle = (cast: string) =>
     <PartyChip party={member.party} />
   </h1>
   <p class="mt-1 text-sm text-navy-700">
-    U.S. Senator for Wisconsin since {sinceYear} &middot; term ends {member.term_end.slice(0, 4)} &middot;
+    {member.chamber === "senate"
+      ? "U.S. Senator for Wisconsin"
+      : `U.S. Representative for Wisconsin's ${member.district}th district`} since {sinceYear} &middot; term ends {member.term_end.slice(0, 4)} &middot;
     <a href={`https://www.congress.gov/member/${member.slug}/${member.bioguide}`} class="underline">
       official profile &#8599;
     </a>
   </p>
   <SourceStrip
-    sources={[{ label: "U.S. Senate", href: "https://www.senate.gov/legislative/votes_new.htm" }]}
+    sources={[
+      member.chamber === "senate"
+        ? { label: "U.S. Senate", href: "https://www.senate.gov/legislative/votes_new.htm" }
+        : { label: "U.S. House Clerk", href: "https://clerk.house.gov/Votes" },
+    ]}
     through={latest}
   />
 
