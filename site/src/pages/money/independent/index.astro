@@ -1,6 +1,6 @@
 ---
 import Base from "../../../layouts/Base.astro";
-import { independentExpenditures, independentExpenditureTotals, conduitFlows, donorCommittees } from "../../../lib/db";
+import { independentExpenditures, independentExpenditureTotals, conduitFlows, donorCommittees, cfEntityByName } from "../../../lib/db";
 import SourceStrip from "../../../components/SourceStrip.astro";
 import ScrollPanel from "../../../components/ScrollPanel.astro";
 import { fmtMoney, fmtDate } from "../../../lib/format";
@@ -9,6 +9,10 @@ const spends = independentExpenditures(800);
 // filers that also have a committee page here (they gave to legislators);
 // express-advocacy-only groups have no internal page and stay plain text
 const internalCommittee = new Set(donorCommittees().map((c) => c.entityId));
+// official registrant pages, keyed by the entity id CFIS itself assigns
+const officialUrl = (entityId: number) =>
+  `https://campaignfinance.wi.gov/browse-data/registrant/${entityId}`;
+const entityByName = cfEntityByName();
 const latestFiling = spends[0]?.date ?? null;
 const conduits = conduitFlows(60);
 // totals cover every filing, not just the rows listed below
@@ -162,7 +166,15 @@ const races = [...byRace.entries()]
               <ul class="mb-3 max-w-2xl divide-y divide-navy-100 text-sm">
                 {summary.slice(0, 8).map((l) => (
                   <li class="py-2">
-                    <p class="font-semibold">{l.name}</p>
+                    <p class="font-semibold">
+                      {entityByName.has(l.name.toLowerCase()) ? (
+                        <a href={officialUrl(entityByName.get(l.name.toLowerCase())!)} class="underline">
+                          {l.name}
+                        </a>
+                      ) : (
+                        l.name
+                      )}
+                    </p>
                     <p class="mt-0.5 flex flex-wrap gap-x-5 gap-y-0.5 text-navy-700">
                       {l.forN > 0 && (
                         <span>
@@ -188,13 +200,16 @@ const races = [...byRace.entries()]
                     <div class="flex flex-wrap items-baseline gap-x-3">
                       <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(c.date)}</span>
                       <span class="min-w-0 flex-1 truncate text-xs text-navy-600" title={c.filer_name ?? ""}>
-                        {c.filer_entity_id != null && internalCommittee.has(c.filer_entity_id) ? (
-                          <a href={`/money/committees/${c.filer_entity_id}/`} class="underline">
+                        {c.filer_entity_id != null ? (
+                          <a href={officialUrl(c.filer_entity_id)} class="underline">
                             {c.filer_name ?? "committee not named"}
                           </a>
                         ) : (
                           c.filer_name ?? "committee not named"
                         )}{c.filer_type ? ` · ${c.filer_type}` : ""}
+                        {c.filer_entity_id != null && internalCommittee.has(c.filer_entity_id) && (
+                          <a href={`/money/committees/${c.filer_entity_id}/`} class="ml-1 underline">donor history</a>
+                        )}
                       </span>
                       <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(c.amount)}</span>
                     </div>
@@ -248,8 +263,8 @@ const races = [...byRace.entries()]
   <p class="mt-8 max-w-3xl text-xs text-navy-600">
     Source: Wisconsin Ethics Commission campaign finance filings, browsable
     at <a href="https://campaignfinance.wi.gov/browse-data/transactions" class="underline">campaignfinance.wi.gov</a>.
-    The Commission's site shows filing details only in pop-ups, so
-    individual filings cannot be linked to directly.
+    Committee names link to each registrant's official page, which holds
+    their filings; single transactions have no linkable page of their own.
     Committees register and report only after
     crossing statutory thresholds, and contributions below the itemization
     threshold are reported as totals rather than by donor, so these figures

@@ -1448,6 +1448,24 @@ export const cfCommitteesWithPages = (minTotal = 5000) =>
     )
     .all(minTotal) as (CfCommittee & { raised: number; spent: number; n: number })[];
 
+/** Registrant entity ids by exact committee name, for linking a name in
+ * a filing to its official page on campaignfinance.wi.gov. Names that
+ * match more than one registrant resolve to nothing: exact-unique or no
+ * link, never a guess. */
+export const cfEntityByName = (): Map<string, number> => {
+  const rows = prep("SELECT entity_id, name FROM cf_committees").all() as {
+    entity_id: number; name: string;
+  }[];
+  const seen = new Map<string, number | null>();
+  for (const r of rows) {
+    const key = r.name.trim().toLowerCase();
+    seen.set(key, seen.has(key) ? null : r.entity_id);
+  }
+  const out = new Map<string, number>();
+  for (const [k, v] of seen) if (v != null) out.set(k, v);
+  return out;
+};
+
 /** One committee's money: totals, top donors, top recipients. */
 export const cfCommitteeFor = (entityId: number) => {
   const committee = prep("SELECT * FROM cf_committees WHERE entity_id = ?")
