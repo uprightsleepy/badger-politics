@@ -57,16 +57,30 @@ for (const c of cards) {
 // source, one for each side, and appears in each line the way the
 // Commission's own records carry it. Names are grouped after trimming
 // and case-folding only; differently named payees stay separate.
-const linesByRace = new Map<string, Map<string, { stance: string; name: string; total: number; n: number }>>();
+// One row per target, both as-filed sums side by side: what was spent
+// to help this campaign, what was spent against it. Nothing is split or
+// reallocated, and a half with no filings simply is not shown. Targets
+// are the committees the filings name (usually the candidate's own
+// campaign committee); grouping is after trim and case-fold only.
+interface TargetLine {
+  name: string; forTotal: number; forN: number; againstTotal: number; againstN: number;
+}
+const linesByRace = new Map<string, Map<string, TargetLine>>();
 for (const sp of spends) {
   if (!sp.related_name || !sp.stance) continue;
   const race = raceOf(sp.related_office, sp.related_district);
   if (!linesByRace.has(race)) linesByRace.set(race, new Map());
   const by = linesByRace.get(race)!;
-  const key = `${sp.stance}|${sp.related_name.trim().toLowerCase()}`;
-  const row = by.get(key) ?? { stance: sp.stance, name: sp.related_name.trim(), total: 0, n: 0 };
-  row.total += sp.amount;
-  row.n += 1;
+  const key = sp.related_name.trim().toLowerCase();
+  const row = by.get(key) ??
+    { name: sp.related_name.trim(), forTotal: 0, forN: 0, againstTotal: 0, againstN: 0 };
+  if (sp.stance === "FOR") {
+    row.forTotal += sp.amount;
+    row.forN += 1;
+  } else {
+    row.againstTotal += sp.amount;
+    row.againstN += 1;
+  }
   by.set(key, row);
 }
 
@@ -74,7 +88,9 @@ const races = [...byRace.entries()]
   .map(([race, rows]) => ({
     race, rows,
     total: rows.reduce((t, r) => t + r.amount, 0),
-    summary: [...(linesByRace.get(race)?.values() ?? [])].sort((a, b) => b.total - a.total),
+    summary: [...(linesByRace.get(race)?.values() ?? [])].sort(
+      (a, b) => b.forTotal + b.againstTotal - (a.forTotal + a.againstTotal),
+    ),
   }))
   .sort((a, b) => b.total - a.total);
 ---
@@ -129,19 +145,24 @@ const races = [...byRace.entries()]
           </summary>
           <div class="border-t border-navy-100 p-3">
             {summary.length > 0 && (
-              <ul class="mb-3 max-w-xl space-y-1 text-sm">
+              <ul class="mb-3 max-w-2xl divide-y divide-navy-100 text-sm">
                 {summary.slice(0, 8).map((l) => (
-                  <li class="flex flex-wrap items-baseline gap-x-2">
-                    <span
-                      class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
-                        l.stance === "FOR" ? "bg-moss-50 text-moss-600" : "bg-badger-50 text-badger-700"
-                      }`}
-                    >
-                      {l.stance === "FOR" ? "Supporting" : "Opposing"}
-                    </span>
-                    <span class="min-w-0 flex-1 truncate">{l.name}</span>
-                    <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(l.total)}</span>
-                    <span class="shrink-0 text-xs text-navy-600">{l.n.toLocaleString()} filing{l.n === 1 ? "" : "s"}</span>
+                  <li class="py-2">
+                    <p class="font-semibold">{l.name}</p>
+                    <p class="mt-0.5 flex flex-wrap gap-x-5 gap-y-0.5 text-navy-700">
+                      {l.forN > 0 && (
+                        <span>
+                          <span class="font-bold text-moss-600">{fmtMoney(l.forTotal)}</span> spent
+                          to help ({l.forN.toLocaleString()} filing{l.forN === 1 ? "" : "s"})
+                        </span>
+                      )}
+                      {l.againstN > 0 && (
+                        <span>
+                          <span class="font-bold text-badger-700">{fmtMoney(l.againstTotal)}</span> spent
+                          against ({l.againstN.toLocaleString()} filing{l.againstN === 1 ? "" : "s"})
+                        </span>
+                      )}
+                    </p>
                   </li>
                 ))}
               </ul>
