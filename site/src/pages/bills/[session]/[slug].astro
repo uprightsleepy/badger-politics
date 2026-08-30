@@ -51,6 +51,12 @@ const subjects = subjectsForBill(bill.id);
 const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
 
 // plain-language fate explainer: docs.legis never says "this bill is dead"
+// the story after a veto, straight from the history: when it was vetoed,
+// and whether the Legislature tried to override (Joint Rule 82) and failed
+const vetoDate = actions.find((a) => /vetoed by the governor/i.test(a.description ?? ""))?.date;
+const overrideFailed = actions.find((a) =>
+  /notwithstanding the objections/i.test(a.description ?? ""),
+)?.date;
 const vetoMsg = bill.status === "vetoed" || bill.status === "enacted"
   ? vetoMessageUrl(bill.id) : null;
 const partialVeto = actions.some((a) => /partial veto/i.test(a.description));
@@ -223,9 +229,11 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
     {bill.status === "vetoed" && (
       <aside class="mt-4 rounded-lg border border-navy-100 bg-navy-50 p-4 text-sm">
         <p>
-          <strong>The governor vetoed this bill</strong>, blocking it from
+          <strong>The governor vetoed this bill</strong>{vetoDate && ` on ${fmtDate(vetoDate)}`}, blocking it from
           becoming law after both chambers passed it. The Legislature can
-          override a veto only with a two-thirds vote of each chamber.
+          override a veto only with a two-thirds vote of each chamber{overrideFailed
+            ? `; it tried on ${fmtDate(overrideFailed)}, and the override failed`
+            : ""}.
           {vetoMsg && (
             <>
               {" "}<a href={vetoMsg} class="underline">Read the governor's veto message</a>.

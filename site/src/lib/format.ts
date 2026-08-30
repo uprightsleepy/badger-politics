@@ -207,7 +207,8 @@ export function stepperState(
     passed: 3,
     adopted: steps.length,
     failed_sjr1: 1,
-    vetoed: 3,
+    // a vetoed bill passed BOTH chambers; the stop is the governor's desk
+    vetoed: 4,
     enacted: 5,
   };
   // a one-house resolution is fully adopted at "passed one chamber"
