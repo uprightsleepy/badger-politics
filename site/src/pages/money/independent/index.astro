@@ -41,15 +41,41 @@ for (const s of spends) {
   if (s.related_name && !side.includes(s.related_name)) side.push(s.related_name);
 }
 
+const raceOf = (office: string | null, district: string | null) =>
+  [office, district].filter(Boolean).join(" ") || "Race not named in the filing";
+
 // group by the race the filing names, so a reader sees a contest at once
 const byRace = new Map<string, Card[]>();
 for (const c of cards) {
-  const race = [c.office, c.district].filter(Boolean).join(" ") || "Race not named in the filing";
+  const race = raceOf(c.office, c.district);
   if (!byRace.has(race)) byRace.set(race, []);
   byRace.get(race)!.push(c);
 }
+// Per race: each stance-and-target line exactly as filed with the
+// Commission -- "supporting X, $N across k filings" -- summed with no
+// splitting or reallocation. A paired ad buy is two filings in the
+// source, one for each side, and appears in each line the way the
+// Commission's own records carry it. Names are grouped after trimming
+// and case-folding only; differently named payees stay separate.
+const linesByRace = new Map<string, Map<string, { stance: string; name: string; total: number; n: number }>>();
+for (const sp of spends) {
+  if (!sp.related_name || !sp.stance) continue;
+  const race = raceOf(sp.related_office, sp.related_district);
+  if (!linesByRace.has(race)) linesByRace.set(race, new Map());
+  const by = linesByRace.get(race)!;
+  const key = `${sp.stance}|${sp.related_name.trim().toLowerCase()}`;
+  const row = by.get(key) ?? { stance: sp.stance, name: sp.related_name.trim(), total: 0, n: 0 };
+  row.total += sp.amount;
+  row.n += 1;
+  by.set(key, row);
+}
+
 const races = [...byRace.entries()]
-  .map(([race, rows]) => ({ race, rows, total: rows.reduce((t, r) => t + r.amount, 0) }))
+  .map(([race, rows]) => ({
+    race, rows,
+    total: rows.reduce((t, r) => t + r.amount, 0),
+    summary: [...(linesByRace.get(race)?.values() ?? [])].sort((a, b) => b.total - a.total),
+  }))
   .sort((a, b) => b.total - a.total);
 ---
 
@@ -64,7 +90,10 @@ const races = [...byRace.entries()]
     support or oppose that candidate, as long as they do not coordinate with
     them. This is <strong>express advocacy</strong>, and it never appears in
     the candidate's own fundraising totals — so a race can be far more
-    expensive than the candidates' filings suggest.
+    expensive than the candidates' filings suggest. Spending
+    <em>for</em> one candidate and <em>against</em> their opponent are two
+    halves of the same strategy: a group backing a candidate for governor
+    will often file both kinds in the same race.
   </p>
 
   {filingCount === 0 ? (
@@ -90,7 +119,7 @@ const races = [...byRace.entries()]
           races below list the {spends.length.toLocaleString()} most recent.
         </p>
       )}
-      {races.map(({ race, rows, total }) => (
+      {races.map(({ race, rows, total, summary }) => (
         <details class="mt-4 rounded-lg border border-navy-100 bg-white" open={total === races[0].total}>
           <summary class="flex cursor-pointer flex-wrap items-baseline gap-x-3 px-4 py-3">
             <span class="text-lg font-bold">{race}</span>
@@ -99,7 +128,25 @@ const races = [...byRace.entries()]
             </span>
           </summary>
           <div class="border-t border-navy-100 p-3">
-            <ScrollPanel label={`Spending in ${race}`} max="max-h-[26rem]" count={rows.length}>
+            {summary.length > 0 && (
+              <ul class="mb-3 max-w-xl space-y-1 text-sm">
+                {summary.slice(0, 8).map((l) => (
+                  <li class="flex flex-wrap items-baseline gap-x-2">
+                    <span
+                      class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
+                        l.stance === "FOR" ? "bg-moss-50 text-moss-600" : "bg-badger-50 text-badger-700"
+                      }`}
+                    >
+                      {l.stance === "FOR" ? "Supporting" : "Opposing"}
+                    </span>
+                    <span class="min-w-0 flex-1 truncate">{l.name}</span>
+                    <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(l.total)}</span>
+                    <span class="shrink-0 text-xs text-navy-600">{l.n.toLocaleString()} filing{l.n === 1 ? "" : "s"}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+                        <ScrollPanel label={`Spending in ${race}`} max="max-h-[26rem]" count={rows.length}>
               <ul class="divide-y divide-navy-100">
                 {rows.map((c) => (
                   <li class="px-3 py-2 text-sm">

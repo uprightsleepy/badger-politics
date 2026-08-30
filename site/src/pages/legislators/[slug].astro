@@ -419,13 +419,16 @@ const tally = TALLY_ORDER.map((status) => ({
             <h2 class="font-bold">Compensation</h2>
             <p class="mt-1">
               Salary: <strong>${COMPENSATION.salary.toLocaleString()}</strong>/year
-              <span class="text-xs text-navy-600"> (set by statute, same for every member)</span>
+              <span class="text-xs text-navy-600">
+                {" "}(2025&ndash;26 legislature, same for every member;
+                <a href="https://legis.wisconsin.gov/lrb/media/chth4qs4/elected-official-salaries-2025-95.pdf" class="underline">LRB</a>)
+              </span>
             </p>
             <p class="mt-1">
               Per diem rate:{" "}
               {person.chamber === "lower"
-                ? `$${COMPENSATION.assembly.overnight}/overnight or $${COMPENSATION.assembly.day}/day trip`
-                : `$${COMPENSATION.senate.overnight}/day (${COMPENSATION.senate.note})`}
+                ? `$${COMPENSATION.assembly.overnight}/overnight or $${COMPENSATION.assembly.day}/day trip (Dane County members: day rate only)`
+                : `$${COMPENSATION.senate.overnight}/day for senators outside Dane County`}
             </p>
             <p class="mt-1 text-xs text-navy-600">
               What each member actually claims varies. Per-member claim records
