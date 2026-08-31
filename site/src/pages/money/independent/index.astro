@@ -1,267 +1,126 @@
 ---
+/** Outside spending on Wisconsin candidates, one filing at a time.
+ *
+ * No sums, no per-candidate rollups: every row is one filing exactly as
+ * the Ethics Commission holds it -- who spent, how much, paid to whom,
+ * for or against which campaign, and the report it was filed on. An
+ * earlier version totaled these by stance and by campaign, and the
+ * totals raised more questions than they answered; the records
+ * themselves are unambiguous, so they are the page.
+ *
+ * Every row carries the Commission's own transaction ID and links the
+ * report it came from, so any figure here can be checked against the
+ * official system in two clicks.
+ */
 import Base from "../../../layouts/Base.astro";
-import { independentExpenditures, independentExpenditureTotals, conduitFlows, donorCommittees, cfEntityByName } from "../../../lib/db";
+import FilterBar from "../../../components/FilterBar.astro";
 import SourceStrip from "../../../components/SourceStrip.astro";
-import ScrollPanel from "../../../components/ScrollPanel.astro";
+import { independentExpenditures, conduitFlows } from "../../../lib/db";
 import { fmtMoney, fmtDate } from "../../../lib/format";
 
-const spends = independentExpenditures(800);
-// filers that also have a committee page here (they gave to legislators);
-// express-advocacy-only groups have no internal page and stay plain text
-const internalCommittee = new Set(donorCommittees().map((c) => c.entityId));
-// official registrant pages, keyed by the entity id CFIS itself assigns
+// every filing, not a sample: the whole point is completeness
+const filings = independentExpenditures(100000);
+const conduits = conduitFlows(60);
+const latest = filings[0]?.date ?? null;
 const officialUrl = (entityId: number) =>
   `https://campaignfinance.wi.gov/browse-data/registrant/${entityId}`;
-const entityByName = cfEntityByName();
-const latestFiling = spends[0]?.date ?? null;
-const conduits = conduitFlows(60);
-// totals cover every filing, not just the rows listed below
-const totals = independentExpenditureTotals();
-const sumOf = (stance: string) => totals.find((t) => t.stance === stance)?.total ?? 0;
-const countOf = (stance: string) => totals.find((t) => t.stance === stance)?.n ?? 0;
-const forTotal = sumOf("FOR");
-const againstTotal = sumOf("AGAINST");
-const filingCount = countOf("FOR") + countOf("AGAINST");
-// One ad buy is filed twice — supporting one candidate and opposing the
-// other — with the same filer, date and amount. Showing both as separate
-// rows doubles the apparent number of filings, so pair them into one.
-type Spend = (typeof spends)[number];
-interface Card {
-  date: string; amount: number; filer_entity_id: number | null;
-  filer_name: string | null; filer_type: string | null;
-  report_id: number | null;
-  office: string | null; district: string | null;
-  supporting: string[]; opposing: string[];
-}
-const cards: Card[] = [];
-const pairKey = (s: Spend) =>
-  [s.date, s.amount, s.filer_entity_id, s.related_office, s.related_district].join("|");
-const index = new Map<string, Card>();
-for (const s of spends) {
-  const key = pairKey(s);
-  let card = index.get(key);
-  if (!card) {
-    card = {
-      date: s.date, amount: s.amount, filer_entity_id: s.filer_entity_id,
-      filer_name: s.filer_name, filer_type: s.filer_type, report_id: s.report_id,
-      office: s.related_office, district: s.related_district, supporting: [], opposing: [],
-    };
-    index.set(key, card);
-    cards.push(card);
-  }
-  const side = s.stance === "FOR" ? card.supporting : card.opposing;
-  if (s.related_name && !side.includes(s.related_name)) side.push(s.related_name);
-}
-
-const raceOf = (office: string | null, district: string | null) =>
-  [office, district].filter(Boolean).join(" ") || "Race not named in the filing";
-
-// group by the race the filing names, so a reader sees a contest at once
-const byRace = new Map<string, Card[]>();
-for (const c of cards) {
-  const race = raceOf(c.office, c.district);
-  if (!byRace.has(race)) byRace.set(race, []);
-  byRace.get(race)!.push(c);
-}
-// Per race: each stance-and-target line exactly as filed with the
-// Commission -- "supporting X, $N across k filings" -- summed with no
-// splitting or reallocation. A paired ad buy is two filings in the
-// source, one for each side, and appears in each line the way the
-// Commission's own records carry it. Names are grouped after trimming
-// and case-folding only; differently named payees stay separate.
-// One row per target, both as-filed sums side by side: what was spent
-// to help this campaign, what was spent against it. Nothing is split or
-// reallocated, and a half with no filings simply is not shown. Targets
-// are the committees the filings name (usually the candidate's own
-// campaign committee); grouping is after trim and case-fold only.
-interface TargetLine {
-  name: string; forTotal: number; forN: number; againstTotal: number; againstN: number;
-}
-const linesByRace = new Map<string, Map<string, TargetLine>>();
-for (const sp of spends) {
-  if (!sp.related_name || !sp.stance) continue;
-  const race = raceOf(sp.related_office, sp.related_district);
-  if (!linesByRace.has(race)) linesByRace.set(race, new Map());
-  const by = linesByRace.get(race)!;
-  const key = sp.related_name.trim().toLowerCase();
-  const row = by.get(key) ??
-    { name: sp.related_name.trim(), forTotal: 0, forN: 0, againstTotal: 0, againstN: 0 };
-  if (sp.stance === "FOR") {
-    row.forTotal += sp.amount;
-    row.forN += 1;
-  } else {
-    row.againstTotal += sp.amount;
-    row.againstN += 1;
-  }
-  by.set(key, row);
-}
-
-const races = [...byRace.entries()]
-  .map(([race, rows]) => ({
-    race, rows,
-    total: rows.reduce((t, r) => t + r.amount, 0),
-    summary: [...(linesByRace.get(race)?.values() ?? [])].sort(
-      (a, b) => b.forTotal + b.againstTotal - (a.forTotal + a.againstTotal),
-    ),
-  }))
-  .sort((a, b) => b.total - a.total);
+const facets = [
+  { key: "for", label: "Supporting a campaign" },
+  { key: "against", label: "Opposing a campaign" },
+].map((f) => ({
+  ...f,
+  count: filings.filter((t) => t.stance.toLowerCase() === f.key).length,
+}));
 ---
 
 <Base
-  title="Spending for and against candidates"
-  description="Independent expenditures in Wisconsin: money spent to support or oppose candidates by committees other than the candidates themselves."
+  title="Outside spending on Wisconsin candidates"
+  description="Every independent-expenditure filing in Wisconsin, one record at a time, with the Ethics Commission's transaction IDs and links to the reports they were filed on."
+  breadcrumbs={[{ name: "Money", url: "/money/" }]}
 >
   <p class="text-sm text-navy-600"><a href="/money/" class="underline">Campaign money</a></p>
-  <h1 class="mt-1 text-2xl font-bold">Spending for and against candidates</h1>
+  <h1 class="mt-1 text-2xl font-bold">Outside spending, filing by filing</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    Groups other than a candidate's own committee can spend unlimited
+    amounts on ads about that candidate, as long as they don't coordinate
+    with the campaign. The Ethics Commission calls each such purchase an
+    <strong>independent expenditure</strong>; the group filing it records
+    whether the ad supports or opposes a campaign. Below is every one we
+    hold, exactly as filed: nothing is added up. Each row carries the
+    Commission's transaction ID and links to the report it appeared on and
+    to the filer's official page.
+  </p>
   <SourceStrip
     sources={[{
       label: "Wisconsin Ethics Commission filings",
       href: "https://campaignfinance.wi.gov/browse-data/transactions",
     }]}
-    through={latestFiling}
+    through={latest}
   />
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Committees other than a candidate's own can spend unlimited amounts to
-    support or oppose that candidate, as long as they do not coordinate with
-    them. This is <strong>express advocacy</strong>, and it never appears in
-    the candidate's own fundraising totals — so a race can be far more
-    expensive than the candidates' filings suggest. Spending
-    <em>for</em> one candidate and <em>against</em> their opponent are two
-    halves of the same strategy: a group backing a candidate for governor
-    will often file both kinds in the same race.
-  </p>
 
-  {filingCount === 0 ? (
-    <p class="mt-6 rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-700">
-      No express advocacy is recorded in the filings we hold for this period.
-      Committees register only after crossing the state's reporting
-      threshold, so spending below it never appears at all.
-    </p>
-  ) : (
-    <>
-      <div class="mt-4 flex flex-wrap gap-6 rounded-lg border border-navy-100 bg-white p-4 text-sm">
-        <p><span class="block text-xs text-navy-600">Spent supporting</span>
-          <span class="text-xl font-bold text-moss-600">{fmtMoney(forTotal)}</span></p>
-        <p><span class="block text-xs text-navy-600">Spent opposing</span>
-          <span class="text-xl font-bold text-badger-700">{fmtMoney(againstTotal)}</span></p>
-        <p><span class="block text-xs text-navy-600">Filings</span>
-          <span class="text-xl font-bold">{filingCount.toLocaleString()}</span></p>
-      </div>
+  <div class="mt-4">
+    <FilterBar
+      id="filing-filter"
+      statusId="filing-filter-status"
+      label="Filter filings"
+      placeholder="e.g. Crowley, Believe in Wisconsin, Beacon Media…"
+      facetAttr="stance"
+      facetLabel="Filed as"
+      facets={facets}
+    />
+  </div>
 
-      {spends.length < filingCount && (
-        <p class="mt-2 text-xs text-navy-600">
-          Totals above cover all {filingCount.toLocaleString()} filings; the
-          races below list the {spends.length.toLocaleString()} most recent.
-        </p>
-      <p class="mt-1 text-sm">
-        <a href="/money/independent/filings/" class="font-semibold underline">
-          Check our numbers: every filing with its Commission ID &rarr;
-        </a>
-      </p>
-      )}
-      {races.map(({ race, rows, total, summary }) => (
-        <details class="mt-4 rounded-lg border border-navy-100 bg-white" open={total === races[0].total}>
-          <summary class="flex cursor-pointer flex-wrap items-baseline gap-x-3 px-4 py-3">
-            <span class="text-lg font-bold">{race}</span>
-            <span class="text-sm text-navy-600">
-              {fmtMoney(total)} across {rows.length.toLocaleString()} ad buy{rows.length === 1 ? "" : "s"}
+  <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+    {filings.map((t) => (
+      <li
+        data-filing-row
+        data-text={`${t.filer_name ?? ""} ${t.related_name ?? ""} ${t.purpose ?? ""} ${t.other_name ?? ""} ${t.related_office ?? ""} ${t.id}`.toLowerCase()}
+        data-stance={t.stance.toLowerCase()}
+        class="px-4 py-2"
+      >
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(t.date)}</span>
+          <span class="min-w-0 flex-1">
+            <a href={officialUrl(t.filer_entity_id)} class="underline">
+              {t.filer_name ?? "committee not named"}
+            </a>
+            {t.filer_type && <span class="text-xs text-navy-600"> &middot; {t.filer_type}</span>}
+          </span>
+          <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(t.amount)}</span>
+        </div>
+        <p class="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:pl-[6.75rem]">
+          <span
+            class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
+              t.stance === "FOR" ? "bg-moss-50 text-moss-600" : "bg-badger-50 text-badger-700"
+            }`}
+          >
+            {t.stance === "FOR" ? "Supporting" : "Opposing"}
+          </span>
+          <span class="min-w-0">{t.related_name}</span>
+          {t.related_office && (
+            <span class="text-xs text-navy-600">
+              ({[t.related_office, t.related_district].filter(Boolean).join(" ")})
             </span>
-          </summary>
-          <div class="border-t border-navy-100 p-3">
-            {summary.length > 0 && (
-              <p class="text-xs font-semibold uppercase tracking-wide text-navy-600">
-                Outside spending, by campaign targeted
-              </p>
-            )}
-            {summary.length > 0 && (
-              <ul class="mb-3 max-w-2xl divide-y divide-navy-100 text-sm">
-                {summary.slice(0, 8).map((l) => (
-                  <li class="py-2">
-                    <p class="font-semibold">
-                      {entityByName.has(l.name.toLowerCase()) ? (
-                        <a href={officialUrl(entityByName.get(l.name.toLowerCase())!)} class="underline">
-                          {l.name}
-                        </a>
-                      ) : (
-                        l.name
-                      )}
-                    </p>
-                    <p class="mt-0.5 flex flex-wrap gap-x-5 gap-y-0.5 text-navy-700">
-                      {l.forN > 0 && (
-                        <span>
-                          <span class="font-bold text-moss-600">{fmtMoney(l.forTotal)}</span> spent
-                          to help ({l.forN.toLocaleString()} filing{l.forN === 1 ? "" : "s"})
-                        </span>
-                      )}
-                      {l.againstN > 0 && (
-                        <span>
-                          <span class="font-bold text-badger-700">{fmtMoney(l.againstTotal)}</span> spent
-                          against ({l.againstN.toLocaleString()} filing{l.againstN === 1 ? "" : "s"})
-                        </span>
-                      )}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {summary.length > 0 && (
-              <p class="mb-3 max-w-2xl text-xs text-navy-600">
-                These are other groups' dollars spent about each campaign —
-                not the campaigns' own fundraising, which lives on each
-                committee's official page.
-              </p>
-            )}
-            <ScrollPanel label={`Spending in ${race}`} max="max-h-[26rem]" count={rows.length}>
-              <ul class="divide-y divide-navy-100">
-                {rows.map((c) => (
-                  <li class="px-3 py-2 text-sm">
-                    <div class="flex flex-wrap items-baseline gap-x-3">
-                      <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(c.date)}</span>
-                      <span class="min-w-0 flex-1 truncate text-xs text-navy-600" title={c.filer_name ?? ""}>
-                        {c.filer_entity_id != null ? (
-                          <a href={officialUrl(c.filer_entity_id)} class="underline">
-                            {c.filer_name ?? "committee not named"}
-                          </a>
-                        ) : (
-                          c.filer_name ?? "committee not named"
-                        )}{c.filer_type ? ` · ${c.filer_type}` : ""}
-                        {c.filer_entity_id != null && internalCommittee.has(c.filer_entity_id) && (
-                          <a href={`/money/committees/${c.filer_entity_id}/`} class="ml-1 underline">donor history</a>
-                        )}
-                      </span>
-                      <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(c.amount)}</span>
-                      {c.report_id != null && (
-                        <a
-                          href={`https://campaignfinance.wi.gov/browse-data/report/${c.report_id}`}
-                          class="shrink-0 py-1 text-xs underline"
-                        >
-                          report &#8599;
-                        </a>
-                      )}
-                    </div>
-                    <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                      {c.supporting.length > 0 && (
-                        <p class="flex min-w-0 items-baseline gap-1.5">
-                          <span class="shrink-0 rounded-full bg-moss-50 px-2 py-0.5 text-xs font-bold text-moss-600">FOR</span>
-                          <span class="min-w-0 truncate" title={c.supporting.join(", ")}>{c.supporting.join(", ")}</span>
-                        </p>
-                      )}
-                      {c.opposing.length > 0 && (
-                        <p class="flex min-w-0 items-baseline gap-1.5">
-                          <span class="shrink-0 rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">AGAINST</span>
-                          <span class="min-w-0 truncate" title={c.opposing.join(", ")}>{c.opposing.join(", ")}</span>
-                        </p>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </ScrollPanel>
-          </div>
-        </details>
-      ))}
-    </>
-  )}
+          )}
+        </p>
+        <p class="mt-0.5 text-xs text-navy-600 sm:pl-[6.75rem]">
+          {t.other_name && <>Paid to {t.other_name}{t.purpose ? ` for ${t.purpose.toLowerCase()}` : ""} &middot; </>}
+          Commission transaction ID <span class="font-semibold tabular-nums">{t.id}</span>
+          {t.report_id != null && (
+            <>
+              {" "}&middot;{" "}
+              <a href={`https://campaignfinance.wi.gov/browse-data/report/${t.report_id}`} class="underline">
+                {t.report_name ?? "filed report"} &#8599;
+              </a>
+            </>
+          )}
+        </p>
+      </li>
+    ))}
+  </ul>
+  <p id="filing-no-match" class="mt-3 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600">
+    No filings match. Try a shorter word, or clear the filter.
+  </p>
 
   {conduits.length > 0 && (
     <section class="mt-10">
@@ -289,12 +148,20 @@ const races = [...byRace.entries()]
   <p class="mt-8 max-w-3xl text-xs text-navy-600">
     Source: Wisconsin Ethics Commission campaign finance filings, browsable
     at <a href="https://campaignfinance.wi.gov/browse-data/transactions" class="underline">campaignfinance.wi.gov</a>.
-    Committee names link to each registrant's official page, which holds
-    their filings; single transactions have no linkable page of their own.
-    Committees register and report only after
-    crossing statutory thresholds, and contributions below the itemization
-    threshold are reported as totals rather than by donor, so these figures
-    are the itemized, reported record — not necessarily all money spent.
+    Committees register and report only after crossing statutory
+    thresholds, so spending below them never appears in any filing.
     <a href="/about/#money" class="underline"> Full methodology</a>
   </p>
+
+  <script>
+    import { initRowFilter } from "../../../scripts/rowFilter";
+    initRowFilter({
+      input: "filing-filter",
+      rows: "[data-filing-row]",
+      status: "filing-filter-status",
+      noMatch: "filing-no-match",
+      noun: "filings",
+      facetAttr: "stance",
+    });
+  </script>
 </Base>

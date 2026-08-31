@@ -62,6 +62,11 @@
     ],
     "redirects": [
       {
+        "source": "/money/independent/filings{,/**}",
+        "destination": "/money/independent/",
+        "type": 301
+      },
+      {
         "source": "/legislators/003644e8-cb82-45c6-b875-e52bc28424bb",
         "destination": "/legislators/romaine-quinn",
         "type": 301
