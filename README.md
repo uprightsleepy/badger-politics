@@ -1,36 +1,74 @@
 # Badger Politics
 
-Static tracker for the Wisconsin Legislature at
-[badgerpolitics.org](https://badgerpolitics.org): bills, roll calls,
-hearings, campaign finance, and lobbying registrations since 2009, rebuilt
-nightly from official records.
+Free, independent tracking of the Wisconsin Legislature at
+[badgerpolitics.org](https://badgerpolitics.org): every bill, roll call,
+hearing, veto, campaign dollar and lobbying registration since 2009, plus
+how Wisconsin's members of Congress vote, rebuilt from official records
+and served as a fully static site.
 
 > **Badger Politics is an independent project, not affiliated with the State of Wisconsin.**
+
+## What is on the site
+
+| Section | What it holds |
+|---|---|
+| Bills | Every proposal in every session since 2009, with status, sponsors, the LRB plain-language analysis, fiscal estimates, lobbying interests, companion bills (from the Legislature's own See Also links), and the full official history with legislator names linked |
+| Roll calls | Every recorded floor vote, name by name, with party splits and the reader's own legislators pinned |
+| Legislators | Profiles with bills led, key votes selected by rule, votes against party, floor attendance by day, committees, campaign money while in office, compensation, and the complete paged record |
+| Districts and Find My Legislators | Address to district entirely in the browser (Census geocoder for coordinates, bundled LTSB boundaries for the match); nothing is stored anywhere but the device |
+| Committees | Members, hearings, and the bills that died in each committee without a hearing |
+| Hearing None | The graveyard: bills that were referred, never heard, and failed at session's end |
+| Calendar | Hearings and election days, with iCal feeds and WisconsinEye recordings where they exist |
+| New Laws, Governor's Desk, Veto Tracker, Partial Veto | Acts by biennium with passage tallies; bills awaiting signature; every veto, partial veto and override attempt; how the partial veto works |
+| Campaign Money | Receipts to sitting legislators windowed to their time in office, contributing committees, and outside spending filing by filing with the Ethics Commission's transaction IDs and report links |
+| Lobbying | Registrations by organization and by bill (an interest, never a for-or-against position) |
+| Federal Delegation | Both U.S. senators and all eight House members, with every floor roll call from the Senate's and House Clerk's own XML (Senate from the 112th Congress, House from 2005) |
+| 2026 Ballot | Statewide offices and every legislative seat, with a personal "what is on my ballot" view from the saved district |
+| Following | Device-only follows for bills, legislators, committees, districts and races, with what changed since the last visit |
+| Data and API | Static JSON API, Atom feeds, iCal calendars, bulk CSV and a provenance-filtered SQLite snapshot, all keyless |
+
+Every page links its official source and carries the independence
+disclaimer.
 
 ## Architecture
 
 ```
-openstates-scrapers (wi, pinned, CLI-only)  ┐
-WEC ballot access + canvass PDFs/CSVs       ├─→ archived JSON/CSV (_data/) → SQLite → integrity gates → data products + Astro static build → Firebase Hosting
-CFIS tRPC API (campaignfinance.wi.gov)      │
-Eye on Lobbying (lobbying.wi.gov)           ┘
+openstates-scrapers (wi, pinned, CLI-only)    ┐
+docs.legis member pages, subject index, LRB   │
+WEC ballot access + certified canvasses       ├─→ archived raw data (_data/) → SQLite → integrity gates → data products + Astro static build → Firebase Hosting
+CFIS tRPC API (campaignfinance.wi.gov)        │
+Eye on Lobbying, WisconsinEye                 │
+Senate LIS + House Clerk roll-call XML        ┘
 ```
 
-One nightly job ([pipeline/run.sh](pipeline/run.sh)). SQLite is the only
-database and is rebuilt from the archived raw data on every run. The served
-site is fully static: no servers, no functions, no runtime LLM calls.
-Target infrastructure cost ~$2/month plus domains.
+SQLite is the only database and is rebuilt from the archived raw data on
+every run ([pipeline/run.sh](pipeline/run.sh)). The served site is fully
+static: no servers, no functions, no runtime LLM calls. Target
+infrastructure cost is about $2 a month plus domains.
+
+Releases run in GitHub Actions, never from a laptop: a push to `main`
+rehearses on dev, and production is a deliberate promotion
+(`workflow_dispatch`). CI builds from the newest database snapshot in a
+private bucket and runs every gate before publishing. See
+[docs/deploys.md](docs/deploys.md). The scheduled Cloud Run job is not yet
+enabled; today the pipeline is run from a workstation and uploads the
+snapshot CI releases from.
 
 ## Data sources
 
 | Data | Source | Mechanism |
 |---|---|---|
 | Bills, actions, votes, hearings | docs.legis.wisconsin.gov | [openstates-scrapers](https://github.com/openstates/openstates-scrapers) pinned as a git submodule, invoked only as a CLI (`os-update`); fixes live in `pipeline/patches/` |
-| Legislator roster, photos, committees | openstates people files + docs.legis membership listings + openstates legacy CSV (2009-2012) | fetched YAML/CSV, session-windowed rosters |
-| Candidates and election results | Wisconsin Elections Commission | ballot access report PDF → CSV; certified canvass files |
-| District boundaries | LTSB 2024 official files | bundled GeoJSON; Census geocoder is used for address→point only |
-| Campaign finance | CFIS tRPC API (campaignfinance.wi.gov) | monthly windows since 2008-01, receipts only, filtered to mapped committees |
-| Lobbying registrations | Eye on Lobbying (lobbying.wi.gov) | per-session matter grid + per-bill principal lists |
+| LRB analyses, companion bills, fiscal documents | docs.legis bill and proposal pages | fetched once per URL into an on-disk cache; companions come only from the page's own See Also links |
+| Legislator roster, photos, committees, service terms | openstates people files, docs.legis membership listings, openstates legacy CSV (2009-2012) | session-windowed rosters; human-verified curation tables for merges, aliases, terms and departures |
+| Capitol office contacts | docs.legis member pages | refreshed each run; sitting members only |
+| Subject index | docs.legis subject index | matched by exact session and identifier |
+| Hearing recordings | WisconsinEye | metadata matched by exact date and committee title; links out, never hosted |
+| Candidates and election results | Wisconsin Elections Commission | ballot access report PDF to CSV; certified ward-by-ward canvasses |
+| District boundaries | LTSB 2024 official files | bundled GeoJSON; the Census geocoder is used for address-to-point only |
+| Campaign finance | CFIS tRPC API (campaignfinance.wi.gov) | legislator receipts in monthly windows since 2008-01 through a verified committee map; every other filer's money since 2025-01, including independent expenditures with their report IDs |
+| Lobbying registrations | Eye on Lobbying (lobbying.wi.gov) | per-session matter grid plus per-bill principal lists |
+| Federal roll calls | senate.gov LIS XML, clerk.house.gov EVS XML, unitedstates/congress-legislators roster | per-vote files mirrored once and cached forever; positions keyed by each chamber's own member id |
 | Cross-check only | FollowTheMoney API (CC BY-NC-SA) | verification input, never imported or republished |
 | Org logos | logo.dev (`LOGO_DEV_TOKEN`) | build-time fetch for hand-verified org domains only |
 
@@ -42,20 +80,23 @@ These are hard rules. A change that violates one is wrong even if it works.
 2. **Integrity gates block deploys and are never weakened to make a run
    pass.** Fix the scraper or importer, or let the run fail. When source
    data is genuinely defective, the gate is re-specified narrowly, the
-   reasoning documented in-code, and the behavior surfaced — never
+   reasoning documented in code, and the behavior surfaced, never
    silently loosened.
 3. **Attribution never guesses.**
    - Votes and sponsorships resolve against per-session, per-chamber
      rosters. An ambiguous name is a build failure. Upstream duplicates
      and gaps are fixed only via the human-verified curation tables
-     (`person_merges`, `person_aliases`, `person_terms`,
-     `candidate_committees`), each entry with its basis.
+     (`person_merges`, `person_aliases`, `person_terms`, `term_events`,
+     `vote_corrections`, `candidate_committees`), each entry with its
+     basis.
    - Campaign committees auto-link only on unambiguous full-name matches;
      surname-only committee names ("Testin for Senate") always go through
-     human curation. Committees whose office words don't match a
+     human curation. Committees whose office words do not match a
      legislative seat are excluded from auto-matching.
    - Donors aggregate by CFIS entity id, never by name.
-   - Site-side name→profile links resolve only exact, unique names.
+   - Federal positions are attributed by the Senate's LIS id or the
+     House's bioguide id on each vote record; there is no name matching.
+   - Site-side name-to-profile links resolve only exact, unique names.
 4. **Coverage gaps over inference.** A legislator without a verified
    committee link shows "isn't linked yet", never $0. A member whose
    linked committees have zero receipts in all recorded history is
@@ -65,8 +106,9 @@ These are hard rules. A change that violates one is wrong even if it works.
    payment; occupations are donor-reported; a contribution is not an
    endorsement of a vote. Donations are never displayed next to votes.
    Individual donors appear only in aggregate. Totals are windowed to
-   each member's time in office (first recorded floor vote; electronic
-   records floor 2008).
+   each member's time in office. Outside spending is shown one filing at
+   a time, as filed, with the Commission's transaction ID and the report
+   it appeared on; nothing is summed by stance.
 6. **Provenance filtering.** Rows with `source='legiscan'`, if ever
    present, never leave the SQLite via any export. FollowTheMoney data is
    cross-check input only and is never read by the importer or the site
@@ -81,102 +123,113 @@ These are hard rules. A change that violates one is wrong even if it works.
 8. **Privacy.** No accounts, no tracking cookies, no ads. Analytics is
    GoatCounter only. Personalization is localStorage-only. Addresses are
    sent to the Census geocoder solely for coordinates and are never
-   stored; only the resulting district (and an optionally saved polling
-   place string) persist, on the device.
+   stored; only the resulting district, follows, and an optionally saved
+   polling place persist, on the device.
 9. **Static serving path.** No paid GCP resources beyond the ~$2/month
-   ceiling; deploys never run from a PR; dependencies are hash-pinned
-   (`uv.lock`, `package-lock.json`, `npm ci --ignore-scripts`).
+   ceiling; deploys never run from a pull request; dependencies are
+   lock-pinned (`uv.lock`, `package-lock.json`, `npm ci --ignore-scripts`).
 10. **Every page links its official source**, and the footer carries the
     independence disclaimer.
 
 ## Verification gates
 
-Pipeline (every nightly run, deploy aborts on failure):
+Pipeline (`importer/checks.py`, every run; a failure aborts before any
+snapshot is written):
 
-- Roll call yes/no sums reconcile exactly with official counts; NV is
+- Roll-call yes/no sums reconcile exactly with the official counts; NV is
   all-or-none (docs.legis sometimes omits the NV name list).
-- Bill counts per session cannot fall more than 2% versus the previous run.
-- Referential integrity: votes→people, votes→events, events→bills,
-  bills→sessions, actions/sponsorships→bills, contributions→people,
-  every contribution traces to a live (committee, person) mapping, no
-  committee maps to two people, no person appears twice on one roll call,
-  hearing chairs resolve.
+- Bill counts per session cannot fall more than 2% against the previous
+  run.
+- Referential integrity across every table: votes to people and events,
+  events to bills, bills to sessions, actions and sponsorships to bills,
+  contributions to people and to a live committee mapping, no committee
+  mapped to two people, no person twice on one roll call, no vote outside
+  a recorded service term, every sitting member with a live term and
+  office contacts, hearing chairs and videos resolving, committee money
+  tracing to a known filer, advocacy rows naming both candidate and race.
+- Federal: recounted Senate tallies equal the stated yeas and nays, every
+  Senate vote carries exactly two Wisconsin senators, House rows are
+  Wisconsin-only, and the delegation holds ten members.
 - CFIS: every fetched month reconciles exactly against the server's own
   transaction count (the newest month retries, and accepts a stable
   mismatch only when a plain-view diff proves every omitted row is
-  outside our data). Month windows carry end-of-day timestamps because
-  bare date bounds drop rows with timezone-artifact times.
-- A rotating nightly audit re-fetches three archived months and refreshes
-  any the state amended.
+  outside our data). Month windows end at 23:59:59 because bare date
+  bounds drop rows with timezone-artifact times. A rotating audit
+  re-fetches three archived months each run and refreshes any the state
+  amended.
 
-Cross-checks (manual):
-
-- `python -m scraper.crosscheck_ftm --cycle YYYY` compares per-member
-  cycle totals against FollowTheMoney's independent pipeline
-  (cache-first; 1,000 record/year API quota).
-
-Site (`site/scripts/`, run against a build):
+Site (`site/scripts/`, run against a build; CI runs all of them before a
+release):
 
 | Script | Checks |
 |---|---|
-| `verify.mjs` | 10 functional checks in headless Edge (search quality, district lookup, roll-call pinning, disclaimers, analytics) |
-| `a11y.mjs` | axe-core WCAG 2.2 AA over 22 representative pages at desktop and 360px viewports; 0 violations required |
-| `responsive.mjs` | no horizontal overflow on 18 pages at 344/360/412/540/768/1280/1920px |
+| `preflight.mjs` | the built tree matches the database it came from: every session, one page per bill, legislator and roll call, a search index at least as large as the bill count, data products present, disclaimer shipped |
+| `verify.mjs` | 11 functional checks in headless Chrome: search quality and junk-match rejection, address lookup to the right two legislators, roll-call pinning, rep highlighting, Hearing None banner, LRB analysis, disclaimer, analytics |
+| `a11y.mjs` | axe-core WCAG 2.2 AA over 41 representative pages at desktop and 360px; 0 violations required |
+| `responsive.mjs` | no horizontal overflow on the same 41 pages at 344/360/412/540/768/1280/1920px |
 | `links.mjs` | every internal path and fragment anchor resolves; `--external` probes deduplicated outbound URLs with per-host pacing |
+| `csp.mjs` | run against the released site: the Content-Security-Policy breaks neither search (WebAssembly) nor the address lookup (Census JSONP) |
+
+The two browser gates share one page list (`scripts/lib/serve.mjs`), so a
+page added to one is scanned by both.
 
 ## Data products
 
-Everything on the site is also data, keyless: static JSON API
-(`/api/v1/...`), Atom feeds per bill/legislator/committee plus a weekly
-digest, iCal calendars for hearings and election days, per-session CSVs,
-and a provenance-filtered SQLite snapshot.
+Everything on the site is also data, keyless: a static JSON API under
+`/api/v1/` (about 41,000 files), Atom feeds per bill, legislator and
+committee plus a weekly digest (about 20,600), iCal calendars for every
+hearing and for election days (845), per-session CSVs, and a
+provenance-filtered SQLite snapshot. See [/data/](https://badgerpolitics.org/data/).
 
 ## Coverage
 
 | Data | Coverage |
 |---|---|
 | Bills, actions, roll calls | 2011-12 through 2025-26 full; 2009-10 partial (official pages list vote totals, not names) |
-| Campaign finance | electronic records 2008 to present; members with a verified committee link (see `docs/curation-worklist.md` for the human-verification queue) |
-| Lobbying | current session |
-| Election results | certified WEC canvasses per seat |
+| Legislator campaign finance | electronic records 2008 to present, for members with a verified committee link (`docs/curation-worklist.md` holds the human-verification queue) |
+| Committee, PAC and outside spending | every filer's transactions since January 2025 |
+| Lobbying | current session (2025 Regular) |
+| Election results | certified WEC canvasses per seat and statewide office |
+| Federal roll calls | U.S. Senate from the 112th Congress (2011); U.S. House from 2005 |
 
 ## Local development
 
-Prerequisites: [uv](https://docs.astral.sh/uv/), Node 20+, Docker
-(scrapes only), Microsoft Edge (headless test harnesses).
+Prerequisites: [uv](https://docs.astral.sh/uv/), Node 22, Docker (scrapes
+only), Google Chrome (headless test harnesses; Edge is the fallback, or
+set `BROWSER_PATH`).
 
 ### Pipeline
 
 ```sh
 cd pipeline
-uv run pytest tests            # 80 tests
-uv run ruff check . --exclude vendor
-uv run ./run.sh --local --skip-deploy   # full nightly chain
-uv run python -m scraper.backfill       # historical sessions (idempotent)
+uv run pytest                            # 114 tests
+uv run ruff check .
+uv run ./run.sh --local --skip-deploy    # full chain: scrape, import, enrich, check, build
 uv run python -m importer.checks ../data/wi.sqlite
+uv run python -m scraper.backfill        # historical sessions (idempotent)
 ```
 
 Scrapes run in the vendored container: `python -m scraper.scrape bills`
 wraps `docker compose run --rm scrape` against
-`pipeline/vendor/openstates-scrapers/docker-compose.yml` (in the deployed
-image, `os-update` is on PATH instead). `os-update` wipes `_data` at run
-start — never run two scrapes concurrently. `pipeline/Dockerfile` is the
-Phase 6 Cloud Run Job image (stub until deploy).
+`pipeline/vendor/openstates-scrapers/docker-compose.yml`. `os-update`
+wipes its output at run start, so never run two scrapes concurrently, and
+never build the site while the importer is rebuilding the database.
 
-Secrets/keys live in gitignored `pipeline/.env` (`FTM_API_KEY`) and
-`site/.env` (`LOGO_DEV_TOKEN`); both are optional, features degrade
-gracefully without them.
+Secrets live in gitignored `pipeline/.env` (`FTM_API_KEY`) and `site/.env`
+(`LOGO_DEV_TOKEN`); both are optional and the features degrade gracefully
+without them.
 
 ### Site
 
 ```sh
 cd site
 npm ci
-npm run dev                    # local dev server against ../data/wi.sqlite
-npm run build                  # current sessions only (fast dev builds)
-BUILD_SESSIONS=all npm run build   # full history; required for valid profile links; deploy default
-npx astro check                # TypeScript; 0 errors expected
-node scripts/verify.mjs && node scripts/a11y.mjs && node scripts/responsive.mjs && node scripts/links.mjs
+npm run dev                          # against ../data/wi.sqlite
+npm run build                        # current biennium only, for fast iteration
+BUILD_SESSIONS=all npm run build      # full history; what CI releases
+npx astro check                      # TypeScript; 0 errors expected
+node scripts/preflight.mjs
+node scripts/responsive.mjs && node scripts/a11y.mjs && node scripts/verify.mjs && node scripts/links.mjs
 ```
 
 `CYCLE` (default 2026) selects the active election year in `run.sh`.
@@ -185,20 +238,29 @@ node scripts/verify.mjs && node scripts/a11y.mjs && node scripts/responsive.mjs 
 
 | Path | Contents |
 |---|---|
-| `pipeline/` | scraper wrappers, importers, integrity checks, data products, nightly `run.sh` |
-| `pipeline/importer/schema.sql` | the entire data model |
-| `pipeline/importer/*.json` | human-verified curation tables |
+| `pipeline/scraper/` | fetchers for every source; `http.py` is the one HTTP session (identifying User-Agent, retries, page cache), `cfis_api.py` the one CFIS client |
+| `pipeline/importer/` | importers, enrichment, `checks.py` (the gates), `schema.sql` (the entire data model), and the human-verified curation JSON |
+| `pipeline/dataproducts/` | JSON API, Atom feeds, iCal, bulk exports |
 | `pipeline/patches/` | documented fixes applied to the pinned scraper at runtime |
-| `pipeline/_data/` | archived raw scrapes and API responses (the rebuild source) |
-| `site/` | Astro 5 + Tailwind 4 + Pagefind static site; `src/lib/db.ts` is the only DB access |
-| `site/scripts/` | build-time logo fetcher and the four test harnesses |
-| `infra/` | OpenTofu for the GCP free-tier resources (Phase 6) |
-| `docs/` | plan, backfill record, data research, money methodology, cross-check reports, curation worklist |
+| `pipeline/_data/` | archived raw scrapes and API responses (the rebuild source; gitignored) |
+| `site/` | Astro 7 + Tailwind 4 + Pagefind; `src/lib/db.ts` is the only database access, `src/lib/wire.ts` the contract between build-time JSON and browser scripts |
+| `site/scripts/` | the build-time logo fetcher, preflight, and the browser harnesses |
+| `.github/workflows/` | `ci.yml` (lint, tests, typecheck, workflow guards, tofu validate) and `deploy.yml` (gated release from a snapshot) |
+| `infra/` | OpenTofu for the GCP resources: hosting projects, snapshot bucket, Workload Identity for CI |
+| `docs/` | plan, deploy runbook, backfill record, money methodology, cross-check reports, curation worklist, and `research/` notes behind each module |
+
+## Contributing
+
+Corrections are the highest-priority issues:
+[open one here](https://github.com/uprightsleepy/badger-politics/issues).
+Pull requests to `main` need the code owner's approval and a green CI run
+(lint, tests, schema, typecheck, workflow guards, tofu validate); only the
+owner pushes directly. Please keep the data mandates above in mind: a
+change that makes a number look better by guessing is not a fix.
 
 ## Licensing
 
-Code is [Apache-2.0](LICENSE). Legislative and campaign finance data is
-Wisconsin public record. openstates-scrapers is GPL-3.0, subprocess-only
-(see mandate 7). FollowTheMoney data is CC BY-NC-SA and is not
-redistributed. Corrections are the highest-priority issues:
-[open one here](https://github.com/uprightsleepy/badger-politics/issues).
+Code is [Apache-2.0](LICENSE). Legislative, election, campaign finance and
+lobbying data is Wisconsin public record; federal roll calls are U.S.
+government works. openstates-scrapers is GPL-3.0, subprocess-only (see
+mandate 7). FollowTheMoney data is CC BY-NC-SA and is not redistributed.
