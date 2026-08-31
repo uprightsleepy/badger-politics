@@ -246,7 +246,7 @@ node scripts/responsive.mjs && node scripts/a11y.mjs && node scripts/verify.mjs 
 | `site/` | Astro 7 + Tailwind 4 + Pagefind; `src/lib/db.ts` is the only database access, `src/lib/wire.ts` the contract between build-time JSON and browser scripts |
 | `site/scripts/` | the build-time logo fetcher, preflight, and the browser harnesses |
 | `.github/workflows/` | `ci.yml` (lint, tests, typecheck, workflow guards, tofu validate) and `deploy.yml` (gated release from a snapshot) |
-| `infra/` | OpenTofu for the GCP resources: hosting projects, snapshot bucket, Workload Identity for CI |
+| `infra/` | OpenTofu for the CI deploy identity: the enabled APIs, the Workload Identity pool and provider GitHub federates into, the deployer service account, and its hosting and snapshot-bucket IAM bindings |
 | `docs/` | plan, deploy runbook, backfill record, money methodology, cross-check reports, curation worklist, and `research/` notes behind each module |
 
 ## Contributing
