@@ -20,6 +20,6 @@ const { label, max = "max-h-96", count, hint } = Astro.props;
 </div>
 {(count != null || hint) && (
   <p class="scroll-hint mt-1">
-    {hint ?? `Scrollable — ${count?.toLocaleString()} in the list.`}
+    {hint ?? `Scrollable, ${count?.toLocaleString()} in the list.`}
   </p>
 )}

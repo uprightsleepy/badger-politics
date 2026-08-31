@@ -770,7 +770,7 @@ const tally = TALLY_ORDER.map((status) => ({
                       .filter((s) => s.end?.startsWith(String(b.year)) && s.end_label)
                       .map((s) => (
                         <p class="mt-2 text-xs text-navy-600">
-                          Out of office from {fmtDate(s.end!)} —{" "}
+                          Out of office from {fmtDate(s.end!)},{" "}
                           {s.end_url ? <a href={s.end_url} class="underline">{s.end_label}</a> : s.end_label}
                         </p>
                       ))}

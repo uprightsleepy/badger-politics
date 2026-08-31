@@ -69,6 +69,9 @@ const lineage = [...byPerson.entries()]
       <FollowButton kind="districts" id={seatKey} />
     </span>
   </div>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    The district's current member, everyone who has held the seat since 2009, and official election results.
+  </p>
   <SourceStrip
     sources={[
       { label: "Wisconsin LTSB (2024 boundaries)" },
@@ -92,7 +95,7 @@ const lineage = [...byPerson.entries()]
         <p class="mt-1 text-sm text-navy-700">
           {election.cycle_year === 2026
             ? election.on_ballot === 1
-              ? `On the November 2026 ballot${opponents.length ? ` — challenged by ${opponents.map((o) => `${o.name} (${partyLetter(o.party)})`).join(", ")}` : ", unopposed so far"}`
+              ? `On the November 2026 ballot${opponents.length ? `, challenged by ${opponents.map((o) => `${o.name} (${partyLetter(o.party)})`).join(", ")}` : ", unopposed so far"}`
               : election.on_ballot === 0
                 ? "Not running in November 2026"
                 : `Seat next on the ballot in November ${election.cycle_year}`

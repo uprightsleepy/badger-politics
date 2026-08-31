@@ -65,10 +65,10 @@ const NAV_GROUPS: { label: string; items: [string, string][] }[] = [
     label: "Legislation",
     items: [
       ["/bills/", "Bills"],
-      ["/laws/", "New laws"],
+      ["/laws/", "New Laws"],
       ["/subjects/", "Subjects"],
-      ["/governors-desk/", "Governor's desk"],
-      ["/vetoes/", "Veto tracker"],
+      ["/governors-desk/", "Governor's Desk"],
+      ["/vetoes/", "Veto Tracker"],
       ["/hearing-none/", "Hearing None"],
     ],
   },
@@ -78,14 +78,14 @@ const NAV_GROUPS: { label: string; items: [string, string][] }[] = [
       ["/legislators/", "Legislators"],
       ["/districts/", "Districts"],
       ["/committees/", "Committees"],
-      ["/federal/", "Federal delegation"],
+      ["/federal/", "Federal Delegation"],
     ],
   },
   {
     label: "Money",
     items: [
-      ["/money/", "Campaign money"],
-      ["/money/independent/", "Outside spending"],
+      ["/money/", "Campaign Money"],
+      ["/money/independent/", "Outside Spending"],
       ["/lobbying/", "Lobbying"],
     ],
   },
@@ -120,7 +120,7 @@ const NAV_DIRECT: [string, string][] = [
     <meta property="og:image" content={imageUrl} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Badger Politics — Wisconsin's Legislature, in plain sight." />
+    <meta property="og:image:alt" content="Badger Politics: Wisconsin's Legislature, in plain sight." />
     <meta property="og:locale" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
@@ -168,7 +168,7 @@ const NAV_DIRECT: [string, string][] = [
                 data-nav-my-reps
                 class="block rounded-lg bg-gold-500 px-3 py-2.5 text-center font-bold text-navy-900 hover:bg-gold-600"
               >
-                Find my legislators
+                Find My Legislators
               </a>
               <a href="/following/" class="mt-1 block rounded-lg border border-navy-600 px-3 py-2 text-center font-semibold hover:bg-navy-800">
                 Following
@@ -223,7 +223,7 @@ const NAV_DIRECT: [string, string][] = [
               <a href={href} class="py-1 hover:text-gold-500">{label}</a>
             ))}
             <a href="/my-reps/" data-nav-my-reps class="rounded-full bg-navy-700 px-3 py-1 hover:bg-navy-600">
-              Find my legislators
+              Find My Legislators
             </a>
           </div>
         </div>

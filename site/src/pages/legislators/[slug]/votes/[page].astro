@@ -31,7 +31,7 @@ const last = Math.min(page * PER_PAGE, total);
 ---
 
 <Base
-  title={`${person.name}${seat} — every vote, page ${page} of ${pages}`}
+  title={`${person.name}${seat}: every vote, page ${page} of ${pages}`}
   description={`Votes ${first.toLocaleString()}–${last.toLocaleString()} of ${total.toLocaleString()} cast by ${person.name} in the Wisconsin ${chamberName(person.chamber)}, from the official roll calls.`}
   noindex
   searchable={false}
@@ -43,7 +43,7 @@ const last = Math.min(page * PER_PAGE, total);
   <p class="text-sm text-navy-600">
     <a href={`${base}/`} class="underline">← {person.name}</a>
   </p>
-  <h1 class="mt-1 text-2xl font-bold">Every recorded vote</h1>
+  <h1 class="mt-1 text-2xl font-bold">Every Recorded Vote</h1>
   <p class="mt-1 text-sm text-navy-600">
     {total.toLocaleString()} roll calls, oldest sessions last. Showing
     {" "}{first.toLocaleString()}–{last.toLocaleString()}.

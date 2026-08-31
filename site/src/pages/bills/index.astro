@@ -7,8 +7,11 @@ const sessions = allSessions();
 
 <Base
   description="Every bill and resolution before the Wisconsin Legislature, by session, with status, sponsors and roll-call votes from the official record."
-  title="Bills by session">
-  <h1 class="text-2xl font-bold">Bills by session</h1>
+  title="Bills by Session">
+  <h1 class="text-2xl font-bold">Bills by Session</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    Every bill and resolution introduced in each two-year session, and how far it got. Pick a session to browse or search its bills.
+  </p>
   <ul class="mt-4 space-y-2">
     {sessions.map((s) => {
       const stats = sessionStats(s.id);

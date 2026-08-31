@@ -94,7 +94,10 @@ const statewide = OFFICES.map(([key, label]) => {
 ---
 
 <Base title="2026 elections" description="Everything on Wisconsin's November 2026 ballot: all five statewide constitutional offices and every legislative seat, with incumbents, retirements, and qualified candidates.">
-  <h1 class="text-2xl font-bold">On the ballot: November 3, 2026</h1>
+  <h1 class="text-2xl font-bold">On the Ballot: November 3, 2026</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    Everything on Wisconsin's November 2026 ballot: the statewide offices, every legislative seat up this year, and who has qualified to run.
+  </p>
   <SourceStrip
     sources={[{ label: "Wisconsin Elections Commission", href: "https://elections.wi.gov" }]}
     through={null}
@@ -160,7 +163,7 @@ const statewide = OFFICES.map(([key, label]) => {
           </h3>
           {o.incumbent && (
             <p class="mt-1 text-navy-700">
-              Incumbent: {o.incumbent}{o.retiring && " — not seeking reelection"}
+              Incumbent: {o.incumbent}{o.retiring && ", not seeking reelection"}
             </p>
           )}
           <p class="mt-2 font-semibold">
@@ -181,7 +184,7 @@ const statewide = OFFICES.map(([key, label]) => {
             <p class="mt-2 border-t border-navy-100 pt-2 text-xs text-navy-600">
               {o.last[0].year} result: {o.last.slice(0, 2).map((h) =>
                 `${h.candidate} (${partyLetter(h.party)}) ${h.votes.toLocaleString()}`
-              ).join(" — ")}
+              ).join(" / ")}
             </p>
           )}
           {o.key === "LIEUTENANT GOVERNOR" && (

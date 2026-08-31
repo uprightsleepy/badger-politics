@@ -35,7 +35,7 @@ const last = Math.min(page * PER_PAGE, total);
 ---
 
 <Base
-  title={`${person.name}${seat} — every bill, page ${page} of ${pages}`}
+  title={`${person.name}${seat}: every bill, page ${page} of ${pages}`}
   description={`Bills ${first.toLocaleString()}–${last.toLocaleString()} of ${total.toLocaleString()} that ${person.name} led or signed onto in the Wisconsin ${chamberName(person.chamber)}, from each bill's official history.`}
   noindex
   searchable={false}
@@ -47,7 +47,7 @@ const last = Math.min(page * PER_PAGE, total);
   <p class="text-sm text-navy-600">
     <a href={`${base}/`} class="underline">← {person.name}</a>
   </p>
-  <h1 class="mt-1 text-2xl font-bold">Every bill led or signed</h1>
+  <h1 class="mt-1 text-2xl font-bold">Every Bill Led or Signed</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-600">
     {total.toLocaleString()} in total, newest first. Signing on adds a name
     to a bill; it is not the same as leading it. Showing

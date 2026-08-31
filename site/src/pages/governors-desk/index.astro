@@ -20,10 +20,10 @@ const billRow = (b: {
 ---
 
 <Base
-  title="Governor's desk"
+  title="Governor's Desk"
   description="Wisconsin bills awaiting the governor's signature, signed into law, vetoed, and veto-override votes, straight from official bill histories."
 >
-  <h1 class="text-2xl font-bold">The governor's desk</h1>
+  <h1 class="text-2xl font-bold">The Governor's Desk</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
     What happened after the Legislature acted, this session: bills awaiting the
     governor, signed into law, vetoed, and every veto-override roll call. All
@@ -68,7 +68,7 @@ const billRow = (b: {
             Not seeking reelection in 2026
             {gov.candidates2026.length > 0 && (
               <span class="font-normal text-navy-600">
-                {" "}— {gov.candidates2026.length} candidates have filed for the open seat.
+                {" "}and {gov.candidates2026.length} candidates have filed for the open seat.
               </span>
             )}
             {" "}<a href="/elections/2026/" class="font-normal underline">2026 ballot</a>

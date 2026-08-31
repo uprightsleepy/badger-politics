@@ -18,7 +18,7 @@ const stats = sessionStats(session.id);
   title={`Hearing None · ${session.name ?? session.id}`}
   description={`${stats.graveyard} Wisconsin bills died without ever getting a public hearing in the ${session.name}.`}
 >
-  <h1 class="text-3xl font-bold tracking-tight">Hearing: none</h1>
+  <h1 class="text-3xl font-bold tracking-tight">Hearing: None</h1>
   <p class="mt-2 max-w-3xl text-lg text-navy-700">
     <strong class="text-badger-700">{stats.graveyard.toLocaleString()}</strong> of the
     {" "}{stats.bills.toLocaleString()} proposals in the {session.name ?? session.id}
