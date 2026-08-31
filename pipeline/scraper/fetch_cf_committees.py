@@ -128,6 +128,11 @@ def fetch_month(http: requests.Session, first: str, last: str):
                 "final_recipient_id": (t.get("finalRecipient") or {}).get("id"),
                 "final_recipient_name": _name(t.get("finalRecipient")),
                 "purpose": (t.get("transactionPurpose") or {}).get("name"),
+                # the report this transaction was filed on: the Commission
+                # serves a page per report, which is the closest thing to a
+                # per-filing document a reader can open
+                "report_id": ((t.get("reports") or [{}])[0]).get("id"),
+                "report_name": ((t.get("reports") or [{}])[0]).get("name"),
             })
         if len(results) < PAGE:
             break

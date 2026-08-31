@@ -5,9 +5,9 @@
  * This page exists so nobody has to take our aggregates on faith: the
  * for/against totals are sums over exactly these rows, and each row can
  * be checked against the Commission's records. Their site has no page
- * per transaction, so the check goes: open the filer's official
- * registrant page, open its Transactions tab, and find the ID, date and
- * amount printed here.
+ * per transaction, but it does serve one per filed report, and every
+ * row links the report it came from; the filer's official registrant
+ * page (Transactions tab) is the second route to the same ID.
  */
 import Base from "../../../../layouts/Base.astro";
 import FilterBar from "../../../../components/FilterBar.astro";
@@ -44,10 +44,10 @@ const facets = [
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
     Every for-and-against figure on this site is a sum over the
     {filings.length.toLocaleString()} filings below, each carrying the
-    Wisconsin Ethics Commission's own transaction ID. To verify a row,
-    open the filer's official page, open its <strong>Transactions</strong>
-    tab, and find the same ID, date and amount. The Commission's site has
-    no page per transaction, so the ID is the join.
+    Wisconsin Ethics Commission's own transaction ID and links to the
+    official report it was filed on. To verify a row, open that report,
+    or open the filer's official page and its <strong>Transactions</strong>
+    tab, and find the same ID, date and amount.
   </p>
   <SourceStrip
     sources={[{
@@ -96,6 +96,14 @@ const facets = [
         </div>
         <p class="mt-0.5 pl-0 text-xs text-navy-600 sm:pl-[6.75rem]">
           Commission transaction ID <span class="font-semibold tabular-nums">{t.id}</span>
+          {t.report_id != null && (
+            <>
+              {" "}&middot;{" "}
+              <a href={`https://campaignfinance.wi.gov/browse-data/report/${t.report_id}`} class="underline">
+                {t.report_name ?? "filed report"} &#8599;
+              </a>
+            </>
+          )}
           {t.other_name && <> &middot; paid to {t.other_name}</>}
           {t.purpose && <> &middot; {t.purpose}</>}
         </p>

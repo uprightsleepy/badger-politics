@@ -29,6 +29,7 @@ type Spend = (typeof spends)[number];
 interface Card {
   date: string; amount: number; filer_entity_id: number | null;
   filer_name: string | null; filer_type: string | null;
+  report_id: number | null;
   office: string | null; district: string | null;
   supporting: string[]; opposing: string[];
 }
@@ -42,7 +43,7 @@ for (const s of spends) {
   if (!card) {
     card = {
       date: s.date, amount: s.amount, filer_entity_id: s.filer_entity_id,
-      filer_name: s.filer_name, filer_type: s.filer_type,
+      filer_name: s.filer_name, filer_type: s.filer_type, report_id: s.report_id,
       office: s.related_office, district: s.related_district, supporting: [], opposing: [],
     };
     index.set(key, card);
@@ -229,6 +230,14 @@ const races = [...byRace.entries()]
                         )}
                       </span>
                       <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(c.amount)}</span>
+                      {c.report_id != null && (
+                        <a
+                          href={`https://campaignfinance.wi.gov/browse-data/report/${c.report_id}`}
+                          class="shrink-0 py-1 text-xs underline"
+                        >
+                          report &#8599;
+                        </a>
+                      )}
                     </div>
                     <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                       {c.supporting.length > 0 && (

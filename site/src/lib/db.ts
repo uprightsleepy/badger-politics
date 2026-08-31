@@ -1527,6 +1527,7 @@ export const independentExpenditures = (limit = 500) =>
   prep(
       `SELECT t.id, t.date, t.amount, t.stance, t.related_name, t.related_office,
               t.related_district, t.purpose, t.other_name, t.filer_entity_id,
+              t.report_id, t.report_name,
               c.name AS filer_name, c.committee_type AS filer_type
        FROM cf_transactions t
        LEFT JOIN cf_committees c ON c.entity_id = t.filer_entity_id
@@ -1538,6 +1539,7 @@ export const independentExpenditures = (limit = 500) =>
       id: number; date: string; amount: number; stance: string; related_name: string | null;
       related_office: string | null; related_district: string | null;
       purpose: string | null; other_name: string | null; filer_entity_id: number;
+      report_id: number | null; report_name: string | null;
       filer_name: string | null; filer_type: string | null;
     }[];
 

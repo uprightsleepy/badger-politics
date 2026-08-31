@@ -19,7 +19,7 @@ FIELDS = (
     "id", "filer_entity_id", "filer_type", "direction", "date", "amount",
     "other_entity_id", "other_name", "other_type", "stance", "related_name",
     "related_office", "related_district", "final_recipient_id",
-    "final_recipient_name", "purpose",
+    "final_recipient_name", "purpose", "report_id", "report_name",
 )
 
 
@@ -34,6 +34,12 @@ def run(cfis_dir: Path, db_path: Path) -> int:
         raise RuntimeError(f"no pac-*.json archives in {cfis_dir}")
 
     conn = sqlite3.connect(db_path)
+    # databases built before report links existed lack the two columns;
+    # add them in place rather than demanding a from-scratch rebuild
+    have = {row[1] for row in conn.execute("PRAGMA table_info(cf_transactions)")}
+    for col, kind in (("report_id", "INTEGER"), ("report_name", "TEXT")):
+        if col not in have:
+            conn.execute(f"ALTER TABLE cf_transactions ADD COLUMN {col} {kind}")
     kept = 0
     with conn:
         conn.execute("DELETE FROM cf_committees")

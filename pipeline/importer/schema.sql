@@ -284,7 +284,9 @@ CREATE TABLE cf_transactions (
     -- conduits pass earmarked money through: the true recipient
     final_recipient_id   INTEGER,
     final_recipient_name TEXT,
-    purpose              TEXT
+    purpose              TEXT,
+    report_id            INTEGER,  -- the Commission's report this row was filed on
+    report_name          TEXT
 );
 CREATE INDEX idx_cf_tx_filer ON cf_transactions (filer_entity_id, date);
 CREATE INDEX idx_cf_tx_stance ON cf_transactions (stance);
