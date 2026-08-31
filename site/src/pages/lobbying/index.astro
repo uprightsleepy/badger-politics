@@ -2,7 +2,8 @@
 import Base from "../../layouts/Base.astro";
 import FilterBar from "../../components/FilterBar.astro";
 import { lobbyingOrgs, mostLobbiedBills, builtSessions } from "../../lib/db";
-import { STATUS_LABELS, billSlug, shortTitle } from "../../lib/format";
+import StatusBadge from "../../components/StatusBadge.astro";
+import { billSlug, shortTitle } from "../../lib/format";
 
 const orgs = lobbyingOrgs();
 const currentSession = builtSessions().find((s) => s.id === "2025")?.id ?? builtSessions()[0].id;
@@ -29,7 +30,7 @@ const topBills = mostLobbiedBills(currentSession, 20);
         <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
           <a href={`/bills/${currentSession}/${billSlug(b.identifier)}/`} class="w-20 shrink-0 font-bold underline">{b.identifier}</a>
           <span class="min-w-0 flex-1 truncate">{shortTitle(b.title)}</span>
-          <span class="shrink-0 text-xs text-navy-600">{b.status ? (STATUS_LABELS[b.status] ?? b.status) : ""}</span>
+          <StatusBadge status={b.status} short />
           <span class="w-16 shrink-0 text-right text-xs tabular-nums text-navy-600">{b.orgs} orgs</span>
         </li>
       ))}
