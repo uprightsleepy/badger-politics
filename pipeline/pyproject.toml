@@ -11,6 +11,7 @@ dependencies = [
     "pyyaml>=6.0.3",
     "requests>=2.34.2",
     "shapely>=2.1.2",
+    # no direct import: zoneinfo needs it for America/Chicago on python-slim
     "tzdata>=2026.3",
 ]
 

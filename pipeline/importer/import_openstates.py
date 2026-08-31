@@ -20,8 +20,10 @@ from zoneinfo import ZoneInfo
 from importer.committees import CommitteeIndex, load_committees
 from importer.roster import (
     OPEN_END,
+    TERMS_PATH,
     Person,
     Roster,
+    load_curation,
     load_legacy_terms,
     load_people,
     merge_listing,
@@ -32,6 +34,8 @@ from importer.status import SJR1_RE, derive_status
 CENTRAL = ZoneInfo("America/Chicago")
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
 VOTE_FIXES_PATH = Path(__file__).resolve().parent / "vote_corrections.json"
+# curated departures (recalls, resignations) that relabel a term's end
+TERM_EVENTS_PATH = Path(__file__).resolve().parent / "term_events.json"
 
 # per-vote name re-attributions for defective source pages (see the JSON)
 VOTE_NAME_FIXES: dict[str, dict[str, str]] = {
@@ -268,21 +272,48 @@ class Importer:
                 ),
             )
 
+    def _insert_term(
+        self,
+        person_id: str,
+        chamber: str,
+        district: int | None,
+        start: str,
+        end: str | None,
+        events: dict[tuple[str, str], dict],
+        used: set[tuple[str, str]],
+    ) -> str:
+        """Persist one service term, applying the curated departure event
+        that matches its end (if any); returns the end actually stored,
+        OPEN_END for a term still being served."""
+        event = events.get((person_id, end)) if end else None
+        if event and event.get("chamber") not in (None, chamber):
+            event = None
+        if event:
+            used.add((person_id, end))
+            end = event["end"]
+        self.conn.execute(
+            "INSERT INTO person_terms"
+            " (person_id, chamber, district, start, end, end_label, end_url)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (person_id, chamber, district, start, end,
+             event["label"] if event else None,
+             event.get("url") if event else None),
+        )
+        return end or OPEN_END
+
     def import_terms(
         self, people: list[Person], session_windows: dict[str, tuple[str, str]],
     ) -> None:
-        events_path = Path(__file__).resolve().parent / "term_events.json"
         # entries match a term by "matches" (the source's end date) when the
         # source end is a verified artifact; "end" is what gets persisted.
         # "chamber" narrows the match when both chambers share an end date
         events = {
             (pid, e.get("matches", e["end"])): e
-            for pid, entries in json.loads(events_path.read_text(encoding="utf-8")).items()
-            if not pid.startswith("_")
+            for pid, entries in load_curation(TERM_EVENTS_PATH).items()
             for e in entries
         }
         known = {row[0] for row in self.conn.execute("SELECT id FROM people")}
-        used = set()
+        used: set[tuple[str, str]] = set()
         coverage: list[tuple[str, str, str, str]] = []  # id, chamber, start, end
         for person in people:
             if person.id not in known:
@@ -292,22 +323,10 @@ class Importer:
                 # persisted; exact session windows replace them below
                 if term.synthetic:
                     continue
-                event = events.get((person.id, term.end)) if term.end else None
-                if event and event.get("chamber") not in (None, term.chamber):
-                    event = None
-                end = term.end
-                if event:
-                    used.add((person.id, term.end))
-                    end = event["end"]
-                self.conn.execute(
-                    "INSERT INTO person_terms"
-                    " (person_id, chamber, district, start, end, end_label, end_url)"
-                    " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (person.id, term.chamber, term.district, term.start, end,
-                     event["label"] if event else None,
-                     event.get("url") if event else None),
+                end = self._insert_term(
+                    person.id, term.chamber, term.district, term.start, term.end, events, used,
                 )
-                coverage.append((person.id, term.chamber, term.start, end or OPEN_END))
+                coverage.append((person.id, term.chamber, term.start, end))
         # session rosters are the authority that attributes votes; a rostered
         # member without a real dated term gets a biennium-bounded one, so
         # service coverage and vote attribution share one authority. The
@@ -318,11 +337,9 @@ class Importer:
         # curation marked "exclusive" is the complete verified service for
         # that person+chamber; supplements stay out of its way (a curation
         # gap then orphans votes and fails the coverage gate loudly)
-        curated_path = Path(__file__).resolve().parent / "person_terms.json"
         exclusive = {
             (pid, t["chamber"])
-            for pid, entries in json.loads(curated_path.read_text(encoding="utf-8")).items()
-            if not pid.startswith("_")
+            for pid, entries in load_curation(TERMS_PATH).items()
             for t in entries
             if t.get("exclusive")
         }
@@ -355,20 +372,8 @@ class Importer:
                     # curated departure events label supplement ends too, and
                     # a "matches" entry corrects them (a mid-biennium exit by
                     # a legacy-era member has no real dated term to carry it)
-                    event = events.get((m.id, end))
-                    if event and event.get("chamber") not in (None, m.chamber):
-                        event = None
-                    term_end = end
-                    if event:
-                        used.add((m.id, end))
-                        term_end = event["end"]
-                    self.conn.execute(
-                        "INSERT INTO person_terms"
-                        " (person_id, chamber, district, start, end, end_label, end_url)"
-                        " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        (m.id, m.chamber, m.district, start, term_end,
-                         event["label"] if event else None,
-                         event.get("url") if event else None),
+                    term_end = self._insert_term(
+                        m.id, m.chamber, m.district, start, end, events, used,
                     )
                     coverage.append((m.id, m.chamber, start, term_end))
         dangling = set(events) - used

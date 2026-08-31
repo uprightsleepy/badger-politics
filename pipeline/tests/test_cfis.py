@@ -79,3 +79,13 @@ def test_import_rejects_unknown_person(tmp_path: Path, make_db) -> None:
     (archive / "tx-2026-02.json").write_text(json.dumps([bad]), encoding="utf-8")
     with pytest.raises(RuntimeError, match="unknown person"):
         import_run(archive, db)
+
+
+def test_month_windows_run_to_each_month_last_instant() -> None:
+    from scraper.cfis_api import month_windows
+
+    windows = month_windows("2025-11", "2026-01")
+    assert [w[0] for w in windows] == ["2025-11", "2025-12", "2026-01"]
+    # a bare date bound parses as midnight and drops the last day's rows
+    assert windows[0][1:] == ("2025-11-01", "2025-11-30T23:59:59")
+    assert windows[1][2] == "2025-12-31T23:59:59"

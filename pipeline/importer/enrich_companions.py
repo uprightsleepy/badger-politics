@@ -18,7 +18,6 @@ Usage: python -m importer.enrich_companions <sqlite> [scrape_dirs...]
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import sqlite3
@@ -28,7 +27,7 @@ from pathlib import Path
 
 import requests
 
-from scraper.http import USER_AGENT
+from scraper.http import cached_page, session
 
 CACHE_DIR = Path(__file__).resolve().parents[1] / "_data" / "companions_cache"
 
@@ -60,21 +59,6 @@ def extract_companions(page_html: str) -> list[str]:
     if not block:
         return []
     return sorted({norm_identifier(m) for m in PROPOSAL_LINK.findall(block.group(1))})
-
-
-def cache_path(url: str) -> Path:
-    return CACHE_DIR / f"{hashlib.sha256(url.encode()).hexdigest()[:16]}.html"
-
-
-def fetch_page(http: requests.Session, url: str) -> str:
-    cache_file = cache_path(url)
-    if cache_file.exists():
-        return cache_file.read_text(encoding="utf-8", errors="replace")
-    response = http.get(url, timeout=60)
-    response.raise_for_status()
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    cache_file.write_text(response.text, encoding="utf-8")
-    return response.text
 
 
 def scrape_sources(scrape_dirs: list[Path]) -> dict[tuple[str, str], str]:
@@ -118,15 +102,14 @@ def enrich(db_path: Path, scrape_dirs: list[Path], limit: int | None, delay: flo
     if limit:
         todo = todo[:limit]
 
-    http = requests.Session()
-    http.headers["User-Agent"] = USER_AGENT
+    http = session()
     fetched = edges = unresolved = failed = 0
     for (session_id, identifier), url in todo:
         try:
-            cached = cache_path(url).exists()
-            page = fetch_page(http, url)
-        except requests.RequestException:
+            page, cached = cached_page(http, url, CACHE_DIR)
+        except requests.RequestException as exc:
             failed += 1
+            print(f"FETCH FAILED {session_id} {identifier}: {exc}", file=sys.stderr)
             continue
         if not cached:
             fetched += 1

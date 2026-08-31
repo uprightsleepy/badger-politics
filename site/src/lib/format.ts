@@ -1,4 +1,5 @@
 import PERSON_SLUGS from "../data/person-slugs.json";
+import { esc } from "./html";
 
 export const STATUS_LABELS: Record<string, string> = {
   introduced: "Introduced",
@@ -42,6 +43,23 @@ export const partyStyle = (party: string | null): string =>
 
 export const partyLetter = (party: string | null): string =>
   party ? party[0] : "?";
+
+/** The party chip as markup. PartyChip.astro renders this at build time
+ * and the client scripts that build their own cards call it directly, so
+ * there is one chip. `decorative` hides it from screen readers where the
+ * party name sits in text right beside it and would be announced twice. */
+export const partyChipHtml = (
+  party: string | null,
+  { dims = "h-5 w-5 text-xs", decorative = false }: { dims?: string; decorative?: boolean } = {},
+): string => {
+  const a11y = decorative
+    ? ' aria-hidden="true"'
+    : ` role="img" aria-label="${esc(party ?? "party unknown")}"`;
+  return (
+    `<span class="inline-flex ${dims} shrink-0 items-center justify-center rounded-full font-bold ${partyStyle(party)}"${a11y}>` +
+    `<span aria-hidden="true">${esc(partyLetter(party))}</span></span>`
+  );
+};
 
 /** Trim to a word boundary for a <title>, which search engines cut around
  * 60 characters including the site name. Truncating mid-word looks broken
@@ -101,6 +119,10 @@ export const roleAbbr = (chamber: string | null): string =>
 export const chamberName = (chamber: string | null): string =>
   chamber === "lower" ? "Assembly" : chamber === "upper" ? "Senate" : "Legislature";
 
+/** A committee's house, where a null chamber means a joint committee. */
+export const committeeChamber = (chamber: string | null): string =>
+  chamber ? chamberName(chamber) : "Joint";
+
 /** One display-name rule for a hearing, shared by the calendar JSON and
  * the hearings list so the same event never shows two names. */
 export const hearingDisplayName = (h: {
@@ -124,10 +146,6 @@ export const billSlug = (identifier: string): string =>
  * the old uuid form, which still resolves. */
 export const personSlug = (personId: string): string =>
   PERSON_SLUGS[personId] ?? personId.replace(/^legacy\//, "legacy-").split("/").pop()!;
-
-/** The uuid form a person's page used to live at, for the redirect map. */
-export const legacyPersonSlug = (personId: string): string =>
-  personId.replace(/^legacy\//, "legacy-").split("/").pop()!;
 
 /** '13:01' (already America/Chicago) -> '1:01 PM' */
 export const fmtTime = (t: string | null): string => {

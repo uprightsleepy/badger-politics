@@ -71,16 +71,18 @@ import Base from "../layouts/Base.astro";
   </div>
 
   <script>
-    import { savedDistrict } from "../lib/district";
+    import { savedDistrict, saveDistrict, forgetDistrict } from "../lib/district";
     import { esc } from "../lib/html";
-    import { fmtDate, partyLetter, partyStyle, shortTitle } from "../lib/format";
-    import { districtAt, districtForAddress, saveDistrict } from "../lib/lookup";
+    import { fmtDate, partyChipHtml, shortTitle } from "../lib/format";
+    import { districtAt, districtForAddress } from "../lib/lookup";
+    import { forgetPollingPlace, savePollingPlace, savedPollingPlace } from "../lib/pollingPlace";
+    import type { RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
 
     const statusEl = document.getElementById("status")!;
     const resultEl = document.getElementById("result")!;
     const repsEl = document.getElementById("reps")!;
-    let reps: any = null;
-    let summaries: any = null;
+    let reps: Reps | null = null;
+    let summaries: RepSummaries | null = null;
 
     // The boundaries and the point-in-polygon test live in lib/lookup, shared
     // with the homepage. What this page loads on its own is the roster it
@@ -128,9 +130,10 @@ import Base from "../layouts/Base.astro";
     const sectionLabel = (text: string) =>
       `<p class="mt-4 text-xs font-semibold uppercase tracking-wide text-navy-600">${esc(text)}</p>`;
 
-    function repCard(seat: string, districtHref: string, slim: any, full: any): string {
+    function repCard(
+      seat: string, districtHref: string, slim: RepSlim | undefined, full: RepSummary | undefined,
+    ): string {
       if (!slim) return "";
-      const party = slim.party ?? null;
       const head =
         '<div class="flex items-start gap-3">' +
         '<div class="min-w-0 flex-1">' +
@@ -138,8 +141,7 @@ import Base from "../layouts/Base.astro";
         ` href="${esc(districtHref)}">${esc(seat)}</a>` +
         `<p class="mt-0.5"><a class="text-lg font-bold leading-tight hover:underline" href="/legislators/${esc(slim.slug)}/">${esc(slim.name)}</a></p>` +
         '</div>' +
-        `<span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${partyStyle(party)}"` +
-        ` role="img" aria-label="${esc(party ?? "party unknown")}"><span aria-hidden="true">${esc(partyLetter(party))}</span></span>` +
+        partyChipHtml(slim.party, { dims: "h-6 w-6 text-xs" }) +
         '</div>';
       const shell = (body: string) =>
         `<div class="rounded-lg border border-navy-100 p-4">${head}${body}</div>`;
@@ -203,13 +205,13 @@ import Base from "../layouts/Base.astro";
 
       const cs = (full.committees ?? [])
         .slice()
-        .sort((a: any, b: any) => roleRank(a.role) - roleRank(b.role));
+        .sort((a, b) => roleRank(a.role) - roleRank(b.role));
       const committees = cs.length
         ? sectionLabel(`Committees \u00b7 ${cs.length}`) +
           '<div class="mt-1 flex flex-wrap gap-1.5">' +
           cs
             .map(
-              (c: any) =>
+              (c) =>
                 '<a class="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-navy-100' +
                 ` bg-paper px-2.5 py-1 text-xs leading-snug hover:bg-navy-50" href="/committees/${esc(c.slug)}/">` +
                 `<span>${esc(c.name)}</span>` +
@@ -226,16 +228,16 @@ import Base from "../layouts/Base.astro";
       // with room to actually read it. The motion is what separates two
       // same-day votes on the same bill.
       const votes = (full.recentVotes ?? [])
-        .map((v: any) => {
+        .map((v) => {
           const vs = voteStyle(v.option);
           return (
             '<li class="border-t border-navy-100 py-2 first:border-t-0 first:pt-0">' +
             '<div class="flex items-center gap-2">' +
             `<span class="w-16 shrink-0 rounded px-1 py-0.5 text-center text-xs font-bold ${vs.cls}">${esc(vs.label)}</span>` +
             `<a class="font-semibold hover:underline" href="/bills/${esc(v.session)}/${esc(v.slug)}/">${esc(v.identifier)}</a>` +
-            `<span class="ml-auto shrink-0 text-xs tabular-nums text-navy-600">${esc(fmtDate(v.date ?? null))}</span>` +
+            `<span class="ml-auto shrink-0 text-xs tabular-nums text-navy-600">${esc(fmtDate(v.date))}</span>` +
             '</div>' +
-            `<p class="mt-1 line-clamp-2 text-sm leading-snug text-navy-700">${esc(shortTitle(v.title ?? null))}</p>` +
+            `<p class="mt-1 line-clamp-2 text-sm leading-snug text-navy-700">${esc(shortTitle(v.title))}</p>` +
             '<p class="mt-0.5 flex items-baseline gap-x-2 text-xs text-navy-600">' +
             `<span class="min-w-0 flex-1 truncate">${esc(v.motion ?? "")}</span>` +
             `<a class="shrink-0 py-1 underline" href="/votes/${esc(v.event)}/">roll call</a></p>` +
@@ -264,13 +266,13 @@ import Base from "../layouts/Base.astro";
         repCard(
           `Assembly District ${props.ad}`,
           `/districts/assembly-${props.ad}/`,
-          reps.assembly[props.ad],
+          reps!.assembly[props.ad],
           summaries?.assembly?.[props.ad],
         ),
         repCard(
           `Senate District ${props.sd}`,
           `/districts/senate-${props.sd}/`,
-          reps.senate[props.sd],
+          reps!.senate[props.sd],
           summaries?.senate?.[props.sd],
         ),
         '<p class="rounded-lg bg-navy-50 px-3 py-2 text-sm text-navy-700">Every bill page will now pin how these two voted, and they are highlighted anywhere they appear.</p>',
@@ -318,7 +320,7 @@ import Base from "../layouts/Base.astro";
     });
 
     document.getElementById("forget")!.addEventListener("click", () => {
-      localStorage.removeItem("bp-district");
+      forgetDistrict();
       resultEl.classList.add("hidden");
       statusEl.textContent = "Forgotten.";
       (document.getElementById("addr") as HTMLInputElement).focus();
@@ -334,7 +336,7 @@ import Base from "../layouts/Base.astro";
     const pollingSaved = document.getElementById("polling-saved")!;
     const pollingValue = document.getElementById("polling-value")!;
     function renderPolling() {
-      const place = localStorage.getItem("bp-polling");
+      const place = savedPollingPlace();
       pollingSaved.classList.toggle("hidden", !place);
       if (place) {
         pollingValue.textContent = place;
@@ -345,12 +347,12 @@ import Base from "../layouts/Base.astro";
       e.preventDefault();
       const value = pollingInput.value.trim();
       if (value) {
-        localStorage.setItem("bp-polling", value);
+        savePollingPlace(value);
         renderPolling();
       }
     });
     document.getElementById("polling-forget")!.addEventListener("click", () => {
-      localStorage.removeItem("bp-polling");
+      forgetPollingPlace();
       pollingInput.value = "";
       renderPolling();
       pollingInput.focus();

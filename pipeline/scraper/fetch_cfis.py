@@ -21,27 +21,14 @@ from pathlib import Path
 
 import requests
 
-from scraper.http import USER_AGENT
+from scraper.cfis_api import DELAY, PAGE, call, month_windows
+from scraper.http import session
 
-BASE = "https://campaignfinance.wi.gov/api/trpc/"
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "cfis"
 CURATED_PATH = (
     Path(__file__).resolve().parents[1] / "importer" / "candidate_committees.json"
 )
 MAP_PATH = DATA_DIR / "committee_map.json"
-PAGE = 1000
-DELAY = 0.4
-
-
-def call(http: requests.Session, proc: str, payload: dict) -> dict:
-    url = BASE + proc + "?input=" + requests.utils.quote(json.dumps({"json": payload}))
-    response = http.get(url, timeout=60)
-    response.raise_for_status()
-    body = response.json()
-    result = body.get("result", {}).get("data", {}).get("json")
-    if result is None:
-        raise RuntimeError(f"CFIS drift: unexpected shape from {proc}: {str(body)[:200]}")
-    return result
 
 
 def _normalize(text: str) -> str:
@@ -128,8 +115,7 @@ def build_map(db_path: Path) -> None:
             if not k.startswith("_")
         }
 
-    http = requests.Session()
-    http.headers["User-Agent"] = USER_AGENT
+    http = session()
     mapped, unresolved = [], []
     for person_id, name in people:
         override = curated.get(person_id)
@@ -183,26 +169,6 @@ def build_map(db_path: Path) -> None:
     if unresolved:
         print(f"WARNING: {len(unresolved)} legislators lack a committee mapping",
               file=sys.stderr)
-
-
-def month_windows(since: str) -> list[tuple[str, str, str]]:
-    """(label, first_day, last_day) for each month from `since` to now.
-
-    dateTo carries an end-of-day time: some CFIS rows hold timezone
-    artifacts like T05:00:00Z, and a bare date bound parses as midnight,
-    silently dropping last-day rows into the crack between months."""
-    year, month = int(since[:4]), int(since[5:7])
-    today = date.today()
-    windows = []
-    while (year, month) <= (today.year, today.month):
-        nxt_y, nxt_m = (year + 1, 1) if month == 12 else (year, month + 1)
-        last = date(nxt_y, nxt_m, 1).toordinal() - 1
-        windows.append(
-            (f"{year:04d}-{month:02d}", f"{year:04d}-{month:02d}-01",
-             date.fromordinal(last).isoformat() + "T23:59:59")
-        )
-        year, month = nxt_y, nxt_m
-    return windows
 
 
 def load_committee_ids() -> dict:
@@ -304,8 +270,7 @@ def _drift_is_benign(
 
 def fetch_transactions(since: str) -> None:
     committee_ids = load_committee_ids()
-    http = requests.Session()
-    http.headers["User-Agent"] = USER_AGENT
+    http = session()
 
     windows = month_windows(since)
     # immutable once past; always refresh the two newest months
@@ -334,8 +299,7 @@ def audit_archives(sample: int) -> None:
     against the archive. Amendments legitimately rewrite filed history, so
     a drifted month is refreshed in place and reported, never left stale."""
     committee_ids = load_committee_ids()
-    http = requests.Session()
-    http.headers["User-Agent"] = USER_AGENT
+    http = session()
     windows = month_windows("2008-01")
     newest = {w[0] for w in windows[-2:]}
     archived = [w for w in windows

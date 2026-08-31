@@ -24,6 +24,8 @@ def test_document_urls_only_for_known_types():
 def test_slugify():
     assert slugify("Tammy Baldwin") == "tammy-baldwin"
     assert slugify("Thomas P. Tiffany") == "thomas-p-tiffany"
+    # the state legislators' rule: accents fold rather than vanish
+    assert slugify("André Jacque") == "andre-jacque"
 
 
 def test_house_legis_num_normalization():

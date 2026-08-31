@@ -85,7 +85,7 @@ def _normalize(name: str) -> str:
     return re.sub(r"[^a-z]", "", name.lower())
 
 
-def _curation(path: Path) -> dict:
+def load_curation(path: Path) -> dict:
     """Load a curation JSON, dropping the _comment key."""
     return {
         k: v
@@ -98,7 +98,7 @@ def apply_merges(people: list[Person]) -> list[Person]:
     """Fold manually verified duplicates, extra aliases, and missing terms
     (see the three curation JSON files) into the people list."""
     by_id = {p.id: p for p in people}
-    for dupe_id, canonical_id in _curation(MERGES_PATH).items():
+    for dupe_id, canonical_id in load_curation(MERGES_PATH).items():
         dupe, canonical = by_id.get(dupe_id), by_id.get(canonical_id)
         if dupe is None or canonical is None:
             continue
@@ -106,10 +106,10 @@ def apply_merges(people: list[Person]) -> list[Person]:
         canonical.aliases.extend([dupe.name, *dupe.aliases])
         canonical.legacy_ids.extend(dupe.legacy_ids)
         del by_id[dupe_id]
-    for person_id, aliases in _curation(ALIASES_PATH).items():
+    for person_id, aliases in load_curation(ALIASES_PATH).items():
         if person_id in by_id:
             by_id[person_id].aliases.extend(aliases)
-    for person_id, terms in _curation(TERMS_PATH).items():
+    for person_id, terms in load_curation(TERMS_PATH).items():
         if person_id in by_id:
             by_id[person_id].terms.extend(
                 Term(t["chamber"], t.get("district"), t["start"], t.get("end"))

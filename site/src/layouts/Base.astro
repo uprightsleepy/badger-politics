@@ -302,7 +302,8 @@ const NAV_DIRECT: [string, string][] = [
     </script>
 
     <script>
-      import { savedDistrict } from "../lib/district";
+      import { markAsMine, savedDistrict } from "../lib/district";
+      import type { Reps } from "../lib/wire";
 
       // "Your reps" chip: district saved by /my-reps lives in localStorage only
       const saved = savedDistrict();
@@ -319,12 +320,7 @@ const NAV_DIRECT: [string, string][] = [
         ];
         for (const [href, srLabel] of districtLinks) {
           document.querySelectorAll<HTMLAnchorElement>(`a[href="${href}"]`).forEach((a) => {
-            if (a.closest("nav")) return;
-            a.classList.add("bg-gold-100", "rounded", "px-1", "font-semibold");
-            const sr = document.createElement("span");
-            sr.className = "sr-only";
-            sr.textContent = srLabel;
-            a.prepend(sr);
+            if (!a.closest("nav")) markAsMine(a, srLabel);
           });
         }
         // highlight the saved district's reps anywhere they appear; every
@@ -332,7 +328,7 @@ const NAV_DIRECT: [string, string][] = [
         // the reliable hook. Roll-call rows mark themselves.
         fetch("/data/reps.json")
           .then((r) => r.json())
-          .then((reps: { assembly: Record<string, { slug: string }>; senate: Record<string, { slug: string }> }) => {
+          .then((reps: Reps) => {
             const slugs = [reps.assembly[ad]?.slug, reps.senate[sd]?.slug].filter(Boolean);
             for (const slug of slugs) {
               document.querySelectorAll<HTMLAnchorElement>(`a[href="/legislators/${slug}/"]`).forEach((a) => {
@@ -341,11 +337,7 @@ const NAV_DIRECT: [string, string][] = [
                   a.closest("nav") ||
                   a.closest("[data-no-rep-highlight]")
                 ) return;
-                a.classList.add("bg-gold-100", "rounded", "px-1", "font-semibold");
-                const sr = document.createElement("span");
-                sr.className = "sr-only";
-                sr.textContent = "Your representative: ";
-                a.prepend(sr);
+                markAsMine(a, "Your representative: ");
               });
             }
           })

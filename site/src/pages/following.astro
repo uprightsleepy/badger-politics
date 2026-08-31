@@ -40,7 +40,9 @@ import Base from "../layouts/Base.astro";
 
   <script>
     import { getFollows, toggleFollow, lastSeen, markSeen, FOLLOW_KINDS } from "../scripts/follows";
+    import type { Follows } from "../scripts/follows";
     import { esc } from "../lib/html";
+    import type { Ballot } from "../lib/wire";
 
     // every kind's row ends the same way
     const unfollow = (kind: string, id: string) =>
@@ -105,11 +107,11 @@ import Base from "../layouts/Base.astro";
       }
     }
 
-    function raceRow(id: string, ballot: any) {
+    function raceRow(id: string, ballot: Ballot | null) {
       const [kind, num] = id.split("-");
-      const r = ballot?.[kind]?.[num];
+      const r = kind === "senate" ? ballot?.senate[num] : ballot?.assembly[num];
       const names = r
-        ? [...(r.incumbentRunning && r.incumbent ? [r.incumbent.name] : []), ...(r.candidates ?? []).map((c: any) => c.name)]
+        ? [...(r.incumbentRunning && r.incumbent ? [r.incumbent.name] : []), ...r.candidates.map((c) => c.name)]
         : [];
       return row(false,
         `<a href="/elections/2026/${esc(id)}/" class="min-w-0 flex-1 truncate py-1 font-semibold underline">${esc(seatName(id))}</a>
@@ -130,7 +132,7 @@ import Base from "../layouts/Base.astro";
       document.getElementById("follow-empty")!.hidden = total > 0;
 
       // races share one static file; fetch it once, only when needed
-      const ballot = follows.races.length
+      const ballot: Ballot | null = follows.races.length
         ? await fetch("/data/ballot-2026.json").then((r) => r.json()).catch(() => null)
         : null;
 
@@ -158,7 +160,7 @@ import Base from "../layouts/Base.astro";
 
       document.querySelectorAll<HTMLButtonElement>("[data-unfollow-kind]").forEach((b) =>
         b.addEventListener("click", () => {
-          toggleFollow(b.dataset.unfollowKind as any, b.dataset.unfollowId!);
+          toggleFollow(b.dataset.unfollowKind as keyof Follows, b.dataset.unfollowId!);
           render();
         }));
     }

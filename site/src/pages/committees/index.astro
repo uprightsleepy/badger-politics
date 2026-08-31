@@ -3,12 +3,10 @@ import Base from "../../layouts/Base.astro";
 import FilterBar from "../../components/FilterBar.astro";
 import SourceStrip from "../../components/SourceStrip.astro";
 import { allCommittees } from "../../lib/db";
-import { committeeSlug, personSlug, fmtDate } from "../../lib/format";
+import { committeeChamber, committeeSlug, personSlug, fmtDate } from "../../lib/format";
 
 const committees = allCommittees();
-const CHAMBERS: Record<string, string> = { lower: "Assembly", upper: "Senate" };
 const chamberKey = (c: string | null) => (c == null ? "joint" : c);
-const chamberLabel = (c: string | null) => CHAMBERS[c ?? ""] ?? "Joint";
 const facets = [
   { key: "lower", label: "Assembly" },
   { key: "upper", label: "Senate" },
@@ -45,7 +43,7 @@ const facets = [
     {committees.map((c) => (
       <li
         data-cmte-row
-        data-text={`${c.name} ${c.chair_name ?? ""} ${chamberLabel(c.chamber)}`.toLowerCase()}
+        data-text={`${c.name} ${c.chair_name ?? ""} ${committeeChamber(c.chamber)}`.toLowerCase()}
         data-chamber={chamberKey(c.chamber)}
         class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5"
       >
@@ -54,7 +52,7 @@ const facets = [
             {c.name}
           </a>
           <span class="ml-2 rounded-full bg-navy-50 px-2 py-0.5 text-xs text-navy-700">
-            {chamberLabel(c.chamber)}
+            {committeeChamber(c.chamber)}
           </span>
         </span>
         {c.chair_name && (

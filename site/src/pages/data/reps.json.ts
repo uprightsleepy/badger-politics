@@ -2,12 +2,13 @@
 import type { APIRoute } from "astro";
 import { sittingPeople } from "../../lib/db";
 import { personSlug } from "../../lib/format";
+import type { RepSlim } from "../../lib/wire";
 
 export const GET: APIRoute = () => {
-  const assembly: Record<string, unknown> = {};
-  const senate: Record<string, unknown> = {};
+  const assembly: Record<string, RepSlim> = {};
+  const senate: Record<string, RepSlim> = {};
   for (const p of sittingPeople()) {
-    const entry = {
+    const entry: RepSlim = {
       name: p.name,
       party: p.party,
       slug: personSlug(p.id),

@@ -126,42 +126,39 @@ function breakdown(rows: typeof members, seatCount: number) {
           </li>
         ))}
       </ul>
-      <p class="mt-2 hidden text-sm text-navy-600" data-empty>No legislators match that filter.</p>
     </section>
     );
   })}
+  <p id="member-no-match" class="mt-3 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600"></p>
 
 <script>
-  // Filters rows already on the page. Nothing is fetched and nothing is
-  // hidden from a crawler: every member stays in the HTML.
-  const rows = [...document.querySelectorAll<HTMLElement>("[data-member]")];
-  const chips = [...document.querySelectorAll<HTMLButtonElement>("[data-member-facet]")];
-  const input = document.getElementById("member-filter") as HTMLInputElement;
-  const count = document.getElementById("member-count")!;
-  let facet = "all";
+  import { initRowFilter, paintChips } from "../../scripts/rowFilter";
 
-  const apply = () => {
-    const q = input.value.trim().toLowerCase();
-    let shown = 0;
-    for (const row of rows) {
-      const matchesText = !q || (row.dataset.text ?? "").includes(q);
-      const matchesFacet =
-        facet === "all" ||
-        (facet === "ballot" && row.dataset.ballot === "1") ||
-        (facet.startsWith("party:") && row.dataset.party === facet.slice(6));
-      const show = matchesText && matchesFacet;
-      row.classList.toggle("hidden", !show);
-      if (show) shown++;
-    }
-    count.textContent = shown === rows.length ? `All ${rows.length} legislators` : `${shown} of ${rows.length}`;
-    for (const el of document.querySelectorAll("[data-empty]")) {
-      el.classList.toggle("hidden", shown > 0);
-    }
-    // hide a chamber heading whose members are all filtered out
+  // The text filter, live count, empty state and browser-restore re-apply
+  // are the shared list filter's. This page's own: one chip row that
+  // matches on either party or ballot status, and hiding a chamber
+  // heading whose members are all filtered out. Nothing is fetched and
+  // nothing is hidden from a crawler: every member stays in the HTML.
+  const chips = [...document.querySelectorAll<HTMLButtonElement>("[data-member-facet]")];
+  let facet = "all";
+  const matchesFacet = (row: HTMLElement) =>
+    facet === "all" ||
+    (facet === "ballot" && row.dataset.ballot === "1") ||
+    (facet.startsWith("party:") && row.dataset.party === facet.slice(6));
+
+  const apply = initRowFilter({
+    input: "member-filter",
+    rows: "[data-member]",
+    status: "member-count",
+    noMatch: "member-no-match",
+    noun: "legislators",
+    extra: matchesFacet,
+  });
+  const hideEmptySections = () => {
     for (const section of document.querySelectorAll("section")) {
       const own = [...section.querySelectorAll<HTMLElement>("[data-member]")];
       if (own.length) {
-        section.classList.toggle("hidden", own.every((r) => r.classList.contains("hidden")));
+        section.classList.toggle("hidden", own.every((r) => r.classList.contains("sorted-hidden")));
       }
     }
   };
@@ -169,19 +166,11 @@ function breakdown(rows: typeof members, seatCount: number) {
   for (const chip of chips) {
     chip.addEventListener("click", () => {
       facet = chip.dataset.memberFacet ?? "all";
-      for (const c of chips) {
-        const on = c === chip;
-        c.setAttribute("aria-pressed", String(on));
-        c.classList.toggle("border-navy-800", on);
-        c.classList.toggle("bg-navy-800", on);
-        c.classList.toggle("text-white", on);
-        c.classList.toggle("border-navy-100", !on);
-        c.classList.toggle("bg-white", !on);
-      }
+      paintChips(chips, (c) => c === chip);
       apply();
+      hideEmptySections();
     });
   }
-  input.addEventListener("input", apply);
-  apply();
+  document.getElementById("member-filter")!.addEventListener("input", hideEmptySections);
 </script>
 </Base>

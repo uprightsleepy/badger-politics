@@ -1,5 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
+import SourceStrip from "../../components/SourceStrip.astro";
 import { vetoTracker, vetoMessageUrl } from "../../lib/db";
 import { billSlug, chamberName, fmtDate, shortTitle } from "../../lib/format";
 const bienniums = vetoTracker();
@@ -16,8 +17,11 @@ const bienniums = vetoTracker();
     the partial veto works</a>). The Legislature can pass a bill over a veto
     with a two-thirds vote of both chambers. Everything below comes verbatim
     from the official bill histories; where docs.legis publishes the
-    governor's veto message, it's linked.
+    governor's veto message, it's linked. An override needs two-thirds in
+    both chambers; attempts that passed one chamber but not the other did
+    not become law.
   </p>
+  <SourceStrip sources={[{ label: "Wisconsin Legislature", href: "https://docs.legis.wisconsin.gov" }]} />
   {bienniums.map((b) => (
     <section class="mt-6">
       <h2 class="text-xl font-bold">{b.biennium}–{b.biennium + 1}</h2>
@@ -101,9 +105,4 @@ const bienniums = vetoTracker();
       )}
     </section>
   ))}
-  <p class="mt-6 text-xs text-navy-600">
-    Source: each bill's official history at docs.legis.wisconsin.gov. An
-    override needs two-thirds in both chambers; attempts that passed one
-    chamber but not the other did not become law.
-  </p>
 </Base>

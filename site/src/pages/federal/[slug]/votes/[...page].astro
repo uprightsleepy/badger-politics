@@ -8,16 +8,14 @@ import PartyChip from "../../../../components/PartyChip.astro";
 import Pager from "../../../../components/Pager.astro";
 import { federalMembers, federalVotesFor } from "../../../../lib/db";
 import { fmtDate } from "../../../../lib/format";
-import { documentUrlFragment } from "../../../../lib/federal";
-
-const PER_PAGE = 250;
+import { castStyle, documentUrlFragment } from "../../../../lib/federal";
+import { FEDERAL_VOTES_PER_PAGE as PER_PAGE, pageCount } from "../../../../lib/paging";
 
 export function getStaticPaths() {
   return federalMembers()
     .flatMap((m) => {
       const total = federalVotesFor(m.chamber === "senate" ? m.lis_id! : m.bioguide).length;
-      // literal, not PER_PAGE: getStaticPaths is hoisted out of this scope
-      const pages = Math.max(1, Math.ceil(total / 250));
+      const pages = pageCount(total, PER_PAGE);
       return Array.from({ length: pages }, (_, i) => ({
         params: { slug: m.slug, page: i === 0 ? undefined : String(i + 1) },
         props: { member: m, page: i + 1, pages },
@@ -29,13 +27,6 @@ const { member, page, pages } = Astro.props;
 const all = federalVotesFor(member.chamber === "senate" ? member.lis_id! : member.bioguide);
 const votes = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 const base = `/federal/${member.slug}/votes/`;
-
-const castStyle = (cast: string) =>
-  ["Yea", "Aye", "Guilty"].includes(cast)
-    ? "bg-moss-50 text-moss-600"
-    : ["Nay", "No", "Not Guilty"].includes(cast)
-      ? "bg-badger-50 text-badger-700"
-      : "bg-navy-50 text-navy-600";
 ---
 
 <Base

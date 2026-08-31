@@ -80,7 +80,7 @@ const groups = [
 </div>
 
 <script>
-  import { savedDistrict } from "../lib/district";
+  import { savedDistrict, srPrefix } from "../lib/district";
 
   // Pin the saved district's reps in every roll call on the page. Lives in
   // the component so bill pages and standalone vote pages both get it.
@@ -100,10 +100,7 @@ const groups = [
             const option = row.getAttribute("data-option");
             const name = a.textContent!.trim();
             names.push(option === "Not voting" ? `${name} did not vote` : `${name} voted ${option}`);
-            const sr = document.createElement("span");
-            sr.className = "sr-only";
-            sr.textContent = "Your representative: ";
-            a.prepend(sr);
+            srPrefix(a, "Your representative: ");
           }
         }
       });

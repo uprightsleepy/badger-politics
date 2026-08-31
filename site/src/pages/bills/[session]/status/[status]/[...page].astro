@@ -8,8 +8,7 @@ import BillList from "../../../../../components/BillList.astro";
 import Pager from "../../../../../components/Pager.astro";
 import { builtSessions, billsFor } from "../../../../../lib/db";
 import { STATUS_LABELS } from "../../../../../lib/format";
-
-const PER_PAGE = 200;
+import { PER_PAGE, pageBounds, pageCount } from "../../../../../lib/paging";
 
 export function getStaticPaths() {
   return builtSessions().flatMap((session) => {
@@ -19,8 +18,7 @@ export function getStaticPaths() {
       byStatus.set(key, (byStatus.get(key) ?? 0) + 1);
     }
     return [...byStatus].flatMap(([status, total]) => {
-      // literal, not PER_PAGE: getStaticPaths is hoisted out of this scope
-      const pages = Math.max(1, Math.ceil(total / 200));
+      const pages = pageCount(total);
       return Array.from({ length: pages }, (_, i) => ({
         params: {
           session: session.id,
@@ -41,8 +39,7 @@ const bills = billsFor(session.id)
 const name = session.name ?? session.id;
 const label = STATUS_LABELS[status] ?? status;
 const base = `/bills/${session.id}/status/${status}/`;
-const first = (page - 1) * PER_PAGE + 1;
-const last = Math.min(page * PER_PAGE, total);
+const { first, last } = pageBounds(page, total);
 ---
 
 <Base

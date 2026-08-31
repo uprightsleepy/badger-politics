@@ -10,12 +10,13 @@
  * Nothing is stored anywhere but this browser.
  */
 
-export type District = { ad: number; sd: number };
+import type { District } from "./district";
+export type { District };
 
 let boundaries: { features: { geometry: unknown; properties: District }[] } | null = null;
 
 /** The 284 KB boundary file, fetched once per page. */
-export const loadBoundaries = async () => {
+const loadBoundaries = async () => {
   if (!boundaries) {
     boundaries = await fetch("/data/wi-districts-2024.geojson").then((r) => r.json());
   }
@@ -57,7 +58,7 @@ export const districtAt = async (lng: number, lat: number): Promise<District | n
 /** The Census geocoder sends no CORS headers but does support JSONP, which
  * keeps this working with no server of our own. The address reaches
  * census.gov and nowhere else. */
-export const geocode = (address: string): Promise<any> =>
+const geocode = (address: string): Promise<any> =>
   new Promise((resolve, reject) => {
     const cb = "bpGeo" + Date.now();
     const script = document.createElement("script");
@@ -107,8 +108,4 @@ export const districtForAddress = async (
     return { error: "That address doesn't fall inside a Wisconsin legislative district." };
   }
   return { district };
-};
-
-export const saveDistrict = (d: District) => {
-  localStorage.setItem("bp-district", JSON.stringify(d));
 };

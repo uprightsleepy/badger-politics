@@ -3,6 +3,7 @@ import Base from "../../../layouts/Base.astro";
 import SourceStrip from "../../../components/SourceStrip.astro";
 import OrgLogo from "../../../components/OrgLogo.astro";
 import PartyChip from "../../../components/PartyChip.astro";
+import StanceChip from "../../../components/StanceChip.astro";
 import { donorCommittees, donorCommitteeFor, cfCommitteeFor, cfTypeOf } from "../../../lib/db";
 import { fmtMoney, fmtDate, personSlug, roleAbbr } from "../../../lib/format";
 
@@ -33,20 +34,20 @@ const kind = cfTypeOf(committee.entityId);
     <a href="/money/" class="underline">Campaign money</a> ·
     <a href="/money/committees/" class="underline">Contributing committees</a>
   </p>
-  <div class="mt-2 flex items-center gap-3">
+  <div class="mt-2 flex flex-wrap items-center gap-3">
     <OrgLogo entityId={committee.entityId} name={committee.name} />
     <h1 class="text-2xl font-bold">{committee.name}</h1>
-    <p class="mt-1 max-w-3xl text-sm text-navy-700">
-      What this committee has given to sitting Wisconsin legislators, from Ethics Commission filings, counted only while each member was in office.
-    </p>
-    <SourceStrip
-      sources={[{ label: "Wisconsin Ethics Commission (CFIS)", href: "https://cfis.wi.gov" }]}
-      through={committee.last ?? null}
-    />
     {kind && (
       <span class="rounded-full bg-navy-50 px-2.5 py-0.5 text-xs font-semibold text-navy-700">{kind}</span>
     )}
   </div>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    What this committee has given to sitting Wisconsin legislators, from Ethics Commission filings, counted only while each member was in office.
+  </p>
+  <SourceStrip
+    sources={[{ label: "Wisconsin Ethics Commission (CFIS)", href: "https://cfis.wi.gov" }]}
+    through={committee.last ?? null}
+  />
 
   <div class="mt-4 grid max-w-3xl gap-3 sm:grid-cols-3 [&>div]:min-w-0">
     <div class="rounded-lg border border-navy-100 bg-white p-4">
@@ -175,9 +176,7 @@ const kind = cfTypeOf(committee.entityId);
         {own.advocacy.map((a) => (
           <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
             <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(a.date)}</span>
-            <span class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${a.stance === "FOR" ? "bg-moss-50 text-moss-600" : "bg-badger-50 text-badger-700"}`}>
-              {a.stance === "FOR" ? "FOR" : "AGAINST"}
-            </span>
+            <StanceChip stance={a.stance} />
             <span class="min-w-0 flex-1">{a.related_name ?? "(candidate not named in the filing)"}</span>
             {a.related_office && (
               <span class="shrink-0 text-xs text-navy-600">{a.related_office}{a.related_district ? ` ${a.related_district}` : ""}</span>

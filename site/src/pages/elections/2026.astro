@@ -292,24 +292,20 @@ const statewide = OFFICES.map(([key, label]) => {
 <script>
   import { savedDistrict } from "../../lib/district";
   import { esc } from "../../lib/html";
-  import { partyLetter, partyStyle } from "../../lib/format";
+  import { partyChipHtml } from "../../lib/format";
+  import type { Ballot, Race } from "../../lib/wire";
 
   const saved = savedDistrict();
   if (saved) {
     fetch("/data/ballot-2026.json")
       .then((r) => r.json())
-      .then((data) => {
+      .then((data: Ballot) => {
         const empty = document.getElementById("my-ballot-empty")!;
         const body = document.getElementById("my-ballot-body")!;
 
-        const chip = (party: string | null) =>
-          `<span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${partyStyle(
-            party,
-          )}" role="img" aria-label="${esc(party ?? "party unknown")}"><span aria-hidden="true">${esc(
-            partyLetter(party),
-          )}</span></span>`;
+        const chip = partyChipHtml;
 
-        const race = (label: string, r: any) => {
+        const race = (label: string, r: Race | undefined) => {
           if (!r) return "";
           if (!r.onBallot) {
             return (
@@ -330,7 +326,7 @@ const statewide = OFFICES.map(([key, label]) => {
             ...(r.incumbentRunning && r.incumbent
               ? [{ name: r.incumbent.name, party: r.incumbent.party, incumbent: true }]
               : []),
-            ...r.candidates.map((c: any) => ({ ...c, incumbent: false })),
+            ...r.candidates.map((c) => ({ ...c, incumbent: false })),
           ];
           const open = !r.incumbentRunning;
           return (
@@ -342,7 +338,7 @@ const statewide = OFFICES.map(([key, label]) => {
               ? `<ul class="mt-1.5 space-y-1 text-sm">` +
                 names
                   .map(
-                    (c: any) =>
+                    (c) =>
                       `<li class="flex items-center gap-2">${chip(c.party)}<span>${esc(
                         c.name,
                       )}${c.incumbent ? ' <span class="text-xs text-navy-600">(incumbent)</span>' : ""}</span></li>`,
@@ -356,13 +352,13 @@ const statewide = OFFICES.map(([key, label]) => {
 
         const statewide = Object.entries(data.statewide ?? {})
           .map(
-            ([office, cands]: [string, any]) =>
+            ([office, cands]) =>
               `<div class="rounded-lg border border-navy-100 bg-paper p-3">` +
               `<p class="text-xs font-semibold uppercase tracking-wide text-navy-600">${esc(office)}</p>` +
               `<ul class="mt-1.5 space-y-1 text-sm">` +
               cands
                 .map(
-                  (c: any) =>
+                  (c) =>
                     `<li class="flex items-center gap-2">${chip(c.party)}<span>${esc(c.name)}</span></li>`,
                 )
                 .join("") +

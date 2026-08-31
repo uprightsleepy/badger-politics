@@ -18,7 +18,7 @@ from pathlib import Path
 import requests
 from lxml import html as lxml_html
 
-from scraper.http import USER_AGENT
+from scraper.http import session as http_session
 
 BASE = "https://lobbying.wi.gov"
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "lobbying"
@@ -90,8 +90,7 @@ def main(argv: list[str]) -> int:
     refresh = "--refresh" in argv
     pages_dir = DATA_DIR / "pages" / session
     pages_dir.mkdir(parents=True, exist_ok=True)
-    http = requests.Session()
-    http.headers["User-Agent"] = USER_AGENT
+    http = http_session()
 
     matters = list_bill_matters(http, session)
     print(f"{session}: {len(matters)} bill matters in the lobbying registry")

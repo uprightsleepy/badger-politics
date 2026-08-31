@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 from pathlib import Path
 
 from dataproducts import queries
@@ -41,7 +42,10 @@ def bill_slug(identifier: str) -> str:
 _SLUGS_PATH = Path(__file__).resolve().parents[2] / "site" / "src" / "data" / "person-slugs.json"
 try:
     _PERSON_SLUGS: dict[str, str] = json.loads(_SLUGS_PATH.read_text(encoding="utf-8"))
-except (OSError, ValueError):
+except (OSError, ValueError) as exc:
+    # every feed and API URL would silently fall back to uuid tails, which
+    # no page links to; say so where the build log will show it
+    print(f"WARNING: person slugs unreadable ({exc}); URLs fall back to ids", file=sys.stderr)
     _PERSON_SLUGS = {}
 
 

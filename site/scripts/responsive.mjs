@@ -3,21 +3,10 @@
  * degradation). Usage: node scripts/responsive.mjs [--shots DIR] */
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { serveDist, launchBrowser, moneyLegislatorHref, blockThirdPartyAssets } from "./lib/serve.mjs";
+import { serveDist, launchBrowser, samplePages, blockThirdPartyAssets } from "./lib/serve.mjs";
 
 const server = await serveDist(8935);
-
-const PAGES = [
-  "/", "/bills/", "/bills/2025/", "/bills/2025/ab656/", "/votes/2025-av0001-ar1/",
-  "/legislators/", "/hearing-none/2025/", "/calendar/", "/my-reps/",
-  "/elections/2026/", "/data/", "/about/", "/money/", "/money/committees/",
-  "/money/committees/651839/", "/404.html", "/governors-desk/", "/districts/",
-  "/districts/senate-21/", "/lobbying/", "/testify/", "/glossary/",
-  "/laws/", "/laws/2025/", "/vetoes/", "/partial-veto/",
-  "/bills/2025/ab1/", "/elections/2026/senate-5/", "/committees/", "/following/",
-];
-const moneyHref = await moneyLegislatorHref();
-if (moneyHref) PAGES.push(moneyHref);
+const PAGES = await samplePages();
 
 // fold cover screen, small phone, phone, foldable half, tablet portrait,
 // laptop, widescreen
@@ -30,7 +19,7 @@ if (shotsDir) await mkdir(shotsDir, { recursive: true });
 
 const browser = await launchBrowser();
 const page = await browser.newPage();
-  await blockThirdPartyAssets(page);
+await blockThirdPartyAssets(page);
 
 let failures = 0;
 for (const width of WIDTHS) {

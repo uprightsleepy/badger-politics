@@ -16,12 +16,13 @@ import {
 } from "../../lib/db";
 import { billSlug, committeeSlug, personSlug } from "../../lib/format";
 import { buildHeatDays } from "../../lib/service";
+import type { RepSummary } from "../../lib/wire";
 
 export const GET: APIRoute = () => {
   const sessionIds = new Set(currentSessions().map((s) => s.id));
   const bienniumStart = "2025-01-01";
-  const assembly: Record<string, unknown> = {};
-  const senate: Record<string, unknown> = {};
+  const assembly: Record<string, RepSummary> = {};
+  const senate: Record<string, RepSummary> = {};
 
   for (const p of sittingPeople()) {
     const heat = buildHeatDays(termsFor(p.id), personVoteDays(p.id), chamberVoteDays())
@@ -37,7 +38,7 @@ export const GET: APIRoute = () => {
     const signedOn = sponsorships.length - authored.length;
     const election = electionFor(p.id);
 
-    const entry = {
+    const entry: RepSummary = {
       name: p.name,
       party: p.party,
       slug: personSlug(p.id),

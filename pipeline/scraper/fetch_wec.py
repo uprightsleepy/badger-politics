@@ -12,9 +12,7 @@ parser's drift alarms catch format changes.
 import sys
 from pathlib import Path
 
-import requests
-
-from scraper.http import USER_AGENT
+from scraper.http import session
 
 DEFAULT_URL = (
     "https://elections.wi.gov/sites/default/files/documents/"
@@ -24,7 +22,7 @@ DEFAULT_DEST = Path(__file__).resolve().parents[1] / "_data" / "wec" / "ballot-a
 
 
 def fetch(url: str, dest: Path) -> None:
-    response = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=120)
+    response = session().get(url, timeout=120)
     response.raise_for_status()
     if not response.content.startswith(b"%PDF"):
         raise RuntimeError(f"{url} did not return a PDF (WEC page moved?)")

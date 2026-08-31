@@ -9,6 +9,23 @@
  * inbound ?<facetAttr>= link arrives pre-filtered. Chips never remove rows
  * from the page — they only hide them — so the full list stays in the HTML
  * and in the search index. */
+/** Paint a chip row's pressed state: the chips `isOn` picks are on, the
+ * rest off. Shared with pages whose facets need their own matching. */
+export const paintChips = (
+  chips: HTMLButtonElement[],
+  isOn: (chip: HTMLButtonElement) => boolean,
+): void => {
+  for (const chip of chips) {
+    const on = isOn(chip);
+    chip.setAttribute("aria-pressed", String(on));
+    chip.classList.toggle("border-navy-800", on);
+    chip.classList.toggle("bg-navy-800", on);
+    chip.classList.toggle("text-white", on);
+    chip.classList.toggle("border-navy-100", !on);
+    chip.classList.toggle("bg-white", !on);
+  }
+};
+
 export function initRowFilter(opts: {
   input: string;
   rows: string;
@@ -34,17 +51,7 @@ export function initRowFilter(opts: {
     : "";
   let announceTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const paintChips = () => {
-    for (const chip of chips) {
-      const on = (chip.dataset.facet ?? "") === facet;
-      chip.setAttribute("aria-pressed", String(on));
-      chip.classList.toggle("border-navy-800", on);
-      chip.classList.toggle("bg-navy-800", on);
-      chip.classList.toggle("text-white", on);
-      chip.classList.toggle("border-navy-100", !on);
-      chip.classList.toggle("bg-white", !on);
-    }
-  };
+  const paint = () => paintChips(chips, (chip) => (chip.dataset.facet ?? "") === facet);
 
   const apply = () => {
     const q = input.value.toLowerCase();
@@ -57,7 +64,7 @@ export function initRowFilter(opts: {
       row.classList.toggle("sorted-hidden", hide);
       if (!hide) shown++;
     });
-    const filtering = q !== "" || facet !== "" || opts.extra !== undefined;
+    const filtering = shown !== rows.length;
     clearTimeout(announceTimer);
     announceTimer = setTimeout(() => {
       status.textContent = filtering
@@ -76,7 +83,7 @@ export function initRowFilter(opts: {
       if (facet) url.searchParams.set(opts.facetAttr!, facet);
       else url.searchParams.delete(opts.facetAttr!);
       history.replaceState(null, "", url);
-      paintChips();
+      paint();
       apply();
     });
   }
@@ -85,7 +92,7 @@ export function initRowFilter(opts: {
   window.addEventListener("pageshow", () => {
     if (input.value) apply();
   });
-  paintChips();
+  paint();
   if (input.value || facet) apply();
   return apply;
 }

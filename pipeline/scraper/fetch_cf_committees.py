@@ -17,17 +17,14 @@ import argparse
 import json
 import sys
 import time
-from datetime import date
 from pathlib import Path
 
 import requests
 
+from scraper.cfis_api import DELAY, PAGE, call, month_windows
 from scraper.http import session
 
-BASE = "https://campaignfinance.wi.gov/api/trpc/"
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "cfis"
-PAGE = 1000
-DELAY = 0.4
 
 # the filer types worth keeping: everything that is not one candidate's
 # own committee. "State Candidate" and "Federal Candidate" are excluded
@@ -43,17 +40,6 @@ KEEP_TYPES = {
     "Unregistered Express Advocacy",
     "Unregistered",
 }
-
-
-def call(http: requests.Session, proc: str, payload: dict):
-    url = BASE + proc + "?input=" + requests.utils.quote(json.dumps({"json": payload}))
-    response = http.get(url, timeout=90)
-    response.raise_for_status()
-    body = response.json()
-    result = body.get("result", {}).get("data", {}).get("json")
-    if result is None:
-        raise RuntimeError(f"CFIS drift: unexpected shape from {proc}: {str(body)[:200]}")
-    return result
 
 
 def committee_of(entity: dict | None) -> dict | None:
@@ -76,26 +62,17 @@ def _name(entity: dict | None) -> str | None:
     return (entity or {}).get("name")
 
 
-def month_windows(since: str, until: str) -> list[tuple[str, str, str]]:
-    y, m = (int(p) for p in since.split("-"))
-    end_y, end_m = (int(p) for p in until.split("-"))
-    out = []
-    while (y, m) <= (end_y, end_m):
-        ny, nm = (y + 1, 1) if m == 12 else (y, m + 1)
-        last = (date(ny, nm, 1) - date.resolution).isoformat()
-        out.append((f"{y:04d}-{m:02d}", f"{y:04d}-{m:02d}-01", last))
-        y, m = ny, nm
-    return out
-
-
 def fetch_month(http: requests.Session, first: str, last: str):
     """(kept transactions, committee registry rows) for one month."""
     rows, registry, skip = [], {}, 0
     while True:
+        # this feed carries every filer's rows, so a page is heavier than
+        # the mapped-committee fetch's and gets a longer timeout
         page = call(
             http, "publicFrontendApi.getTransactions",
             {"take": PAGE, "skip": skip, "sortBy": "date",
              "sortDirection": "asc", "dateFrom": first, "dateTo": last},
+            timeout=90,
         )
         results = page.get("results", [])
         for t in results:
@@ -144,7 +121,7 @@ def fetch_month(http: requests.Session, first: str, last: str):
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--since", default="2025-01")
-    parser.add_argument("--until", default=date.today().strftime("%Y-%m"))
+    parser.add_argument("--until", help="YYYY-MM; defaults to this month")
     ns = parser.parse_args(argv)
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)

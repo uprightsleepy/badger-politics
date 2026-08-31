@@ -21,9 +21,10 @@ from pathlib import Path
 
 import requests
 
+from scraper.http import session
+
 BASE = "https://api.followthemoney.org/"
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "ftm"
-USER_AGENT = "BadgerPolitics/1.0 (badgerpolitics.org; hphil.work@gmail.com)"
 OFFICES = ("R01", "S00")  # Assembly, Senate
 
 _quota_fetched = 0
@@ -80,8 +81,7 @@ def ftm_key(raw: str) -> str:
 
 def fetch_cycle(cycle: int, offices: tuple[str, ...] = OFFICES) -> list[dict]:
     """Candidate totals per chamber, cache-first to respect quota."""
-    http = requests.Session()
-    http.headers["User-Agent"] = USER_AGENT
+    http = session()
     records = []
     for office in offices:
         page = 0

@@ -19,6 +19,16 @@ export const documentUrlFragment = (_congress: number, document: string): string
   return path ? `${path}/${document.slice(at + 1)}` : null;
 };
 
+/** Pill colour for a recorded position. Each chamber has its own
+ * vocabulary (Yea/Nay in the Senate, Aye/No in the House, Guilty/Not
+ * Guilty on impeachment), so the sets are the importer's. */
+export const castStyle = (cast: string): string =>
+  ["Yea", "Aye", "Guilty"].includes(cast)
+    ? "bg-moss-50 text-moss-600"
+    : ["Nay", "No", "Not Guilty"].includes(cast)
+      ? "bg-badger-50 text-badger-700"
+      : "bg-navy-50 text-navy-600";
+
 /** "112th (2011-12)": the first year of a Congress is 1789 + 2(n-1). */
 export const congressLabel = (congress: number): string => {
   const start = 1789 + (congress - 1) * 2;

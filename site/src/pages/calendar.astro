@@ -57,6 +57,7 @@ import { fmtDate } from "../lib/format";
 
   <script>
     import { esc, safeHref } from "../lib/html";
+    import { savedPollingPlace } from "../lib/pollingPlace";
 
     let events: Record<
       string,
@@ -77,7 +78,7 @@ import { fmtDate } from "../lib/format";
     }
 
     function pollingBlock(): string {
-      const place = localStorage.getItem("bp-polling");
+      const place = savedPollingPlace();
       if (!place) {
         return `<p class="mt-1 text-xs text-navy-700">Look up your polling place once on MyVote, then <a class="underline" href="/my-reps/#polling">save it here</a> to see it on every election day.</p>`;
       }

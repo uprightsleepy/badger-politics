@@ -1,9 +1,10 @@
-/** Build-time SQLite access. Runs only during `astro build` — never in the
+/** Build-time SQLite access. Runs only during `astro build`, never in the
  * browser. BUILD_SESSIONS (comma-separated session ids) limits which
  * sessions render; default is the current biennium. `all` renders history
  * (Phase 6 merges a prebuilt historical artifact instead). */
 import Database from "better-sqlite3";
 import { resolve } from "node:path";
+import { OPEN_END, OPEN_START } from "./sentinels";
 
 // Resolved from the working directory (always site/ for astro and the
 // verify scripts), not from import.meta.url: the bundler decides how
@@ -23,6 +24,35 @@ const prep = (sql: string): Database.Statement => {
   }
   return s;
 };
+
+/** Build-time memoization. The database is read-only for the whole build,
+ * so anything derived from it is computed once and shared by every page.
+ * `once` for parameterless derivations, `memoBy` for keyed ones. */
+const once = <T>(compute: () => T): (() => T) => {
+  let value: T;
+  let done = false;
+  return () => {
+    if (!done) {
+      value = compute();
+      done = true;
+    }
+    return value;
+  };
+};
+const memoBy = <K, V>(compute: (key: K) => V): ((key: K) => V) => {
+  const cache = new Map<K, V>();
+  return (key) => {
+    if (!cache.has(key)) cache.set(key, compute(key));
+    return cache.get(key)!;
+  };
+};
+
+/** Enrichment tables are absent from older snapshots; their readers
+ * degrade to "nothing" rather than failing the build. */
+const hasTable = memoBy(
+  (name: string) =>
+    !!prep("SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name=?").get(name),
+);
 
 export interface Session {
   id: string;
@@ -62,32 +92,33 @@ export interface Person {
 
 // order by real start (first recorded action), newest first: special-session
 // ids like '2013s-oct' would otherwise sort alphabetically, not by month
-export const allSessions = (): Session[] =>
-  prep(
-    `SELECT s.*, (SELECT MIN(a.date) FROM actions a JOIN bills b ON b.id = a.bill_id
-       WHERE b.session_id = s.id) AS first_action
-     FROM sessions s ORDER BY first_action DESC, s.id DESC`,
-  ).all() as Session[];
+export const allSessions = once(
+  (): Session[] =>
+    prep(
+      `SELECT s.*, (SELECT MIN(a.date) FROM actions a JOIN bills b ON b.id = a.bill_id
+         WHERE b.session_id = s.id) AS first_action
+       FROM sessions s ORDER BY first_action DESC, s.id DESC`,
+    ).all() as Session[],
+);
 
 // BUILD_SESSIONS cannot change mid-build
-let _built: Session[] | undefined;
-export function builtSessions(): Session[] {
-  if (_built) return _built;
+export const builtSessions = once((): Session[] => {
   const env = process.env.BUILD_SESSIONS ?? "2025,2026s1";
   const sessions = allSessions();
-  if (env === "all") return (_built = sessions);
+  if (env === "all") return sessions;
   const wanted = new Set(env.split(",").map((s) => s.trim()));
-  return (_built = sessions.filter((s) => wanted.has(s.id)));
-}
+  return sessions.filter((s) => wanted.has(s.id));
+});
 
-// read-only DB: one query serves every page's layout
-let _meta: Record<string, string> | undefined;
-export const meta = (): Record<string, string> =>
-  (_meta ??= Object.fromEntries(
-    (prep("SELECT key, value FROM meta").all() as { key: string; value: string }[]).map(
-      (r) => [r.key, r.value],
+// one query serves every page's layout
+export const meta = once(
+  (): Record<string, string> =>
+    Object.fromEntries(
+      (prep("SELECT key, value FROM meta").all() as { key: string; value: string }[]).map(
+        (r) => [r.key, r.value],
+      ),
     ),
-  ));
+);
 
 /** The bill's officially declared companions: the same legislation
  * introduced in the other chamber. The edge comes from docs.legis's own
@@ -96,10 +127,7 @@ export const meta = (): Record<string, string> =>
  * table only exists after enrichment, so absence degrades to "no
  * companions" rather than a build failure. */
 export const companionsFor = (billId: string) => {
-  const has = prep(
-    "SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name='bill_companions'",
-  ).get();
-  if (!has) return [];
+  if (!hasTable("bill_companions")) return [];
   return prep(
       `SELECT b.id, b.identifier, b.session_id, b.status, bc.source_url
        FROM bill_companions bc JOIN bills b ON b.id = bc.companion_bill_id
@@ -115,8 +143,7 @@ export const companionsFor = (billId: string) => {
  * the senate.gov XML the pipeline mirrors. The tables are an enrichment:
  * when they are absent (an older snapshot), everything degrades to empty
  * and the federal pages simply do not build. */
-const hasFederal = () =>
-  !!prep("SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name='federal_members'").get();
+const hasFederal = () => hasTable("federal_members");
 
 export interface FederalMember {
   bioguide: string; lis_id: string | null; name: string; slug: string;
@@ -222,24 +249,28 @@ export const voteRecordsFor = (voteEventId: string) =>
 export const people = (): Person[] =>
   prep("SELECT * FROM people ORDER BY name").all() as Person[];
 
-// memoized: the district pages ask for the roster once per seat
-let _sitting: Person[] | undefined;
-export const sittingPeople = (): Person[] =>
-  (_sitting ??= prep(
+// the district pages ask for the roster once per seat
+export const sittingPeople = once(
+  (): Person[] =>
+    prep(
       "SELECT * FROM people WHERE current_role IN ('Representative', 'Senator') ORDER BY chamber, district",
-    )
-    .all() as Person[]);
+    ).all() as Person[],
+);
 
-export const personVotes = (personId: string, limit: number) =>
+/** One member's roll calls, newest first. The profile takes a bounded
+ * preview and the paged record pages take slices, so counting and
+ * slicing happen in SQLite and a build never holds a whole career in
+ * memory. */
+export const personVotes = (personId: string, limit: number, offset = 0) =>
   prep(
       `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result,
               b.id AS bill_id, b.identifier, b.title, b.session_id
        FROM vote_records r
        JOIN vote_events e ON e.id = r.vote_event_id
        JOIN bills b ON b.id = e.bill_id
-       WHERE r.person_id = ? ORDER BY e.date DESC, e.id LIMIT ?`,
+       WHERE r.person_id = ? ORDER BY e.date DESC, e.id LIMIT ? OFFSET ?`,
     )
-    .all(personId, limit) as {
+    .all(personId, limit, offset) as {
     option: string;
     vote_event_id: string;
     date: string | null;
@@ -251,33 +282,42 @@ export const personVotes = (personId: string, limit: number) =>
     session_id: string;
   }[];
 
+export const personVoteCount = (personId: string): number =>
+  (prep("SELECT COUNT(*) AS n FROM vote_records WHERE person_id = ?").get(personId) as {
+    n: number;
+  }).n;
+
 /** bill id -> its lead author. The introduction line's order is the
  * Legislature's own ranking (its author index prints a description "only
  * under the first and second author"), and the scraper preserves that
  * order, so the first-listed primary sponsor is the lead author. One scan
  * serves every legislator page. */
-let _leadAuthors: Map<string, string | null> | undefined;
-const leadAuthors = (): Map<string, string | null> => {
-  if (_leadAuthors) return _leadAuthors;
-  _leadAuthors = new Map();
+const leadAuthors = once((): Map<string, string | null> => {
+  const leads = new Map<string, string | null>();
   const rows = prep(
     "SELECT bill_id, person_id FROM sponsorships WHERE is_primary = 1 ORDER BY rowid",
   ).all() as { bill_id: string; person_id: string | null }[];
   for (const r of rows) {
-    if (!_leadAuthors.has(r.bill_id)) _leadAuthors.set(r.bill_id, r.person_id);
+    if (!leads.has(r.bill_id)) leads.set(r.bill_id, r.person_id);
   }
-  return _leadAuthors;
-};
+  return leads;
+});
 
-export const personSponsorships = (personId: string) => {
+/** Every bill a member's name is on, newest first, each tagged with one of
+ * the three official roles: lead author (first on the bill), coauthor
+ * (same house, signed on), cosponsor (the other house). The profile reads
+ * the whole list; the paged record pages take slices (a negative limit is
+ * SQLite's "no limit"). */
+export const personSponsorships = (personId: string, limit = -1, offset = 0) => {
   const leads = leadAuthors();
   const rows = prep(
       `SELECT s.is_primary, s.classification, b.id AS bill_id, b.identifier,
               b.title, b.status, b.session_id, b.died_without_hearing
        FROM sponsorships s JOIN bills b ON b.id = s.bill_id
-       WHERE s.person_id = ? AND b.source != 'legiscan' ORDER BY b.id DESC`,
+       WHERE s.person_id = ? AND b.source != 'legiscan'
+       ORDER BY b.id DESC LIMIT ? OFFSET ?`,
     )
-    .all(personId) as {
+    .all(personId, limit, offset) as {
     is_primary: number;
     classification: string;
     bill_id: string;
@@ -287,8 +327,6 @@ export const personSponsorships = (personId: string) => {
     session_id: string;
     died_without_hearing: number;
   }[];
-  // three official roles: lead author (first on the bill), coauthor (same
-  // house, signed on), cosponsor (the other house)
   return rows.map((r) => ({
     ...r,
     role: leads.get(r.bill_id) === personId
@@ -299,15 +337,13 @@ export const personSponsorships = (personId: string) => {
   }));
 };
 
-const _elections = new Map<string, ReturnType<typeof queryElection>>();
-export const electionFor = (personId: string) => {
-  if (_elections.has(personId)) return _elections.get(personId);
-  const result = queryElection(personId);
-  _elections.set(personId, result);
-  return result;
-};
+export const personSponsorshipCount = (personId: string): number =>
+  (prep(
+      "SELECT COUNT(*) AS n FROM sponsorships s JOIN bills b ON b.id = s.bill_id" +
+        " WHERE s.person_id = ? AND b.source != 'legiscan'",
+    ).get(personId) as { n: number }).n;
 
-const queryElection = (personId: string) => {
+export const electionFor = memoBy((personId: string) => {
   const row = prep("SELECT * FROM elections WHERE person_id = ?")
     .get(personId) as
     | {
@@ -327,7 +363,7 @@ const queryElection = (personId: string) => {
       ballot_status: string;
     }[],
   };
-};
+});
 
 export const graveyardFor = (sessionId: string) =>
   prep(
@@ -368,21 +404,17 @@ export const allHearings = () =>
   prep(`${HEARING_SELECT} ORDER BY h.date, h.time`).all() as Hearing[];
 
 /** 'AB 656' -> its bill row in the newest built session that has it. */
-const _billIdCache = new Map<string, { id: string; session_id: string } | null>();
-export const findBillByIdentifier = (identifier: string) => {
-  if (_billIdCache.has(identifier)) return _billIdCache.get(identifier);
-  let found: { id: string; session_id: string } | null = null;
-  for (const session of builtSessions()) {
-    const row = prep("SELECT id, session_id FROM bills WHERE session_id = ? AND identifier = ?")
-      .get(session.id, identifier) as { id: string; session_id: string } | undefined;
-    if (row) {
-      found = row;
-      break;
-    }
-  }
-  _billIdCache.set(identifier, found);
-  return found;
-};
+export const findBillByIdentifier = memoBy((identifier: string) => {
+  const built = builtSessions().map((s) => s.id);
+  const rows = prep(
+      `SELECT id, session_id FROM bills WHERE identifier = ?
+       AND session_id IN (${built.map(() => "?").join(",")})`,
+    )
+    .all(identifier, ...built) as { id: string; session_id: string }[];
+  // builtSessions() is newest first
+  rows.sort((a, b) => built.indexOf(a.session_id) - built.indexOf(b.session_id));
+  return rows[0] ?? null;
+});
 
 export interface Hearing {
   id: string;
@@ -402,17 +434,15 @@ export interface Hearing {
 
 /** Exact-name profile resolver: returns a person id only when exactly one
  * person carries the name; ambiguity or no match stays unlinked. */
-let _nameToId: Map<string, string | null> | null = null;
-export const personIdByName = (name: string | null): string | null => {
-  if (!name) return null;
-  if (!_nameToId) {
-    _nameToId = new Map();
-    for (const p of prep("SELECT id, name FROM people").all() as { id: string; name: string }[]) {
-      _nameToId.set(p.name, _nameToId.has(p.name) ? null : p.id);
-    }
+const nameToId = once(() => {
+  const index = new Map<string, string | null>();
+  for (const p of prep("SELECT id, name FROM people").all() as { id: string; name: string }[]) {
+    index.set(p.name, index.has(p.name) ? null : p.id);
   }
-  return _nameToId.get(name) ?? null;
-};
+  return index;
+});
+export const personIdByName = (name: string | null): string | null =>
+  name ? (nameToId().get(name) ?? null) : null;
 
 export const recentlyActedBills = (sessionIds: string[], limit = 8) =>
   prep(
@@ -422,16 +452,16 @@ export const recentlyActedBills = (sessionIds: string[], limit = 8) =>
     .all(...sessionIds, limit) as Bill[];
 
 /** Days each chamber held attributed floor votes: (chamber, date) -> count.
- * Memoized — one scan serves every legislator page in the build. */
-let _chamberDays: { chamber: string; date: string; n: number }[] | undefined;
-export const chamberVoteDays = () =>
-  (_chamberDays ??= prep(
+ * One scan serves every legislator page in the build. */
+export const chamberVoteDays = once(
+  () =>
+    prep(
       `SELECT chamber, date, COUNT(*) AS n FROM vote_events
        WHERE date IS NOT NULL AND chamber IN ('lower', 'upper')
        AND id IN (SELECT DISTINCT vote_event_id FROM vote_records)
        GROUP BY chamber, date`,
-    )
-    .all() as { chamber: string; date: string; n: number }[]);
+    ).all() as { chamber: string; date: string; n: number }[],
+);
 
 /** One person's per-day participation: cast = aye/nay, nv = present-not-voting. */
 export const personVoteDays = (personId: string) =>
@@ -445,12 +475,10 @@ export const personVoteDays = (personId: string) =>
     )
     .all(personId) as { date: string; chamber: string; cast: number; nv: number }[];
 
-// majority position (aye/nay) per (vote event, party); ties excluded.
-// The full yes/no split is kept alongside so pages can cite exact counts.
-let _partyMajority: Map<string, string> | undefined;
-let _partySplits: Map<string, { yes: number; no: number }> | undefined;
-const partyMajorities = (): Map<string, string> => {
-  if (_partyMajority) return _partyMajority;
+/** Each party's Aye/Nay split on every roll call, keyed "event|party",
+ * and the majority position it implies (ties carry no majority). One
+ * scan serves every legislator and roll-call page. */
+const partyPositions = once(() => {
   const rows = prep(
       `SELECT r.vote_event_id, p.party, r.option, COUNT(*) AS n
        FROM vote_records r JOIN people p ON p.id = r.person_id
@@ -458,32 +486,25 @@ const partyMajorities = (): Map<string, string> => {
        GROUP BY r.vote_event_id, p.party, r.option`,
     )
     .all() as { vote_event_id: string; party: string; option: string; n: number }[];
-  const counts = new Map<string, { yes: number; no: number }>();
+  const splits = new Map<string, { yes: number; no: number }>();
   for (const row of rows) {
     const key = `${row.vote_event_id}|${row.party}`;
-    const c = counts.get(key) ?? { yes: 0, no: 0 };
+    const c = splits.get(key) ?? { yes: 0, no: 0 };
     c[row.option as "yes" | "no"] += row.n;
-    counts.set(key, c);
+    splits.set(key, c);
   }
-  _partySplits = counts;
-  _partyMajority = new Map();
-  for (const [key, c] of counts) {
-    if (c.yes !== c.no) _partyMajority.set(key, c.yes > c.no ? "yes" : "no");
+  const majority = new Map<string, string>();
+  for (const [key, c] of splits) {
+    if (c.yes !== c.no) majority.set(key, c.yes > c.no ? "yes" : "no");
   }
-  return _partyMajority;
-};
-
-const partySplits = (): Map<string, { yes: number; no: number }> => {
-  partyMajorities();
-  return _partySplits!;
-};
+  return { splits, majority };
+});
 
 /** Votes where this member's Aye/Nay opposed their own party's majority
  * position on the roll call (ties excluded, absences never counted). */
 export const partyBreaks = (personId: string, party: string | null) => {
   if (party !== "Democratic" && party !== "Republican") return [];
-  const majorities = partyMajorities();
-  const splits = partySplits();
+  const { majority: majorities, splits } = partyPositions();
   const votes = prep(
       `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.source_url,
               b.id AS bill_id, b.identifier, b.title, b.session_id
@@ -509,7 +530,7 @@ export const partyBreaks = (personId: string, party: string | null) => {
 /** Per-party Aye/Nay splits for one roll call, for the party-line /
  * bipartisan tag. Null when either party cast no recorded Aye/Nay. */
 export const voteSplit = (voteEventId: string) => {
-  const splits = partySplits();
+  const { splits } = partyPositions();
   const dem = splits.get(`${voteEventId}|Democratic`);
   const rep = splits.get(`${voteEventId}|Republican`);
   if (!dem || !rep) return null;
@@ -621,11 +642,8 @@ export const seatTerms = (chamber: string, district: number) =>
 /** Per-session name resolution for display linking: every printed form
  * (surname, compound surname, initial-first, full name) of each member
  * serving that session's biennium, per chamber. A form shared by two
- * members maps to null and never links — exact-unique or nothing. */
-const _nameIndexes = new Map<string, Record<string, Map<string, string | null>>>();
-export const sessionNameIndex = (sessionId: string) => {
-  const cached = _nameIndexes.get(sessionId);
-  if (cached) return cached;
+ * members maps to null and never links: exact-unique or nothing. */
+export const sessionNameIndex = memoBy((sessionId: string) => {
   const by = bienniumOf(sessionId);
   const start = `${by}-01-01`;
   const end = `${by + 2}-01-01`;
@@ -654,9 +672,8 @@ export const sessionNameIndex = (sessionId: string) => {
       map.set(key, map.has(key) && map.get(key) !== r.person_id ? null : r.person_id);
     }
   }
-  _nameIndexes.set(sessionId, index);
   return index;
-};
+});
 
 /** Statewide constitutional races from the WEC ballot-access report. */
 export const statewideRaces = () =>
@@ -674,13 +691,17 @@ export const statewideHistory = () =>
     party: string | null; votes: number;
   }[];
 
+// chair, then co-chair, then vice-chair, then rank-and-file
+const ROLE_ORDER =
+  "CASE WHEN m.role = 'chair' THEN 0 WHEN m.role LIKE 'co-chair%' THEN 1 WHEN m.role LIKE 'vice%' THEN 2 ELSE 3 END";
+
 /** One person's committee assignments, chairs first. */
 export const committeesFor = (personId: string) =>
   prep(
       `SELECT c.id, c.name, m.role FROM committee_members m
        JOIN committees c ON c.id = m.committee_id
        WHERE m.person_id = ?
-       ORDER BY CASE WHEN m.role = 'chair' THEN 0 WHEN m.role LIKE 'co-chair%' THEN 1 WHEN m.role LIKE 'vice%' THEN 2 ELSE 3 END, c.name`,
+       ORDER BY ${ROLE_ORDER}, c.name`,
     )
     .all(personId) as { id: string; name: string; role: string }[];
 
@@ -722,7 +743,7 @@ export const orgLobbying = (principalId: number) =>
  * position, per session. Presented as a plain number, never a grade. */
 export const partyAgreement = (personId: string, party: string | null) => {
   if (party !== "Democratic" && party !== "Republican") return [];
-  const majorities = partyMajorities();
+  const { majority: majorities } = partyPositions();
   const votes = prep(
       `SELECT r.vote_event_id, r.option, b.session_id
        FROM vote_records r
@@ -748,24 +769,16 @@ export const partyAgreement = (personId: string, party: string | null) => {
 /** Official WEC general-election results for one seat, newest first.
  * Percentages use the canvass's own Total Votes Cast where present, so
  * they match the certified report exactly. */
-const _electionHistory = new Map<string, ReturnType<typeof queryElectionHistory>>();
-export const electionHistoryFor = (chamber: string | null, district: number | null) => {
-  if (!chamber || district == null) return [];
-  const key = `${chamber}|${district}`;
-  let cached = _electionHistory.get(key);
-  if (!cached) {
-    cached = queryElectionHistory(chamber, district);
-    _electionHistory.set(key, cached);
-  }
-  return cached;
-};
+export const electionHistoryFor = (chamber: string | null, district: number | null) =>
+  !chamber || district == null ? [] : electionHistoryBySeat(`${chamber}|${district}`);
 
-const queryElectionHistory = (chamber: string, district: number) => {
+const electionHistoryBySeat = memoBy((seat: string) => {
+  const [chamber, district] = seat.split("|");
   const rows = prep(
       `SELECT year, candidate, party, votes, total_cast FROM election_history
        WHERE chamber = ? AND district = ? ORDER BY year DESC, votes DESC`,
     )
-    .all(chamber, district) as {
+    .all(chamber, Number(district)) as {
     year: number; candidate: string; party: string | null;
     votes: number; total_cast: number | null;
   }[];
@@ -778,7 +791,7 @@ const queryElectionHistory = (chamber: string, district: number) => {
     const total = candidates[0].total_cast ?? candidates.reduce((s, c) => s + c.votes, 0);
     return { year, total, candidates };
   });
-};
+});
 
 /** The seat's most recent general-election margin, for competitiveness
  * context: percentage-point gap between the top two candidates over the
@@ -829,8 +842,6 @@ export const termsFor = (personId: string) =>
       chamber: string; district: number | null; start: string; end: string | null;
       end_label: string | null; end_url: string | null;
     }[];
-
-import { OPEN_END, OPEN_START } from "./sentinels";
 
 const officeEntryFor = (personId: string): string => {
   const terms = termsFor(personId);
@@ -952,13 +963,11 @@ const partyTotals = (where: string, extra: Record<string, unknown> = {}) =>
 
 // covered = members whose linked committees actually carry receipts; a
 // receipt-less mapping is an incomplete link, not coverage
-let _coverage: { covered: number; sitting: number } | undefined;
-const coverage = () =>
-  (_coverage ??= {
-    covered: (prep("SELECT COUNT(DISTINCT person_id) AS n FROM contributions").get() as { n: number }).n,
-    sitting: (prep("SELECT COUNT(*) AS n FROM people WHERE current_role IN ('Representative', 'Senator')")
-      .get() as { n: number }).n,
-  });
+const coverage = once(() => ({
+  covered: (prep("SELECT COUNT(DISTINCT person_id) AS n FROM contributions").get() as { n: number }).n,
+  sitting: (prep("SELECT COUNT(*) AS n FROM people WHERE current_role IN ('Representative', 'Senator')")
+    .get() as { n: number }).n,
+}));
 
 /** Statewide rollup of the same contribution data shown on profiles,
  * each member's receipts windowed to their time in office, optionally
@@ -1022,21 +1031,19 @@ export const moneyOverview = (bounds: Record<string, string> = {}) => {
 
 // the lifetime (no-bounds) aggregate is shared by the money overview's
 // Lifetime view and the donor-page set; callers never mutate it in place
-let _aggAll: CommitteeAgg[] | undefined;
-const committeeAggAll = () => (_aggAll ??= windowedAll<CommitteeAgg>(COMMITTEE_AGG));
+const committeeAggAll = once(() => windowedAll<CommitteeAgg>(COMMITTEE_AGG));
 
 /** Committee donors that get their own page: at least $1,000 given to
  * sitting legislators while in office. */
-let _donorCommittees: CommitteeAgg[] | undefined;
-export const donorCommittees = () =>
-  (_donorCommittees ??= committeeAggAll()
+export const donorCommittees = once(() =>
+  committeeAggAll()
     .filter((c) => c.total >= 1000)
-    .sort((a, b) => b.total - a.total));
+    .sort((a, b) => b.total - a.total),
+);
 
-let _donorIds: Set<number> | undefined;
+const donorIds = once(() => new Set(donorCommittees().map((c) => c.entityId)));
 export const hasDonorPage = (entityId: number | null): boolean =>
-  entityId != null &&
-  (_donorIds ??= new Set(donorCommittees().map((c) => c.entityId))).has(entityId);
+  entityId != null && donorIds().has(entityId);
 
 /** One committee donor's giving to sitting legislators, in-office windowed. */
 export const donorCommitteeFor = (entityId: number) => ({
@@ -1055,11 +1062,18 @@ export const donorCommitteeFor = (entityId: number) => ({
   byParty: partyTotals("WHERE c.from_entity_id = @entityId", { entityId }),
 });
 
-/** Committees for the directory: membership, throughput, and the next
- * scheduled hearing when one exists. The died-here match is the same
- * name-and-chamber rule committeeRecord uses, so the directory can never
- * disagree with a committee's own page. */
-export const allCommittees = () =>
+/** Committees for the directory and each committee's own page: membership,
+ * throughput, and the next scheduled hearing when one exists. Two counted
+ * figures, neither inferred: hearings held (joined on committee_id) and
+ * bills that died here without ever getting one.
+ *
+ * The second matches on name *and* chamber. The importer records both
+ * (`committee_at_death`, `committee_chamber_at_death`) precisely so a
+ * same-named committee in the other house is never blamed, and every one
+ * of the 9,465 graveyard bills carries a chamber. Matching on name alone
+ * gave Assembly and Senate Education the same 567 bills. One query feeds
+ * the directory and the page, so the two can never disagree. */
+export const allCommittees = once(() =>
   prep(
       `SELECT c.id, c.name, c.chamber, c.chair_person_id, p.name AS chair_name,
               COUNT(m.person_id) AS member_count,
@@ -1080,7 +1094,8 @@ export const allCommittees = () =>
       id: string; name: string; chamber: string | null;
       chair_person_id: string | null; chair_name: string | null; member_count: number;
       hearings_held: number; next_hearing: string | null; died_here: number;
-    }[];
+    }[],
+);
 
 // mirror of importer/committees.py normalize_name, for matching the
 // graveyard's committee_at_death names to committee pages
@@ -1093,16 +1108,10 @@ const normalizeCommitteeName = (name: string): string => {
   }
 };
 
-// the graveyard aggregate takes no parameters — one scan (with each
+// the graveyard aggregate takes no parameters: one scan (with each
 // referral's normalized key precomputed) serves every committee page
-let _graveyardAgg:
-  | {
-      session_id: string; committee_at_death: string; chamber: string | null;
-      n: number; key: string; referralIsJoint: boolean;
-    }[]
-  | undefined;
-const graveyardAgg = () =>
-  (_graveyardAgg ??= (
+const graveyardAgg = once(() =>
+  (
     prep(
       `SELECT session_id, committee_at_death,
               committee_chamber_at_death AS chamber, COUNT(*) AS n
@@ -1117,7 +1126,8 @@ const graveyardAgg = () =>
     ...g,
     key: normalizeCommitteeName(g.committee_at_death),
     referralIsJoint: /^joint\b/i.test(g.committee_at_death),
-  })));
+  })),
+);
 
 /** One committee: members, hearings, and its Hearing None record.
  * Graveyard rows attach only on exact normalized-name + chamber match. */
@@ -1127,7 +1137,7 @@ export const committeeFor = (committeeId: string) => {
               p.current_role
        FROM committee_members m JOIN people p ON p.id = m.person_id
        WHERE m.committee_id = ?
-       ORDER BY CASE WHEN m.role = 'chair' THEN 0 WHEN m.role LIKE 'co-chair%' THEN 1 WHEN m.role LIKE 'vice%' THEN 2 ELSE 3 END, p.name`,
+       ORDER BY ${ROLE_ORDER}, p.name`,
     )
     .all(committeeId) as {
       id: string; role: string; name: string; party: string | null;
@@ -1194,13 +1204,18 @@ export const lobbyingFor = (billId: string) =>
 
 /** ---- New laws, veto tracker, key votes ---- */
 
-export const bienniumOf = (sessionId: string): number => {
+const bienniumOf = (sessionId: string): number => {
   const y = Number(sessionId.slice(0, 4));
   return y % 2 ? y : y - 1;
 };
 
 const ACT_RE = /Wisconsin Act (\d+)/i;
-const APPROVED_RE = /on (\d{1,2}-\d{1,2}-\d{4})/;
+// the approval action prints M-D-YYYY; stored as ISO like every other date
+const APPROVED_RE = /on (\d{1,2})-(\d{1,2})-(\d{4})/;
+const approvedIso = (description: string): string | null => {
+  const m = APPROVED_RE.exec(description);
+  return m ? `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}` : null;
+};
 // matches every passage-stage motion phrasing on floor roll calls,
 // including the terse all-caps docs ('PASSAGE', 'CONCURRENCE AS AMENDED');
 // the negative guard keeps procedural motions that merely mention passage
@@ -1246,10 +1261,7 @@ const passageVotes = (billId: string): LawVote[] => {
 /** Every act of law from one biennium, in act-number order. The act
  * number and approval date come verbatim from the governor's approval
  * action in the official bill history. */
-const _laws = new Map<number, Law[]>();
-export const lawsFor = (biennium: number): Law[] => {
-  const cached = _laws.get(biennium);
-  if (cached) return cached;
+export const lawsFor = memoBy((biennium: number): Law[] => {
   const rows = prep(
       `SELECT b.id, b.session_id, b.identifier, b.title, a.description
        FROM bills b JOIN actions a ON a.bill_id = b.id
@@ -1266,14 +1278,13 @@ export const lawsFor = (biennium: number): Law[] => {
       bill_id: r.id, session_id: r.session_id, identifier: r.identifier,
       title: r.title,
       act: Number(ACT_RE.exec(r.description)![1]),
-      approved: APPROVED_RE.exec(r.description)?.[1] ?? null,
+      approved: approvedIso(r.description),
       partial: /partial veto/i.test(r.description),
       votes: passageVotes(r.id),
     }))
     .sort((a, b) => a.act - b.act);
-  _laws.set(biennium, laws);
   return laws;
-};
+});
 
 /** Bienniums covered by this build that produced acts, newest first. */
 export const lawBienniums = () =>
@@ -1352,9 +1363,7 @@ export const vetoTracker = (): VetoBiennium[] =>
  * passage vote of every bill that became law, any floor vote decided by
  * five or fewer, and every veto-override vote. One scan serves every
  * legislator page. */
-let _keyEvents: Map<string, string[]> | undefined;
-const keyEvents = (): Map<string, string[]> => {
-  if (_keyEvents) return _keyEvents;
+const keyEvents = once((): Map<string, string[]> => {
   const m = new Map<string, string[]>();
   const add = (id: string, kind: string) => {
     const kinds = m.get(id) ?? [];
@@ -1389,8 +1398,8 @@ const keyEvents = (): Map<string, string[]> => {
     ).all() as { id: string }[]) {
     add(id, "veto override");
   }
-  return (_keyEvents = m);
-};
+  return m;
+});
 
 /** One member's votes on the key roll calls, newest first. */
 export const keyVotesFor = (personId: string) => {
@@ -1425,46 +1434,15 @@ export interface CfCommittee {
 
 /** entity id -> registration type, so a PAC, a party transfer and a
  * conduit pass-through are never shown as the same kind of donor. */
-let _cfTypes: Map<number, CfCommittee> | undefined;
-export const cfCommittees = (): Map<number, CfCommittee> =>
-  (_cfTypes ??= new Map(
-    (prep("SELECT * FROM cf_committees").all() as CfCommittee[]).map((c) => [c.entity_id, c]),
-  ));
+const cfCommittees = once(
+  (): Map<number, CfCommittee> =>
+    new Map(
+      (prep("SELECT * FROM cf_committees").all() as CfCommittee[]).map((c) => [c.entity_id, c]),
+    ),
+);
 
 export const cfTypeOf = (entityId: number | null): string | null =>
   entityId == null ? null : cfCommittees().get(entityId)?.committee_type ?? null;
-
-/** Committees with enough activity to deserve a page, newest money first. */
-export const cfCommitteesWithPages = (minTotal = 5000) =>
-  prep(
-      `SELECT c.entity_id, c.name, c.committee_type, c.assigned_id,
-              SUM(CASE WHEN t.direction = 'INCOMING' THEN t.amount ELSE 0 END) AS raised,
-              SUM(CASE WHEN t.direction = 'OUTGOING' THEN t.amount ELSE 0 END) AS spent,
-              COUNT(*) AS n
-       FROM cf_committees c JOIN cf_transactions t ON t.filer_entity_id = c.entity_id
-       WHERE c.committee_type NOT IN ('State Candidate', 'Federal Candidate')
-       GROUP BY c.entity_id HAVING raised + spent >= ?
-       ORDER BY raised + spent DESC`,
-    )
-    .all(minTotal) as (CfCommittee & { raised: number; spent: number; n: number })[];
-
-/** Registrant entity ids by exact committee name, for linking a name in
- * a filing to its official page on campaignfinance.wi.gov. Names that
- * match more than one registrant resolve to nothing: exact-unique or no
- * link, never a guess. */
-export const cfEntityByName = (): Map<string, number> => {
-  const rows = prep("SELECT entity_id, name FROM cf_committees").all() as {
-    entity_id: number; name: string;
-  }[];
-  const seen = new Map<string, number | null>();
-  for (const r of rows) {
-    const key = r.name.trim().toLowerCase();
-    seen.set(key, seen.has(key) ? null : r.entity_id);
-  }
-  const out = new Map<string, number>();
-  for (const [k, v] of seen) if (v != null) out.set(k, v);
-  return out;
-};
 
 /** One committee's money: totals, top donors, top recipients. */
 export const cfCommitteeFor = (entityId: number) => {
@@ -1543,35 +1521,6 @@ export const independentExpenditures = (limit = 500) =>
       filer_name: string | null; filer_type: string | null;
     }[];
 
-/** Express advocacy naming one legislator, matched on the committee's
- * own related-entity name (exact, never a guess). */
-export const advocacyForName = (name: string) =>
-  prep(
-      `SELECT t.date, t.amount, t.stance, t.related_office, t.related_district,
-              c.name AS filer_name, c.committee_type AS filer_type
-       FROM cf_transactions t
-       LEFT JOIN cf_committees c ON c.entity_id = t.filer_entity_id
-       WHERE t.stance IS NOT NULL AND t.related_name = ?
-       AND COALESCE(t.filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')
-       ORDER BY t.date DESC`,
-    )
-    .all(name) as {
-      date: string; amount: number; stance: string; related_office: string | null;
-      related_district: string | null; filer_name: string | null; filer_type: string | null;
-    }[];
-
-/** Totals over every attributed filing, not just the page's visible slice
- * — a summary computed from a truncated list would understate the money. */
-export const independentExpenditureTotals = () =>
-  prep(
-      `SELECT stance, COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total
-       FROM cf_transactions
-       WHERE stance IS NOT NULL AND related_name IS NOT NULL
-       AND COALESCE(filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')
-       GROUP BY stance`,
-    )
-    .all() as { stance: string; n: number; total: number }[];
-
 /** Conduits pass earmarked individual money through to a candidate; the
  * conduit is the filer, but the money is not the conduit's own. */
 export const conduitFlows = (limit = 200) =>
@@ -1594,60 +1543,6 @@ export const sessionStats = (sessionId: string) =>
        FROM bills WHERE session_id = ?`,
     )
     .get(sessionId) as { bills: number; enacted: number; vetoed: number; graveyard: number };
-
-/** Paged slices for the per-member full-record pages. The profile itself
- * shows a bounded preview; these carry the rest without putting every row
- * of a twenty-year career into one document. Counting and slicing happen
- * in SQLite so a build never holds the whole history in memory. */
-export const personVoteCount = (personId: string): number =>
-  (prep("SELECT COUNT(*) AS n FROM vote_records WHERE person_id = ?").get(personId) as {
-    n: number;
-  }).n;
-
-export const personVotesPage = (personId: string, limit: number, offset: number) =>
-  prep(
-      `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result,
-              b.id AS bill_id, b.identifier, b.title, b.session_id
-       FROM vote_records r
-       JOIN vote_events e ON e.id = r.vote_event_id
-       JOIN bills b ON b.id = e.bill_id
-       WHERE r.person_id = ? ORDER BY e.date DESC, e.id LIMIT ? OFFSET ?`,
-    )
-    .all(personId, limit, offset) as {
-    option: string; vote_event_id: string; date: string | null; motion: string | null;
-    result: string | null; bill_id: string; identifier: string; title: string | null;
-    session_id: string;
-  }[];
-
-export const personSponsorshipCount = (personId: string): number =>
-  (prep(
-      "SELECT COUNT(*) AS n FROM sponsorships s JOIN bills b ON b.id = s.bill_id" +
-        " WHERE s.person_id = ? AND b.source != 'legiscan'",
-    ).get(personId) as { n: number }).n;
-
-export const personSponsorshipsPage = (personId: string, limit: number, offset: number) => {
-  const leads = leadAuthors();
-  const rows = prep(
-      `SELECT s.is_primary, s.classification, b.id AS bill_id, b.identifier,
-              b.title, b.status, b.session_id
-       FROM sponsorships s JOIN bills b ON b.id = s.bill_id
-       WHERE s.person_id = ? AND b.source != 'legiscan'
-       ORDER BY b.id DESC LIMIT ? OFFSET ?`,
-    )
-    .all(personId, limit, offset) as {
-    is_primary: number; classification: string; bill_id: string; identifier: string;
-    title: string | null; status: string | null; session_id: string;
-  }[];
-  return rows.map((r) => ({
-    ...r,
-    role:
-      leads.get(r.bill_id) === personId
-        ? "lead"
-        : r.classification === "cosponsor"
-          ? "cosponsor"
-          : "coauthor",
-  }));
-};
 
 /** What became of a session's bills, as a flow that balances.
  *
@@ -1695,29 +1590,3 @@ export const sessionBillFlow = (sessionId: string) => {
   };
 };
 
-/** What a committee did with the bills it handled. Two counted figures,
- * neither inferred:
- *   - hearings held, joined on committee_id
- *   - bills that died here without ever getting one
- *
- * The second matches on name *and* chamber. The importer records both
- * (`committee_at_death`, `committee_chamber_at_death`) precisely so a
- * same-named committee in the other house is never blamed, and every one
- * of the 9,465 graveyard bills carries a chamber. Matching on name alone
- * gave Assembly and Senate Education the same 567 bills.
- */
-export const committeeRecord = (committeeId: string) => {
-  const row = prep("SELECT name, chamber FROM committees WHERE id = ?").get(committeeId) as
-    | { name: string; chamber: string | null }
-    | undefined;
-  if (!row) return null;
-  const hearingsHeld = (prep(
-      "SELECT COUNT(*) AS n FROM hearings WHERE committee_id = ?",
-    ).get(committeeId) as { n: number }).n;
-  const diedUnheard = (prep(
-      "SELECT COUNT(*) AS n FROM bills WHERE died_without_hearing = 1" +
-        " AND committee_at_death = ? AND source != 'legiscan'" +
-        " AND COALESCE(committee_chamber_at_death, '') = COALESCE(?, '')",
-    ).get(row.name, row.chamber) as { n: number }).n;
-  return { hearingsHeld, diedUnheard };
-};

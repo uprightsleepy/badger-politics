@@ -1,50 +1,17 @@
 /** axe-core accessibility scan over the built site in headless Edge.
  * Usage: node scripts/a11y.mjs  (serves dist/ on :8933) */
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import {
-  DIST, serveDist, launchBrowser, firstLegislatorHref, moneyLegislatorHref, blockThirdPartyAssets } from "./lib/serve.mjs";
+import { serveDist, launchBrowser, samplePages, blockThirdPartyAssets } from "./lib/serve.mjs";
 
 const server = await serveDist(8933);
-
-const PAGES = [
-  "/", "/bills/", "/bills/2025/", "/bills/2025/ab656/", "/bills/2025/ab1/",
-  "/bills/2025/sb23/", "/votes/2025-av0001-ar1/", "/legislators/",
-  "/hearing-none/", "/hearing-none/2025/", "/calendar/",
-  "/my-reps/", "/elections/2026/", "/data/", "/about/", "/money/", "/404.html",
-  "/money/committees/", "/money/committees/651839/", "/committees/", "/subjects/",
-  "/following/", "/governors-desk/", "/districts/", "/districts/senate-21/",
-  "/lobbying/", "/testify/", "/glossary/",
-  "/laws/", "/laws/2025/", "/vetoes/", "/partial-veto/",
-];
-{
-  const idx = await readFile(join(DIST, "lobbying/index.html"), "utf-8").catch(() => "");
-  const m = idx.match(/href="(\/lobbying\/\d+\/)"/);
-  if (m) PAGES.push(m[1]);
-}
-{
-  const idx = await readFile(join(DIST, "subjects/index.html"), "utf-8").catch(() => "");
-  const m = idx.match(/href="(\/subjects\/[^"]+\/)"/);
-  if (m) PAGES.push(m[1]);
-}
-{
-  const idx = await readFile(join(DIST, "committees/index.html"), "utf-8").catch(() => "");
-  const m = idx.match(/href="(\/committees\/[^"]+\/)"/);
-  if (m) PAGES.push(m[1]);
-}
+const PAGES = await samplePages();
 
 const axeSource = await readFile(
   new URL("../node_modules/axe-core/axe.min.js", import.meta.url), "utf-8",
 );
 const browser = await launchBrowser();
 const page = await browser.newPage();
-  await blockThirdPartyAssets(page);
-// include one legislator page with full cards, and one whose money card
-// carries the timeline chart (coverage differs between the two)
-const legHref = await firstLegislatorHref();
-if (legHref) PAGES.push(legHref);
-const moneyHref = await moneyLegislatorHref();
-if (moneyHref) PAGES.push(moneyHref);
+await blockThirdPartyAssets(page);
 
 // phone width catches target-size and hidden-metadata issues that the
 // desktop pass structurally cannot see

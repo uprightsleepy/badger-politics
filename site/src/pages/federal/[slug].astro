@@ -14,7 +14,7 @@ import SourceStrip from "../../components/SourceStrip.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import { federalMembers, federalVotesFor, federalCongressStats } from "../../lib/db";
 import { fmtDate } from "../../lib/format";
-import { documentUrlFragment, congressLabel } from "../../lib/federal";
+import { castStyle, documentUrlFragment, congressLabel } from "../../lib/federal";
 
 export function getStaticPaths() {
   return federalMembers().map((m) => ({ params: { slug: m.slug }, props: { member: m } }));
@@ -30,13 +30,6 @@ const missed = byCongress.reduce((s, c) => s + c.missed, 0);
 const latest = votes[0]?.date ?? null;
 const sinceYear = byCongress.at(-1)?.first.slice(0, 4);
 const recent = votes.slice(0, 25);
-
-const castStyle = (cast: string) =>
-  ["Yea", "Aye", "Guilty"].includes(cast)
-    ? "bg-moss-50 text-moss-600"
-    : ["Nay", "No", "Not Guilty"].includes(cast)
-      ? "bg-badger-50 text-badger-700"
-      : "bg-navy-50 text-navy-600";
 ---
 
 <Base
@@ -114,12 +107,13 @@ const castStyle = (cast: string) =>
 
   <section class="mt-6">
     <h2 class="text-xl font-bold">Latest roll calls</h2>
-    <ul
-      class="scroll-body mt-2 max-h-[26rem] divide-y divide-navy-100 overflow-y-auto rounded-lg border border-navy-100 bg-white text-sm"
+    <div
+      class="scroll-body mt-2 max-h-[26rem] overflow-y-auto rounded-lg border border-navy-100 bg-white"
       role="region"
       tabindex="0"
       aria-label={`${member.name}'s latest roll calls, scrollable`}
     >
+    <ul class="divide-y divide-navy-100 text-sm">
       {recent.map((v) => (
         <li class="px-4 py-2">
           <div class="flex items-baseline gap-x-3">
@@ -147,6 +141,7 @@ const castStyle = (cast: string) =>
         </li>
       ))}
     </ul>
+    </div>
     <p class="mt-2 text-sm">
       <a href={`/federal/${member.slug}/votes/`} class="font-semibold underline">
         All {votes.length.toLocaleString()} roll calls since {sinceYear} &rarr;

@@ -10,9 +10,7 @@ election's files after certification, roughly every November of even years.
 import sys
 from pathlib import Path
 
-import requests
-
-from scraper.http import USER_AGENT
+from scraper.http import session
 
 DEST = Path(__file__).resolve().parents[1] / "_data" / "wec-results"
 
@@ -53,12 +51,13 @@ FILES = {
 
 def main(argv: list[str]) -> int:
     DEST.mkdir(parents=True, exist_ok=True)
+    http = session()
     for name, url in FILES.items():
         target = DEST / name
         if target.exists():
             print(f"{name}: already present")
             continue
-        response = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=120)
+        response = http.get(url, timeout=120)
         response.raise_for_status()
         if not response.content.startswith(b"PK"):  # xlsx = zip container
             raise RuntimeError(f"{url} did not return an xlsx")

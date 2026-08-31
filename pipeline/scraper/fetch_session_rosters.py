@@ -19,7 +19,7 @@ from pathlib import Path
 import requests
 from lxml import html as lxml_html
 
-from scraper.http import USER_AGENT
+from scraper.http import session
 
 DEST = Path(__file__).resolve().parents[1] / "_data" / "rosters"
 CHAMBERS = {"assembly": "lower", "senate": "upper"}
@@ -66,8 +66,7 @@ def fetch_year(session: requests.Session, year: int) -> list[dict]:
 
 def main(argv: list[str]) -> int:
     years = [int(a) for a in argv] if argv else DEFAULT_YEARS
-    http = requests.Session()
-    http.headers["User-Agent"] = USER_AGENT
+    http = session()
     DEST.mkdir(parents=True, exist_ok=True)
     for year in years:
         members = fetch_year(http, year)

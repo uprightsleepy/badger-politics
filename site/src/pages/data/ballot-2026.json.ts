@@ -13,18 +13,11 @@
 import type { APIRoute } from "astro";
 import { sittingPeople, electionFor, statewideRaces } from "../../lib/db";
 import { personSlug } from "../../lib/format";
-
-type Race = {
-  district: number;
-  onBallot: boolean;
-  incumbent: { name: string; party: string | null; slug: string } | null;
-  incumbentRunning: boolean;
-  candidates: { name: string; party: string | null }[];
-};
+import type { Ballot, Race } from "../../lib/wire";
 
 export const GET: APIRoute = () => {
-  const assembly: Record<string, Race> = {};
-  const senate: Record<string, Race> = {};
+  const assembly: Ballot["assembly"] = {};
+  const senate: Ballot["senate"] = {};
 
   for (const p of sittingPeople()) {
     const e = electionFor(p.id);
@@ -44,12 +37,13 @@ export const GET: APIRoute = () => {
   // Every voter in the state sees these, whatever their district.
   const statewide = statewideRaces()
     .filter((r) => r.ballot_status === "Approve")
-    .reduce<Record<string, { name: string; party: string | null }[]>>((acc, r) => {
+    .reduce<Ballot["statewide"]>((acc, r) => {
       (acc[r.office] ??= []).push({ name: r.candidate, party: r.party });
       return acc;
     }, {});
 
-  return new Response(JSON.stringify({ assembly, senate, statewide }), {
+  const ballot: Ballot = { assembly, senate, statewide };
+  return new Response(JSON.stringify(ballot), {
     headers: { "Content-Type": "application/json" },
   });
 };

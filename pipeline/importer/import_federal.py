@@ -25,6 +25,9 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 
+# the same rule that names state legislators' pages, accents folded
+from importer.person_slugs import slugify
+
 
 def text(el: ET.Element | None) -> str | None:
     if el is None or el.text is None:
@@ -82,10 +85,6 @@ def normalize_legis_num(raw: str | None) -> str | None:
 def parse_house_date(raw: str) -> str:
     """'3-Jun-2026' -> '2026-06-03'."""
     return datetime.strptime(raw, "%d-%b-%Y").date().isoformat()
-
-
-def slugify(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
 def import_roster(conn, data_dir: Path) -> None:

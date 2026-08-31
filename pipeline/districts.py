@@ -21,10 +21,9 @@ import math
 import sys
 from pathlib import Path
 
-import requests
 from shapely.geometry import Point, mapping, shape
 
-from scraper.http import USER_AGENT
+from scraper.http import session
 
 SERVICE = (
     "https://services1.arcgis.com/FDsAtKBk8Hy4cAH0/arcgis/rest/services/"
@@ -49,9 +48,7 @@ def fetch_raw() -> dict:
         # server-side generalization (~50 m) before our own simplification
         "maxAllowableOffset": "0.0005",
     }
-    response = requests.get(
-        SERVICE, params=params, headers={"User-Agent": USER_AGENT}, timeout=300
-    )
+    response = session().get(SERVICE, params=params, timeout=300)
     response.raise_for_status()
     data = response.json()
     if len(data.get("features", [])) != 99:

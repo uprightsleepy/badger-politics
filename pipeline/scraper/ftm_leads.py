@@ -18,13 +18,13 @@ from pathlib import Path
 import requests
 
 from scraper.crosscheck_ftm import (
-    USER_AGENT,
     fetch_cycle,
     ftm_get,
     ftm_total,
     norm,
     report_quota,
 )
+from scraper.http import session
 
 WORKLIST = Path(__file__).resolve().parents[2] / "docs" / "curation-worklist.md"
 
@@ -83,8 +83,7 @@ def main() -> int:
         cycles.append((2022, fetch_cycle(2022, ("S00",))))
     index = candidate_index(cycles)
 
-    http = requests.Session()
-    http.headers["User-Agent"] = USER_AGENT
+    http = session()
     lines = text.split("\n")
     out, i, annotated = [], 0, 0
     while i < len(lines):

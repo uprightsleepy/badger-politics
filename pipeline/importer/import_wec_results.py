@@ -185,10 +185,6 @@ def parse_all(path: Path):
     return leg_rows, sw_rows, county_rows
 
 
-def parse_workbook(path: Path) -> list[tuple[int, str, int, str, str | None, int, int]]:
-    return parse_all(path)[0]
-
-
 def parse_statewide(path: Path):
     """Returns (candidate rows incl. total_cast, county rows)."""
     _, sw_rows, county_rows = parse_all(path)

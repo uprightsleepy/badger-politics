@@ -55,13 +55,13 @@ const SENATE = Array.from({ length: 33 }, (_, i) => i + 1);
   )}
 
   <script>
-    import { savedDistrict } from "../../lib/district";
+    import { MINE_CLASS, savedDistrict } from "../../lib/district";
 
     // once districts are saved there's nothing left to find: show theirs
     const saved = savedDistrict();
     const finder = document.querySelector("[data-district-finder]");
     if (saved && finder) {
-      const chip = "bg-gold-100 rounded px-1 font-semibold underline";
+      const chip = `${MINE_CLASS} underline`;
       finder.innerHTML =
         `Yours: <a href="/districts/assembly-${saved.ad}/" class="${chip}">Assembly District ${saved.ad}</a>` +
         ` and <a href="/districts/senate-${saved.sd}/" class="${chip}">Senate District ${saved.sd}</a>.`;

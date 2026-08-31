@@ -23,7 +23,7 @@ from pathlib import Path
 
 import requests
 
-from scraper.http import USER_AGENT
+from scraper.http import session as http_session
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "federal"
 
@@ -62,8 +62,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--delay", type=float, default=0.3)
     ns = ap.parse_args(argv)
 
-    http = requests.Session()
-    http.headers["User-Agent"] = USER_AGENT
+    http = http_session()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     (DATA_DIR / "legislators-current.json").write_bytes(fetch(http, ROSTER_URL))
@@ -101,12 +100,11 @@ def main(argv: list[str]) -> int:
             n += 1
             dest = house / f"roll_{year}_{n:04d}.xml"
             url = HOUSE_URL.format(y=year, n=n)
+            # session() retries 5xx itself, so a transient error can never
+            # read as the year's end; only a real 404 ends the count
             response = http.get(url, timeout=60)
             if response.status_code == 404:
                 break  # past the year's last roll call
-            if response.status_code >= 500:
-                time.sleep(2)  # one retry: transient errors must not
-                response = http.get(url, timeout=60)  # fake a year's end
             response.raise_for_status()
             dest.write_bytes(response.content)
             fetched += 1

@@ -12,6 +12,7 @@ import SourceStrip from "../../components/SourceStrip.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import { federalMembers, federalVotesFor, federalLatestVoteDate } from "../../lib/db";
 import { fmtDate } from "../../lib/format";
+import { castStyle } from "../../lib/federal";
 
 const members = federalMembers();
 const senators = members.filter((m) => m.chamber === "senate");
@@ -59,15 +60,7 @@ const recentFor = (m: (typeof members)[number]) =>
               <ul class="mt-2 divide-y divide-navy-100 text-sm">
                 {recent.map((v) => (
                   <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1.5">
-                    <span
-                      class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
-                        v.vote_cast === "Yea"
-                          ? "bg-moss-50 text-moss-600"
-                          : v.vote_cast === "Nay"
-                            ? "bg-badger-50 text-badger-700"
-                            : "bg-navy-50 text-navy-600"
-                      }`}
-                    >
+                    <span class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${castStyle(v.vote_cast)}`}>
                       {v.vote_cast}
                     </span>
                     <span class="min-w-0 flex-1">{v.title ?? v.question}</span>

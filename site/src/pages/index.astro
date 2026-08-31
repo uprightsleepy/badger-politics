@@ -441,10 +441,11 @@ const sessionName = current.name ?? current.id;
   </script>
 
 <script>
-  import { savedDistrict } from "../lib/district";
-  import { districtAt, districtForAddress, saveDistrict } from "../lib/lookup";
+  import { savedDistrict, saveDistrict, forgetDistrict } from "../lib/district";
+  import { districtAt, districtForAddress } from "../lib/lookup";
   import { esc } from "../lib/html";
-  import { partyLetter, partyStyle } from "../lib/format";
+  import { partyChipHtml } from "../lib/format";
+  import type { RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
 
   // Returning visitors get their own two legislators on the front page.
   // Everything here is read from localStorage and a static JSON file; the
@@ -487,7 +488,7 @@ const sessionName = current.name ?? current.id;
 
   document.getElementById("home-addr-change")?.addEventListener("click", showPrompt);
   document.getElementById("home-addr-forget")?.addEventListener("click", () => {
-    localStorage.removeItem("bp-district");
+    forgetDistrict();
     document.getElementById("my-reps-home")?.classList.add("hidden");
     showPrompt();
     if (addrStatus) addrStatus.textContent = "Forgotten.";
@@ -535,18 +536,17 @@ const sessionName = current.name ?? current.id;
       fetch("/data/reps.json").then((r) => r.json()),
       fetch("/data/rep-summaries.json").then((r) => r.json()).catch(() => null),
     ])
-      .then(([reps, summaries]) => {
-        const seats: [string, string, any, any][] = [
+      .then(([reps, summaries]: [Reps, RepSummaries | null]) => {
+        const seats: [string, string, RepSlim | undefined, RepSummary | undefined][] = [
           [`Assembly District ${saved.ad}`, `/districts/assembly-${saved.ad}/`,
            reps.assembly?.[saved.ad], summaries?.assembly?.[saved.ad]],
           [`Senate District ${saved.sd}`, `/districts/senate-${saved.sd}/`,
            reps.senate?.[saved.sd], summaries?.senate?.[saved.sd]],
         ];
         const html = seats
-          .filter(([, , slim]) => slim)
           .map(([seat, districtHref, slim, full]) => {
-            const party = slim.party ?? null;
-            const uid = `pc-${String(slim.slug).replace(/[^a-z0-9]/gi, "")}`;
+            if (!slim) return "";
+            const uid = `pc-${slim.slug.replace(/[^a-z0-9]/gi, "")}`;
             const photo = slim.image
               ? `<img src="${esc(slim.image)}" alt="" width="56" height="56" loading="lazy" decoding="async" class="h-14 w-14 shrink-0 rounded-full border border-navy-100 bg-navy-50 object-cover object-[50%_25%]">`
               : `<svg viewBox="0 0 48 48" width="56" height="56" class="h-14 w-14 shrink-0 rounded-full border border-navy-100" role="img" aria-label="No official portrait on file for ${esc(slim.name)}">` +
@@ -579,7 +579,7 @@ const sessionName = current.name ?? current.id;
               `<a class="inline-block py-1 text-xs font-semibold uppercase tracking-wide text-navy-600 hover:underline" href="${esc(districtHref)}">${esc(seat)}</a>` +
               `<p class="mt-0.5"><a class="text-lg font-bold leading-tight hover:underline" href="/legislators/${esc(slim.slug)}/">${esc(slim.name)}</a></p>` +
               `</div>` +
-              `<span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${partyStyle(party)}" role="img" aria-label="${esc(party ?? "party unknown")}"><span aria-hidden="true">${esc(partyLetter(party))}</span></span>` +
+              partyChipHtml(slim.party, { dims: "h-6 w-6 text-xs" }) +
               `</div>${stats}${lastVote}</div>`
             );
           })

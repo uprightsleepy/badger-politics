@@ -4,23 +4,23 @@ import SourceStrip from "../../components/SourceStrip.astro";
 import FollowButton from "../../components/FollowButton.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import { existsSync } from "node:fs";
-import { allCommittees, committeeFor, committeeRecord } from "../../lib/db";
-import { chamberName, committeeSlug, personSlug, fmtDate, fmtTime, roleAbbr } from "../../lib/format";
+import { allCommittees, committeeFor } from "../../lib/db";
+import { committeeChamber, committeeSlug, personSlug, fmtDate, fmtTime, roleAbbr } from "../../lib/format";
 
 export function getStaticPaths() {
+  // the directory row already carries this page's two headline counts
   return allCommittees().map((c) => ({
     params: { id: committeeSlug(c.id) },
-    props: { committeeId: c.id },
+    props: { committeeId: c.id, record: { hearingsHeld: c.hearings_held, diedUnheard: c.died_here } },
   }));
 }
-const { committeeId } = Astro.props;
+const { committeeId, record } = Astro.props;
 const { committee, members, hearings, graveyard } = committeeFor(committeeId);
 // a committee only gets a hearings feed if it has ever held one; linking
 // a feed that does not exist is a 404 the link check rightly rejects
 const hasFeed = existsSync(
   new URL(`../../../public/feeds/committees/${committeeSlug(committee.id)}.xml`, import.meta.url),
 );
-const record = committeeRecord(committeeId);
 const today = new Date().toISOString().slice(0, 10);
 const upcoming = hearings.filter((h) => (h.date ?? "") >= today).reverse();
 const recent = hearings.filter((h) => (h.date ?? "") < today);
@@ -30,14 +30,14 @@ const roleLabel = (role: string) =>
 
 <Base
   title={committee.name}
-  filters={{ type: "Committee", chamber: chamberName(committee.chamber) || "Joint" }}
-  description={`${chamberName(committee.chamber) || "Joint"} committee: members, hearings, and bills that died here without a hearing.`}
+  filters={{ type: "Committee", chamber: committeeChamber(committee.chamber) }}
+  description={`${committeeChamber(committee.chamber)} committee: members, hearings, and bills that died here without a hearing.`}
   breadcrumbs={[{ name: "Committees", url: "/committees/" }]}
 >
   <p class="text-sm text-navy-600"><a href="/committees/" class="underline">Committees</a></p>
   <div class="mt-1 flex flex-wrap items-center gap-3">
     <h1 class="text-2xl font-bold">
-      {committee.chamber ? `${chamberName(committee.chamber)} ` : ""}{committee.name}
+      {committee.chamber ? `${committeeChamber(committee.chamber)} ` : ""}{committee.name}
     </h1>
     <span class="ml-auto flex items-center gap-3" data-pagefind-ignore>
       <FollowButton kind="committees" id={committeeSlug(committee.id)} />
@@ -51,8 +51,7 @@ const roleLabel = (role: string) =>
   </p>
   <SourceStrip sources={[{ label: "Wisconsin Legislature", href: "https://docs.legis.wisconsin.gov" }]} />
 
-  {record && (
-    <section class="mt-4 rounded-lg border border-navy-100 bg-white p-4">
+  <section class="mt-4 rounded-lg border border-navy-100 bg-white p-4">
       <h2 class="font-bold">What this committee did</h2>
       <p class="mt-1 max-w-3xl text-sm text-navy-600">
         Committees decide which bills get hearings. A chair alone decides
@@ -78,8 +77,7 @@ const roleLabel = (role: string) =>
           </p>
         </a>
       </div>
-    </section>
-  )}
+  </section>
 
   <div class="mt-4 grid gap-6 lg:grid-cols-2">
     <section class="min-w-0">

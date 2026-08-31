@@ -1,14 +1,8 @@
 ---
-import { partyStyle, partyLetter } from "../lib/format";
-// decorative: hide from screen readers where the party name sits in text
-// right beside the chip and would otherwise be announced twice
+/** The party chip; see partyChipHtml for the one place its markup lives. */
+import { partyChipHtml } from "../lib/format";
 interface Props { party: string | null; size?: "sm" | "md"; decorative?: boolean }
 const { party, size = "md", decorative = false } = Astro.props;
 const dims = size === "sm" ? "h-4 w-4 text-[0.625rem]" : "h-5 w-5 text-xs";
 ---
-<span
-  class={`inline-flex ${dims} shrink-0 items-center justify-center rounded-full font-bold ${partyStyle(party)}`}
-  role={decorative ? undefined : "img"}
-  aria-label={decorative ? undefined : (party ?? "party unknown")}
-  aria-hidden={decorative ? "true" : undefined}
-><span aria-hidden="true">{partyLetter(party)}</span></span>
+<Fragment set:html={partyChipHtml(party, { dims, decorative })} />

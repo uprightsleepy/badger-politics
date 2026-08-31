@@ -4,10 +4,10 @@
  * Same policy as the vote pages -- noindex, but crawlable, so old bills
  * keep a link path. */
 import Base from "../../../../layouts/Base.astro";
-import { people, personSponsorshipCount, personSponsorshipsPage } from "../../../../lib/db";
+import Pager from "../../../../components/Pager.astro";
+import { people, personSponsorshipCount, personSponsorships } from "../../../../lib/db";
 import { billSlug, chamberName, personSlug, roleAbbr, shortTitle } from "../../../../lib/format";
-
-const PER_PAGE = 200;
+import { PER_PAGE, pageBounds, pageCount } from "../../../../lib/paging";
 
 const ROLE_LABEL: Record<string, string> = {
   lead: "Lead author",
@@ -18,7 +18,7 @@ const ROLE_LABEL: Record<string, string> = {
 export function getStaticPaths() {
   return people().flatMap((p) => {
     const total = personSponsorshipCount(p.id);
-    const pages = Math.max(1, Math.ceil(total / 200));
+    const pages = pageCount(total);
     return Array.from({ length: pages }, (_, i) => ({
       params: { slug: personSlug(p.id), page: String(i + 1) },
       props: { person: p, page: i + 1, pages, total },
@@ -27,11 +27,10 @@ export function getStaticPaths() {
 }
 
 const { person, page, pages, total } = Astro.props;
-const rows = personSponsorshipsPage(person.id, PER_PAGE, (page - 1) * PER_PAGE);
+const rows = personSponsorships(person.id, PER_PAGE, (page - 1) * PER_PAGE);
 const base = `/legislators/${personSlug(person.id)}`;
 const seat = person.district != null ? `, ${roleAbbr(person.chamber)} ${person.district}` : "";
-const first = (page - 1) * PER_PAGE + 1;
-const last = Math.min(page * PER_PAGE, total);
+const { first, last } = pageBounds(page, total);
 ---
 
 <Base
@@ -67,19 +66,5 @@ const last = Math.min(page * PER_PAGE, total);
     ))}
   </ul>
 
-  {pages > 1 && (
-    <nav class="mt-4 flex flex-wrap items-center gap-3 text-sm" aria-label="Bill record pages">
-      {page > 1 && (
-        <a class="rounded-lg border border-navy-100 bg-white px-3 py-2 underline" href={`${base}/bills/${page - 1}/`}>
-          ← Newer
-        </a>
-      )}
-      <span class="text-navy-600">Page {page} of {pages}</span>
-      {page < pages && (
-        <a class="rounded-lg border border-navy-100 bg-white px-3 py-2 underline" href={`${base}/bills/${page + 1}/`}>
-          Older →
-        </a>
-      )}
-    </nav>
-  )}
+  <Pager page={page} pages={pages} href={(n) => `${base}/bills/${n}/`} label="Bill record pages" />
 </Base>

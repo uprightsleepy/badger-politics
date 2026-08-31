@@ -15,6 +15,7 @@
 import Base from "../../../layouts/Base.astro";
 import FilterBar from "../../../components/FilterBar.astro";
 import SourceStrip from "../../../components/SourceStrip.astro";
+import StanceChip from "../../../components/StanceChip.astro";
 import { independentExpenditures, conduitFlows } from "../../../lib/db";
 import { fmtMoney, fmtDate } from "../../../lib/format";
 
@@ -89,13 +90,7 @@ const facets = [
           <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(t.amount)}</span>
         </div>
         <p class="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:pl-[6.75rem]">
-          <span
-            class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
-              t.stance === "FOR" ? "bg-moss-50 text-moss-600" : "bg-badger-50 text-badger-700"
-            }`}
-          >
-            {t.stance === "FOR" ? "Supporting" : "Opposing"}
-          </span>
+          <StanceChip stance={t.stance} />
           <span class="min-w-0">{t.related_name}</span>
           {t.related_office && (
             <span class="text-xs text-navy-600">

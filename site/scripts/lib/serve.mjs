@@ -72,11 +72,15 @@ export const launchBrowser = async () => {
   return browser;
 };
 
-/** First legislator profile linked from the index, or null. */
-export const firstLegislatorHref = async () => {
-  const idx = await readFile(join(DIST, "legislators/index.html"), "utf-8").catch(() => "");
-  return idx.match(/href="(\/legislators\/[^"]+\/)"/)?.[1] ?? null;
+/** First href matching `pattern` on a built index page, or null. */
+export const firstHref = async (indexDir, pattern) => {
+  const html = await readFile(join(DIST, indexDir, "index.html"), "utf-8").catch(() => "");
+  return html.match(pattern)?.[1] ?? null;
 };
+
+/** First legislator profile linked from the index, or null. */
+export const firstLegislatorHref = () =>
+  firstHref("legislators", /href="(\/legislators\/[^"]+\/)"/);
 
 /** First legislator whose money card carries the quarterly chart, or null. */
 export const moneyLegislatorHref = async () => {
@@ -88,6 +92,33 @@ export const moneyLegislatorHref = async () => {
   return null;
 };
 
+/** The pages the layout and accessibility gates walk: one of every page
+ * type, plus the specific pages whose history has bitten. Static paths
+ * first; the dynamic ones are read off the built indexes so the list
+ * survives a data change. One list, so the two gates never drift apart. */
+const SAMPLE_PATHS = [
+  "/", "/404.html", "/about/", "/data/", "/following/", "/glossary/", "/testify/",
+  "/bills/", "/bills/2025/", "/bills/2025/ab656/", "/bills/2025/ab1/", "/bills/2025/sb23/",
+  "/votes/2025-av0001-ar1/", "/laws/", "/laws/2025/", "/vetoes/", "/partial-veto/",
+  "/governors-desk/", "/hearing-none/", "/hearing-none/2025/", "/subjects/",
+  "/legislators/", "/districts/", "/districts/senate-21/", "/committees/", "/federal/",
+  "/calendar/", "/my-reps/", "/elections/2026/", "/elections/2026/senate-5/",
+  "/money/", "/money/committees/", "/money/committees/651839/", "/money/independent/",
+  "/lobbying/",
+];
+export const samplePages = async () => {
+  const dynamic = await Promise.all([
+    firstHref("lobbying", /href="(\/lobbying\/\d+\/)"/),
+    firstHref("subjects", /href="(\/subjects\/[^"]+\/)"/),
+    firstHref("committees", /href="(\/committees\/[^"]+\/)"/),
+    firstHref("federal", /href="(\/federal\/[^"]+\/)"/),
+    // one legislator page with full cards, and one whose money card
+    // carries the timeline chart (coverage differs between the two)
+    firstLegislatorHref(),
+    moneyLegislatorHref(),
+  ]);
+  return [...SAMPLE_PATHS, ...new Set(dynamic.filter(Boolean))];
+};
 
 /** Keep a harness independent of third-party hosts.
  *
