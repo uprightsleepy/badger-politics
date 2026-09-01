@@ -123,6 +123,30 @@ def matter_url(links: dict, item: dict) -> str | None:
     return links.get(file.strip()) if file else None
 
 
+def title_case(text: str) -> str:
+    """'ALD. CHAMBERS JR.' -> 'Ald. Chambers Jr.'; numerals stay as they are."""
+    return " ".join(
+        w if w.strip(".") in {"II", "III", "IV"}
+        else re.sub(r"[A-Za-z]+", lambda m: m.group(0).capitalize(), w)
+        for w in text.split()
+    )
+
+
+def display_name(record: str, person: dict | None) -> str:
+    """The name shown. A record name that already reads as a name stays
+    ("Martin J. Weigel"); an abbreviated one ("ALD. A. PRATT") gives way to
+    the same record's first and last name, and where the tenant holds no
+    person record, to the abbreviation in title case ("Ald. A. Pratt")."""
+    record = " ".join(record.split())
+    if record != record.upper():
+        return record
+    first = " ".join(((person or {}).get("PersonFirstName") or "").split())
+    last = " ".join(((person or {}).get("PersonLastName") or "").split())
+    if first and last:
+        return f"{first} {last}"
+    return title_case(record)
+
+
 def import_members(
     conn: sqlite3.Connection, spec: dict, office: list[dict], curated: dict,
     profiles: dict, persons: dict,
@@ -140,7 +164,8 @@ def import_members(
     for person_id, records in sorted(by_person.items()):
         records.sort(key=lambda r: r.get("OfficeRecordStartDate") or "")
         latest = records[-1]
-        name = latest["OfficeRecordFullName"].strip()
+        record_name = latest["OfficeRecordFullName"].strip()
+        name = display_name(record_name, persons.get(str(person_id)))
         is_current = any((r.get("OfficeRecordEndDate") or "")[:10] >= today for r in records)
         # the seat: the tenant's own title, else the curated table
         seat = seat_basis = None
@@ -168,10 +193,10 @@ def import_members(
             counts["emails"] += email is not None
             counts["phones"] += phone is not None
         conn.execute(
-            "INSERT INTO local_members (tenant, person_id, name, slug, seat,"
+            "INSERT INTO local_members (tenant, person_id, name, record_name, slug, seat,"
             " seat_basis, member_type, is_current, image_url, image_basis, email, phone)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (tenant, person_id, name, slug, seat, seat_basis,
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (tenant, person_id, name, record_name, slug, seat, seat_basis,
              latest.get("OfficeRecordMemberType"), int(is_current),
              image, basis, email, phone),
         )
@@ -320,12 +345,12 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
                     # in the votes but not the body's office records: keep
                     # the tenant's own id and name, invent nothing
                     vote_only_members.add(person_id)
-                    names[person_id] = voter_names[person_id]
+                    names[person_id] = display_name(voter_names[person_id], None)
                     conn.execute(
-                        "INSERT INTO local_members (tenant, person_id, name, slug,"
-                        " seat, seat_basis, member_type, is_current)"
-                        " VALUES (?, ?, ?, ?, NULL, NULL, NULL, 0)",
-                        (tenant, person_id, names[person_id],
+                        "INSERT INTO local_members (tenant, person_id, name, record_name,"
+                        " slug, seat, seat_basis, member_type, is_current)"
+                        " VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, 0)",
+                        (tenant, person_id, names[person_id], voter_names[person_id],
                          f"{slugify(names[person_id]) or 'member'}-{person_id}"),
                     )
                 conn.execute(

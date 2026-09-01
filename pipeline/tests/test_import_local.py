@@ -125,7 +125,7 @@ def test_votes_join_on_the_tenants_person_id(tmp_path, make_db) -> None:
     # person 10 was known only from the vote record: kept, invented nothing
     name, seat, current = conn.execute(
         "SELECT name, seat, is_current FROM local_members WHERE person_id=10").fetchone()
-    assert (name, seat, current) == ("ALD. OTHER", None, 0)
+    assert (name, seat, current) == ("Ald. Other", None, 0)
     # unactioned items carry no action row; an item links only to the page
     # the meeting's own page lists for its file number (the API's matter
     # id is not InSite's), and an unlisted file links nowhere
@@ -266,3 +266,24 @@ def test_memberships_skip_the_council_and_past_seats(tmp_path, make_db) -> None:
     rows = conn.execute("SELECT body_name, role, body_url FROM local_memberships").fetchall()
     assert rows == [("LICENSES COMMITTEE", "Member",
                      "https://milwaukee.legistar.com/DepartmentDetail.aspx?ID=12345&GUID=G10")]
+
+
+def test_names_come_from_the_person_record_where_the_office_record_abbreviates(
+    tmp_path, make_db,
+) -> None:
+    conn = build(
+        tmp_path, make_db,
+        milwaukee_office=[office(9, "ALD. CHAMBERS JR.", "2nd District"),
+                          office(10, "ALD. O'DONNELL", "3rd District")],
+        westallis_office=[office(117, "Kevin Haass", "Ald.")],
+        persons={"milwaukee": {"9": {"PersonFirstName": "Mark",
+                                     "PersonLastName": "Chambers Jr."}}},
+    )
+    rows = dict(conn.execute(
+        "SELECT person_id, name || '|' || slug || '|' || record_name FROM local_members"
+    ).fetchall())
+    assert rows[9] == "Mark Chambers Jr.|mark-chambers-jr|ALD. CHAMBERS JR."
+    # no person record: the abbreviation itself, cased, never a guessed first name
+    assert rows[10] == "Ald. O'Donnell|ald-o-donnell|ALD. O'DONNELL"
+    # a record name that already reads as a name is kept as the tenant wrote it
+    assert rows[117] == "Kevin Haass|kevin-haass|Kevin Haass"

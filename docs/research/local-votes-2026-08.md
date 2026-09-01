@@ -328,6 +328,16 @@ rule, and a piece that fails its rule is left off rather than guessed.
   member whose early terms lack dates shows only the dated ones.
 - No party appears anywhere: council seats are nonpartisan, and the pages
   say so.
+- Names: Milwaukee's office records abbreviate ("ALD. A. PRATT",
+  "ALD. CHAMBERS JR."), while the same tenant's Persons record carries the
+  first and last name ("Andrea" / "Pratt", "Mark" / "Chambers Jr."). A
+  record name that already reads as a name (West Allis: "Martin J.
+  Weigel") is shown as written; an all-caps abbreviation gives way to the
+  person record's first and last name; with no person record (a member
+  known only from vote rows) the abbreviation is shown in title case. The
+  record's own string is kept as `record_name` and shown on the page when
+  it differs. Slugs follow the shown name, so the Milwaukee URLs changed
+  before any production release.
 
 ## Open questions for the owner
 

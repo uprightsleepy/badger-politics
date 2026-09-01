@@ -307,7 +307,9 @@ CREATE TABLE local_bodies (
 CREATE TABLE local_members (
     tenant      TEXT NOT NULL REFERENCES local_bodies (tenant),
     person_id   INTEGER NOT NULL,         -- the tenant's own id: the vote join key
-    name        TEXT NOT NULL,
+    name        TEXT NOT NULL,            -- as shown: the person record's full name
+                                          -- where the office record abbreviates
+    record_name TEXT,                     -- the office record's own string
     slug        TEXT NOT NULL,
     -- aldermanic district; NULL where not recorded (a presiding mayor, or
     -- a historical member with no curated seat)

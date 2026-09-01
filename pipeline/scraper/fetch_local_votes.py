@@ -162,7 +162,10 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
         r["OfficeRecordPersonId"] for r in office
         if (r.get("OfficeRecordEndDate") or "")[:10] >= today
     })
-    persons = {str(pid): call(http, tenant, f"Persons/{pid}", delay) for pid in sitting}
+    # every member's person record: the full name where the office record
+    # abbreviates it, and contacts for sitting members
+    people = sorted({r["OfficeRecordPersonId"] for r in office})
+    persons = {str(pid): call(http, tenant, f"Persons/{pid}", delay) for pid in people}
     (out / "persons.json").write_text(json.dumps(persons, indent=0), encoding="utf-8")
     memberships = {
         str(pid): call(

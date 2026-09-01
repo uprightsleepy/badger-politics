@@ -1604,7 +1604,7 @@ export const localBodies = once((): LocalBody[] =>
 );
 
 export interface LocalMember {
-  tenant: string; person_id: number; name: string; slug: string;
+  tenant: string; person_id: number; name: string; record_name: string | null; slug: string;
   seat: number | null; seat_basis: string | null; member_type: string | null;
   is_current: number; vote_count: number;
   image_url: string | null; image_basis: string | null;

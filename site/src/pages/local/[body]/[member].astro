@@ -53,6 +53,7 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
     data={{
       "@type": "Person",
       name: member.name,
+      alternateName: member.record_name && member.record_name !== member.name ? member.record_name : undefined,
       jobTitle: member.seat != null
         ? `Alderperson, District ${member.seat}`
         : member.member_type === "Chair" ? "Mayor" : "Council member",
@@ -75,6 +76,11 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
   <p class="mt-1 text-sm text-navy-700">
     {member.is_current ? role : `Former member, ${role}`}
     <span class="text-xs text-navy-600"> &middot; nonpartisan office</span>
+    {member.record_name && member.record_name !== member.name && (
+      <span class="text-xs text-navy-600">
+        {" "}&middot; listed as &ldquo;{member.record_name}&rdquo; in the council's records
+      </span>
+    )}
     {member.seat_basis && (
       <span class="text-xs text-navy-600">
         {" "}&middot; district per <a href={member.seat_basis} class="underline">the city's roster</a>
