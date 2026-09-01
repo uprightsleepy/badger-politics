@@ -353,6 +353,11 @@ rule, and a piece that fails its rule is left off rather than guessed.
   cast the only No; "motions they moved" are items whose record names
   the member as mover (`EventItemMoverId`, present on 99% of acted
   items, kept with the seconder).
+- A presiding officer's page (the West Allis mayor) leads with
+  tie-breaking votes: Aye/No cast while the other voters split evenly,
+  recounted from the vote rows (6 on record, all Aye on 5-5 splits). His
+  other 49 Ayes joined an already unanimous council and the rest is
+  Non-Voting, which the page now says outright.
 - Term end from the office record; every sitting member's term ends in
   April 2028, and the seat is filled at that April's spring election.
 - A paged full vote record at 200 a page, noindex like a legislator's,
