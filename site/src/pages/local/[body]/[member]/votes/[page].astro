@@ -66,7 +66,7 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
           ) : (
             <span class="shrink-0 font-semibold">{v.matter_file ?? "item"}</span>
           )}
-          <span class="min-w-0 flex-1 break-words">{v.title}</span>
+          <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title}</span>
         </div>
         <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{v.action}</p>
       </li>

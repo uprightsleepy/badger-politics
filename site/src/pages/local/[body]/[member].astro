@@ -256,7 +256,7 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
                 ) : (
                   <span class="shrink-0 font-bold">{v.matter_file ?? "item"}</span>
                 )}
-                <span class="min-w-0 flex-1 break-words">{v.title}</span>
+                <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title}</span>
                 <span class="shrink-0 text-xs font-semibold tabular-nums">
                   <span class="text-moss-600">{v.ayes} Aye</span> &ndash; <span class="text-badger-700">1 No</span>
                 </span>
@@ -290,7 +290,7 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
                 ) : (
                   <span class="shrink-0 font-bold">{v.matter_file ?? "item"}</span>
                 )}
-                <span class="min-w-0 flex-1 break-words">{v.title}</span>
+                <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title}</span>
                 <span class="shrink-0 text-xs font-semibold tabular-nums">
                   <span class="text-moss-600">{v.ayes} Aye</span> &ndash; <span class="text-badger-700">{v.noes} No</span>
                 </span>
@@ -321,7 +321,7 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
               ) : (
                 <span class="w-28 shrink-0 truncate font-semibold">{m.matter_file ?? "item"}</span>
               )}
-              <span class="min-w-0 flex-1 truncate">{m.title}</span>
+              <span class="order-last min-w-0 basis-full truncate sm:order-none sm:flex-1">{m.title}</span>
               <span class="shrink-0 text-xs text-navy-600">{m.action}</span>
             </li>
           ))}
@@ -350,7 +350,7 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
             ) : (
               <span class="w-28 shrink-0 truncate font-semibold">{v.matter_file ?? "item"}</span>
             )}
-            <span class="min-w-0 flex-1 truncate">{v.title}</span>
+            <span class="order-last min-w-0 basis-full truncate sm:order-none sm:flex-1">{v.title}</span>
           </li>
         ))}
       </ul>

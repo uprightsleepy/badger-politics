@@ -107,7 +107,7 @@ const districts = [...new Set(seated.map((m) => m.seat!))].sort((a, b) => a - b)
               ) : (
                 <span class="shrink-0 font-bold">{a.matter_file ?? "item"}</span>
               )}
-              <span class="min-w-0 flex-1 break-words">{a.title}</span>
+              <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{a.title}</span>
               <span class="shrink-0 font-semibold tabular-nums">
                 <span class="text-moss-600">{a.ayes} Aye</span> &ndash; <span class="text-badger-700">{a.noes} No</span>
               </span>
