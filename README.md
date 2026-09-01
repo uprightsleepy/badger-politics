@@ -23,7 +23,7 @@ and served as a fully static site.
 | Campaign Money | Receipts to sitting legislators windowed to their time in office, contributing committees, and outside spending filing by filing with the Ethics Commission's transaction IDs and report links |
 | Lobbying | Registrations by organization and by bill (an interest, never a for-or-against position) |
 | Federal Delegation | Both U.S. senators and all eight House members, with every floor roll call from the Senate's and House Clerk's own XML (Senate from the 112th Congress, House from 2005) |
-| City Councils | Milwaukee and West Allis Common Council votes, member by member, with divided votes surfaced and every item linking the clerk's own record; the address lookup adds the reader's alderpersons |
+| City Councils | Milwaukee and West Allis Common Council votes, member by member, with divided votes surfaced and every item linking the clerk's own record; each member page carries the portrait, office contacts, committee assignments, service dates, a follow button, an Atom feed and JSON, like a legislator's; the address lookup adds the reader's alderpersons |
 | 2026 Ballot | Statewide offices and every legislative seat, with a personal "what is on my ballot" view from the saved district |
 | Following | Device-only follows for bills, legislators, committees, districts and races, with what changed since the last visit |
 | Data and API | Static JSON API, Atom feeds, iCal calendars, bulk CSV and a provenance-filtered SQLite snapshot, all keyless |
@@ -73,6 +73,7 @@ snapshot CI releases from.
 | Council votes | Legistar Web API (`milwaukee`, `westalliswi` tenants) | meetings cached permanently once minutes are Final; votes keyed by each tenant's own person id |
 | Aldermanic district boundaries | Milwaukee open data portal (CC BY shapefile); West Allis city GIS server | one-time generator (`importer/local_shapes.py`), committed GeoJSON; the robots-disallowed city map host is not used |
 | West Allis seat roster | the city's own district pages | ten-row curated table (`importer/local_seats.json`), each entry with its basis URL |
+| Council member portraits, contacts, committees | the cities' own district pages (city.milwaukee.gov, westalliswi.gov, both `Allow: /`); Legistar Persons, OfficeRecords and each tenant's public Departments listing | a portrait attaches only when the city's page labels it with the member's district (Milwaukee) or name (West Allis); an email or phone only when exactly one is on record; committee links by exact body name against the tenant's own listing, plain text otherwise |
 | Cross-check only | FollowTheMoney API (CC BY-NC-SA) | verification input, never imported or republished |
 | Org logos | logo.dev (`LOGO_DEV_TOKEN`) | build-time fetch for hand-verified org domains only |
 
@@ -156,8 +157,9 @@ snapshot is written):
   Wisconsin-only, and the delegation holds ten members.
 - Council votes: every vote traces to the tenant's own member id and
   vocabulary, every meeting and item links its public page, every sitting
-  member has a seat, and a tenant with no dissenting vote on record fails
-  (a fetch that stopped at consent items).
+  member has a seat, every committee assignment names a known member, and
+  a tenant with no dissenting vote on record fails (a fetch that stopped
+  at consent items).
 - CFIS: every fetched month reconciles exactly against the server's own
   transaction count (the newest month retries, and accepts a stable
   mismatch only when a plain-view diff proves every omitted row is

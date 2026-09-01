@@ -62,6 +62,6 @@ export type LocalReps = Record<
     city: string;
     slug: string;
     council: string;
-    districts: Record<string, { name: string; slug: string }[]>;
+    districts: Record<string, { name: string; slug: string; image: string | null }[]>;
   }
 >;

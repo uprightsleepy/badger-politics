@@ -5,7 +5,10 @@
 import Base from "../../../layouts/Base.astro";
 import SourceStrip from "../../../components/SourceStrip.astro";
 import ScrollPanel from "../../../components/ScrollPanel.astro";
-import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, localMemberDividedVotes, localMemberTerms } from "../../../lib/db";
+import Portrait from "../../../components/Portrait.astro";
+import FollowButton from "../../../components/FollowButton.astro";
+import JsonLd from "../../../components/JsonLd.astro";
+import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, localMemberDividedVotes, localMemberTerms, localMemberships } from "../../../lib/db";
 import { fmtDate } from "../../../lib/format";
 
 const RECENT = 300;
@@ -22,6 +25,8 @@ const stats = localMemberVoteStats(body.tenant, member.person_id);
 const votes = localMemberVotes(body.tenant, member.person_id, RECENT);
 const dividedVotes = localMemberDividedVotes(body.tenant, member.person_id);
 const terms = localMemberTerms(body.tenant, member.person_id);
+const committees = member.is_current ? localMemberships(body.tenant, member.person_id) : [];
+const followId = `${body.slug}/${member.slug}`;
 const role = member.seat != null
   ? `${body.city} Common Council, District ${member.seat}`
   : member.member_type === "Chair"
@@ -44,29 +49,106 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
     { name: body.name, url: `/local/${body.slug}/` },
   ]}
 >
+  <JsonLd
+    data={{
+      "@type": "Person",
+      name: member.name,
+      jobTitle: member.seat != null
+        ? `Alderperson, District ${member.seat}`
+        : member.member_type === "Chair" ? "Mayor" : "Council member",
+      email: member.email ?? undefined,
+      telephone: member.phone ?? undefined,
+      image: member.image_url ?? undefined,
+      memberOf: { "@type": "GovernmentOrganization", name: body.name },
+    }}
+  />
   <p class="text-sm text-navy-600">
     <a href={`/local/${body.slug}/`} class="underline">&larr; {body.name}</a>
   </p>
-  <h1 class="mt-1 text-2xl font-bold">{member.name}</h1>
+  <div class="mt-1 flex flex-wrap items-center gap-3">
+    <h1 class="text-2xl font-bold">{member.name}</h1>
+    <span class="ml-auto flex items-center gap-3" data-pagefind-ignore>
+      <FollowButton kind="council" id={followId} />
+      <a href={`/feeds/local/${followId}.xml`} class="text-xs underline">Atom feed</a>
+    </span>
+  </div>
   <p class="mt-1 text-sm text-navy-700">
     {member.is_current ? role : `Former member, ${role}`}
+    <span class="text-xs text-navy-600"> &middot; nonpartisan office</span>
     {member.seat_basis && (
       <span class="text-xs text-navy-600">
         {" "}&middot; district per <a href={member.seat_basis} class="underline">the city's roster</a>
       </span>
     )}
   </p>
-  {terms.length > 0 && (
-    <p class="mt-0.5 text-xs text-navy-600">
-      Serving {fmtDate(terms[0].start)}{terms.at(-1)!.end ? ` to ${fmtDate(terms.at(-1)!.end)}` : " to present"}, per the council's own records.
-    </p>
-  )}
   <SourceStrip
     sources={[{ label: `${body.name} records (Legistar)`, href: body.insite_url }]}
     through={stats.last}
   />
 
-  <dl class="mt-4 grid max-w-2xl gap-x-6 gap-y-3 rounded-lg border border-navy-100 bg-white p-4 text-sm sm:grid-cols-3">
+  <div class="mt-4 flex flex-col gap-6 md:flex-row">
+    <aside class="w-full shrink-0 md:w-64" aria-label={`About ${member.name}`}>
+      <div class="rounded-lg border border-navy-100 bg-white p-4">
+        <Portrait src={member.image_url} name={member.name} size={120} className="mb-3 rounded" />
+        {member.image_basis && (
+          <p class="text-xs text-navy-600">
+            Official portrait from <a href={member.image_basis} class="underline">the city's page</a>.
+          </p>
+        )}
+        {terms.length > 0 && (
+          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
+            <h2 class="font-bold">Service</h2>
+            {terms.map((t) => (
+              <p class="mt-1">
+                {t.title ?? "Member"}: {fmtDate(t.start)} to {t.end ? fmtDate(t.end) : "present"}
+              </p>
+            ))}
+            <p class="mt-1 text-xs text-navy-600">From the council's own office records.</p>
+          </div>
+        )}
+        {member.is_current && (member.email || member.phone) && (
+          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
+            <h2 class="font-bold">Contact</h2>
+            {member.email && (
+              <p class="mt-1 break-all">
+                <a href={`mailto:${member.email}`} class="underline">{member.email}</a>
+              </p>
+            )}
+            {member.phone && (
+              <p class="mt-1">
+                <a href={`tel:${member.phone.replace(/\D/g, "")}`} class="underline">{member.phone}</a>
+              </p>
+            )}
+            <p class="mt-1 text-xs text-navy-600">
+              Official office contacts, from the council's records and the city's page for the district.
+            </p>
+          </div>
+        )}
+        {committees.length > 0 && (
+          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
+            <h2 class="font-bold">Committees · {committees.length}</h2>
+            <ul class="mt-1 space-y-1">
+              {committees.map((c) => (
+                <li>
+                  {c.body_url ? (
+                    <a href={c.body_url} class="underline">{c.body_name}</a>
+                  ) : (
+                    c.body_name
+                  )}
+                  {c.role && c.role !== "Member" && (
+                    <span class="ml-1 rounded-full bg-gold-100 px-1.5 py-0.5 text-xs font-semibold">{c.role}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p class="mt-1 text-xs text-navy-600">Current assignments, from the council's own records.</p>
+          </div>
+        )}
+      </div>
+    </aside>
+
+    <div class="min-w-0 flex-1">
+  <dl class="grid max-w-2xl gap-x-6 gap-y-3 rounded-lg border border-navy-100 bg-white p-4 text-sm sm:grid-cols-3">
     <div>
       <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Recorded votes</dt>
       <dd class="mt-0.5 text-xl font-bold tabular-nums">{stats.total.toLocaleString()}</dd>
@@ -139,4 +221,6 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
       </ul>
     </ScrollPanel>
   </section>
+    </div>
+  </div>
 </Base>

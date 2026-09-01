@@ -268,6 +268,44 @@ quirks: 3,794 rows list a member with no value (skipped, counted) and
 18 identical repeats (kept once). West Allis records no attendance roll
 calls, so its member pages carry votes only.
 
+## Parity with the legislator profiles (2026-08-31, built)
+
+Council member pages now carry what the legislator pages carry: a
+portrait, office contacts, committee assignments, service dates, a follow
+button, an Atom feed and a JSON record. Each piece has one source and one
+rule, and a piece that fails its rule is left off rather than guessed.
+
+- Portraits and contacts come from the cities' own district pages
+  (`city.milwaukee.gov/CommonCouncil/...` and
+  `westalliswi.gov/page/district-{one..five}`; both sites' robots.txt say
+  `Allow: /`, and the West Allis `Disallow: /api/` path is not touched),
+  fetched once a night by `scraper/fetch_local_profiles.py` under the
+  project User-Agent. A Milwaukee photo attaches only when exactly one
+  image on the district's page is captioned with that district; a West
+  Allis photo only when the page's entry heading is the member's own
+  name. An email attaches only when its local part carries the member's
+  surname and the page holds exactly one; a phone only when exactly one
+  remains after the number printed on every district page (the council's
+  main line) is set aside. Milwaukee's page hrefs are obfuscated by its
+  CDN, so an address is read from the link's `title` attribute, which only
+  one district page exposes. Result: Milwaukee 14 of 15 portraits
+  (District 9's page has none), 9 emails, 5 phones; West Allis 10 of 11
+  portraits, 11 emails, 10 phones (the mayor's contacts come from the
+  tenant's Persons record).
+- Committees are every current OfficeRecord for a sitting member besides
+  the council itself. InSite's page ids and GUIDs for a body differ from
+  the API's BodyId and BodyGuid (0 of 100 matched, all 100 names did), so
+  the link is by exact name against the tenant's own `Departments.aspx`
+  listing. That grid shows 100 rows a page; later pages come through the
+  plain form postback each page link carries for browsers without JS
+  (one extra request per tenant a night). 89 of 92 Milwaukee seats and 68
+  of 70 West Allis seats link; the rest name bodies the listing no longer
+  carries and show as plain text.
+- Service dates are the council's office records as held, so a Milwaukee
+  member whose early terms lack dates shows only the dated ones.
+- No party appears anywhere: council seats are nonpartisan, and the pages
+  say so.
+
 ## Open questions for the owner
 
 1. Scope of the first build: both city councils plus the county board, or
@@ -290,4 +328,6 @@ calls, so its member pages carry votes only.
 - Milwaukee aldermanic districts: `https://milwaukeemaps.milwaukee.gov/arcgis/rest/services/election/alderman/MapServer/0`; `https://data.milwaukee.gov/dataset/aldermanic-districts` (CC BY)
 - West Allis aldermanic districts and wards: `https://gis.westalliswi.gov/server/rest/services/Political_Layers_MIL1/MapServer/{4,5}`
 - West Allis council roster: `https://www.westalliswi.gov/page/district-one` through `district-five`, `https://www.westalliswi.gov/page/contact-your-alderperson`
+- Milwaukee council district pages (portraits, contacts): `https://city.milwaukee.gov/CommonCouncil/Council-Members/District{1..15}`
+- InSite body listings (committee links): `https://milwaukee.legistar.com/Departments.aspx`, `https://westalliswi.legistar.com/Departments.aspx`
 - West Allis meeting records index: `https://www.westalliswi.gov/page/common-council-agendas-minutes`

@@ -54,12 +54,21 @@ def write_tenant(root: Path, tenant: str, officerecords, events) -> None:
 
 
 def build(tmp_path: Path, make_db, milwaukee_events=(), westallis_events=(),
-          milwaukee_office=(), westallis_office=()):
+          milwaukee_office=(), westallis_office=(), profiles=None, persons=None,
+          memberships=None, bodies=None):
     db = tmp_path / "wi.sqlite"
     make_db(db).close()
     local = tmp_path / "local"
     write_tenant(local, "milwaukee", list(milwaukee_office), list(milwaukee_events))
     write_tenant(local, "westalliswi", list(westallis_office), list(westallis_events))
+    if profiles is not None:
+        (local / "profiles.json").write_text(json.dumps(profiles), encoding="utf-8")
+    for tenant, data in (persons or {}).items():
+        (local / tenant / "persons.json").write_text(json.dumps(data), encoding="utf-8")
+    for tenant, data in (memberships or {}).items():
+        (local / tenant / "memberships.json").write_text(json.dumps(data), encoding="utf-8")
+    for tenant, data in (bodies or {}).items():
+        (local / tenant / "departments.json").write_text(json.dumps(data), encoding="utf-8")
     run(local, db)
     import sqlite3
     return sqlite3.connect(db)
@@ -157,3 +166,93 @@ def test_meta_carries_the_local_data_edge(tmp_path, make_db) -> None:
                  milwaukee_events=[ev])
     assert conn.execute(
         "SELECT value FROM meta WHERE key='local_votes_through'").fetchone()[0] == "2026-07-31"
+
+
+def test_milwaukee_portrait_and_contacts_attach_only_by_exact_rule(tmp_path, make_db) -> None:
+    profiles = {"milwaukee": {"seats": {"3": {
+        "page": "https://city.milwaukee.gov/CommonCouncil/Council-Members/District3",
+        "photos": [
+            {"src": "https://city.milwaukee.gov/x/Brower.jpg",
+             "alt": "Photo of Alex Brower District 3 Alderman"},
+            {"src": "https://city.milwaukee.gov/x/Other.jpg",
+             "alt": "Photo of District 4 Alderman"},
+        ],
+        "mailto": ["Alex.Brower@milwaukee.gov", "staffer@milwaukee.gov"],
+        "tel": ["4142862489"],
+    }}}}
+    conn = build(tmp_path, make_db,
+                 milwaukee_office=[office(3906, "ALD. BROWER", "3rd District")],
+                 profiles=profiles)
+    row = conn.execute(
+        "SELECT image_url, email, phone FROM local_members WHERE person_id=3906").fetchone()
+    assert row == ("https://city.milwaukee.gov/x/Brower.jpg", "Alex.Brower@milwaukee.gov",
+                   "414-286-2489")
+
+
+def test_a_phone_on_every_district_page_is_the_templates(tmp_path, make_db) -> None:
+    page = {"page": "p", "mailto": [], "photos": []}
+    profiles = {"milwaukee": {"seats": {
+        "3": page | {"tel": ["4142862489"]},
+        "5": page | {"tel": ["4142862489", "4143012195"]},
+    }}}
+    conn = build(tmp_path, make_db,
+                 milwaukee_office=[office(3906, "ALD. BROWER", "3rd District"),
+                                   office(3693, "ALD. WESTMORELAND", "5th District")],
+                 profiles=profiles)
+    phones = dict(conn.execute("SELECT person_id, phone FROM local_members").fetchall())
+    assert phones == {3906: None, 3693: "414-301-2195"}
+
+
+def test_two_matching_headshots_attach_none(tmp_path, make_db) -> None:
+    profiles = {"milwaukee": {"seats": {"3": {
+        "page": "p", "mailto": [], "tel": ["4142862489", "4142860000"],
+        "photos": [{"src": "a.jpg", "alt": "Photo of District 3 A"},
+                   {"src": "b.jpg", "alt": "Photo of District 3 B"}],
+    }}}}
+    conn = build(tmp_path, make_db,
+                 milwaukee_office=[office(3906, "ALD. BROWER", "3rd District")],
+                 profiles=profiles)
+    row = conn.execute(
+        "SELECT image_url, phone FROM local_members WHERE person_id=3906").fetchone()
+    assert row == (None, None)
+
+
+def test_west_allis_portrait_by_heading_and_email_from_the_record(tmp_path, make_db) -> None:
+    profiles = {"westalliswi": {"districts": {"5": {
+        "page": "https://www.westalliswi.gov/page/district-five",
+        "entries": [
+            {"heading": "Kevin Haass - Council President", "image": "https://cdn/haass.jpg",
+             "emails": [], "phones": ["4143028220"]},
+            {"heading": "Martin J. Weigel", "image": "https://cdn/weigel.jpg",
+             "emails": [], "phones": []},
+        ],
+    }}}}
+    persons = {"westalliswi": {"117": {"PersonEmail": "khaass@westalliswi.gov", "PersonPhone": ""}}}
+    conn = build(tmp_path, make_db,
+                 westallis_office=[office(117, "Kevin Haass", "Ald.")],
+                 profiles=profiles, persons=persons)
+    assert conn.execute(
+        "SELECT image_url, email, phone FROM local_members WHERE person_id=117").fetchone() == (
+        "https://cdn/haass.jpg", "khaass@westalliswi.gov", "414-302-8220")
+
+
+def test_memberships_skip_the_council_and_past_seats(tmp_path, make_db) -> None:
+    memberships = {"milwaukee": {"3906": [
+        office(3906, "ALD. BROWER", "3rd District")
+        | {"OfficeRecordBodyName": "COMMON COUNCIL", "OfficeRecordBodyId": 1},
+        office(3906, "ALD. BROWER", "Member")
+        | {"OfficeRecordBodyName": "LICENSES COMMITTEE", "OfficeRecordBodyId": 10},
+        office(3906, "ALD. BROWER", "Member", end="2020-01-01T00:00:00")
+        | {"OfficeRecordBodyName": "OLD BOARD", "OfficeRecordBodyId": 99},
+    ]}}
+    # InSite's page ids differ from the API's; the link is by exact body name
+    bodies = {"milwaukee": [
+        {"name": "LICENSES COMMITTEE",
+         "url": "https://milwaukee.legistar.com/DepartmentDetail.aspx?ID=12345&GUID=G10"},
+    ]}
+    conn = build(tmp_path, make_db,
+                 milwaukee_office=[office(3906, "ALD. BROWER", "3rd District")],
+                 memberships=memberships, bodies=bodies)
+    rows = conn.execute("SELECT body_name, role, body_url FROM local_memberships").fetchall()
+    assert rows == [("LICENSES COMMITTEE", "Member",
+                     "https://milwaukee.legistar.com/DepartmentDetail.aspx?ID=12345&GUID=G10")]

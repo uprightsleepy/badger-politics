@@ -7,10 +7,10 @@ import type { LocalReps } from "../../lib/wire";
 export const GET: APIRoute = () => {
   const out: LocalReps = {};
   for (const body of localBodies()) {
-    const districts: Record<string, { name: string; slug: string }[]> = {};
+    const districts: Record<string, { name: string; slug: string; image: string | null }[]> = {};
     for (const m of localMembers(body.tenant)) {
       if (!m.is_current || m.seat == null) continue;
-      (districts[String(m.seat)] ??= []).push({ name: m.name, slug: m.slug });
+      (districts[String(m.seat)] ??= []).push({ name: m.name, slug: m.slug, image: m.image_url });
     }
     out[body.tenant] = {
       city: body.city,

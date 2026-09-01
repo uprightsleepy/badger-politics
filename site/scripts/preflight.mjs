@@ -129,6 +129,15 @@ if (hasLocal) {
   } else {
     pass(`council member pages: ${built} built for ${expected} members`);
   }
+  let feeds = 0;
+  for (const bodyDir of (await subdirs("feeds", "local")) ?? []) {
+    feeds += (await readdir(join(DIST, "feeds", "local", bodyDir)).catch(() => [])).length;
+  }
+  if (feeds < expected) {
+    fail(`council member feeds: ${feeds} files in feeds/local, expected ${expected}`);
+  } else {
+    pass(`council member feeds: ${feeds} files`);
+  }
 }
 
 // --- the search index has to match the build it shipped with ---------------

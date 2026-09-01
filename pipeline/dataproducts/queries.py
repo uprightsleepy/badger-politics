@@ -243,3 +243,42 @@ def hearings(conn: sqlite3.Connection) -> list[dict]:
     for row in rows:
         row["agenda_bills"] = json.loads(row.pop("agenda_bill_ids_json") or "[]")
     return rows
+
+
+def _has_table(conn: sqlite3.Connection, name: str) -> bool:
+    return bool(conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
+    ).fetchone())
+
+
+def local_bodies(conn: sqlite3.Connection) -> list[dict]:
+    """Covered city councils; empty when the enrichment tables are absent."""
+    if not _has_table(conn, "local_bodies"):
+        return []
+    return _rows(conn, "SELECT * FROM local_bodies ORDER BY city")
+
+
+def local_members(conn: sqlite3.Connection, tenant: str) -> list[dict]:
+    return _rows(
+        conn,
+        """SELECT m.*, (SELECT COUNT(*) FROM local_votes v
+                        WHERE v.tenant = m.tenant AND v.person_id = m.person_id) AS vote_count
+           FROM local_members m WHERE m.tenant = ? ORDER BY m.seat, m.name""",
+        (tenant,),
+    )
+
+
+def local_member_votes(
+    conn: sqlite3.Connection, tenant: str, person_id: int, limit: int = 100
+) -> list[dict]:
+    return _rows(
+        conn,
+        """SELECT v.value, a.event_item_id, a.matter_file, a.title, a.action,
+                  a.matter_url, e.date, e.insite_url
+           FROM local_votes v
+           JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
+           JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
+           WHERE v.tenant = ? AND v.person_id = ?
+           ORDER BY e.date DESC, a.event_item_id DESC LIMIT ?""",
+        (tenant, person_id, limit),
+    )

@@ -17,8 +17,8 @@ import Base from "../layouts/Base.astro";
 
   <div id="follow-empty" hidden class="mt-4 max-w-3xl rounded-lg border border-navy-100 bg-white p-4 text-sm">
     You aren't following anything yet. Use the Follow button on any bill,
-    legislator, committee, district or race page, then check back here to
-    see what changed.
+    legislator, council member, committee, district or race page, then
+    check back here to see what changed.
   </div>
 
   {
@@ -28,6 +28,7 @@ import Base from "../layouts/Base.astro";
       ["committees", "Committees"],
       ["races", "2026 races"],
       ["districts", "Districts"],
+      ["council", "City council members"],
     ].map(([kind, label]) => (
       <section id={`follow-${kind}-section`} hidden class="mt-6">
         <h2 class="text-xl font-bold">{label}</h2>
@@ -120,6 +121,23 @@ import Base from "../layouts/Base.astro";
          ${unfollow("races", id)}`);
     }
 
+    async function councilRow(id: string, seen: string | null) {
+      // id is "body-slug/member-slug"; the JSON record carries the latest votes
+      try {
+        const m = await (await fetch(`/api/v1/local/${id}.json`)).json();
+        const last = m.votes?.[0];
+        const changed = !!(seen && last?.date && last.date > seen);
+        return { changed, html: row(changed,
+          `<a href="/local/${esc(id)}/" class="min-w-0 flex-1 truncate py-1 font-semibold underline">${esc(m.name ?? id)}</a>
+           ${changed ? changedBadge : ""}
+           ${last ? `<span class="shrink-0 text-xs text-navy-600">last vote ${esc(last.date)} on ${esc(last.matter_file ?? "an item")}</span>` : ""}
+           ${unfollow("council", id)}`) };
+      } catch {
+        return { changed: false, html: row(false,
+          `<a href="/local/${esc(id)}/" class="py-1 underline">View record</a>${unfollow("council", id)}`) };
+      }
+    }
+
     const districtRow = (id: string) =>
       row(false,
         `<a href="/districts/${esc(id)}/" class="min-w-0 flex-1 truncate py-1 font-semibold underline">${esc(seatName(id))}</a>
@@ -149,6 +167,7 @@ import Base from "../layouts/Base.astro";
       await fill("committees", await Promise.all(follows.committees.map((id) => committeeRow(id, seen))));
       await fill("races", follows.races.map((id) => raceRow(id, ballot)));
       await fill("districts", follows.districts.map(districtRow));
+      await fill("council", await Promise.all(follows.council.map((id) => councilRow(id, seen))));
 
       const note = document.getElementById("follow-changed-note")!;
       note.hidden = !seen || changedCount === 0;

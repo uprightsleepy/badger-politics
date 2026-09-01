@@ -55,7 +55,7 @@ export default defineConfig({
         if (/^\/(bills|votes)\//.test(path)) {
           return { ...item, changefreq: "weekly", priority: 0.8 };
         }
-        if (/^\/(legislators|committees|districts|money|lobbying)\//.test(path)) {
+        if (/^\/(legislators|committees|districts|money|lobbying|local|federal)\//.test(path)) {
           return { ...item, changefreq: "weekly", priority: 0.7 };
         }
         return { ...item, changefreq: "monthly", priority: 0.5 };

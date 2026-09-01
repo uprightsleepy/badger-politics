@@ -8,6 +8,8 @@ Layout (all CDN-served static files):
   /api/v1/votes/{vote_id}.json           full roll call
   /api/v1/legislators/index.json
   /api/v1/legislators/{person_id}.json   profile + election + sponsorships + votes
+  /api/v1/local/{body}/index.json        a city council's members
+  /api/v1/local/{body}/{member}.json     one member + their latest votes
 """
 
 from __future__ import annotations
@@ -172,5 +174,30 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
         }
         write_json(api / "legislators" / f"{person_slug(person['id'])}.json", payload)
         files += 1
+
+    # city councils: the same record-first shape, keyed by the tenant's ids
+    for body in queries.local_bodies(conn):
+        members = queries.local_members(conn, body["tenant"])
+        write_json(
+            api / "local" / body["slug"] / "index.json",
+            {
+                "body": body,
+                "members": [
+                    {k: m[k] for k in ("person_id", "name", "slug", "seat", "is_current",
+                                       "image_url", "vote_count")}
+                    for m in members
+                ],
+            },
+        )
+        files += 1
+        for m in members:
+            if not (m["is_current"] or m["vote_count"]):
+                continue
+            write_json(
+                api / "local" / body["slug"] / f"{m['slug']}.json",
+                {**m, "body": body["slug"],
+                 "votes": queries.local_member_votes(conn, body["tenant"], m["person_id"])},
+            )
+            files += 1
 
     return files

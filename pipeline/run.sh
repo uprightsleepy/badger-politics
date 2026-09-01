@@ -65,6 +65,7 @@ python -m scraper.fetch_federal_votes           # U.S. Senate roll calls + roste
 python -m importer.import_federal _data/federal ../data/wi.sqlite
 
 python -m scraper.fetch_local_votes             # council votes (Legistar; cached)
+python -m scraper.fetch_local_profiles          # portraits + contacts from city pages
 python -m importer.import_local _data/local ../data/wi.sqlite
 
 python -m importer.enrich_lrb ../data/wi.sqlite

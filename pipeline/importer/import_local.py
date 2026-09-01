@@ -28,11 +28,92 @@ from importer.roster import load_curation
 SEATS_PATH = Path(__file__).resolve().parent / "local_seats.json"
 # Milwaukee office-record titles carry the seat: '3rd District'
 TITLE_SEAT_RE = re.compile(r"^(\d+)(?:st|nd|rd|th) District$")
+NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
 
 TABLES = (
-    "local_votes", "local_actions", "local_events",
+    "local_votes", "local_actions", "local_events", "local_memberships",
     "local_member_terms", "local_members", "local_vote_types", "local_bodies",
 )
+
+
+def _letters(s: str) -> str:
+    return re.sub(r"[^a-z]", "", s.lower())
+
+
+def surname(name: str) -> str:
+    """'ALD. CHAMBERS JR.' -> 'chambers'; 'Daniel J. Roadt' -> 'roadt'."""
+    words = name.split()
+    while words and words[-1].lower().strip(".") in NAME_SUFFIXES:
+        words.pop()
+    return _letters(words[-1]) if words else ""
+
+
+def fmt_phone(digits: str) -> str | None:
+    d = re.sub(r"[^\d]", "", digits or "")[-10:]
+    return f"{d[:3]}-{d[3:6]}-{d[6:]}" if len(d) == 10 else None
+
+
+def strip_template_phones(seats: dict) -> dict:
+    """A number on every district page is the site template's (Milwaukee's
+    Unified Call Center), not any member's; only numbers particular to a
+    page can be attributed."""
+    if len(seats) < 2:
+        return seats
+    common = set.intersection(*(set(page["tel"]) for page in seats.values()))
+    return {
+        seat: {**page, "tel": [t for t in page["tel"] if t not in common]}
+        for seat, page in seats.items()
+    }
+
+
+def attribute_profile(
+    spec: dict, name: str, seat: int | None, curated_name: str | None,
+    profiles: dict, person: dict | None,
+) -> tuple[str | None, str | None, str | None, str | None]:
+    """(image_url, image_basis, email, phone) for one sitting member, each
+    attributed only under an exact rule; None otherwise.
+
+    The tenant's own person record comes first for contacts. The city's
+    district page then fills gaps: a Milwaukee headshot counts only when
+    its alt text names this seat's district; a West Allis portrait only
+    when the heading above it is the curated name; a mailto only when
+    the member's surname is in the address; a phone only when the page
+    shows exactly one for the seat."""
+    email = (person or {}).get("PersonEmail", "").strip() or None
+    phone = fmt_phone((person or {}).get("PersonPhone", "")) if person else None
+    image = basis = None
+    sn = surname(name)
+    found = profiles.get(spec["tenant"], {})
+    if seat is None:
+        return image, basis, email, phone
+    if spec["tenant"] == "milwaukee":
+        page = (found.get("seats") or {}).get(str(seat))
+        if page:
+            hits = [x for x in page["photos"]
+                    if re.search(rf"\bDistrict\s*{seat}\b", x["alt"], re.I)]
+            if len(hits) == 1:
+                image, basis = hits[0]["src"], page["page"]
+            mails = [m for m in page["mailto"] if sn and sn in _letters(m.split("@")[0])]
+            if email is None and len(mails) == 1:
+                email = mails[0]
+            if phone is None and len(page["tel"]) == 1:
+                phone = fmt_phone(page["tel"][0])
+    elif spec["tenant"] == "westalliswi" and curated_name:
+        page = (found.get("districts") or {}).get(str(seat))
+        if page:
+            key = _letters(curated_name)
+            hits = [e for e in page["entries"]
+                    if _letters(e["heading"].split(" - ")[0]) == key]
+            if len(hits) == 1:
+                entry = hits[0]
+                if entry.get("image"):
+                    image, basis = entry["image"], page["page"]
+                mails = [m for m in entry["emails"] if sn and sn in _letters(m.split("@")[0])]
+                if email is None and len(mails) == 1:
+                    email = mails[0]
+                if phone is None and len(entry["phones"]) == 1:
+                    phone = fmt_phone(entry["phones"][0])
+    return image, basis, email, phone
 
 
 def matter_url(spec: dict, item: dict) -> str | None:
@@ -43,9 +124,10 @@ def matter_url(spec: dict, item: dict) -> str | None:
 
 
 def import_members(
-    conn: sqlite3.Connection, spec: dict, office: list[dict], curated: dict
-) -> dict[int, str]:
-    """Insert members and terms; returns person_id -> name."""
+    conn: sqlite3.Connection, spec: dict, office: list[dict], curated: dict,
+    profiles: dict, persons: dict,
+) -> tuple[dict[int, str], dict[str, int]]:
+    """Insert members and terms; returns (person_id -> name, profile counts)."""
     tenant = spec["tenant"]
     today = date.today().isoformat()
     by_person: dict[int, list[dict]] = {}
@@ -54,6 +136,7 @@ def import_members(
 
     names: dict[int, str] = {}
     used_slugs: set[str] = set()
+    counts = {"photos": 0, "emails": 0, "phones": 0}
     for person_id, records in sorted(by_person.items()):
         records.sort(key=lambda r: r.get("OfficeRecordStartDate") or "")
         latest = records[-1]
@@ -75,11 +158,22 @@ def import_members(
         if slug in used_slugs:  # two members sharing a name: id, never a guess
             slug = f"{slug}-{person_id}"
         used_slugs.add(slug)
+        image = basis = email = phone = None
+        if is_current:
+            image, basis, email, phone = attribute_profile(
+                spec, name, seat, curated.get(str(person_id), {}).get("name"),
+                profiles, persons.get(str(person_id)),
+            )
+            counts["photos"] += image is not None
+            counts["emails"] += email is not None
+            counts["phones"] += phone is not None
         conn.execute(
             "INSERT INTO local_members (tenant, person_id, name, slug, seat,"
-            " seat_basis, member_type, is_current) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            " seat_basis, member_type, is_current, image_url, image_basis, email, phone)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (tenant, person_id, name, slug, seat, seat_basis,
-             latest.get("OfficeRecordMemberType"), int(is_current)),
+             latest.get("OfficeRecordMemberType"), int(is_current),
+             image, basis, email, phone),
         )
         names[person_id] = name
         for r in records:
@@ -92,7 +186,47 @@ def import_members(
                     (r.get("OfficeRecordEndDate") or "")[:10] or None,
                 ),
             )
-    return names
+    return names, counts
+
+
+def import_memberships(
+    conn: sqlite3.Connection, spec: dict, memberships: dict, departments: list[dict]
+) -> int:
+    """Every body a sitting member currently serves on besides the council
+    itself, linked to the tenant's public page for the body. InSite's page
+    ids are not the API's body ids, so the link is by exact name against
+    the tenant's own Departments listing; a name listed twice links nowhere."""
+    tenant = spec["tenant"]
+    today = date.today().isoformat()
+    seen: dict[str, str | None] = {}
+    for d in departments:
+        key = d["name"].strip().lower()
+        seen[key] = None if key in seen else d["url"]
+    n = 0
+    for pid, records in memberships.items():
+        for r in records:
+            if r.get("OfficeRecordBodyName") == spec["body_name"]:
+                continue
+            if (r.get("OfficeRecordEndDate") or "")[:10] < today:
+                continue
+            body_name = r["OfficeRecordBodyName"]
+            conn.execute(
+                "INSERT INTO local_memberships (tenant, person_id, body_id, body_name,"
+                " role, start, end, body_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    tenant, int(pid), r["OfficeRecordBodyId"], body_name,
+                    r.get("OfficeRecordTitle") or r.get("OfficeRecordMemberType"),
+                    (r.get("OfficeRecordStartDate") or "")[:10] or None,
+                    (r.get("OfficeRecordEndDate") or "")[:10] or None,
+                    seen.get(body_name.strip().lower()),
+                ),
+            )
+            n += 1
+    return n
+
+
+def _optional_json(path: Path, default):
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
 
 
 def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict:
@@ -101,6 +235,12 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
     office = json.loads((src / "officerecords.json").read_text(encoding="utf-8"))
     vote_types = json.loads((src / "votetypes.json").read_text(encoding="utf-8"))
     curated = load_curation(SEATS_PATH).get(tenant, {})
+    profiles = _optional_json(local_dir / "profiles.json", {})
+    if profiles.get(tenant, {}).get("seats"):
+        profiles[tenant]["seats"] = strip_template_phones(profiles[tenant]["seats"])
+    persons = _optional_json(src / "persons.json", {})
+    memberships = _optional_json(src / "memberships.json", {})
+    departments = _optional_json(src / "departments.json", [])
 
     conn.execute(
         "INSERT INTO local_bodies (tenant, slug, city, name, insite_url, seats)"
@@ -113,7 +253,8 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
             "INSERT INTO local_vote_types (tenant, value) VALUES (?, ?)",
             (tenant, vt["VoteTypeName"]),
         )
-    names = import_members(conn, spec, office, curated)
+    names, profile_counts = import_members(conn, spec, office, curated, profiles, persons)
+    membership_rows = import_memberships(conn, spec, memberships, departments)
 
     events = actions = votes = unvalued = duplicated = conflicting = 0
     vote_only_members: set[int] = set()
@@ -212,6 +353,7 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
         "members": len(names), "vote_only": len(vote_only_members),
         "unvalued": unvalued, "outside_terms": outside,
         "duplicated": duplicated, "conflicting": conflicting,
+        "memberships": membership_rows, **profile_counts,
     }
 
 
@@ -229,6 +371,8 @@ def run(local_dir: Path, db_path: Path) -> None:
                 + (f" ({stats['vote_only']} known only from vote records)"
                    if stats["vote_only"] else "")
             )
+            print(f"  sitting members: {stats['photos']} portraits, {stats['emails']} emails,"
+                  f" {stats['phones']} phones attributed; {stats['memberships']} committee seats")
             if stats["unvalued"]:
                 print(f"  {stats['unvalued']} vote rows carried no recorded value: skipped")
             if stats["duplicated"]:

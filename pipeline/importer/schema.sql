@@ -315,8 +315,29 @@ CREATE TABLE local_members (
     seat_basis  TEXT,                     -- curation source URL when curated
     member_type TEXT,                     -- the tenant's own label (Member/Chair)
     is_current  INTEGER NOT NULL DEFAULT 0 CHECK (is_current IN (0, 1)),
+    -- official portrait and office contacts, from the city's own page for
+    -- the seat (image_basis) or the tenant's person record; NULL = none
+    -- attributable under the exact rules in import_local
+    image_url   TEXT,
+    image_basis TEXT,
+    email       TEXT,
+    phone       TEXT,
     PRIMARY KEY (tenant, person_id)
 );
+
+-- every body a sitting member serves on, from the tenant's office records
+CREATE TABLE local_memberships (
+    tenant    TEXT NOT NULL,
+    person_id INTEGER NOT NULL,
+    body_id   INTEGER NOT NULL,
+    body_name TEXT NOT NULL,
+    role      TEXT,
+    start     TEXT,
+    end       TEXT,
+    body_url  TEXT,                       -- the tenant's public page for the body
+    FOREIGN KEY (tenant, person_id) REFERENCES local_members (tenant, person_id)
+);
+CREATE INDEX idx_local_memberships ON local_memberships (tenant, person_id);
 
 CREATE TABLE local_member_terms (
     tenant    TEXT NOT NULL,

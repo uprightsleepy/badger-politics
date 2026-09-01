@@ -1607,6 +1607,8 @@ export interface LocalMember {
   tenant: string; person_id: number; name: string; slug: string;
   seat: number | null; seat_basis: string | null; member_type: string | null;
   is_current: number; vote_count: number;
+  image_url: string | null; image_basis: string | null;
+  email: string | null; phone: string | null;
 }
 export const localMembers = memoBy(
   (tenant: string) =>
@@ -1702,6 +1704,19 @@ export const localMemberVoteStats = (tenant: string, personId: number) =>
     .get(tenant, personId) as {
     total: number; noes: number; other: number; last: string | null;
   };
+
+/** Every body a sitting member serves on besides the council, from the
+ * tenant's own office records, chairs first. */
+export const localMemberships = (tenant: string, personId: number) =>
+  prep(
+      `SELECT body_name, role, start, end, body_url FROM local_memberships
+       WHERE tenant = ? AND person_id = ?
+       ORDER BY CASE WHEN role LIKE '%Chair%' THEN 0 ELSE 1 END, body_name`,
+    )
+    .all(tenant, personId) as {
+    body_name: string; role: string | null; start: string | null;
+    end: string | null; body_url: string | null;
+  }[];
 
 export const localMemberTerms = (tenant: string, personId: number) =>
   prep(

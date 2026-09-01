@@ -3,6 +3,7 @@
   /feeds/bills/{bill_id}.xml        a bill's action timeline
   /feeds/legislators/{slug}.xml     a legislator's votes + sponsorships
   /feeds/committees/{id}.xml        a committee's hearings
+  /feeds/local/{body}/{member}.xml  a council member's votes
   /feeds/weekly.xml                 "this week in the legislature" digest
 """
 
@@ -114,6 +115,27 @@ def build_feeds(
             )
         _write(root, feeds_dir / "legislators" / f"{slug}.xml")
         files += 1
+
+    # council members: one feed per member, the same shape as a legislator's
+    for body in queries.local_bodies(conn):
+        for m in queries.local_members(conn, body["tenant"]):
+            if not (m["is_current"] or m["vote_count"]):
+                continue
+            votes = queries.local_member_votes(conn, body["tenant"], m["person_id"])
+            path = f"/feeds/local/{body['slug']}/{m['slug']}.xml"
+            root = _feed(f"{m['name']}: {body['name']} votes", path,
+                         _stamp(votes[0]["date"] if votes else None))
+            for vote in votes:
+                _entry(
+                    root,
+                    f"{SITE}{path}#{vote['event_item_id']}",
+                    f"Voted '{vote['value']}' on {vote['matter_file'] or 'an item'}",
+                    _stamp(vote["date"]),
+                    vote["matter_url"] or vote["insite_url"],
+                    f"{vote['action']}: {(vote['title'] or '')[:150]}",
+                )
+            _write(root, feeds_dir / "local" / body["slug"] / f"{m['slug']}.xml")
+            files += 1
 
     if hearings is None:
         hearings = queries.hearings(conn)

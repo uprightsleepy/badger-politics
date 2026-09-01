@@ -323,6 +323,11 @@ def check_local(conn: sqlite3.Connection) -> list[str]:
             "SELECT COUNT(*) FROM local_members WHERE is_current = 1"
             " AND member_type = 'Member' AND seat IS NULL"
         ),
+        "local memberships -> members": (
+            "SELECT COUNT(*) FROM local_memberships s LEFT JOIN local_members m"
+            " ON m.tenant = s.tenant AND m.person_id = s.person_id"
+            " WHERE m.person_id IS NULL"
+        ),
         "duplicate local member slugs": (
             "SELECT COUNT(*) FROM (SELECT tenant, slug FROM local_members"
             " GROUP BY tenant, slug HAVING COUNT(*) > 1)"

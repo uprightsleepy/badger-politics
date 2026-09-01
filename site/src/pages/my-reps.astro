@@ -277,7 +277,11 @@ import Base from "../layouts/Base.astro";
         alders
           .map(
             (a) =>
-              `<p class="mt-0.5"><a class="text-lg font-bold leading-tight hover:underline" href="/local/${esc(info.slug)}/${esc(a.slug)}/">${esc(a.name)}</a></p>`,
+              '<p class="mt-1.5 flex items-center gap-2">' +
+              (a.image
+                ? `<img src="${esc(a.image)}" alt="" width="40" height="40" loading="lazy" decoding="async" class="h-10 w-10 shrink-0 rounded-full border border-navy-100 bg-navy-50 object-cover object-[50%_25%]">`
+                : "") +
+              `<a class="text-lg font-bold leading-tight hover:underline" href="/local/${esc(info.slug)}/${esc(a.slug)}/">${esc(a.name)}</a></p>`,
           )
           .join("") +
         '</div>' +

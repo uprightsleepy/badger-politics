@@ -1,16 +1,19 @@
 /** Device-only follows, same model as districts and polling places: the
  * server never learns what anyone follows.
  *
- * Five kinds share one store. Old two-kind stores migrate silently: any
- * missing list is simply empty. */
+ * Six kinds share one store. Older stores migrate silently: any missing
+ * list is simply empty. */
 export interface Follows {
   bills: string[];
   legislators: string[];
   committees: string[];
   districts: string[];
   races: string[];
+  council: string[];
 }
-export const FOLLOW_KINDS = ["bills", "legislators", "committees", "districts", "races"] as const;
+export const FOLLOW_KINDS = [
+  "bills", "legislators", "committees", "districts", "races", "council",
+] as const;
 
 const KEY = "bp-follows";
 const SEEN_KEY = "bp-follows-seen";

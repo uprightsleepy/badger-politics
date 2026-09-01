@@ -1,6 +1,7 @@
 ---
 import Base from "../../../layouts/Base.astro";
 import SourceStrip from "../../../components/SourceStrip.astro";
+import Portrait from "../../../components/Portrait.astro";
 import { localBodies, localMembers, localTenantStats, localDividedActions } from "../../../lib/db";
 import { fmtDate } from "../../../lib/format";
 
@@ -60,9 +61,10 @@ const districts = [...new Set(seated.map((m) => m.seat!))].sort((a, b) => a - b)
         <li class="rounded-lg border border-navy-100 bg-white p-3">
           <p class="text-xs font-semibold uppercase tracking-wide text-navy-600">District {d}</p>
           {seated.filter((m) => m.seat === d).map((m) => (
-            <p class="mt-0.5">
-              <a href={`/local/${body.slug}/${m.slug}/`} class="font-semibold underline">{m.name}</a>
-            </p>
+            <a href={`/local/${body.slug}/${m.slug}/`} class="mt-1.5 flex items-center gap-2 font-semibold underline">
+              <Portrait src={m.image_url} name={m.name} size={40} />
+              <span class="min-w-0 truncate">{m.name}</span>
+            </a>
           ))}
         </li>
       ))}
@@ -71,12 +73,17 @@ const districts = [...new Set(seated.map((m) => m.seat!))].sort((a, b) => a - b)
           <p class="text-xs font-semibold uppercase tracking-wide text-navy-600">
             Presiding{m.member_type ? ` (${m.member_type})` : ""}
           </p>
-          <p class="mt-0.5">
-            <a href={`/local/${body.slug}/${m.slug}/`} class="font-semibold underline">{m.name}</a>
-          </p>
+          <a href={`/local/${body.slug}/${m.slug}/`} class="mt-1.5 flex items-center gap-2 font-semibold underline">
+            <Portrait src={m.image_url} name={m.name} size={40} />
+            <span class="min-w-0 truncate">{m.name}</span>
+          </a>
         </li>
       ))}
     </ul>
+    <p class="mt-2 text-xs text-navy-600">
+      Council seats in Wisconsin are nonpartisan, so no party is shown.
+      Portraits and contacts come from the city's own pages for each district.
+    </p>
   </section>
 
   {divided.length > 0 && (

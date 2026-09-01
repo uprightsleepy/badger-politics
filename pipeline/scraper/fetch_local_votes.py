@@ -19,7 +19,9 @@ docs/research/local-votes-2026-08.md.
 from __future__ import annotations
 
 import argparse
+import html
 import json
+import re
 import sys
 import time
 from datetime import date
@@ -63,6 +65,41 @@ def fetch_events(http, tenant: str, body: str, since: int, delay: float) -> list
         skip += PAGE
 
 
+DEPT_ROW = re.compile(
+    r'href="DepartmentDetail\.aspx\?ID=(\d+)&amp;GUID=([0-9A-Fa-f-]+)[^"]*"[^>]*>(.*?)</a>', re.S
+)
+PAGE_LINK = re.compile(r"__doPostBack\(&#39;([^&]+)&#39;,&#39;&#39;\)\"><span>(\d+)</span></a>")
+HIDDEN = re.compile(r'<input type="hidden" name="([^"]+)"[^>]*?value="([^"]*)"')
+
+
+def fetch_departments(http, insite: str, delay: float) -> list[dict]:
+    """InSite's public listing of every body, name and page url. Its page
+    ids and GUIDs differ from the API's, so this is the only way to link a
+    body. The grid shows 100 rows a page; later pages come through the
+    plain form postback each page link carries for browsers without JS."""
+    url = f"{insite}/Departments.aspx"
+    response = http.get(url, timeout=60)
+    response.raise_for_status()
+    time.sleep(delay)
+    rows, page = [], 1
+    while True:
+        text = response.text
+        rows += [
+            {"name": html.unescape(re.sub(r"<[^>]+>", "", label)).strip(),
+             "url": f"{insite}/DepartmentDetail.aspx?ID={dept_id}&GUID={guid}"}
+            for dept_id, guid, label in DEPT_ROW.findall(text)
+        ]
+        page += 1
+        target = {int(n): t for t, n in PAGE_LINK.findall(text)}.get(page)
+        if target is None:
+            return rows
+        form = dict(HIDDEN.findall(text))
+        form.update({"__EVENTTARGET": target, "__EVENTARGUMENT": ""})
+        response = http.post(url, data=form, timeout=60)
+        response.raise_for_status()
+        time.sleep(delay)
+
+
 def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int, int]:
     tenant = spec["tenant"]
     out = DATA_DIR / tenant
@@ -79,6 +116,26 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
     (out / "officerecords.json").write_text(json.dumps(office, indent=0), encoding="utf-8")
 
     today = date.today().isoformat()
+    # for sitting members: their person record (contacts where the tenant
+    # fills them in) and every body they sit on, for committee lists
+    bodies = call(http, tenant, "Bodies", delay, **{"$top": PAGE})
+    (out / "bodies.json").write_text(json.dumps(bodies, indent=0), encoding="utf-8")
+    sitting = sorted({
+        r["OfficeRecordPersonId"] for r in office
+        if (r.get("OfficeRecordEndDate") or "")[:10] >= today
+    })
+    persons = {str(pid): call(http, tenant, f"Persons/{pid}", delay) for pid in sitting}
+    (out / "persons.json").write_text(json.dumps(persons, indent=0), encoding="utf-8")
+    memberships = {
+        str(pid): call(
+            http, tenant, "OfficeRecords", delay,
+            **{"$top": PAGE, "$filter": f"OfficeRecordPersonId eq {pid}"},
+        )
+        for pid in sitting
+    }
+    (out / "memberships.json").write_text(json.dumps(memberships, indent=0), encoding="utf-8")
+    departments = fetch_departments(http, spec["insite"], delay)
+    (out / "departments.json").write_text(json.dumps(departments, indent=0), encoding="utf-8")
     fetched = cached = 0
     for event in fetch_events(http, tenant, spec["body_name"], spec["since"], delay):
         if (event.get("EventDate") or "")[:10] >= today:
