@@ -177,6 +177,7 @@ release):
 | `responsive.mjs` | no horizontal overflow on the same 41 pages at 344/360/412/540/768/1280/1920px |
 | `links.mjs` | every internal path and fragment anchor resolves; `--external` probes deduplicated outbound URLs with per-host pacing |
 | `csp.mjs` | run against the released site: the Content-Security-Policy breaks neither search (WebAssembly) nor the address lookup (Census JSONP) |
+| `measure.mjs` | diagnostic, not a gate: names the element that overflows one page at one width, with `--wide-font` to reproduce a Linux-only failure on Windows |
 
 The two browser gates share one page list (`scripts/lib/serve.mjs`), so a
 page added to one is scanned by both.

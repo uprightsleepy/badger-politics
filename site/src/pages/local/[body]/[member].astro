@@ -66,7 +66,7 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
     through={stats.last}
   />
 
-  <dl class="mt-4 grid max-w-2xl grid-cols-3 gap-x-6 gap-y-3 rounded-lg border border-navy-100 bg-white p-4 text-sm">
+  <dl class="mt-4 grid max-w-2xl gap-x-6 gap-y-3 rounded-lg border border-navy-100 bg-white p-4 text-sm sm:grid-cols-3">
     <div>
       <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Recorded votes</dt>
       <dd class="mt-0.5 text-xl font-bold tabular-nums">{stats.total.toLocaleString()}</dd>
@@ -105,9 +105,9 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
                 ) : (
                   <span class="shrink-0 font-bold">{v.matter_file ?? "item"}</span>
                 )}
-                <span class="min-w-0 flex-1">{v.title}</span>
+                <span class="min-w-0 flex-1 break-words">{v.title}</span>
               </div>
-              <p class="mt-0.5 text-xs text-navy-600 sm:pl-[12.5rem]">{v.action}</p>
+              <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{v.action}</p>
             </li>
           ))}
         </ul>
