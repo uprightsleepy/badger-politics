@@ -1,0 +1,62 @@
+---
+import Base from "../../layouts/Base.astro";
+import SourceStrip from "../../components/SourceStrip.astro";
+import { localBodies, localTenantStats } from "../../lib/db";
+import { fmtDate } from "../../lib/format";
+
+const bodies = localBodies();
+const stats = new Map(bodies.map((b) => [b.tenant, localTenantStats(b.tenant)]));
+const latest = [...stats.values()].map((s) => s?.last).filter(Boolean).sort().at(-1) ?? null;
+---
+
+<Base
+  title="City Council Votes"
+  description="How Milwaukee and West Allis council members vote, item by item, from each city's own legislative records."
+  filters={{ type: "City Council" }}
+>
+  <h1 class="text-2xl font-bold">City Council Votes</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    State law is only part of the picture: zoning, licenses, budgets and
+    police oversight are decided in council chambers. These pages carry
+    every recorded council vote from the cities we cover, one member at a
+    time, straight from each city's own legislative system.
+  </p>
+  <SourceStrip
+    sources={bodies.map((b) => ({ label: `${b.city} (Legistar)`, href: b.insite_url }))}
+    through={latest}
+  />
+
+  <div class="mt-4 grid gap-3 sm:grid-cols-2">
+    {bodies.map((b) => {
+      const s = stats.get(b.tenant);
+      return (
+        <a
+          href={`/local/${b.slug}/`}
+          class="rounded-lg border border-navy-100 bg-white p-4 hover:border-navy-600"
+        >
+          <p class="text-lg font-bold">{b.name}</p>
+          {s && (
+            <p class="mt-1 text-sm text-navy-600">
+              {s.votes.toLocaleString()} recorded votes across
+              {" "}{s.actions.toLocaleString()} items in
+              {" "}{s.meetings.toLocaleString()} meetings,
+              {" "}{fmtDate(s.first)} to {fmtDate(s.last)}
+            </p>
+          )}
+          <p class="mt-2 text-sm font-semibold underline">
+            Members and votes &rarr;
+          </p>
+        </a>
+      );
+    })}
+  </div>
+
+  <p class="mt-6 max-w-3xl text-xs text-navy-600">
+    Coverage is honest and partial: two councils today, each fetched from
+    its own official system with every item linking back to the clerk's
+    record. Other cities, villages, school boards and county boards post
+    to their own sites; a government appears here only when its records
+    can be carried completely.
+    <a href="/about/" class="underline"> How this site works</a>
+  </p>
+</Base>

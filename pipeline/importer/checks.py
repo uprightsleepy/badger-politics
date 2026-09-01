@@ -283,6 +283,65 @@ def check_federal(conn: sqlite3.Connection) -> list[str]:
     return failures
 
 
+def check_local(conn: sqlite3.Connection) -> list[str]:
+    """Local council votes are an enrichment; when the tables are present
+    they must hold what the importer promised: every vote traces to the
+    tenant's own member id and vocabulary, every record links its public
+    page, and every sitting alderperson has a seat."""
+    has = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='local_bodies'"
+    ).fetchone()
+    if not has or not conn.execute("SELECT 1 FROM local_bodies").fetchone():
+        return []
+    queries = {
+        "local votes -> actions": (
+            "SELECT COUNT(*) FROM local_votes v LEFT JOIN local_actions a"
+            " ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id"
+            " WHERE a.event_item_id IS NULL"
+        ),
+        "local votes -> members": (
+            "SELECT COUNT(*) FROM local_votes v LEFT JOIN local_members m"
+            " ON m.tenant = v.tenant AND m.person_id = v.person_id"
+            " WHERE m.person_id IS NULL"
+        ),
+        "local actions -> events": (
+            "SELECT COUNT(*) FROM local_actions a LEFT JOIN local_events e"
+            " ON e.tenant = a.tenant AND e.event_id = a.event_id"
+            " WHERE e.event_id IS NULL"
+        ),
+        # a value outside the tenant's own VoteTypes is platform drift
+        "local vote values outside the tenant's vocabulary": (
+            "SELECT COUNT(*) FROM local_votes v LEFT JOIN local_vote_types t"
+            " ON t.tenant = v.tenant AND t.value = v.value WHERE t.value IS NULL"
+        ),
+        "local events missing their public page": (
+            "SELECT COUNT(*) FROM local_events"
+            " WHERE insite_url IS NULL OR insite_url = ''"
+        ),
+        # the mayor presides without a seat; every sitting *Member* has one
+        "sitting council members missing a seat": (
+            "SELECT COUNT(*) FROM local_members WHERE is_current = 1"
+            " AND member_type = 'Member' AND seat IS NULL"
+        ),
+        "duplicate local member slugs": (
+            "SELECT COUNT(*) FROM (SELECT tenant, slug FROM local_members"
+            " GROUP BY tenant, slug HAVING COUNT(*) > 1)"
+        ),
+        # a tenant with only Ayes means the fetch stopped at consent items
+        "local tenants with no dissenting vote on record": (
+            "SELECT COUNT(*) FROM local_bodies b WHERE NOT EXISTS"
+            " (SELECT 1 FROM local_votes v WHERE v.tenant = b.tenant"
+            "  AND v.value = 'No')"
+        ),
+    }
+    failures = []
+    for label, query in queries.items():
+        bad = conn.execute(query).fetchone()[0]
+        if bad:
+            failures.append(f"{label}: {bad} rows")
+    return failures
+
+
 def run_checks(db_path: Path, counts_file: Path) -> list[str]:
     conn = sqlite3.connect(db_path)
     try:
@@ -290,6 +349,7 @@ def run_checks(db_path: Path, counts_file: Path) -> list[str]:
         failures += check_bill_counts(conn, counts_file)
         failures += check_referential_integrity(conn)
         failures += check_federal(conn)
+        failures += check_local(conn)
     finally:
         conn.close()
     return failures

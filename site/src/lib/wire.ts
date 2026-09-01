@@ -54,3 +54,14 @@ export type Ballot = {
   senate: Record<string, Race>;
   statewide: Record<string, { name: string; party: string | null }[]>;
 };
+
+/** /data/local-reps.json: city-council rosters for the my-reps card. */
+export type LocalReps = Record<
+  string,
+  {
+    city: string;
+    slug: string;
+    council: string;
+    districts: Record<string, { name: string; slug: string }[]>;
+  }
+>;

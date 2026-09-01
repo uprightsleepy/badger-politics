@@ -70,6 +70,7 @@ if (!resolved) throw new Error("my-reps lookup never resolved after 2 attempts")
 const repsText = await page.$eval("#reps", (el) => el.textContent);
 check("West Allis -> Assembly D14 Tenorio", repsText.includes("Angelito Tenorio"), "");
 check("West Allis -> Senate D5 Hutton", repsText.includes("Rob Hutton"), "");
+check("West Allis address shows the city council card", repsText.includes("West Allis Common Council"), "");
 const savedDistrict = await page.evaluate(() => localStorage.getItem("bp-district"));
 check("district saved to localStorage", savedDistrict === '{"ad":14,"sd":5}', savedDistrict);
 

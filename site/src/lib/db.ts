@@ -1590,3 +1590,122 @@ export const sessionBillFlow = (sessionId: string) => {
   };
 };
 
+
+/** ---- Local council votes (Legistar tenants; enrichment tables) ---- */
+
+export interface LocalBody {
+  tenant: string; slug: string; city: string; name: string;
+  insite_url: string; seats: number;
+}
+export const localBodies = once((): LocalBody[] =>
+  hasTable("local_bodies")
+    ? (prep("SELECT * FROM local_bodies ORDER BY city").all() as LocalBody[])
+    : [],
+);
+
+export interface LocalMember {
+  tenant: string; person_id: number; name: string; slug: string;
+  seat: number | null; seat_basis: string | null; member_type: string | null;
+  is_current: number; vote_count: number;
+}
+export const localMembers = memoBy(
+  (tenant: string) =>
+    prep(
+      `SELECT m.*, (SELECT COUNT(*) FROM local_votes v
+          WHERE v.tenant = m.tenant AND v.person_id = m.person_id) AS vote_count
+       FROM local_members m WHERE m.tenant = ? ORDER BY m.seat, m.name`,
+    ).all(tenant) as LocalMember[],
+);
+
+export const localTenantStats = memoBy((tenant: string) =>
+  prep(
+      `SELECT COUNT(DISTINCT e.event_id) AS meetings,
+              COUNT(DISTINCT a.event_item_id) AS actions,
+              (SELECT COUNT(*) FROM local_votes v WHERE v.tenant = e.tenant) AS votes,
+              MIN(e.date) AS first, MAX(e.date) AS last
+       FROM local_events e LEFT JOIN local_actions a
+         ON a.tenant = e.tenant AND a.event_id = e.event_id
+       WHERE e.tenant = ?`,
+    ).get(tenant) as {
+    meetings: number; actions: number; votes: number;
+    first: string | null; last: string | null;
+  },
+);
+
+/** Items where the council split: the votes that separate one member
+ * from another. Ayes and Noes recounted from the vote rows themselves. */
+const DIVIDED_SQL = `
+  SELECT a.event_item_id, a.matter_file, a.matter_url, a.title, a.action,
+         e.date, e.insite_url,
+         SUM(v.value = 'Aye') AS ayes, SUM(v.value = 'No') AS noes
+  FROM local_actions a
+  JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
+  JOIN local_votes v ON v.tenant = a.tenant AND v.event_item_id = a.event_item_id
+  WHERE a.tenant = ?
+  GROUP BY a.event_item_id
+  HAVING ayes > 0 AND noes > 0
+  ORDER BY e.date DESC, a.event_item_id DESC`;
+
+export const localDividedActions = (tenant: string, limit: number) =>
+  prep(`${DIVIDED_SQL} LIMIT ?`).all(tenant, limit) as {
+    event_item_id: number; matter_file: string | null; matter_url: string | null;
+    title: string | null; action: string; date: string; insite_url: string;
+    ayes: number; noes: number;
+  }[];
+
+/** One member's positions on the divided items only, newest first; the
+ * split test runs in SQLite so a long career never loads whole. */
+export const localMemberDividedVotes = (tenant: string, personId: number) =>
+  prep(
+      `SELECT v.value, v.event_item_id, a.matter_file, a.matter_url, a.title,
+              a.action, e.date
+       FROM local_votes v
+       JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
+       JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
+       WHERE v.tenant = ? AND v.person_id = ? AND v.event_item_id IN (
+         SELECT v2.event_item_id FROM local_votes v2 WHERE v2.tenant = v.tenant
+         GROUP BY v2.event_item_id
+         HAVING SUM(v2.value = 'Aye') > 0 AND SUM(v2.value = 'No') > 0)
+       ORDER BY e.date DESC, a.event_item_id DESC`,
+    )
+    .all(tenant, personId) as {
+    value: string; event_item_id: number; matter_file: string | null;
+    matter_url: string | null; title: string | null; action: string; date: string;
+  }[];
+
+export const localMemberVotes = (tenant: string, personId: number, limit: number) =>
+  prep(
+      `SELECT v.value, v.event_item_id, a.matter_file, a.matter_url, a.title,
+              a.action, e.date
+       FROM local_votes v
+       JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
+       JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
+       WHERE v.tenant = ? AND v.person_id = ?
+       ORDER BY e.date DESC, a.event_item_id DESC LIMIT ?`,
+    )
+    .all(tenant, personId, limit) as {
+    value: string; event_item_id: number; matter_file: string | null;
+    matter_url: string | null; title: string | null; action: string; date: string;
+  }[];
+
+export const localMemberVoteStats = (tenant: string, personId: number) =>
+  prep(
+      `SELECT COUNT(*) AS total,
+              COALESCE(SUM(v.value = 'No'), 0) AS noes,
+              COALESCE(SUM(v.value NOT IN ('Aye', 'No')), 0) AS other,
+              MAX(e.date) AS last
+       FROM local_votes v
+       JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
+       JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
+       WHERE v.tenant = ? AND v.person_id = ?`,
+    )
+    .get(tenant, personId) as {
+    total: number; noes: number; other: number; last: string | null;
+  };
+
+export const localMemberTerms = (tenant: string, personId: number) =>
+  prep(
+      `SELECT title, start, end FROM local_member_terms
+       WHERE tenant = ? AND person_id = ? ORDER BY start`,
+    )
+    .all(tenant, personId) as { title: string | null; start: string; end: string | null }[];

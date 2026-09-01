@@ -292,6 +292,88 @@ CREATE INDEX idx_cf_tx_filer ON cf_transactions (filer_entity_id, date);
 CREATE INDEX idx_cf_tx_stance ON cf_transactions (stance);
 CREATE INDEX idx_cf_tx_other ON cf_transactions (other_entity_id);
 
+-- Council votes from local Legistar tenants (importer/local_registry.py;
+-- research in docs/research/local-votes-2026-08.md). Attribution is the
+-- tenant's own person id on every row; no name matching anywhere.
+CREATE TABLE local_bodies (
+    tenant     TEXT PRIMARY KEY,          -- Legistar client id
+    slug       TEXT NOT NULL UNIQUE,      -- URL path segment
+    city       TEXT NOT NULL,
+    name       TEXT NOT NULL,             -- display name of the council
+    insite_url TEXT NOT NULL,             -- the tenant's public Legistar site
+    seats      INTEGER NOT NULL
+);
+
+CREATE TABLE local_members (
+    tenant      TEXT NOT NULL REFERENCES local_bodies (tenant),
+    person_id   INTEGER NOT NULL,         -- the tenant's own id: the vote join key
+    name        TEXT NOT NULL,
+    slug        TEXT NOT NULL,
+    -- aldermanic district; NULL where not recorded (a presiding mayor, or
+    -- a historical member with no curated seat)
+    seat        INTEGER,
+    seat_basis  TEXT,                     -- curation source URL when curated
+    member_type TEXT,                     -- the tenant's own label (Member/Chair)
+    is_current  INTEGER NOT NULL DEFAULT 0 CHECK (is_current IN (0, 1)),
+    PRIMARY KEY (tenant, person_id)
+);
+
+CREATE TABLE local_member_terms (
+    tenant    TEXT NOT NULL,
+    person_id INTEGER NOT NULL,
+    title     TEXT,
+    start     TEXT NOT NULL,
+    end       TEXT,
+    FOREIGN KEY (tenant, person_id) REFERENCES local_members (tenant, person_id)
+);
+CREATE INDEX idx_local_member_terms ON local_member_terms (tenant, person_id);
+
+CREATE TABLE local_events (
+    tenant         TEXT NOT NULL REFERENCES local_bodies (tenant),
+    event_id       INTEGER NOT NULL,
+    date           TEXT NOT NULL,
+    minutes_status TEXT,
+    insite_url     TEXT NOT NULL,         -- the clerk's public meeting page
+    PRIMARY KEY (tenant, event_id)
+);
+
+CREATE TABLE local_actions (
+    tenant        TEXT NOT NULL,
+    event_item_id INTEGER NOT NULL,
+    event_id      INTEGER NOT NULL,
+    matter_id     INTEGER,
+    matter_file   TEXT,
+    matter_type   TEXT,
+    matter_status TEXT,
+    title         TEXT,
+    action        TEXT NOT NULL,          -- what the body did, verbatim
+    passed        INTEGER,                -- the clerk's own flag; may be NULL
+    agenda_number TEXT,
+    matter_url    TEXT,                   -- the clerk's public legislation page
+    PRIMARY KEY (tenant, event_item_id),
+    FOREIGN KEY (tenant, event_id) REFERENCES local_events (tenant, event_id)
+);
+CREATE INDEX idx_local_actions_event  ON local_actions (tenant, event_id);
+CREATE INDEX idx_local_actions_matter ON local_actions (tenant, matter_id);
+
+CREATE TABLE local_votes (
+    tenant        TEXT NOT NULL,
+    event_item_id INTEGER NOT NULL,
+    person_id     INTEGER NOT NULL,
+    value         TEXT NOT NULL,          -- Aye/No/Excused/... exactly as recorded
+    PRIMARY KEY (tenant, event_item_id, person_id),
+    FOREIGN KEY (tenant, event_item_id) REFERENCES local_actions (tenant, event_item_id),
+    FOREIGN KEY (tenant, person_id) REFERENCES local_members (tenant, person_id)
+);
+CREATE INDEX idx_local_votes_person ON local_votes (tenant, person_id);
+
+-- each tenant's own vote vocabulary (its VoteTypes), the checks' allowlist
+CREATE TABLE local_vote_types (
+    tenant TEXT NOT NULL,
+    value  TEXT NOT NULL,
+    PRIMARY KEY (tenant, value)
+);
+
 -- Build metadata, e.g. key='data_through' for the site footer freshness badge.
 CREATE TABLE meta (
     key   TEXT PRIMARY KEY,

@@ -23,6 +23,7 @@ and served as a fully static site.
 | Campaign Money | Receipts to sitting legislators windowed to their time in office, contributing committees, and outside spending filing by filing with the Ethics Commission's transaction IDs and report links |
 | Lobbying | Registrations by organization and by bill (an interest, never a for-or-against position) |
 | Federal Delegation | Both U.S. senators and all eight House members, with every floor roll call from the Senate's and House Clerk's own XML (Senate from the 112th Congress, House from 2005) |
+| City Councils | Milwaukee and West Allis Common Council votes, member by member, with divided votes surfaced and every item linking the clerk's own record; the address lookup adds the reader's alderpersons |
 | 2026 Ballot | Statewide offices and every legislative seat, with a personal "what is on my ballot" view from the saved district |
 | Following | Device-only follows for bills, legislators, committees, districts and races, with what changed since the last visit |
 | Data and API | Static JSON API, Atom feeds, iCal calendars, bulk CSV and a provenance-filtered SQLite snapshot, all keyless |
@@ -69,6 +70,9 @@ snapshot CI releases from.
 | Campaign finance | CFIS tRPC API (campaignfinance.wi.gov) | legislator receipts in monthly windows since 2008-01 through a verified committee map; every other filer's money since 2025-01, including independent expenditures with their report IDs |
 | Lobbying registrations | Eye on Lobbying (lobbying.wi.gov) | per-session matter grid plus per-bill principal lists |
 | Federal roll calls | senate.gov LIS XML, clerk.house.gov EVS XML, unitedstates/congress-legislators roster | per-vote files mirrored once and cached forever; positions keyed by each chamber's own member id |
+| Council votes | Legistar Web API (`milwaukee`, `westalliswi` tenants) | meetings cached permanently once minutes are Final; votes keyed by each tenant's own person id |
+| Aldermanic district boundaries | Milwaukee open data portal (CC BY shapefile); West Allis city GIS server | one-time generator (`importer/local_shapes.py`), committed GeoJSON; the robots-disallowed city map host is not used |
+| West Allis seat roster | the city's own district pages | ten-row curated table (`importer/local_seats.json`), each entry with its basis URL |
 | Cross-check only | FollowTheMoney API (CC BY-NC-SA) | verification input, never imported or republished |
 | Org logos | logo.dev (`LOGO_DEV_TOKEN`) | build-time fetch for hand-verified org domains only |
 
@@ -150,6 +154,10 @@ snapshot is written):
 - Federal: recounted Senate tallies equal the stated yeas and nays, every
   Senate vote carries exactly two Wisconsin senators, House rows are
   Wisconsin-only, and the delegation holds ten members.
+- Council votes: every vote traces to the tenant's own member id and
+  vocabulary, every meeting and item links its public page, every sitting
+  member has a seat, and a tenant with no dissenting vote on record fails
+  (a fetch that stopped at consent items).
 - CFIS: every fetched month reconciles exactly against the server's own
   transaction count (the newest month retries, and accepts a stable
   mismatch only when a plain-view diff proves every omitted row is
@@ -191,6 +199,7 @@ provenance-filtered SQLite snapshot. See [/data/](https://badgerpolitics.org/dat
 | Lobbying | current session (2025 Regular) |
 | Election results | certified WEC canvasses per seat and statewide office |
 | Federal roll calls | U.S. Senate from the 112th Congress (2011); U.S. House from 2005 |
+| Council votes | Milwaukee from 2008; West Allis from 2015 (earlier minutes record votes inconsistently) |
 
 ## Local development
 

@@ -1,0 +1,142 @@
+---
+/** One council member's voting record. Bounded like the legislator
+ * profiles: recent votes in a scroll panel, divided votes in full, and
+ * the clerk's page linked from every row. */
+import Base from "../../../layouts/Base.astro";
+import SourceStrip from "../../../components/SourceStrip.astro";
+import ScrollPanel from "../../../components/ScrollPanel.astro";
+import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, localMemberDividedVotes, localMemberTerms } from "../../../lib/db";
+import { fmtDate } from "../../../lib/format";
+
+const RECENT = 300;
+
+export function getStaticPaths() {
+  return localBodies().flatMap((body) =>
+    localMembers(body.tenant)
+      .filter((m) => m.is_current || m.vote_count > 0)
+      .map((m) => ({ params: { body: body.slug, member: m.slug }, props: { body, member: m } })),
+  );
+}
+const { body, member } = Astro.props;
+const stats = localMemberVoteStats(body.tenant, member.person_id);
+const votes = localMemberVotes(body.tenant, member.person_id, RECENT);
+const dividedVotes = localMemberDividedVotes(body.tenant, member.person_id);
+const terms = localMemberTerms(body.tenant, member.person_id);
+const role = member.seat != null
+  ? `${body.city} Common Council, District ${member.seat}`
+  : member.member_type === "Chair"
+    ? `Presides over the ${body.name}`
+    : body.name;
+
+const CAST_STYLE: Record<string, string> = {
+  Aye: "bg-moss-50 text-moss-600",
+  No: "bg-badger-50 text-badger-700",
+};
+const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
+---
+
+<Base
+  title={`${member.name}, ${body.city}${member.seat != null ? ` District ${member.seat}` : ""}`}
+  description={`${member.name}'s complete ${body.name} voting record from the city's own legislative system: ${stats.total.toLocaleString()} recorded votes.`}
+  filters={{ type: "City Council", city: body.city }}
+  breadcrumbs={[
+    { name: "City Councils", url: "/local/" },
+    { name: body.name, url: `/local/${body.slug}/` },
+  ]}
+>
+  <p class="text-sm text-navy-600">
+    <a href={`/local/${body.slug}/`} class="underline">&larr; {body.name}</a>
+  </p>
+  <h1 class="mt-1 text-2xl font-bold">{member.name}</h1>
+  <p class="mt-1 text-sm text-navy-700">
+    {member.is_current ? role : `Former member, ${role}`}
+    {member.seat_basis && (
+      <span class="text-xs text-navy-600">
+        {" "}&middot; district per <a href={member.seat_basis} class="underline">the city's roster</a>
+      </span>
+    )}
+  </p>
+  {terms.length > 0 && (
+    <p class="mt-0.5 text-xs text-navy-600">
+      Serving {fmtDate(terms[0].start)}{terms.at(-1)!.end ? ` to ${fmtDate(terms.at(-1)!.end)}` : " to present"}, per the council's own records.
+    </p>
+  )}
+  <SourceStrip
+    sources={[{ label: `${body.name} records (Legistar)`, href: body.insite_url }]}
+    through={stats.last}
+  />
+
+  <dl class="mt-4 grid max-w-2xl grid-cols-3 gap-x-6 gap-y-3 rounded-lg border border-navy-100 bg-white p-4 text-sm">
+    <div>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Recorded votes</dt>
+      <dd class="mt-0.5 text-xl font-bold tabular-nums">{stats.total.toLocaleString()}</dd>
+    </div>
+    <div>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Voted No</dt>
+      <dd class="mt-0.5 text-xl font-bold tabular-nums">{stats.noes.toLocaleString()}</dd>
+    </div>
+    <div>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Other than Aye/No</dt>
+      <dd class="mt-0.5 text-xl font-bold tabular-nums">{stats.other.toLocaleString()}</dd>
+    </div>
+  </dl>
+  <p class="mt-1 max-w-2xl text-xs text-navy-600">
+    "Other" is everything the clerk recorded besides Aye or No: excused,
+    absent, abstaining, or presiding without a vote, shown on each row
+    exactly as recorded.
+  </p>
+
+  {dividedVotes.length > 0 && (
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">On divided votes · {dividedVotes.length.toLocaleString()}</h2>
+      <p class="mt-1 max-w-3xl text-sm text-navy-600">
+        Every item where the council split and {member.name}'s position is
+        on record. Each links to the clerk's page.
+      </p>
+      <ScrollPanel label={`${member.name} on divided votes`} max="max-h-[28rem]" count={dividedVotes.length}>
+        <ul class="divide-y divide-navy-100 p-0 text-sm">
+          {dividedVotes.map((v) => (
+            <li class="px-4 py-2">
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <span class={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.value)}`}>{v.value}</span>
+                <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
+                {v.matter_url ? (
+                  <a href={v.matter_url} class="shrink-0 font-bold underline">{v.matter_file ?? "item"}</a>
+                ) : (
+                  <span class="shrink-0 font-bold">{v.matter_file ?? "item"}</span>
+                )}
+                <span class="min-w-0 flex-1">{v.title}</span>
+              </div>
+              <p class="mt-0.5 text-xs text-navy-600 sm:pl-[12.5rem]">{v.action}</p>
+            </li>
+          ))}
+        </ul>
+      </ScrollPanel>
+    </section>
+  )}
+
+  <section class="mt-6">
+    <h2 class="text-xl font-bold">Recent votes</h2>
+    <p class="mt-1 max-w-3xl text-sm text-navy-600">
+      The {Math.min(RECENT, stats.total).toLocaleString()} most recent of
+      {" "}{stats.total.toLocaleString()} recorded votes; the complete
+      record lives in the <a href={body.insite_url} class="underline">city's own system</a>.
+    </p>
+    <ScrollPanel label={`${member.name}'s recent votes`} max="max-h-[32rem]" count={Math.min(RECENT, stats.total)}>
+      <ul class="divide-y divide-navy-100 p-0 text-sm">
+        {votes.map((v) => (
+          <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-1.5">
+            <span class={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.value)}`}>{v.value}</span>
+            <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
+            {v.matter_url ? (
+              <a href={v.matter_url} class="w-28 shrink-0 truncate font-semibold underline">{v.matter_file ?? "item"}</a>
+            ) : (
+              <span class="w-28 shrink-0 truncate font-semibold">{v.matter_file ?? "item"}</span>
+            )}
+            <span class="min-w-0 flex-1 truncate">{v.title}</span>
+          </li>
+        ))}
+      </ul>
+    </ScrollPanel>
+  </section>
+</Base>

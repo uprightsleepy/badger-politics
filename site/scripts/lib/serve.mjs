@@ -104,7 +104,7 @@ const SAMPLE_PATHS = [
   "/legislators/", "/districts/", "/districts/senate-21/", "/committees/", "/federal/",
   "/calendar/", "/my-reps/", "/elections/2026/", "/elections/2026/senate-5/",
   "/money/", "/money/committees/", "/money/committees/651839/", "/money/independent/",
-  "/lobbying/",
+  "/lobbying/", "/local/", "/local/milwaukee/", "/local/west-allis/",
 ];
 export const samplePages = async () => {
   const dynamic = await Promise.all([
@@ -112,6 +112,7 @@ export const samplePages = async () => {
     firstHref("subjects", /href="(\/subjects\/[^"]+\/)"/),
     firstHref("committees", /href="(\/committees\/[^"]+\/)"/),
     firstHref("federal", /href="(\/federal\/[^"]+\/)"/),
+    firstHref("local/milwaukee", /href="(\/local\/milwaukee\/[^"]+\/)"/),
     // one legislator page with full cards, and one whose money card
     // carries the timeline chart (coverage differs between the two)
     firstLegislatorHref(),

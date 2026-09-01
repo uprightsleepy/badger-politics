@@ -89,10 +89,12 @@ const geocode = (address: string): Promise<any> =>
   });
 
 /** Address -> district, with the failure cases a reader needs told apart:
- * an address the geocoder cannot place, and a point outside Wisconsin. */
+ * an address the geocoder cannot place, and a point outside Wisconsin.
+ * The coordinates come back too, so the caller can run the city-council
+ * lookup on the same point without a second geocode. */
 export const districtForAddress = async (
   address: string,
-): Promise<{ district: District } | { error: string }> => {
+): Promise<{ district: District; lng: number; lat: number } | { error: string }> => {
   let data: any;
   try {
     data = await geocode(address);
@@ -107,5 +109,26 @@ export const districtForAddress = async (
   if (!district) {
     return { error: "That address doesn't fall inside a Wisconsin legislative district." };
   }
-  return { district };
+  return { district, lng: match.coordinates.x, lat: match.coordinates.y };
+};
+
+export type CityDistrictHit = { tenant: string; slug: string; city: string; district: number };
+
+let localBoundaries: { features: { geometry: unknown; properties: CityDistrictHit }[] } | null =
+  null;
+
+/** Which covered city-council district contains this point, if any.
+ * Same in-browser point-in-polygon as the state lookup, against the
+ * bundled city boundary file. */
+export const cityDistrictAt = async (
+  lng: number,
+  lat: number,
+): Promise<CityDistrictHit | null> => {
+  if (!localBoundaries) {
+    localBoundaries = await fetch("/data/local-districts.geojson").then((r) => r.json());
+  }
+  for (const f of localBoundaries!.features) {
+    if (pointInPolygon(lng, lat, f.geometry)) return f.properties;
+  }
+  return null;
 };

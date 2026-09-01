@@ -1,0 +1,25 @@
+{
+  "_comment": [
+    "Seat (aldermanic district) per Legistar person id, for tenants whose",
+    "office records do not carry it. West Allis lists all ten members as",
+    "'Ald.'; the city's own district pages name the two alderpersons per",
+    "district. Each entry cites the page it was read from and the date it",
+    "was verified. Milwaukee needs no entries: its office-record titles",
+    "carry the district ('3rd District') and are parsed directly.",
+    "Re-verify after each April municipal election.",
+    "Name note: Legistar prints 'Ray Turner'; the city page prints",
+    "'Ray C. Turner'. The person id is the join, never the name."
+  ],
+  "westalliswi": {
+    "430": { "seat": 1, "name": "Ray C. Turner", "basis": "https://www.westalliswi.gov/page/district-one", "verified": "2026-08-31" },
+    "531": { "seat": 1, "name": "Kimberlee Grob", "basis": "https://www.westalliswi.gov/page/district-one", "verified": "2026-08-31" },
+    "582": { "seat": 2, "name": "Chad Halvorsen", "basis": "https://www.westalliswi.gov/page/district-two", "verified": "2026-08-31" },
+    "538": { "seat": 2, "name": "Marissa Nowling", "basis": "https://www.westalliswi.gov/page/district-two", "verified": "2026-08-31" },
+    "471": { "seat": 3, "name": "Suzzette Grisham", "basis": "https://www.westalliswi.gov/page/district-three", "verified": "2026-08-31" },
+    "470": { "seat": 3, "name": "Danna Kuehn", "basis": "https://www.westalliswi.gov/page/district-three", "verified": "2026-08-31" },
+    "583": { "seat": 4, "name": "Patty Novak", "basis": "https://www.westalliswi.gov/page/district-four", "verified": "2026-08-31" },
+    "104": { "seat": 4, "name": "Daniel J. Roadt", "basis": "https://www.westalliswi.gov/page/district-four", "verified": "2026-08-31" },
+    "117": { "seat": 5, "name": "Kevin Haass", "basis": "https://www.westalliswi.gov/page/district-five", "verified": "2026-08-31" },
+    "53": { "seat": 5, "name": "Martin J. Weigel", "basis": "https://www.westalliswi.gov/page/district-five", "verified": "2026-08-31" }
+  }
+}

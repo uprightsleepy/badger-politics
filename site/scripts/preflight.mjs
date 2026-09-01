@@ -108,6 +108,29 @@ for (const c of counts) {
   }
 }
 
+// --- council member pages mirror the local tables, when present ------------
+const hasLocal = db
+  .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='local_members'")
+  .get();
+if (hasLocal) {
+  const expected = db
+    .prepare(
+      "SELECT COUNT(*) AS n FROM local_members m WHERE m.is_current = 1" +
+        " OR EXISTS (SELECT 1 FROM local_votes v WHERE v.tenant = m.tenant" +
+        " AND v.person_id = m.person_id)",
+    )
+    .get().n;
+  let built = 0;
+  for (const bodyDir of (await subdirs("local")) ?? []) {
+    built += ((await subdirs("local", bodyDir)) ?? []).length;
+  }
+  if (built < expected) {
+    fail(`council member pages: built ${built}, database has ${expected}`);
+  } else {
+    pass(`council member pages: ${built} built for ${expected} members`);
+  }
+}
+
 // --- the search index has to match the build it shipped with ---------------
 const pfPath = join(DIST, "pagefind", "pagefind-entry.json");
 if (!(await exists("pagefind/pagefind-entry.json"))) {

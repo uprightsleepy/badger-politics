@@ -72,17 +72,19 @@ import Base from "../layouts/Base.astro";
 
   <script>
     import { savedDistrict, saveDistrict, forgetDistrict } from "../lib/district";
+    import { forgetCityDistrict, saveCityDistrict, savedCityDistrict } from "../lib/cityDistrict";
     import { esc } from "../lib/html";
     import { fmtDate, partyChipHtml, shortTitle } from "../lib/format";
-    import { districtAt, districtForAddress } from "../lib/lookup";
+    import { cityDistrictAt, districtAt, districtForAddress } from "../lib/lookup";
     import { forgetPollingPlace, savePollingPlace, savedPollingPlace } from "../lib/pollingPlace";
-    import type { RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
+    import type { LocalReps, RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
 
     const statusEl = document.getElementById("status")!;
     const resultEl = document.getElementById("result")!;
     const repsEl = document.getElementById("reps")!;
     let reps: Reps | null = null;
     let summaries: RepSummaries | null = null;
+    let localReps: LocalReps | null = null;
 
     // The boundaries and the point-in-polygon test live in lib/lookup, shared
     // with the homepage. What this page loads on its own is the roster it
@@ -90,9 +92,10 @@ import Base from "../layouts/Base.astro";
     async function loadData() {
       if (!reps) {
         statusEl.textContent = "Loading your districts…";
-        [reps, summaries] = await Promise.all([
+        [reps, summaries, localReps] = await Promise.all([
           fetch("/data/reps.json").then((r) => r.json()),
           fetch("/data/rep-summaries.json").then((r) => r.json()).catch(() => null),
+          fetch("/data/local-reps.json").then((r) => r.json()).catch(() => null),
         ]);
       }
     }
@@ -260,6 +263,29 @@ import Base from "../layouts/Base.astro";
       );
     }
 
+    /** The council card, for addresses inside a covered city. Appended
+     * after the two state cards; absent for everyone else. */
+    function cityCard(): string {
+      const saved = savedCityDistrict();
+      const info = saved && localReps ? localReps[saved.t] : null;
+      if (!saved || !info) return "";
+      const alders = info.districts[String(saved.d)] ?? [];
+      return (
+        '<div class="rounded-lg border border-navy-100 p-4">' +
+        '<div class="min-w-0 flex-1">' +
+        `<a class="inline-block py-1 text-xs font-semibold uppercase tracking-wide text-navy-600 hover:underline" href="/local/${esc(info.slug)}/">${esc(info.council)} · District ${saved.d}</a>` +
+        alders
+          .map(
+            (a) =>
+              `<p class="mt-0.5"><a class="text-lg font-bold leading-tight hover:underline" href="/local/${esc(info.slug)}/${esc(a.slug)}/">${esc(a.name)}</a></p>`,
+          )
+          .join("") +
+        '</div>' +
+        `<p class="mt-2 text-sm"><a class="inline-block py-1 font-semibold underline" href="/local/${esc(info.slug)}/">How the ${esc(info.city)} council votes &rarr;</a></p>` +
+        '</div>'
+      );
+    }
+
     function show(props: { ad: number; sd: number }, announce = false) {
       saveDistrict(props);
       repsEl.innerHTML = [
@@ -275,6 +301,7 @@ import Base from "../layouts/Base.astro";
           reps!.senate[props.sd],
           summaries?.senate?.[props.sd],
         ),
+        cityCard(),
         '<p class="rounded-lg bg-navy-50 px-3 py-2 text-sm text-navy-700">Every bill page will now pin how these two voted, and they are highlighted anywhere they appear.</p>',
       ]
         .filter(Boolean)
@@ -286,9 +313,17 @@ import Base from "../layouts/Base.astro";
       }
     }
 
+    async function resolveCity(lng: number, lat: number) {
+      // covered-city lookup on the same point; the address goes nowhere new
+      const hit = await cityDistrictAt(lng, lat).catch(() => null);
+      if (hit) saveCityDistrict({ t: hit.tenant, d: hit.district });
+      else forgetCityDistrict();
+    }
+
     async function resolvePoint(lng: number, lat: number) {
       const [props] = await Promise.all([districtAt(lng, lat), loadData()]);
       if (props) {
+        await resolveCity(lng, lat);
         show(props, true);
       } else {
         statusEl.textContent =
@@ -305,6 +340,7 @@ import Base from "../layouts/Base.astro";
         statusEl.textContent = result.error;
         return;
       }
+      await resolveCity(result.lng, result.lat);
       show(result.district, true);
     });
 
@@ -321,6 +357,7 @@ import Base from "../layouts/Base.astro";
 
     document.getElementById("forget")!.addEventListener("click", () => {
       forgetDistrict();
+      forgetCityDistrict();
       resultEl.classList.add("hidden");
       statusEl.textContent = "Forgotten.";
       (document.getElementById("addr") as HTMLInputElement).focus();
