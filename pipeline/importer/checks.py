@@ -328,6 +328,20 @@ def check_local(conn: sqlite3.Connection) -> list[str]:
             " ON m.tenant = s.tenant AND m.person_id = s.person_id"
             " WHERE m.person_id IS NULL"
         ),
+        "local roll calls -> events": (
+            "SELECT COUNT(*) FROM local_rollcalls r LEFT JOIN local_events e"
+            " ON e.tenant = r.tenant AND e.event_id = r.event_id"
+            " WHERE e.event_id IS NULL"
+        ),
+        "local roll calls -> members": (
+            "SELECT COUNT(*) FROM local_rollcalls r LEFT JOIN local_members m"
+            " ON m.tenant = r.tenant AND m.person_id = r.person_id"
+            " WHERE m.person_id IS NULL"
+        ),
+        "local roll-call values outside the tenant's vocabulary": (
+            "SELECT COUNT(*) FROM local_rollcalls r LEFT JOIN local_vote_types t"
+            " ON t.tenant = r.tenant AND t.value = r.value WHERE t.value IS NULL"
+        ),
         "duplicate local member slugs": (
             "SELECT COUNT(*) FROM (SELECT tenant, slug FROM local_members"
             " GROUP BY tenant, slug HAVING COUNT(*) > 1)"

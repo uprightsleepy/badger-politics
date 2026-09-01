@@ -18,7 +18,7 @@ def office(person_id: int, name: str, title: str, member_type: str = "Member",
 
 
 def event_file(event_id: int, date: str, items: list[dict], votes: dict,
-               links: dict | None = None) -> dict:
+               links: dict | None = None, rollcalls: dict | None = None) -> dict:
     return {
         "event": {
             "EventId": event_id, "EventDate": f"{date}T09:00:00",
@@ -28,6 +28,7 @@ def event_file(event_id: int, date: str, items: list[dict], votes: dict,
         "items": items,
         "votes": votes,
         "links": links or {},
+        "rollcalls": rollcalls or {},
     }
 
 
@@ -46,7 +47,7 @@ def write_tenant(root: Path, tenant: str, officerecords, events) -> None:
     (d / "officerecords.json").write_text(json.dumps(officerecords), encoding="utf-8")
     (d / "votetypes.json").write_text(
         json.dumps([{"VoteTypeName": v} for v in
-                    ("Aye", "No", "Abstain", "Excused", "Non-Voting")]),
+                    ("Aye", "No", "Abstain", "Excused", "Non-Voting", "Present")]),
         encoding="utf-8",
     )
     for e in events:
@@ -287,3 +288,30 @@ def test_names_come_from_the_person_record_where_the_office_record_abbreviates(
     assert rows[10] == "Ald. O'Donnell|ald-o-donnell|ALD. O'DONNELL"
     # a record name that already reads as a name is kept as the tenant wrote it
     assert rows[117] == "Kevin Haass|kevin-haass|Kevin Haass"
+
+
+def test_roll_calls_record_attendance_and_movers_are_kept(tmp_path, make_db) -> None:
+    ev = event_file(
+        100, "2026-07-31",
+        [item(7, "PASSED", EventItemMoverId=9, EventItemSeconderId=12),
+         {"EventItemId": 5, "EventItemActionName": None, "EventItemRollCallFlag": 1}],
+        {"7": [vote(9, "A", "Aye")]},
+        rollcalls={"5": [
+            {"RollCallPersonId": 9, "RollCallPersonName": "A", "RollCallValueName": "Present"},
+            {"RollCallPersonId": 12, "RollCallPersonName": "ALD. LATE",
+             "RollCallValueName": "Excused"},
+            {"RollCallPersonId": 13, "RollCallPersonName": "C", "RollCallValueName": None},
+        ]},
+    )
+    conn = build(tmp_path, make_db,
+                 milwaukee_office=[office(9, "A", "1st District")], milwaukee_events=[ev])
+    assert conn.execute(
+        "SELECT person_id, value FROM local_rollcalls ORDER BY person_id"
+    ).fetchall() == [(9, "Present"), (12, "Excused")]
+    # known only from the roll call: the tenant's own id and name, not sitting
+    assert conn.execute(
+        "SELECT name, record_name, is_current FROM local_members WHERE person_id=12"
+    ).fetchone() == ("Ald. Late", "ALD. LATE", 0)
+    assert conn.execute(
+        "SELECT mover_id, seconder_id FROM local_actions WHERE event_item_id=7"
+    ).fetchone() == (9, 12)

@@ -44,7 +44,8 @@ export default defineConfig({
         // noindex; listing them here would ask a crawler to fetch what it
         // has been told not to index
         !/\/votes\//.test(page) &&
-        !/\/legislators\/[^/]+\/(votes|bills)\//.test(page),
+        !/\/legislators\/[^/]+\/(votes|bills)\//.test(page) &&
+        !/\/local\/[^/]+\/[^/]+\/votes\//.test(page),
       serialize(item) {
         // bills and members change as the session moves; reference pages
         // rarely do. Priority is relative within our own site only.

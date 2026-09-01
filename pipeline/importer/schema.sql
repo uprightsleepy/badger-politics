@@ -373,6 +373,8 @@ CREATE TABLE local_actions (
     passed        INTEGER,                -- the clerk's own flag; may be NULL
     agenda_number TEXT,
     matter_url    TEXT,                   -- the clerk's public legislation page
+    mover_id      INTEGER,                -- who moved the action: the tenant's person id
+    seconder_id   INTEGER,
     PRIMARY KEY (tenant, event_item_id),
     FOREIGN KEY (tenant, event_id) REFERENCES local_events (tenant, event_id)
 );
@@ -388,6 +390,19 @@ CREATE TABLE local_votes (
     FOREIGN KEY (tenant, event_item_id) REFERENCES local_actions (tenant, event_item_id),
     FOREIGN KEY (tenant, person_id) REFERENCES local_members (tenant, person_id)
 );
+-- attendance: the clerk's roll call, one row per member per roll-call
+-- item, values (Present/Excused/...) exactly as recorded
+CREATE TABLE local_rollcalls (
+    tenant        TEXT NOT NULL,
+    event_item_id INTEGER NOT NULL,
+    event_id      INTEGER NOT NULL,
+    person_id     INTEGER NOT NULL,
+    value         TEXT NOT NULL,
+    PRIMARY KEY (tenant, event_item_id, person_id),
+    FOREIGN KEY (tenant, event_id) REFERENCES local_events (tenant, event_id),
+    FOREIGN KEY (tenant, person_id) REFERENCES local_members (tenant, person_id)
+);
+CREATE INDEX idx_local_rollcalls ON local_rollcalls (tenant, person_id);
 CREATE INDEX idx_local_votes_person ON local_votes (tenant, person_id);
 
 -- each tenant's own vote vocabulary (its VoteTypes), the checks' allowlist

@@ -265,8 +265,9 @@ vote rows: Aye 96,102, Non-Voting 10,435 (the presiding mayor), No 525,
 Present 42, Abstain 16. Attribution is clean: every voter is in the
 body's office records and every vote falls inside a recorded term. The
 quirks: 3,794 rows list a member with no value (skipped, counted) and
-18 identical repeats (kept once). West Allis records no attendance roll
-calls, so its member pages carry votes only.
+18 identical repeats (kept once). Attendance is not in the vote rows for
+either city; it is in the roll-call items, added later (see the parity
+section below).
 
 ## Item links: InSite's ids are not the API's (2026-09-01, fixed)
 
@@ -338,6 +339,25 @@ rule, and a piece that fails its rule is left off rather than guessed.
   record's own string is kept as `record_name` and shown on the page when
   it differs. Slugs follow the shown name, so the Milwaukee URLs changed
   before any production release.
+- Attendance: the API's `EventItems/{id}/RollCalls` lists every member
+  with Present, Excused, Absent or Non-Voting for each roll-call item
+  (`EventItemRollCallFlag`), in both tenants. Fetched once per meeting
+  and cached with it; imported under the votes' rules (no value is no
+  fact, two values is no fact) into `local_rollcalls`, gated on member
+  ids and the tenant's vocabulary. Shown as meetings recorded present of
+  meetings where the roll was called with the member listed, with every
+  value as recorded.
+- Outcomes and motions, from data already held: "on the losing side" is
+  an Aye or No opposite the clerk's passed flag (items without the flag
+  left out of both counts); "sole No votes" are items where the member
+  cast the only No; "motions they moved" are items whose record names
+  the member as mover (`EventItemMoverId`, present on 99% of acted
+  items, kept with the seconder).
+- Term end from the office record; every sitting member's term ends in
+  April 2028, and the seat is filled at that April's spring election.
+- A paged full vote record at 200 a page, noindex like a legislator's,
+  and one page per council district drawing the district within its city
+  from the committed boundaries (`importer/local_district_shapes.py`).
 
 ## Open questions for the owner
 

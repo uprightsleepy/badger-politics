@@ -5,8 +5,9 @@ Usage: python -m scraper.fetch_local_votes [--max-new N] [--delay S]
 For each registry tenant (importer/local_registry.py): the body's vote
 vocabulary and office records refresh every run; each council meeting is
 one cached JSON file holding the event, its agenda items, the
-per-member votes for every acted item, and each item's own InSite link
-read from the meeting's page (InSite's ids are not the API's). A meeting refetches only while
+per-member votes for every acted item, each item's own InSite link read
+from the meeting's page (InSite's ids are not the API's), and the
+per-member attendance of every roll-call item. A meeting refetches only while
 its minutes are not Final, so the one-time backfill is exactly that.
 Meetings are fetched newest first, so an interrupted backfill still
 leaves the recent record complete.
@@ -138,6 +139,16 @@ def fetch_links(http, event: dict, insite: str, delay: float) -> dict[str, str]:
     return links
 
 
+def fetch_rollcalls(http, tenant: str, items: list[dict], delay: float) -> dict[str, list]:
+    """Per-member attendance for each roll-call item of a meeting."""
+    return {
+        str(i["EventItemId"]): call(
+            http, tenant, f"EventItems/{i['EventItemId']}/RollCalls", delay
+        )
+        for i in items if i.get("EventItemRollCallFlag")
+    }
+
+
 def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int, int]:
     tenant = spec["tenant"]
     out = DATA_DIR / tenant
@@ -185,8 +196,15 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
         if dest.exists():
             held = json.loads(dest.read_text(encoding="utf-8"))
             if held["event"].get("EventMinutesStatusName") == "Final":
-                if "links" not in held:  # cached before item links were kept
+                # cached before item links or attendance were kept: filled once
+                changed = False
+                if "links" not in held:
                     held["links"] = fetch_links(http, held["event"], spec["insite"], delay)
+                    changed = True
+                if "rollcalls" not in held:
+                    held["rollcalls"] = fetch_rollcalls(http, tenant, held["items"], delay)
+                    changed = True
+                if changed:
                     dest.write_text(json.dumps(held, indent=0), encoding="utf-8")
                 cached += 1
                 continue  # minutes final: the record is settled
@@ -201,9 +219,10 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
                     http, tenant, f"EventItems/{item['EventItemId']}/Votes", delay
                 )
         links = fetch_links(http, event, spec["insite"], delay)
+        rollcalls = fetch_rollcalls(http, tenant, items, delay)
         dest.write_text(
-            json.dumps({"event": event, "items": items, "votes": votes, "links": links},
-                       indent=0),
+            json.dumps({"event": event, "items": items, "votes": votes, "links": links,
+                        "rollcalls": rollcalls}, indent=0),
             encoding="utf-8",
         )
         fetched += 1

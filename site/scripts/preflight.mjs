@@ -122,12 +122,22 @@ if (hasLocal) {
     .get().n;
   let built = 0;
   for (const bodyDir of (await subdirs("local")) ?? []) {
-    built += ((await subdirs("local", bodyDir)) ?? []).length;
+    built += ((await subdirs("local", bodyDir)) ?? []).filter((d) => d !== "district").length;
   }
   if (built < expected) {
     fail(`council member pages: built ${built}, database has ${expected}`);
   } else {
     pass(`council member pages: ${built} built for ${expected} members`);
+  }
+  const seats = db.prepare("SELECT COALESCE(SUM(seats), 0) AS n FROM local_bodies").get().n;
+  let districtPages = 0;
+  for (const bodyDir of (await subdirs("local")) ?? []) {
+    districtPages += ((await subdirs("local", bodyDir, "district")) ?? []).length;
+  }
+  if (districtPages < seats) {
+    fail(`council district pages: built ${districtPages}, database has ${seats} seats`);
+  } else {
+    pass(`council district pages: ${districtPages} built for ${seats} seats`);
   }
   let feeds = 0;
   for (const bodyDir of (await subdirs("feeds", "local")) ?? []) {

@@ -1,0 +1,30 @@
+---
+/** A council district's shape within its city; the council counterpart of
+ * DistrictMap.astro. Paths are precomputed and committed
+ * (importer/local_district_shapes.py); the city's other districts are the
+ * backdrop, so position and size read true. Decorative by design: the page
+ * states the district and its member in text. */
+import SHAPES from "../data/local-district-shapes.json";
+interface Props { body: string; seat: number; label: string; city: string }
+const { body, seat, label, city } = Astro.props;
+const shapes = SHAPES as Record<string, string>;
+const path = shapes[`${body}-${seat}`];
+const backdrop = shapes[`_${body}`];
+const viewBox = shapes[`_${body}_viewBox`];
+---
+{path && (
+  <figure class="rounded-lg border border-navy-100 bg-white p-3">
+    <svg
+      viewBox={viewBox}
+      class="mx-auto h-auto w-full max-w-[220px]"
+      role="img"
+      aria-label={`Map of ${label} within ${city}`}
+    >
+      <path d={backdrop} fill="var(--color-navy-50)" stroke="var(--color-navy-100)" stroke-width="0.5" />
+      <path d={path} fill="var(--color-navy-600)" stroke="var(--color-navy-800)" stroke-width="0.8" />
+    </svg>
+    <figcaption class="mt-2 text-center text-xs text-navy-600">
+      {label} within {city}. Boundaries are the city's own 2024 district files.
+    </figcaption>
+  </figure>
+)}

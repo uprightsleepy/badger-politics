@@ -1681,7 +1681,9 @@ export const localMemberVotesWithDissent = (tenant: string, personId: number) =>
     ayes: number; noes: number;
   }[];
 
-export const localMemberVotes = (tenant: string, personId: number, limit: number) =>
+export const localMemberVotes = (
+  tenant: string, personId: number, limit: number, offset = 0,
+) =>
   prep(
       `SELECT v.value, v.event_item_id, a.matter_file, a.matter_url, a.title,
               a.action, e.date
@@ -1689,12 +1691,61 @@ export const localMemberVotes = (tenant: string, personId: number, limit: number
        JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
        JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
        WHERE v.tenant = ? AND v.person_id = ?
-       ORDER BY e.date DESC, a.event_item_id DESC LIMIT ?`,
+       ORDER BY e.date DESC, a.event_item_id DESC LIMIT ? OFFSET ?`,
     )
-    .all(tenant, personId, limit) as {
+    .all(tenant, personId, limit, offset) as {
     value: string; event_item_id: number; matter_file: string | null;
     matter_url: string | null; title: string | null; action: string; date: string;
   }[];
+
+/** How often the member's Aye or No ended opposite the clerk's recorded
+ * outcome; items without a passed flag are left out of both counts. */
+export const localMemberOutcomes = (tenant: string, personId: number) =>
+  prep(
+      `SELECT COALESCE(SUM((v.value = 'No' AND a.passed = 1)
+                        OR (v.value = 'Aye' AND a.passed = 0)), 0) AS lost,
+              COALESCE(SUM(v.value IN ('Aye', 'No') AND a.passed IS NOT NULL), 0) AS decided
+       FROM local_votes v
+       JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
+       WHERE v.tenant = ? AND v.person_id = ?`,
+    ).get(tenant, personId) as { lost: number; decided: number };
+
+/** Items the council's record names this member as having moved. */
+export const localMemberMotions = (tenant: string, personId: number, limit: number) =>
+  prep(
+      `SELECT a.event_item_id, a.matter_file, a.matter_url, a.title, a.action, a.passed,
+              e.date
+       FROM local_actions a
+       JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
+       WHERE a.tenant = ? AND a.mover_id = ?
+       ORDER BY e.date DESC, a.event_item_id DESC LIMIT ?`,
+    ).all(tenant, personId, limit) as {
+    event_item_id: number; matter_file: string | null; matter_url: string | null;
+    title: string | null; action: string; passed: number | null; date: string;
+  }[];
+export const localMemberMotionCount = (tenant: string, personId: number) =>
+  (prep(`SELECT COUNT(*) AS n FROM local_actions WHERE tenant = ? AND mover_id = ?`)
+    .get(tenant, personId) as { n: number }).n;
+
+/** Attendance from the clerk's roll calls: meetings where the member is
+ * listed, meetings recorded present, and every value as recorded. */
+export interface LocalAttendance {
+  meetings: number; present: number; values: { value: string; n: number }[];
+}
+export const localMemberAttendance = (tenant: string, personId: number): LocalAttendance => {
+  if (!hasTable("local_rollcalls")) return { meetings: 0, present: 0, values: [] };
+  const totals = prep(
+    `SELECT COUNT(DISTINCT event_id) AS meetings,
+            COUNT(DISTINCT CASE WHEN value IN ('Present', 'Pres (virt)') THEN event_id END)
+              AS present
+     FROM local_rollcalls WHERE tenant = ? AND person_id = ?`,
+  ).get(tenant, personId) as { meetings: number; present: number };
+  const values = prep(
+    `SELECT value, COUNT(*) AS n FROM local_rollcalls WHERE tenant = ? AND person_id = ?
+     GROUP BY value ORDER BY n DESC`,
+  ).all(tenant, personId) as { value: string; n: number }[];
+  return { ...totals, values };
+};
 
 export const localMemberVoteStats = (tenant: string, personId: number) =>
   prep(

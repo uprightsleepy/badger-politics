@@ -31,7 +31,7 @@ TITLE_SEAT_RE = re.compile(r"^(\d+)(?:st|nd|rd|th) District$")
 NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
 
 TABLES = (
-    "local_votes", "local_actions", "local_events", "local_memberships",
+    "local_rollcalls", "local_votes", "local_actions", "local_events", "local_memberships",
     "local_member_terms", "local_members", "local_vote_types", "local_bodies",
 )
 
@@ -145,6 +145,25 @@ def display_name(record: str, person: dict | None) -> str:
     if first and last:
         return f"{first} {last}"
     return title_case(record)
+
+
+def ensure_member(
+    conn: sqlite3.Connection, tenant: str, names: dict[int, str], person_id: int,
+    record_name: str, record_only: set[int],
+) -> None:
+    """A person in the votes or roll calls but not the body's office
+    records: keep the tenant's own id and name, invent nothing."""
+    if person_id in names:
+        return
+    record_only.add(person_id)
+    names[person_id] = display_name(record_name, None)
+    conn.execute(
+        "INSERT INTO local_members (tenant, person_id, name, record_name,"
+        " slug, seat, seat_basis, member_type, is_current)"
+        " VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, 0)",
+        (tenant, person_id, names[person_id], record_name,
+         f"{slugify(names[person_id]) or 'member'}-{person_id}"),
+    )
 
 
 def import_members(
@@ -282,6 +301,7 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
     membership_rows = import_memberships(conn, spec, memberships, departments)
 
     events = actions = votes = unvalued = duplicated = conflicting = 0
+    rollcalls = unvalued_rollcalls = 0
     vote_only_members: set[int] = set()
     voter_names: dict[int, str] = {}
     for path in sorted(src.glob("event_*.json")):
@@ -304,8 +324,8 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
             conn.execute(
                 "INSERT INTO local_actions (tenant, event_item_id, event_id,"
                 " matter_id, matter_file, matter_type, matter_status, title,"
-                " action, passed, agenda_number, matter_url)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " action, passed, agenda_number, matter_url, mover_id, seconder_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     tenant, item["EventItemId"], event["EventId"],
                     item.get("EventItemMatterId"), item.get("EventItemMatterFile"),
@@ -313,6 +333,7 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
                     item.get("EventItemTitle"), item["EventItemActionName"],
                     item.get("EventItemPassedFlag"), item.get("EventItemAgendaNumber"),
                     matter_url(links, item),
+                    item.get("EventItemMoverId"), item.get("EventItemSeconderId"),
                 ),
             )
             actions += 1
@@ -341,24 +362,41 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
             for person_id, value in positions.items():
                 if person_id in conflicted:
                     continue
-                if person_id not in names:
-                    # in the votes but not the body's office records: keep
-                    # the tenant's own id and name, invent nothing
-                    vote_only_members.add(person_id)
-                    names[person_id] = display_name(voter_names[person_id], None)
-                    conn.execute(
-                        "INSERT INTO local_members (tenant, person_id, name, record_name,"
-                        " slug, seat, seat_basis, member_type, is_current)"
-                        " VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, 0)",
-                        (tenant, person_id, names[person_id], voter_names[person_id],
-                         f"{slugify(names[person_id]) or 'member'}-{person_id}"),
-                    )
+                ensure_member(conn, tenant, names, person_id, voter_names[person_id],
+                              vote_only_members)
                 conn.execute(
                     "INSERT INTO local_votes (tenant, event_item_id, person_id, value)"
                     " VALUES (?, ?, ?, ?)",
                     (tenant, item["EventItemId"], person_id, value),
                 )
                 votes += 1
+        # attendance, under the same rules as votes: a row with no value is
+        # not a fact, a person listed twice with one value is one fact, and
+        # two values is the record disagreeing with itself
+        for item_id, rows in data.get("rollcalls", {}).items():
+            attendance: dict[int, str] = {}
+            disputed: set[int] = set()
+            for r in rows:
+                value = r.get("RollCallValueName")
+                if not value:
+                    unvalued_rollcalls += 1
+                    continue
+                pid = r["RollCallPersonId"]
+                if pid in attendance and attendance[pid] != value:
+                    disputed.add(pid)
+                attendance.setdefault(pid, value)
+                voter_names.setdefault(pid, (r.get("RollCallPersonName") or "").strip()
+                                       or str(pid))
+            for pid, value in attendance.items():
+                if pid in disputed:
+                    continue
+                ensure_member(conn, tenant, names, pid, voter_names[pid], vote_only_members)
+                conn.execute(
+                    "INSERT INTO local_rollcalls (tenant, event_item_id, event_id,"
+                    " person_id, value) VALUES (?, ?, ?, ?, ?)",
+                    (tenant, int(item_id), event["EventId"], pid, value),
+                )
+                rollcalls += 1
     # Office records are incomplete for earlier years (Milwaukee's carry no
     # dates for several long-serving members), so a vote outside its
     # member's recorded dates is reported, not gated: the vote itself is
@@ -375,6 +413,7 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
     ).fetchone()[0]
     return {
         "events": events, "actions": actions, "votes": votes,
+        "rollcalls": rollcalls, "unvalued_rollcalls": unvalued_rollcalls,
         "members": len(names), "vote_only": len(vote_only_members),
         "unvalued": unvalued, "outside_terms": outside,
         "duplicated": duplicated, "conflicting": conflicting,
@@ -398,6 +437,9 @@ def run(local_dir: Path, db_path: Path) -> None:
             )
             print(f"  sitting members: {stats['photos']} portraits, {stats['emails']} emails,"
                   f" {stats['phones']} phones attributed; {stats['memberships']} committee seats")
+            print(f"  {stats['rollcalls']} attendance rows from the clerk's roll calls"
+                  + (f"; {stats['unvalued_rollcalls']} listed no value: skipped"
+                     if stats["unvalued_rollcalls"] else ""))
             if stats["unvalued"]:
                 print(f"  {stats['unvalued']} vote rows carried no recorded value: skipped")
             if stats["duplicated"]:

@@ -1,0 +1,67 @@
+---
+/** One council district: its shape within the city and who holds the seat.
+ * Milwaukee seats one alderperson per district, West Allis two. */
+import Base from "../../../../layouts/Base.astro";
+import SourceStrip from "../../../../components/SourceStrip.astro";
+import Portrait from "../../../../components/Portrait.astro";
+import LocalDistrictMap from "../../../../components/LocalDistrictMap.astro";
+import { localBodies, localMembers } from "../../../../lib/db";
+
+export function getStaticPaths() {
+  return localBodies().flatMap((body) =>
+    Array.from({ length: body.seats }, (_, i) => ({
+      params: { body: body.slug, seat: String(i + 1) },
+      props: { body, seat: i + 1 },
+    })),
+  );
+}
+const { body, seat } = Astro.props;
+const holders = localMembers(body.tenant).filter((m) => m.is_current && m.seat === seat);
+const name = `${body.city} Common Council District ${seat}`;
+---
+
+<Base
+  title={name}
+  description={`${name}: the district's boundary within ${body.city} and ${holders.length === 1 ? "its alderperson" : "its alderpersons"}, from the city's own records.`}
+  filters={{ type: "City Council", city: body.city }}
+  breadcrumbs={[
+    { name: "City Councils", url: "/local/" },
+    { name: body.name, url: `/local/${body.slug}/` },
+  ]}
+>
+  <p class="text-sm text-navy-600">
+    <a href={`/local/${body.slug}/`} class="underline">&larr; {body.name}</a>
+  </p>
+  <h1 class="mt-1 text-2xl font-bold">{name}</h1>
+  <p class="mt-1 max-w-3xl text-sm text-navy-700">
+    One of {body.seats} aldermanic districts. Council seats are nonpartisan.
+  </p>
+  <SourceStrip
+    sources={[{ label: `${body.name} records (Legistar)`, href: body.insite_url }]}
+    through={null}
+  />
+
+  <div class="mt-3 max-w-[240px]">
+    <LocalDistrictMap body={body.slug} seat={seat} label={`District ${seat}`} city={body.city} />
+  </div>
+
+  {holders.length > 0 ? (
+    <div class="mt-3 rounded-lg border border-navy-100 bg-white p-4">
+      <p class="text-sm text-navy-600">{holders.length === 1 ? "Current member" : "Current members"}</p>
+      {holders.map((m) => (
+        <a href={`/local/${body.slug}/${m.slug}/`} class="mt-2 flex items-center gap-3 text-lg font-bold underline">
+          <Portrait src={m.image_url} name={m.name} size={48} />
+          <span>{m.name}</span>
+        </a>
+      ))}
+      <p class="mt-2 text-xs text-navy-600">From the council's own office records.</p>
+    </div>
+  ) : (
+    <p class="mt-3 text-sm text-navy-600">No sitting member on record for this district.</p>
+  )}
+
+  <p class="mt-4 max-w-3xl text-sm text-navy-700">
+    Not sure which district you live in?
+    {" "}<a href="/my-reps/" class="underline">Look up your address</a>; the answer stays on your device.
+  </p>
+</Base>

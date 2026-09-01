@@ -1,0 +1,77 @@
+---
+/** A council member's complete voting record, paged like a legislator's.
+ * The profile shows the most recent 300; a long career runs to tens of
+ * thousands. noindex like the legislator pages: derived lists whose
+ * substance is on the clerk's pages, but crawlable for a link path. */
+import Base from "../../../../../layouts/Base.astro";
+import Pager from "../../../../../components/Pager.astro";
+import { localBodies, localMembers, localMemberVotes } from "../../../../../lib/db";
+import { fmtDate } from "../../../../../lib/format";
+import { PER_PAGE, pageBounds, pageCount } from "../../../../../lib/paging";
+
+export function getStaticPaths() {
+  return localBodies().flatMap((body) =>
+    localMembers(body.tenant)
+      .filter((m) => m.vote_count > 0)
+      .flatMap((m) => {
+        const pages = pageCount(m.vote_count);
+        return Array.from({ length: pages }, (_, i) => ({
+          params: { body: body.slug, member: m.slug, page: String(i + 1) },
+          props: { body, member: m, page: i + 1, pages, total: m.vote_count },
+        }));
+      }),
+  );
+}
+
+const { body, member, page, pages, total } = Astro.props;
+const rows = localMemberVotes(body.tenant, member.person_id, PER_PAGE, (page - 1) * PER_PAGE);
+const base = `/local/${body.slug}/${member.slug}`;
+const { first, last } = pageBounds(page, total);
+
+const CAST_STYLE: Record<string, string> = {
+  Aye: "bg-moss-50 text-moss-600",
+  No: "bg-badger-50 text-badger-700",
+};
+const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
+---
+
+<Base
+  title={`${member.name}: every vote, page ${page} of ${pages}`}
+  description={`Votes ${first.toLocaleString()} to ${last.toLocaleString()} of ${total.toLocaleString()} recorded for ${member.name} on the ${body.name}, from the city's own records.`}
+  noindex
+  searchable={false}
+  breadcrumbs={[
+    { name: "City Councils", url: "/local/" },
+    { name: body.name, url: `/local/${body.slug}/` },
+    { name: member.name, url: `${base}/` },
+  ]}
+>
+  <p class="text-sm text-navy-600">
+    <a href={`${base}/`} class="underline">&larr; {member.name}</a>
+  </p>
+  <h1 class="mt-1 text-2xl font-bold">Every Recorded Vote</h1>
+  <p class="mt-1 text-sm text-navy-600">
+    {total.toLocaleString()} recorded votes, newest first. Showing
+    {" "}{first.toLocaleString()} to {last.toLocaleString()}. Each item links to the clerk's page.
+  </p>
+
+  <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+    {rows.map((v) => (
+      <li class="px-4 py-1.5">
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <span class={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.value)}`}>{v.value}</span>
+          <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
+          {v.matter_url ? (
+            <a href={v.matter_url} class="shrink-0 font-semibold underline">{v.matter_file ?? "item"}</a>
+          ) : (
+            <span class="shrink-0 font-semibold">{v.matter_file ?? "item"}</span>
+          )}
+          <span class="min-w-0 flex-1 break-words">{v.title}</span>
+        </div>
+        <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{v.action}</p>
+      </li>
+    ))}
+  </ul>
+
+  <Pager page={page} pages={pages} href={(n) => `${base}/votes/${n}/`} label="Vote record pages" />
+</Base>
