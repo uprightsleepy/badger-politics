@@ -19,6 +19,11 @@ async function* htmlFiles(dir) {
   }
 }
 
+// A regex capture is a V8 sliced string that keeps the whole page's HTML
+// alive for as long as the capture lives; keyed into a map, one new href
+// per page pinned every page in memory (2 GB on the full build). Copying
+// only the keys that are actually inserted keeps the walk flat.
+const flat = (str) => Buffer.from(str).toString();
 const internal = new Map(); // href -> first page seen on
 const external = new Map();
 const fragments = new Map(); // href without fragment -> Set of fragments used
@@ -33,19 +38,19 @@ for await (const file of htmlFiles(DIST)) {
     const url = m[1];
     if (url.startsWith("mailto:") || url.startsWith("data:") || url.startsWith("//")) continue;
     if (url.startsWith("http")) {
-      if (!external.has(url)) external.set(url, page);
+      if (!external.has(url)) external.set(flat(url), page);
     } else if (url.startsWith("/")) {
       const [path, frag] = url.split("#");
-      if (!internal.has(path || "/")) internal.set(path || "/", page);
+      if (!internal.has(path || "/")) internal.set(flat(path || "/"), page);
       if (frag) {
-        if (!fragments.has(path || page)) fragments.set(path || page, new Map());
+        if (!fragments.has(path || page)) fragments.set(flat(path || page), new Map());
         const fs = fragments.get(path || page);
-        if (!fs.has(frag)) fs.set(frag, page);
+        if (!fs.has(frag)) fs.set(flat(frag), page);
       }
     } else if (url.startsWith("#")) {
       if (!fragments.has(page)) fragments.set(page, new Map());
       const fs = fragments.get(page);
-      if (!fs.has(url.slice(1))) fs.set(url.slice(1), page);
+      if (!fs.has(url.slice(1))) fs.set(flat(url.slice(1)), page);
     }
   }
 }
