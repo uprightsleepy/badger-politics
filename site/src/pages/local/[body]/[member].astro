@@ -8,7 +8,9 @@ import ScrollPanel from "../../../components/ScrollPanel.astro";
 import Portrait from "../../../components/Portrait.astro";
 import FollowButton from "../../../components/FollowButton.astro";
 import JsonLd from "../../../components/JsonLd.astro";
-import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, localMemberVotesWithDissent, localMemberTerms, localMemberships, localMemberOutcomes, localMemberMotions, localMemberMotionCount, localMemberAttendance } from "../../../lib/db";
+import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, localMemberVotesWithDissent, localMemberTerms, localMemberships, localMemberOutcomes, localMemberMotions, localMemberMotionCount, localMemberAttendance, localMemberVoteYears } from "../../../lib/db";
+import YearChips from "../../../components/YearChips.astro";
+import { PER_PAGE } from "../../../lib/paging";
 import { fmtDate } from "../../../lib/format";
 
 const RECENT = 300;
@@ -37,6 +39,19 @@ const termEnd = member.is_current
   : null;
 const springYear = termEnd && termEnd.slice(5, 7) === "04" ? termEnd.slice(0, 4) : null;
 const pct = (n: number, d: number) => (d > 0 ? `${Math.round((n / d) * 100)}%` : "");
+const yearsOf = (rows: { date: string }[]) => {
+  const by = new Map<string, number>();
+  for (const r of rows) by.set(r.date.slice(0, 4), (by.get(r.date.slice(0, 4)) ?? 0) + 1);
+  return [...by.entries()].map(([year, n]) => ({ year, n }))
+    .sort((a, b) => b.year.localeCompare(a.year));
+};
+// the first page of the paged record that holds each year (newest first)
+let counted = 0;
+const yearPages = localMemberVoteYears(body.tenant, member.person_id).map((y) => {
+  const page = Math.floor(counted / PER_PAGE) + 1;
+  counted += y.n;
+  return { year: y.year, page };
+});
 // a presiding officer is recorded as Non-Voting, not Present, so no rate for the Chair
 const rated = member.member_type !== "Chair";
 const followId = `${body.slug}/${member.slug}`;
@@ -245,10 +260,11 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
       <p class="mt-1 max-w-3xl text-sm text-navy-600">
         Items where {member.name} cast the only No. Each links to the clerk's page.
       </p>
+      <YearChips target="sole-no-list" label={`Filter the sole No votes by year`} years={yearsOf(soleNoes)} />
       <ScrollPanel label={`${member.name}'s sole No votes`} max="max-h-[24rem]" count={soleNoes.length}>
-        <ul class="divide-y divide-navy-100 p-0 text-sm">
+        <ul id="sole-no-list" class="divide-y divide-navy-100 p-0 text-sm">
           {soleNoes.map((v) => (
-            <li class="px-4 py-2">
+            <li class="px-4 py-2" data-y={v.date.slice(0, 4)}>
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                 <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
                 {v.matter_url ? (
@@ -278,10 +294,11 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
         passes with every member in favor, so a single No is what sets one
         record apart from another. Each links to the clerk's page.
       </p>
+      <YearChips target="dissent-list" label={`Filter the votes with dissent by year`} years={yearsOf(dissentVotes)} />
       <ScrollPanel label={`${member.name} on votes with dissent`} max="max-h-[28rem]" count={dissentVotes.length}>
-        <ul class="divide-y divide-navy-100 p-0 text-sm">
+        <ul id="dissent-list" class="divide-y divide-navy-100 p-0 text-sm">
           {dissentVotes.map((v) => (
-            <li class="px-4 py-2">
+            <li class="px-4 py-2" data-y={v.date.slice(0, 4)}>
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                 <span class={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.value)}`}>{v.value}</span>
                 <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
@@ -339,6 +356,14 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
         <>, and every recorded vote is <a href={`/local/${body.slug}/${member.slug}/votes/1/`} class="underline">paged here</a></>
       )}.
     </p>
+    {yearPages.length > 1 && (
+      <p class="mt-1 max-w-3xl text-sm text-navy-600" data-pagefind-ignore>
+        Jump to a year in the full record:
+        {yearPages.map((y) => (
+          <a href={`/local/${body.slug}/${member.slug}/votes/${y.page}/`} class="ml-2 underline tabular-nums">{y.year}</a>
+        ))}
+      </p>
+    )}
     <ScrollPanel label={`${member.name}'s recent votes`} max="max-h-[32rem]" count={Math.min(RECENT, stats.total)}>
       <ul class="divide-y divide-navy-100 p-0 text-sm">
         {votes.map((v) => (

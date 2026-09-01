@@ -1,0 +1,35 @@
+---
+/** Single-select year filter for a complete list (never a truncated one:
+ * chips over a window would read as the whole record). Chips hide rows
+ * rather than dropping them, so the full list stays in the page and the
+ * search index; wiring in scripts/yearChips.ts. */
+interface Props {
+  target: string;
+  label: string;
+  years: { year: string; n: number }[];
+}
+const { target, label, years } = Astro.props;
+const total = years.reduce((sum, y) => sum + y.n, 0);
+const CHIP = "shrink-0 rounded-full border px-3 py-1 text-xs font-semibold";
+---
+{years.length > 1 && (
+  <div
+    class="mt-2 flex flex-wrap gap-1.5"
+    role="group"
+    aria-label={label}
+    data-yearchips={target}
+    data-pagefind-ignore
+  >
+    <button type="button" data-year="" aria-pressed="true" class={`${CHIP} border-navy-800 bg-navy-800 text-white`}>
+      All {total.toLocaleString()}
+    </button>
+    {years.map((y) => (
+      <button type="button" data-year={y.year} aria-pressed="false" class={`${CHIP} border-navy-100 bg-white tabular-nums`}>
+        {y.year} · {y.n.toLocaleString()}
+      </button>
+    ))}
+  </div>
+)}
+<script>
+  import "../scripts/yearChips";
+</script>

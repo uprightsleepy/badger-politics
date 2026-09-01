@@ -1698,6 +1698,18 @@ export const localMemberVotes = (
     matter_url: string | null; title: string | null; action: string; date: string;
   }[];
 
+/** Vote counts per year, newest first; the member page turns these into
+ * links to the first page of the paged record that holds each year. */
+export const localMemberVoteYears = (tenant: string, personId: number) =>
+  prep(
+      `SELECT substr(e.date, 1, 4) AS year, COUNT(*) AS n
+       FROM local_votes v
+       JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
+       JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
+       WHERE v.tenant = ? AND v.person_id = ?
+       GROUP BY year ORDER BY year DESC`,
+    ).all(tenant, personId) as { year: string; n: number }[];
+
 /** How often the member's Aye or No ended opposite the clerk's recorded
  * outcome; items without a passed flag are left out of both counts. */
 export const localMemberOutcomes = (tenant: string, personId: number) =>

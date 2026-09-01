@@ -5,7 +5,7 @@
  * substance is on the clerk's pages, but crawlable for a link path. */
 import Base from "../../../../../layouts/Base.astro";
 import Pager from "../../../../../components/Pager.astro";
-import { localBodies, localMembers, localMemberVotes } from "../../../../../lib/db";
+import { localBodies, localMembers, localMemberVotes, localMemberVoteYears } from "../../../../../lib/db";
 import { fmtDate } from "../../../../../lib/format";
 import { PER_PAGE, pageBounds, pageCount } from "../../../../../lib/paging";
 
@@ -27,6 +27,12 @@ const { body, member, page, pages, total } = Astro.props;
 const rows = localMemberVotes(body.tenant, member.person_id, PER_PAGE, (page - 1) * PER_PAGE);
 const base = `/local/${body.slug}/${member.slug}`;
 const { first, last } = pageBounds(page, total);
+let counted = 0;
+const yearPages = localMemberVoteYears(body.tenant, member.person_id).map((y) => {
+  const p = Math.floor(counted / PER_PAGE) + 1;
+  counted += y.n;
+  return { year: y.year, page: p };
+});
 
 const CAST_STYLE: Record<string, string> = {
   Aye: "bg-moss-50 text-moss-600",
@@ -54,6 +60,16 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
     {total.toLocaleString()} recorded votes, newest first. Showing
     {" "}{first.toLocaleString()} to {last.toLocaleString()}. Each item links to the clerk's page.
   </p>
+  {yearPages.length > 1 && (
+    <p class="mt-1 text-sm text-navy-600" data-pagefind-ignore>
+      Jump to a year:
+      {yearPages.map((y) => (
+        y.page === page
+          ? <span class="ml-2 font-semibold tabular-nums">{y.year}</span>
+          : <a href={`${base}/votes/${y.page}/`} class="ml-2 underline tabular-nums">{y.year}</a>
+      ))}
+    </p>
+  )}
 
   <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
     {rows.map((v) => (
