@@ -1634,9 +1634,11 @@ export const localTenantStats = memoBy((tenant: string) =>
   },
 );
 
-/** Items where the council split: the votes that separate one member
- * from another. Ayes and Noes recounted from the vote rows themselves. */
-const DIVIDED_SQL = `
+/** Items with dissent: at least one Aye and at least one No recorded.
+ * Nearly everything passes with every member in favor, so these are the
+ * votes that separate one member's record from another's. Ayes and Noes
+ * are recounted from the vote rows themselves. */
+const DISSENT_SQL = `
   SELECT a.event_item_id, a.matter_file, a.matter_url, a.title, a.action,
          e.date, e.insite_url,
          SUM(v.value = 'Aye') AS ayes, SUM(v.value = 'No') AS noes
@@ -1648,31 +1650,35 @@ const DIVIDED_SQL = `
   HAVING ayes > 0 AND noes > 0
   ORDER BY e.date DESC, a.event_item_id DESC`;
 
-export const localDividedActions = (tenant: string, limit: number) =>
-  prep(`${DIVIDED_SQL} LIMIT ?`).all(tenant, limit) as {
+export const localActionsWithDissent = (tenant: string, limit: number) =>
+  prep(`${DISSENT_SQL} LIMIT ?`).all(tenant, limit) as {
     event_item_id: number; matter_file: string | null; matter_url: string | null;
     title: string | null; action: string; date: string; insite_url: string;
     ayes: number; noes: number;
   }[];
 
-/** One member's positions on the divided items only, newest first; the
- * split test runs in SQLite so a long career never loads whole. */
-export const localMemberDividedVotes = (tenant: string, personId: number) =>
+/** One member's positions on the items with dissent, newest first, each
+ * with the council's tally; the test runs in SQLite so a long career
+ * never loads whole. */
+export const localMemberVotesWithDissent = (tenant: string, personId: number) =>
   prep(
       `SELECT v.value, v.event_item_id, a.matter_file, a.matter_url, a.title,
-              a.action, e.date
+              a.action, e.date, t.ayes, t.noes
        FROM local_votes v
+       JOIN (SELECT tenant, event_item_id,
+                    SUM(value = 'Aye') AS ayes, SUM(value = 'No') AS noes
+             FROM local_votes WHERE tenant = ?
+             GROUP BY event_item_id HAVING ayes > 0 AND noes > 0) t
+         ON t.tenant = v.tenant AND t.event_item_id = v.event_item_id
        JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
        JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
-       WHERE v.tenant = ? AND v.person_id = ? AND v.event_item_id IN (
-         SELECT v2.event_item_id FROM local_votes v2 WHERE v2.tenant = v.tenant
-         GROUP BY v2.event_item_id
-         HAVING SUM(v2.value = 'Aye') > 0 AND SUM(v2.value = 'No') > 0)
+       WHERE v.tenant = ? AND v.person_id = ?
        ORDER BY e.date DESC, a.event_item_id DESC`,
     )
-    .all(tenant, personId) as {
+    .all(tenant, tenant, personId) as {
     value: string; event_item_id: number; matter_file: string | null;
     matter_url: string | null; title: string | null; action: string; date: string;
+    ayes: number; noes: number;
   }[];
 
 export const localMemberVotes = (tenant: string, personId: number, limit: number) =>

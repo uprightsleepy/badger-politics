@@ -2,7 +2,7 @@
 import Base from "../../../layouts/Base.astro";
 import SourceStrip from "../../../components/SourceStrip.astro";
 import Portrait from "../../../components/Portrait.astro";
-import { localBodies, localMembers, localTenantStats, localDividedActions } from "../../../lib/db";
+import { localBodies, localMembers, localTenantStats, localActionsWithDissent } from "../../../lib/db";
 import { fmtDate } from "../../../lib/format";
 
 export function getStaticPaths() {
@@ -11,7 +11,7 @@ export function getStaticPaths() {
 const { body } = Astro.props;
 const members = localMembers(body.tenant);
 const stats = localTenantStats(body.tenant);
-const divided = localDividedActions(body.tenant, 25);
+const dissent = localActionsWithDissent(body.tenant, 25);
 const current = members.filter((m) => m.is_current);
 const seated = current.filter((m) => m.seat != null);
 const presiding = current.filter((m) => m.seat == null);
@@ -86,16 +86,17 @@ const districts = [...new Set(seated.map((m) => m.seat!))].sort((a, b) => a - b)
     </p>
   </section>
 
-  {divided.length > 0 && (
+  {dissent.length > 0 && (
     <section class="mt-8">
-      <h2 class="text-xl font-bold">Recent divided votes</h2>
+      <h2 class="text-xl font-bold">Recent votes with dissent</h2>
       <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Items where members split, the votes that separate one member from
-        another. Most council items pass with every member in favor; those
-        are on each member's page.
+        Items where at least one member voted No. Nearly everything passes
+        with every member in favor, so these are the votes that separate
+        one member's record from another's; the unanimous ones are on each
+        member's page.
       </p>
       <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
-        {divided.map((a) => (
+        {dissent.map((a) => (
           <li class="px-4 py-2">
             <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
               <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(a.date)}</span>

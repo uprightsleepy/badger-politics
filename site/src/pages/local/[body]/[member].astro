@@ -1,6 +1,6 @@
 ---
 /** One council member's voting record. Bounded like the legislator
- * profiles: recent votes in a scroll panel, divided votes in full, and
+ * profiles: recent votes in a scroll panel, votes with dissent in full, and
  * the clerk's page linked from every row. */
 import Base from "../../../layouts/Base.astro";
 import SourceStrip from "../../../components/SourceStrip.astro";
@@ -8,7 +8,7 @@ import ScrollPanel from "../../../components/ScrollPanel.astro";
 import Portrait from "../../../components/Portrait.astro";
 import FollowButton from "../../../components/FollowButton.astro";
 import JsonLd from "../../../components/JsonLd.astro";
-import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, localMemberDividedVotes, localMemberTerms, localMemberships } from "../../../lib/db";
+import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, localMemberVotesWithDissent, localMemberTerms, localMemberships } from "../../../lib/db";
 import { fmtDate } from "../../../lib/format";
 
 const RECENT = 300;
@@ -23,7 +23,7 @@ export function getStaticPaths() {
 const { body, member } = Astro.props;
 const stats = localMemberVoteStats(body.tenant, member.person_id);
 const votes = localMemberVotes(body.tenant, member.person_id, RECENT);
-const dividedVotes = localMemberDividedVotes(body.tenant, member.person_id);
+const dissentVotes = localMemberVotesWithDissent(body.tenant, member.person_id);
 const terms = localMemberTerms(body.tenant, member.person_id);
 const committees = member.is_current ? localMemberships(body.tenant, member.person_id) : [];
 const followId = `${body.slug}/${member.slug}`;
@@ -174,16 +174,18 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
     exactly as recorded.
   </p>
 
-  {dividedVotes.length > 0 && (
+  {dissentVotes.length > 0 && (
     <section class="mt-6">
-      <h2 class="text-xl font-bold">On divided votes · {dividedVotes.length.toLocaleString()}</h2>
+      <h2 class="text-xl font-bold">Votes with dissent · {dissentVotes.length.toLocaleString()}</h2>
       <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Every item where the council split and {member.name}'s position is
-        on record. Each links to the clerk's page.
+        Every item where at least one member voted No and {member.name}'s
+        position is on record, with the council's tally. Nearly everything
+        passes with every member in favor, so a single No is what sets one
+        record apart from another. Each links to the clerk's page.
       </p>
-      <ScrollPanel label={`${member.name} on divided votes`} max="max-h-[28rem]" count={dividedVotes.length}>
+      <ScrollPanel label={`${member.name} on votes with dissent`} max="max-h-[28rem]" count={dissentVotes.length}>
         <ul class="divide-y divide-navy-100 p-0 text-sm">
-          {dividedVotes.map((v) => (
+          {dissentVotes.map((v) => (
             <li class="px-4 py-2">
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                 <span class={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.value)}`}>{v.value}</span>
@@ -194,6 +196,9 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
                   <span class="shrink-0 font-bold">{v.matter_file ?? "item"}</span>
                 )}
                 <span class="min-w-0 flex-1 break-words">{v.title}</span>
+                <span class="shrink-0 text-xs font-semibold tabular-nums">
+                  <span class="text-moss-600">{v.ayes} Aye</span> &ndash; <span class="text-badger-700">{v.noes} No</span>
+                </span>
               </div>
               <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{v.action}</p>
             </li>
