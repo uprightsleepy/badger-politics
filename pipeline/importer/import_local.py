@@ -116,11 +116,11 @@ def attribute_profile(
     return image, basis, email, phone
 
 
-def matter_url(spec: dict, item: dict) -> str | None:
-    mid, guid = item.get("EventItemMatterId"), item.get("EventItemMatterGuid")
-    if not mid or not guid:
-        return None
-    return f"{spec['insite']}/LegislationDetail.aspx?ID={mid}&GUID={guid}"
+def matter_url(links: dict, item: dict) -> str | None:
+    """The item's own InSite page as the meeting's page lists it for the
+    file number. The API's matter id is not InSite's, so none is built."""
+    file = item.get("EventItemMatterFile")
+    return links.get(file.strip()) if file else None
 
 
 def import_members(
@@ -261,7 +261,7 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
     voter_names: dict[int, str] = {}
     for path in sorted(src.glob("event_*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
-        event, items = data["event"], data["items"]
+        event, items, links = data["event"], data["items"], data.get("links", {})
         if not items:
             continue  # duplicate or empty event records carry nothing
         if not event.get("EventInSiteURL"):
@@ -287,7 +287,7 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
                     item.get("EventItemMatterType"), item.get("EventItemMatterStatus"),
                     item.get("EventItemTitle"), item["EventItemActionName"],
                     item.get("EventItemPassedFlag"), item.get("EventItemAgendaNumber"),
-                    matter_url(spec, item),
+                    matter_url(links, item),
                 ),
             )
             actions += 1

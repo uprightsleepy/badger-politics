@@ -268,6 +268,29 @@ quirks: 3,794 rows list a member with no value (skipped, counted) and
 18 identical repeats (kept once). West Allis records no attendance roll
 calls, so its member pages carry votes only.
 
+## Item links: InSite's ids are not the API's (2026-09-01, fixed)
+
+`LegislationDetail.aspx?ID={MatterId}&GUID={MatterGuid}` built from the
+API returns 200 with the body "Invalid parameters!", for every item in
+both tenants: InSite keys a matter by its own id and GUID (file 201705 is
+`ID=4913721` on InSite and `MatterId=56908` in the API), exactly as the
+body pages turned out to be. A status check alone could not catch it. The
+API's `EventInSiteURL` for a meeting does work, and that meeting page
+lists every filed item with its InSite link under the file number, so the
+fetcher now reads each meeting's page once (cached with the meeting; a
+one-time pass over already-cached meetings) and the importer links an
+item only to the page listed for its file number. A file number listed
+with two different links, or not listed, links nowhere. No id is guessed
+in either direction.
+
+The meeting page's item grid pages at 200 rows, so Milwaukee's longest
+agendas (five meetings, 2008 to 2024) needed the same form postback the
+Departments listing uses; one helper now walks every InSite grid. After
+that, Milwaukee links 26,863 of 26,885 filed items and West Allis all
+10,294. The 22 left are one special meeting (2011-11-04) whose InSite
+page lists a single item; those rows show the file number as text and
+the meeting record link stands.
+
 ## Parity with the legislator profiles (2026-08-31, built)
 
 Council member pages now carry what the legislator pages carry: a

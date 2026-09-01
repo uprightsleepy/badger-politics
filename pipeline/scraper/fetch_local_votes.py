@@ -4,8 +4,9 @@ Usage: python -m scraper.fetch_local_votes [--max-new N] [--delay S]
 
 For each registry tenant (importer/local_registry.py): the body's vote
 vocabulary and office records refresh every run; each council meeting is
-one cached JSON file holding the event, its agenda items, and the
-per-member votes for every acted item. A meeting refetches only while
+one cached JSON file holding the event, its agenda items, the
+per-member votes for every acted item, and each item's own InSite link
+read from the meeting's page (InSite's ids are not the API's). A meeting refetches only while
 its minutes are not Final, so the one-time backfill is exactly that.
 Meetings are fetched newest first, so an interrupted backfill still
 leaves the recent record complete.
@@ -70,34 +71,71 @@ DEPT_ROW = re.compile(
 )
 PAGE_LINK = re.compile(r"__doPostBack\(&#39;([^&]+)&#39;,&#39;&#39;\)\"><span>(\d+)</span></a>")
 HIDDEN = re.compile(r'<input type="hidden" name="([^"]+)"[^>]*?value="([^"]*)"')
+LEG_LINK = re.compile(
+    r'href="LegislationDetail\.aspx\?ID=(\d+)&amp;GUID=([0-9A-Fa-f-]+)[^"]*"[^>]*>(.*?)</a>', re.S
+)
+
+
+def grid_pages(http, url: str, delay: float):
+    """Every page of an InSite grid. The grid shows a fixed number of rows
+    a page; later pages come through the plain form postback each page
+    link carries for browsers without JS."""
+    response = http.get(url, timeout=90)
+    response.raise_for_status()
+    time.sleep(delay)
+    page = 1
+    while True:
+        text = response.text
+        yield text
+        page += 1
+        target = {int(n): t for t, n in PAGE_LINK.findall(text)}.get(page)
+        if target is None:
+            return
+        form = dict(HIDDEN.findall(text))
+        form.update({"__EVENTTARGET": target, "__EVENTARGUMENT": ""})
+        response = http.post(url, data=form, timeout=90)
+        response.raise_for_status()
+        time.sleep(delay)
 
 
 def fetch_departments(http, insite: str, delay: float) -> list[dict]:
     """InSite's public listing of every body, name and page url. Its page
     ids and GUIDs differ from the API's, so this is the only way to link a
-    body. The grid shows 100 rows a page; later pages come through the
-    plain form postback each page link carries for browsers without JS."""
-    url = f"{insite}/Departments.aspx"
-    response = http.get(url, timeout=60)
-    response.raise_for_status()
-    time.sleep(delay)
-    rows, page = [], 1
-    while True:
-        text = response.text
-        rows += [
-            {"name": html.unescape(re.sub(r"<[^>]+>", "", label)).strip(),
-             "url": f"{insite}/DepartmentDetail.aspx?ID={dept_id}&GUID={guid}"}
-            for dept_id, guid, label in DEPT_ROW.findall(text)
-        ]
-        page += 1
-        target = {int(n): t for t, n in PAGE_LINK.findall(text)}.get(page)
-        if target is None:
-            return rows
-        form = dict(HIDDEN.findall(text))
-        form.update({"__EVENTTARGET": target, "__EVENTARGUMENT": ""})
-        response = http.post(url, data=form, timeout=60)
-        response.raise_for_status()
-        time.sleep(delay)
+    body."""
+    return [
+        {"name": html.unescape(re.sub(r"<[^>]+>", "", label)).strip(),
+         "url": f"{insite}/DepartmentDetail.aspx?ID={dept_id}&GUID={guid}"}
+        for text in grid_pages(http, f"{insite}/Departments.aspx", delay)
+        for dept_id, guid, label in DEPT_ROW.findall(text)
+    ]
+
+
+def parse_links(page: str, insite: str, found: dict | None = None) -> dict[str, str]:
+    """File number -> the item's own InSite page, read from the meeting's
+    page. InSite's legislation ids are not the API's matter ids, and the
+    meeting page is where the clerk publishes them. A file number shown
+    with two different links maps to none."""
+    found = {} if found is None else found
+    for leg_id, guid, label in LEG_LINK.findall(page):
+        name = html.unescape(re.sub(r"<[^>]+>", "", label)).strip()
+        if name:
+            found.setdefault(name, set()).add(
+                f"{insite}/LegislationDetail.aspx?ID={leg_id}&GUID={guid}"
+            )
+    return {name: next(iter(urls)) for name, urls in found.items() if len(urls) == 1}
+
+
+def fetch_links(http, event: dict, insite: str, delay: float) -> dict[str, str]:
+    """Item links from every page of the meeting's item grid (200 rows a
+    page on Milwaukee's long agendas)."""
+    url = event.get("EventInSiteURL")
+    if not url:
+        return {}
+    found: dict[str, set[str]] = {}
+    links: dict[str, str] = {}
+    for text in grid_pages(http, url, delay):
+        links = parse_links(text, insite, found)
+    return links
 
 
 def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int, int]:
@@ -144,6 +182,9 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
         if dest.exists():
             held = json.loads(dest.read_text(encoding="utf-8"))
             if held["event"].get("EventMinutesStatusName") == "Final":
+                if "links" not in held:  # cached before item links were kept
+                    held["links"] = fetch_links(http, held["event"], spec["insite"], delay)
+                    dest.write_text(json.dumps(held, indent=0), encoding="utf-8")
                 cached += 1
                 continue  # minutes final: the record is settled
         if budget[0] == 0:
@@ -156,8 +197,10 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
                 votes[str(item["EventItemId"])] = call(
                     http, tenant, f"EventItems/{item['EventItemId']}/Votes", delay
                 )
+        links = fetch_links(http, event, spec["insite"], delay)
         dest.write_text(
-            json.dumps({"event": event, "items": items, "votes": votes}, indent=0),
+            json.dumps({"event": event, "items": items, "votes": votes, "links": links},
+                       indent=0),
             encoding="utf-8",
         )
         fetched += 1
