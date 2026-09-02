@@ -76,6 +76,7 @@ snapshot CI releases from.
 | Council member names, portraits, contacts, committees | the tenant's Persons record for the full name where the office record abbreviates it (Milwaukee lists "ALD. BAUMAN"); the cities' own district pages (city.milwaukee.gov, westalliswi.gov, both `Allow: /`); Legistar Persons, OfficeRecords and each tenant's public Departments listing | a portrait attaches only when the city's page labels it with the member's district (Milwaukee) or name (West Allis); an email or phone only when exactly one is on record; committee links by exact body name against the tenant's own listing, plain text otherwise |
 | Cross-check only | FollowTheMoney API (CC BY-NC-SA) | verification input, never imported or republished |
 | Org logos | logo.dev (`LOGO_DEV_TOKEN`) | build-time fetch for hand-verified org domains only |
+| Address suggestions (optional) | Google Places API (New), only in builds where the `PUBLIC_PLACES_KEY` Actions variable is set | as-you-type suggestions in the address lookups, disclosed in the privacy copy; the submitted address still resolves through the Census geocoder; without the variable the feature is dormant and the site fully keyless |
 
 ## Data mandates
 

@@ -1,5 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
+import { PLACES_KEY } from "../lib/placesKey";
 import JsonLd from "../components/JsonLd.astro";
 import StatusBadge from "../components/StatusBadge.astro";
 import BillFlow from "../components/BillFlow.astro";
@@ -108,7 +109,10 @@ const sessionName = current.name ?? current.id;
           <span>
             <strong>Private by design.</strong> Your address goes to the U.S.
             Census geocoder to identify your district and is never stored. The
-            district stays in this browser.
+            district stays in this browser.{PLACES_KEY && (
+              <> Suggestions as you type come from Google Places, so what you
+              type while typing is sent to Google.</>
+            )}
           </span>
         </p>
       </div>
@@ -445,6 +449,7 @@ const sessionName = current.name ?? current.id;
   import { forgetCityDistrict, saveCityDistrict, savedCityDistrict } from "../lib/cityDistrict";
   import { cityDistrictAt, districtAt, districtForAddress } from "../lib/lookup";
   import { esc } from "../lib/html";
+  import { attachSuggest } from "../scripts/addressSuggest";
   import { partyChipHtml } from "../lib/format";
   import type { RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
 
@@ -464,6 +469,7 @@ const sessionName = current.name ?? current.id;
   // the prompt-state pieces, toggled as a set
   const promptEls = ["home-addr-intro", "home-addr-form", "home-addr-privacy"]
     .map((id) => document.getElementById(id));
+  if (form && addr) attachSuggest(addr, () => form.requestSubmit());
 
   const showSaved = (d: { ad: number; sd: number }) => {
     if (heading) heading.textContent = "Your districts";

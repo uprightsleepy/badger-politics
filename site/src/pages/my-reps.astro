@@ -1,13 +1,15 @@
 ---
 import Base from "../layouts/Base.astro";
+import { PLACES_KEY } from "../lib/placesKey";
 ---
 
 <Base title="Find my legislators" description="Enter your address once. Your Assembly and Senate districts are remembered on this device only.">
   <h1 class="text-2xl font-bold">Find My Legislators</h1>
   <p class="mt-2 max-w-2xl text-navy-700">
     Enter your address, or use your location. Your district is saved
-    <strong>on this device only</strong>. Your address is never stored. It is sent
-    to one place, the U.S. Census geocoder, just to get coordinates. After that,
+    <strong>on this device only</strong>. Your address is never stored. {PLACES_KEY
+      ? "As you type, suggestions come from Google Places; the address you submit goes to the U.S. Census geocoder to get coordinates."
+      : "It is sent to one place, the U.S. Census geocoder, just to get coordinates."} After that,
     every bill page shows how your two legislators voted.
   </p>
 
@@ -73,6 +75,7 @@ import Base from "../layouts/Base.astro";
   <script>
     import { savedDistrict, saveDistrict, forgetDistrict } from "../lib/district";
     import { forgetCityDistrict, saveCityDistrict, savedCityDistrict } from "../lib/cityDistrict";
+    import { attachSuggest } from "../scripts/addressSuggest";
     import { esc } from "../lib/html";
     import { fmtDate, partyChipHtml, shortTitle } from "../lib/format";
     import { cityDistrictAt, districtAt, districtForAddress } from "../lib/lookup";
@@ -347,6 +350,9 @@ import Base from "../layouts/Base.astro";
       await resolveCity(result.lng, result.lat);
       show(result.district, true);
     });
+
+    attachSuggest(document.getElementById("addr") as HTMLInputElement, () =>
+      (document.getElementById("addr-form") as HTMLFormElement).requestSubmit());
 
     document.getElementById("geo-btn")!.addEventListener("click", () => {
       statusEl.textContent = "Asking your browser for your location…";
