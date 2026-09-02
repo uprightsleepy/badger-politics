@@ -442,7 +442,8 @@ const sessionName = current.name ?? current.id;
 
 <script>
   import { savedDistrict, saveDistrict, forgetDistrict } from "../lib/district";
-  import { districtAt, districtForAddress } from "../lib/lookup";
+  import { forgetCityDistrict, saveCityDistrict, savedCityDistrict } from "../lib/cityDistrict";
+  import { cityDistrictAt, districtAt, districtForAddress } from "../lib/lookup";
   import { esc } from "../lib/html";
   import { partyChipHtml } from "../lib/format";
   import type { RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
@@ -467,7 +468,10 @@ const sessionName = current.name ?? current.id;
   const showSaved = (d: { ad: number; sd: number }) => {
     if (heading) heading.textContent = "Your districts";
     if (districtsLine) {
-      districtsLine.textContent = `Assembly District ${d.ad}, Senate District ${d.sd}.`;
+      const c = savedCityDistrict();
+      const city = c && (c.t === "milwaukee" ? "Milwaukee" : c.t === "westalliswi" ? "West Allis" : null);
+      districtsLine.textContent = `Assembly District ${d.ad}, Senate District ${d.sd}.`
+        + (city ? ` ${city} Common Council District ${c.d}.` : "");
     }
     for (const el of promptEls) el?.classList.add("hidden");
     cardSaved?.classList.remove("hidden");
@@ -480,6 +484,13 @@ const sessionName = current.name ?? current.id;
     addr?.focus();
   };
 
+  const resolveCity = async (lng: number, lat: number) => {
+    // covered-city lookup on the same point; the address goes nowhere new
+    const hit = await cityDistrictAt(lng, lat).catch(() => null);
+    if (hit) saveCityDistrict({ t: hit.tenant, d: hit.district });
+    else forgetCityDistrict();
+  };
+
   const settle = (d: { ad: number; sd: number }) => {
     saveDistrict(d);
     showSaved(d);
@@ -489,6 +500,7 @@ const sessionName = current.name ?? current.id;
   document.getElementById("home-addr-change")?.addEventListener("click", showPrompt);
   document.getElementById("home-addr-forget")?.addEventListener("click", () => {
     forgetDistrict();
+    forgetCityDistrict();
     document.getElementById("my-reps-home")?.classList.add("hidden");
     showPrompt();
     if (addrStatus) addrStatus.textContent = "Forgotten.";
@@ -503,6 +515,7 @@ const sessionName = current.name ?? current.id;
       if (addrStatus) addrStatus.textContent = result.error;
       return;
     }
+    await resolveCity(result.lng, result.lat);
     settle(result.district);
   });
 
@@ -515,6 +528,7 @@ const sessionName = current.name ?? current.id;
           if (addrStatus) addrStatus.textContent = "That location isn't inside a Wisconsin district.";
           return;
         }
+        await resolveCity(pos.coords.longitude, pos.coords.latitude);
         settle(d);
       },
       () => {
