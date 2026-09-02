@@ -118,7 +118,8 @@ const districts = [...new Set(seated.map((m) => m.seat!))].sort((a, b) => a - b)
         Items where at least one member voted No. Nearly everything passes
         with every member in favor, so these are the votes that separate
         one member's record from another's; the unanimous ones are on each
-        member's page.
+        member's page. The vote is on the action shown with each row: a
+        motion to refer or postpone is not the measure itself.
       </p>
       <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
         {dissent.map((a) => (

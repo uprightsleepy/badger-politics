@@ -293,7 +293,11 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
     <section class="mt-6">
       <h2 class="text-xl font-bold">Sole No votes · {soleNoes.length.toLocaleString()}</h2>
       <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Items where {member.name} cast the only No. Each links to the clerk's page.
+        Items where {member.name} cast the only No.
+        The vote is on the action named under each row: a motion to refer or
+        postpone is not the measure itself, and a sponsor can vote No on
+        referral and Aye on passage.
+        Each links to the clerk's page.
       </p>
       <YearChips target="sole-no-list" label={`Filter the sole No votes by year`} years={yearsOf(soleNoes)} />
       <ScrollPanel label={`${member.name}'s sole No votes`} max="max-h-[24rem]" count={soleNoes.length}>
@@ -327,7 +331,11 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
         Every item where at least one member voted No and {member.name}'s
         position is on record, with the council's tally. Nearly everything
         passes with every member in favor, so a single No is what sets one
-        record apart from another. Each links to the clerk's page.
+        record apart from another.
+        The vote is on the action named under each row: a motion to refer or
+        postpone is not the measure itself, and a sponsor can vote No on
+        referral and Aye on passage.
+        Each links to the clerk's page.
       </p>
       <YearChips target="dissent-list" label={`Filter the votes with dissent by year`} years={yearsOf(dissentVotes)} />
       <ScrollPanel label={`${member.name} on votes with dissent`} max="max-h-[28rem]" count={dissentVotes.length}>

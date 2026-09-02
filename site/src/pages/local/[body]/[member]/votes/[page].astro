@@ -58,7 +58,9 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
   <h1 class="mt-1 text-2xl font-bold">Every Recorded Vote</h1>
   <p class="mt-1 text-sm text-navy-600">
     {total.toLocaleString()} recorded votes, newest first. Showing
-    {" "}{first.toLocaleString()} to {last.toLocaleString()}. Each item links to the clerk's page.
+    {" "}{first.toLocaleString()} to {last.toLocaleString()}. The vote is on the
+    action named under each row, which is not always the measure itself.
+    Each item links to the clerk's page.
   </p>
   {yearPages.length > 1 && (
     <p class="mt-1 text-sm text-navy-600" data-pagefind-ignore>
