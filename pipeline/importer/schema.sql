@@ -403,6 +403,17 @@ CREATE TABLE local_rollcalls (
     FOREIGN KEY (tenant, person_id) REFERENCES local_members (tenant, person_id)
 );
 CREATE INDEX idx_local_rollcalls ON local_rollcalls (tenant, person_id);
+-- the council's next scheduled meetings, refreshed each run; the site's
+-- calendar shows a city's meetings only to readers who saved an address
+CREATE TABLE local_upcoming (
+    tenant     TEXT NOT NULL REFERENCES local_bodies (tenant),
+    event_id   INTEGER NOT NULL,
+    date       TEXT NOT NULL,
+    time       TEXT,
+    location   TEXT,
+    insite_url TEXT NOT NULL,
+    PRIMARY KEY (tenant, event_id)
+);
 CREATE INDEX idx_local_votes_person ON local_votes (tenant, person_id);
 
 -- each tenant's own vote vocabulary (its VoteTypes), the checks' allowlist

@@ -31,8 +31,9 @@ TITLE_SEAT_RE = re.compile(r"^(\d+)(?:st|nd|rd|th) District$")
 NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
 
 TABLES = (
-    "local_rollcalls", "local_votes", "local_actions", "local_events", "local_memberships",
-    "local_member_terms", "local_members", "local_vote_types", "local_bodies",
+    "local_upcoming", "local_rollcalls", "local_votes", "local_actions", "local_events",
+    "local_memberships", "local_member_terms", "local_members", "local_vote_types",
+    "local_bodies",
 )
 
 
@@ -299,6 +300,19 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
         )
     names, profile_counts = import_members(conn, spec, office, curated, profiles, persons)
     membership_rows = import_memberships(conn, spec, memberships, departments)
+    # meetings not held yet: date, time and place for the calendar
+    n_upcoming = 0
+    for e in _optional_json(src / "upcoming.json", []):
+        if not e.get("EventInSiteURL"):
+            continue
+        conn.execute(
+            "INSERT OR REPLACE INTO local_upcoming (tenant, event_id, date, time,"
+            " location, insite_url) VALUES (?, ?, ?, ?, ?, ?)",
+            (tenant, e["EventId"], e["EventDate"][:10], e.get("EventTime"),
+             " ".join((e.get("EventLocation") or "").split()) or None,
+             e["EventInSiteURL"]),
+        )
+        n_upcoming += 1
 
     events = actions = votes = unvalued = duplicated = conflicting = 0
     rollcalls = unvalued_rollcalls = 0
@@ -414,6 +428,7 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
     return {
         "events": events, "actions": actions, "votes": votes,
         "rollcalls": rollcalls, "unvalued_rollcalls": unvalued_rollcalls,
+        "upcoming": n_upcoming,
         "members": len(names), "vote_only": len(vote_only_members),
         "unvalued": unvalued, "outside_terms": outside,
         "duplicated": duplicated, "conflicting": conflicting,
@@ -437,6 +452,7 @@ def run(local_dir: Path, db_path: Path) -> None:
             )
             print(f"  sitting members: {stats['photos']} portraits, {stats['emails']} emails,"
                   f" {stats['phones']} phones attributed; {stats['memberships']} committee seats")
+            print(f"  {stats['upcoming']} upcoming meetings kept for the calendar")
             print(f"  {stats['rollcalls']} attendance rows from the clerk's roll calls"
                   + (f"; {stats['unvalued_rollcalls']} listed no value: skipped"
                      if stats["unvalued_rollcalls"] else ""))

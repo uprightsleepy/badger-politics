@@ -328,6 +328,10 @@ def check_local(conn: sqlite3.Connection) -> list[str]:
             " ON m.tenant = s.tenant AND m.person_id = s.person_id"
             " WHERE m.person_id IS NULL"
         ),
+        "local upcoming meetings missing their public page": (
+            "SELECT COUNT(*) FROM local_upcoming"
+            " WHERE insite_url IS NULL OR insite_url = '' OR date IS NULL"
+        ),
         "local roll calls -> events": (
             "SELECT COUNT(*) FROM local_rollcalls r LEFT JOIN local_events e"
             " ON e.tenant = r.tenant AND e.event_id = r.event_id"

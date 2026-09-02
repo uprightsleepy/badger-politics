@@ -1698,6 +1698,20 @@ export const localMemberVotes = (
     matter_url: string | null; title: string | null; action: string; date: string;
   }[];
 
+/** The councils' next scheduled meetings, for the calendar's device-only
+ * merge; empty until a snapshot carries the table. */
+export const localUpcomingMeetings = () =>
+  hasTable("local_upcoming")
+    ? (prep(
+        `SELECT u.tenant, b.city, u.date, u.time, u.location, u.insite_url
+         FROM local_upcoming u JOIN local_bodies b ON b.tenant = u.tenant
+         ORDER BY u.date, u.tenant`,
+      ).all() as {
+        tenant: string; city: string; date: string; time: string | null;
+        location: string | null; insite_url: string;
+      }[])
+    : [];
+
 /** A presiding officer's Aye/No votes cast while the rest of the body
  * split evenly: the only votes the chair takes part in. The split shown
  * is among the other voters, recounted from the vote rows. */

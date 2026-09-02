@@ -360,6 +360,13 @@ rule, and a piece that fails its rule is left off rather than guessed.
   Non-Voting, which the page now says outright.
 - Term end from the office record; every sitting member's term ends in
   April 2028, and the seat is filled at that April's spring election.
+- Upcoming meetings: the fetcher already receives the not-yet-held
+  meetings and now keeps them (`upcoming.json` -> `local_upcoming`), and
+  the civic calendar merges a city's meetings client-side only for
+  readers whose saved address lookup landed in that city. Council
+  meetings are open to the public under the Open Meetings Law (Wis.
+  Stat. 19.81 to 19.98); the day panel says to confirm against the
+  posted agenda.
 - A paged full vote record at 200 a page, noindex like a legislator's,
   and one page per council district drawing the district within its city
   from the committed boundaries (`importer/local_district_shapes.py`).

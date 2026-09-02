@@ -18,7 +18,7 @@ and served as a fully static site.
 | Districts and Find My Legislators | Address to district entirely in the browser (Census geocoder for coordinates, bundled LTSB boundaries for the match); nothing is stored anywhere but the device |
 | Committees | Members, hearings, and the bills that died in each committee without a hearing |
 | Hearing None | The graveyard: bills that were referred, never heard, and failed at session's end |
-| Calendar | Hearings and election days, with iCal feeds and WisconsinEye recordings where they exist |
+| Calendar | Hearings and election days, with iCal feeds and WisconsinEye recordings where they exist; readers who saved an address in a covered city also see their own council's upcoming meetings, on that device only |
 | New Laws, Governor's Desk, Veto Tracker, Partial Veto | Acts by biennium with passage tallies; bills awaiting signature; every veto, partial veto and override attempt; how the partial veto works |
 | Campaign Money | Receipts to sitting legislators windowed to their time in office, contributing committees, and outside spending filing by filing with the Ethics Commission's transaction IDs and report links |
 | Lobbying | Registrations by organization and by bill (an interest, never a for-or-against position) |

@@ -189,9 +189,11 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
     departments = fetch_departments(http, spec["insite"], delay)
     (out / "departments.json").write_text(json.dumps(departments, indent=0), encoding="utf-8")
     fetched = cached = 0
+    upcoming = []
     for event in fetch_events(http, tenant, spec["body_name"], spec["since"], delay):
         if (event.get("EventDate") or "")[:10] >= today:
-            continue  # agenda for a meeting not held yet
+            upcoming.append(event)  # agenda for a meeting not held yet
+            continue
         dest = out / f"event_{event['EventId']}.json"
         if dest.exists():
             held = json.loads(dest.read_text(encoding="utf-8"))
@@ -229,6 +231,8 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
         if fetched % 25 == 0:
             print(f"{tenant}: {fetched} meetings fetched, at {event['EventDate'][:10]}",
                   flush=True)
+    # the meetings not held yet, for the calendar; refreshed every run
+    (out / "upcoming.json").write_text(json.dumps(upcoming, indent=0), encoding="utf-8")
     return fetched, cached
 
 

@@ -13,6 +13,11 @@ import { fmtDate } from "../lib/format";
     <a href="/calendar/election-days.ics" class="underline">election days</a> ·
     <a href="/testify/" class="underline">how to testify</a>
   </p>
+  <p class="mt-1 text-xs text-navy-600" data-pagefind-ignore>
+    Saved an address on <a href="/my-reps/" class="underline">Your Reps</a> in
+    Milwaukee or West Allis? Your city's council meetings appear here too, on
+    this device only.
+  </p>
 
   <div class="mt-4 rounded-lg border border-navy-100 bg-white p-4">
     <div class="flex items-center justify-between">
@@ -58,6 +63,7 @@ import { fmtDate } from "../lib/format";
   <script>
     import { esc, safeHref } from "../lib/html";
     import { savedPollingPlace } from "../lib/pollingPlace";
+    import { savedCityDistrict } from "../lib/cityDistrict";
 
     let events: Record<
       string,
@@ -119,6 +125,7 @@ import { fmtDate } from "../lib/format";
           ${e.detail ? `<span class="text-navy-600"> · ${esc(e.detail)}</span>` : ""}
           ${e.links?.length ? linksBlock(e.links) : ""}
           ${e.type === "hearing" ? `<p class="mt-1 text-xs text-navy-600">Confirm against the official notice before attending.</p>` : ""}
+          ${e.type === "council" ? `<p class="mt-1 text-xs text-navy-600">Open to the public; confirm time and place on the posted agenda.</p>` : ""}
         </li>`;
             })
             .join("")
@@ -152,15 +159,20 @@ import { fmtDate } from "../lib/format";
           (dayList.length ? "hover:bg-navy-50" : "");
         const hearings = dayList.filter((e) => e.type === "hearing").length;
         const elections = dayList.filter((e) => e.type === "election").length;
+        const councils = dayList.filter((e) => e.type === "council").length;
         // phones get dot markers (text chips don't fit 45px cells); the
         // aria-label carries the counts either way
         const dots =
           (elections ? `<span class="h-2 w-2 rounded-full bg-gold-500"></span>` : "") +
+          (councils ? `<span class="h-2 w-2 rounded-full bg-moss-600"></span>` : "") +
           `<span class="h-1.5 w-1.5 rounded-full bg-navy-600"></span>`.repeat(Math.min(hearings, 3));
         cell.innerHTML =
           `<span class="font-semibold">${d}</span>` +
           (dots ? `<span class="mt-0.5 flex items-center gap-0.5 sm:hidden" aria-hidden="true">${dots}</span>` : "") +
           (elections ? `<span class="mt-0.5 hidden truncate rounded bg-gold-100 px-1 font-semibold sm:block">🗳️ Election day</span>` : "") +
+          (councils
+            ? `<span class="mt-0.5 hidden truncate rounded bg-moss-50 px-1 font-semibold sm:block">Council meeting</span>`
+            : "") +
           (hearings
             ? `<span class="mt-0.5 hidden truncate rounded bg-navy-50 px-1 sm:block">${hearings} hearing${hearings > 1 ? "s" : ""}</span>`
             : "");
@@ -171,6 +183,7 @@ import { fmtDate } from "../lib/format";
           });
           const parts = [];
           if (elections) parts.push("election day");
+          if (councils) parts.push(`${councils} council meeting${councils > 1 ? "s" : ""}`);
           if (hearings) parts.push(`${hearings} hearing${hearings > 1 ? "s" : ""}`);
           cell.setAttribute("aria-label", `${spoken}, ${parts.join(", ")}`);
           cell.addEventListener("click", () => showDay(date));
@@ -189,8 +202,27 @@ import { fmtDate } from "../lib/format";
     label.textContent = "Loading calendar…";
     fetch("/data/calendar.json")
       .then((r) => r.json())
-      .then((data) => {
+      .then(async (data) => {
         events = data;
+        // the reader's own council meetings, only where their saved
+        // address lookup landed; nothing without a saved address
+        const saved = savedCityDistrict();
+        if (saved) {
+          try {
+            const councils = await fetch("/data/council-meetings.json").then((r) => r.json());
+            const mine = councils[saved.t];
+            for (const m of mine?.meetings ?? []) {
+              (events[m.date] ??= []).push({
+                type: "council",
+                label: `${mine.city} Common Council meeting`,
+                detail: [m.time, m.location].filter(Boolean).join(" · "),
+                url: m.url,
+              });
+            }
+          } catch {
+            // a device-only extra; the calendar stands without it
+          }
+        }
         const now = new Date();
         year = now.getFullYear();
         month = now.getMonth();

@@ -58,7 +58,7 @@ def write_tenant(root: Path, tenant: str, officerecords, events) -> None:
 
 def build(tmp_path: Path, make_db, milwaukee_events=(), westallis_events=(),
           milwaukee_office=(), westallis_office=(), profiles=None, persons=None,
-          memberships=None, bodies=None):
+          memberships=None, bodies=None, upcoming=None):
     db = tmp_path / "wi.sqlite"
     make_db(db).close()
     local = tmp_path / "local"
@@ -72,6 +72,8 @@ def build(tmp_path: Path, make_db, milwaukee_events=(), westallis_events=(),
         (local / tenant / "memberships.json").write_text(json.dumps(data), encoding="utf-8")
     for tenant, data in (bodies or {}).items():
         (local / tenant / "departments.json").write_text(json.dumps(data), encoding="utf-8")
+    for tenant, data in (upcoming or {}).items():
+        (local / tenant / "upcoming.json").write_text(json.dumps(data), encoding="utf-8")
     run(local, db)
     import sqlite3
     return sqlite3.connect(db)
@@ -315,3 +317,17 @@ def test_roll_calls_record_attendance_and_movers_are_kept(tmp_path, make_db) -> 
     assert conn.execute(
         "SELECT mover_id, seconder_id FROM local_actions WHERE event_item_id=7"
     ).fetchone() == (9, 12)
+
+
+def test_upcoming_meetings_land_on_the_calendar_table(tmp_path, make_db) -> None:
+    conn = build(tmp_path, make_db, upcoming={"westalliswi": [
+        {"EventId": 900, "EventDate": "2026-09-15T00:00:00", "EventTime": "7:00 PM",
+         "EventLocation": "City Hall,  Common Council Chambers\r\n7525 W. Greenfield Ave.",
+         "EventInSiteURL": "https://westalliswi.legistar.com/MeetingDetail.aspx?ID=900"},
+        # no public page listed: not shown rather than linked nowhere
+        {"EventId": 901, "EventDate": "2026-10-06T00:00:00", "EventInSiteURL": None},
+    ]})
+    assert conn.execute(
+        "SELECT event_id, date, time, location FROM local_upcoming"
+    ).fetchall() == [(900, "2026-09-15", "7:00 PM",
+                      "City Hall, Common Council Chambers 7525 W. Greenfield Ave.")]
