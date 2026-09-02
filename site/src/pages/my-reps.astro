@@ -352,10 +352,20 @@ import Base from "../layouts/Base.astro";
       statusEl.textContent = "Asking your browser for your location…";
       navigator.geolocation.getCurrentPosition(
         (pos) =>
-          resolvePoint(pos.coords.longitude, pos.coords.latitude).catch(
-            () => (statusEl.textContent = "Couldn't load district data. Try again in a minute."),
-          ),
+          resolvePoint(pos.coords.longitude, pos.coords.latitude)
+            .then(() => {
+              // browser locations can be off by blocks; say so instead of
+              // silently saving no council district
+              if (!savedCityDistrict()) {
+                statusEl.textContent += " No covered city at your browser's location;"
+                  + " a street address is more precise.";
+              }
+            })
+            .catch(
+              () => (statusEl.textContent = "Couldn't load district data. Try again in a minute."),
+            ),
         () => (statusEl.textContent = "Location unavailable or denied."),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
       );
     });
 

@@ -530,10 +530,18 @@ const sessionName = current.name ?? current.id;
         }
         await resolveCity(pos.coords.longitude, pos.coords.latitude);
         settle(d);
+        // browser locations can be off by blocks; say so instead of
+        // silently saving no council district
+        if (addrStatus && !savedCityDistrict()) {
+          addrStatus.textContent =
+            "No covered city at your browser's location. If you live in Milwaukee or "
+            + "West Allis, enter your street address instead; it is more precise.";
+        }
       },
       () => {
         if (addrStatus) addrStatus.textContent = "Location unavailable or denied.";
       },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   });
 
