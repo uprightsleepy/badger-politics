@@ -235,22 +235,30 @@ def import_members(
 
 
 def import_memberships(
-    conn: sqlite3.Connection, spec: dict, memberships: dict, departments: list[dict]
+    conn: sqlite3.Connection, spec: dict, memberships: dict, departments: list[dict],
+    bodies: list[dict],
 ) -> int:
     """Every body a sitting member currently serves on besides the council
     itself, linked to the tenant's public page for the body. InSite's page
     ids are not the API's body ids, so the link is by exact name against
-    the tenant's own Departments listing; a name listed twice links nowhere."""
+    the tenant's own Departments listing; a name listed twice links nowhere.
+    Bodies of a legislative-body type are the council itself and the
+    clerk's notice pseudo-body (West Allis files "Notice of Informal
+    Gathering" as one); neither is an assignment."""
     tenant = spec["tenant"]
     today = date.today().isoformat()
     seen: dict[str, str | None] = {}
     for d in departments:
         key = d["name"].strip().lower()
         seen[key] = None if key in seen else d["url"]
+    legislative = {
+        b["BodyId"] for b in bodies if "Legislative Body" in (b.get("BodyTypeName") or "")
+    }
     n = 0
     for pid, records in memberships.items():
         for r in records:
-            if r.get("OfficeRecordBodyName") == spec["body_name"]:
+            if (r.get("OfficeRecordBodyName") == spec["body_name"]
+                    or r.get("OfficeRecordBodyId") in legislative):
                 continue
             if (r.get("OfficeRecordEndDate") or "")[:10] < today:
                 continue
@@ -286,6 +294,7 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
     persons = _optional_json(src / "persons.json", {})
     memberships = _optional_json(src / "memberships.json", {})
     departments = _optional_json(src / "departments.json", [])
+    api_bodies = _optional_json(src / "bodies.json", [])
 
     conn.execute(
         "INSERT INTO local_bodies (tenant, slug, city, name, insite_url, seats)"
@@ -299,12 +308,14 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
             (tenant, vt["VoteTypeName"]),
         )
     names, profile_counts = import_members(conn, spec, office, curated, profiles, persons)
-    membership_rows = import_memberships(conn, spec, memberships, departments)
+    membership_rows = import_memberships(conn, spec, memberships, departments, api_bodies)
     # meetings not held yet: date, time and place for the calendar
     n_upcoming = 0
     for e in _optional_json(src / "upcoming.json", []):
         if not e.get("EventInSiteURL"):
             continue
+        if "INFORMAL GATHERING" in (e.get("EventComment") or "").upper():
+            continue  # the clerk's open-meetings notice, not a sitting
         conn.execute(
             "INSERT OR REPLACE INTO local_upcoming (tenant, event_id, date, time,"
             " location, insite_url) VALUES (?, ?, ?, ?, ?, ?)",
@@ -315,7 +326,7 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
         n_upcoming += 1
 
     events = actions = votes = unvalued = duplicated = conflicting = 0
-    rollcalls = unvalued_rollcalls = 0
+    rollcalls = unvalued_rollcalls = notices = 0
     vote_only_members: set[int] = set()
     voter_names: dict[int, str] = {}
     for path in sorted(src.glob("event_*.json")):
@@ -323,6 +334,12 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
         event, items, links = data["event"], data["items"], data.get("links", {})
         if not items:
             continue  # duplicate or empty event records carry nothing
+        if (not any(i.get("EventItemActionName") for i in items)
+                and not data.get("rollcalls")):
+            # nothing acted and no roll called: the clerk's notice of an
+            # informal gathering, or a sitting that never happened
+            notices += 1
+            continue
         if not event.get("EventInSiteURL"):
             raise RuntimeError(f"{tenant} event {event['EventId']}: no InSite URL")
         conn.execute(
@@ -428,7 +445,7 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
     return {
         "events": events, "actions": actions, "votes": votes,
         "rollcalls": rollcalls, "unvalued_rollcalls": unvalued_rollcalls,
-        "upcoming": n_upcoming,
+        "upcoming": n_upcoming, "notices": notices,
         "members": len(names), "vote_only": len(vote_only_members),
         "unvalued": unvalued, "outside_terms": outside,
         "duplicated": duplicated, "conflicting": conflicting,
@@ -453,6 +470,9 @@ def run(local_dir: Path, db_path: Path) -> None:
             print(f"  sitting members: {stats['photos']} portraits, {stats['emails']} emails,"
                   f" {stats['phones']} phones attributed; {stats['memberships']} committee seats")
             print(f"  {stats['upcoming']} upcoming meetings kept for the calendar")
+            if stats["notices"]:
+                print(f"  {stats['notices']} notice or never-held records skipped"
+                      " (no action, no roll call)")
             print(f"  {stats['rollcalls']} attendance rows from the clerk's roll calls"
                   + (f"; {stats['unvalued_rollcalls']} listed no value: skipped"
                      if stats["unvalued_rollcalls"] else ""))

@@ -269,6 +269,20 @@ quirks: 3,794 rows list a member with no value (skipped, counted) and
 either city; it is in the roll-call items, added later (see the parity
 section below).
 
+## Notice records are not meetings (2026-09-02, fixed)
+
+West Allis files an open-meetings notice ("Notice of Informal
+Gathering") as a Common Council event and as a body with the council's
+own type, "Primary Legislative Body"; 146 of its 404 council events were
+these (Milwaukee had 6 empty records). They held no actions and no roll
+calls but counted as meetings, appeared as a committee assignment on
+every sitting member's page, and would have surfaced as an "upcoming
+meeting". All three are now excluded by exact rules: an event with no
+acted item and no roll call is not a meeting, a legislative-body-typed
+body is not an assignment, and a future event whose comment is the
+notice label is not a sitting. Attendance was already roll-call based,
+so it was correct throughout; the meeting counts now match it.
+
 ## Item links: InSite's ids are not the API's (2026-09-01, fixed)
 
 `LegislationDetail.aspx?ID={MatterId}&GUID={MatterGuid}` built from the

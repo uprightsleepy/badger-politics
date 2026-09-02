@@ -58,7 +58,7 @@ def write_tenant(root: Path, tenant: str, officerecords, events) -> None:
 
 def build(tmp_path: Path, make_db, milwaukee_events=(), westallis_events=(),
           milwaukee_office=(), westallis_office=(), profiles=None, persons=None,
-          memberships=None, bodies=None, upcoming=None):
+          memberships=None, bodies=None, upcoming=None, api_bodies=None):
     db = tmp_path / "wi.sqlite"
     make_db(db).close()
     local = tmp_path / "local"
@@ -74,6 +74,8 @@ def build(tmp_path: Path, make_db, milwaukee_events=(), westallis_events=(),
         (local / tenant / "departments.json").write_text(json.dumps(data), encoding="utf-8")
     for tenant, data in (upcoming or {}).items():
         (local / tenant / "upcoming.json").write_text(json.dumps(data), encoding="utf-8")
+    for tenant, data in (api_bodies or {}).items():
+        (local / tenant / "bodies.json").write_text(json.dumps(data), encoding="utf-8")
     run(local, db)
     import sqlite3
     return sqlite3.connect(db)
@@ -331,3 +333,45 @@ def test_upcoming_meetings_land_on_the_calendar_table(tmp_path, make_db) -> None
         "SELECT event_id, date, time, location FROM local_upcoming"
     ).fetchall() == [(900, "2026-09-15", "7:00 PM",
                       "City Hall, Common Council Chambers 7525 W. Greenfield Ave.")]
+
+
+def test_notice_records_are_not_meetings_or_committees(tmp_path, make_db) -> None:
+    notice = event_file(300, "2026-05-04", [{"EventItemId": 9, "EventItemActionName": None}], {})
+    held = event_file(301, "2026-05-05", [item(7)], {"7": [vote(9, "A", "Aye")]})
+    conn = build(
+        tmp_path, make_db,
+        westallis_office=[office(117, "Kevin Haass", "Ald.")],
+        westallis_events=[notice, held],
+        memberships={"westalliswi": {"117": [
+            office(117, "Kevin Haass", "Ald.") | {"OfficeRecordBodyName": "Common Council",
+                                                  "OfficeRecordBodyId": 1},
+            office(117, "Kevin Haass", "Ald.") | {"OfficeRecordBodyName":
+                                                  "Notice of Informal Gathering",
+                                                  "OfficeRecordBodyId": 77},
+            office(117, "Kevin Haass", "Member") | {"OfficeRecordBodyName":
+                                                    "Events Committee",
+                                                    "OfficeRecordBodyId": 78},
+        ]}},
+        api_bodies={"westalliswi": [
+            {"BodyId": 1, "BodyName": "Common Council",
+             "BodyTypeName": "Primary Legislative Body"},
+            {"BodyId": 77, "BodyName": "Notice of Informal Gathering",
+             "BodyTypeName": "Primary Legislative Body"},
+            {"BodyId": 78, "BodyName": "Events Committee",
+             "BodyTypeName": "Standing Committee"},
+        ]},
+        upcoming={"westalliswi": [
+            {"EventId": 900, "EventDate": "2026-10-06T00:00:00",
+             "EventComment": "NOTICE OF INFORMAL GATHERING",
+             "EventInSiteURL": "https://x.legistar.com/MeetingDetail.aspx?ID=900"},
+        ]},
+    )
+    # the notice event is not a meeting; the held one is
+    assert [r[0] for r in conn.execute(
+        "SELECT event_id FROM local_events WHERE tenant='westalliswi'").fetchall()] == [301]
+    # the notice pseudo-body is not an assignment; the committee is
+    assert conn.execute(
+        "SELECT body_name FROM local_memberships WHERE tenant='westalliswi'"
+    ).fetchall() == [("Events Committee",)]
+    # a future notice is not an upcoming meeting
+    assert conn.execute("SELECT COUNT(*) FROM local_upcoming").fetchone()[0] == 0
