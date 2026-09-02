@@ -29,6 +29,11 @@ import { fmtDate } from "../lib/format";
       {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div>{d}</div>)}
     </div>
     <div id="grid" class="mt-1 grid grid-cols-7 gap-px rounded bg-navy-100"></div>
+    <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-navy-600" data-pagefind-ignore>
+      <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-gold-500"></span> Election day</span>
+      <span class="flex items-center gap-1"><span class="h-1.5 w-1.5 rounded-full bg-navy-600"></span> State: committee hearing</span>
+      <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-moss-600"></span> City: your council's meeting, with a saved address</span>
+    </p>
   </div>
 
   <section id="day-panel" aria-labelledby="day-label" tabindex="-1" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4">
@@ -120,8 +125,8 @@ import { fmtDate } from "../lib/format";
                 ? `<a class="py-1 font-semibold underline" target="_blank" rel="noopener" href="${esc(href)}">${emoji}${esc(e.label)}<span class="sr-only"> official notice, opens in a new tab</span></a>`
                 : `<span class="font-semibold">${emoji}${esc(e.label)}</span>`;
               return `
-        <li class="rounded border ${e.type === "election" ? "border-gold-500 bg-gold-100" : "border-navy-100"} p-2">
-          ${title}
+        <li class="rounded border ${e.type === "election" ? "border-gold-500 bg-gold-100" : e.type === "council" ? "border-moss-600" : "border-navy-100"} p-2">
+          ${e.type === "hearing" ? `<span class="mr-1 rounded bg-navy-50 px-1 text-xs font-semibold">State</span>` : ""}${e.type === "council" ? `<span class="mr-1 rounded bg-moss-50 px-1 text-xs font-semibold">City</span>` : ""}${title}
           ${e.detail ? `<span class="text-navy-600"> · ${esc(e.detail)}</span>` : ""}
           ${e.links?.length ? linksBlock(e.links) : ""}
           ${e.type === "hearing" ? `<p class="mt-1 text-xs text-navy-600">Confirm against the official notice before attending.</p>` : ""}

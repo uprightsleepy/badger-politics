@@ -366,7 +366,10 @@ rule, and a piece that fails its rule is left off rather than guessed.
   readers whose saved address lookup landed in that city. Council
   meetings are open to the public under the Open Meetings Law (Wis.
   Stat. 19.81 to 19.98); the day panel says to confirm against the
-  posted agenda.
+  posted agenda. Both clerks list only the next meeting (checked
+  2026-09-01: one upcoming each), so the calendar and the council pages
+  show what is posted and say so. The council page's "Next meeting" block
+  is public, no saved address needed; the calendar merge stays gated.
 - A paged full vote record at 200 a page, noindex like a legislator's,
   and one page per council district drawing the district within its city
   from the committed boundaries (`importer/local_district_shapes.py`).
