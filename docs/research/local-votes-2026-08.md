@@ -269,6 +269,38 @@ quirks: 3,794 rows list a member with no value (skipped, counted) and
 either city; it is in the roll-call items, added later (see the parity
 section below).
 
+## Deep pass for a reader with no council background (2026-09-02)
+
+A sweep of every reader-facing vocabulary and edge case in the council
+data, and what changed:
+
+- The clerk's placeholder for an empty seat is a "person" named VACANCY
+  with 701 vote rows (696 Excused) and office records; it is no one, and
+  is now excluded everywhere, as are roll-call rows valued VACANCY (a
+  seat's vacancy is not a member's attendance).
+- Three Milwaukee members were each carried under two person ids
+  (Ashanti Hamilton, T. Anthony Zielinski, Russell W. Stamper): identical
+  record names, complementary service, not one item voted under both.
+  `importer/local_person_merges.json` folds each pair with its basis
+  stated; the importer refuses a merge if the two ids ever vote on one
+  item.
+- Names: an all-caps person record ("E. F. ANDERSON") is cased; a
+  courtesy title ("Ms.") is dropped.
+- "Presiding officer" treatment (no attendance rate, tie-break section)
+  now keys off a Mayor term, not the "Chair" member type: Milwaukee's two
+  Chair-typed records are former council presidents, alderpersons who
+  voted like any other.
+- Committee role chips show only chair-type roles; "Ald." and "Mayor"
+  were the tenant's honorifics, not roles. Term titles read "Alderperson"
+  and "Council President" rather than "Ald." and "President".
+- Actions are the clerks' words (Milwaukee's in capitals: "PLACED ON
+  FILE", "DISALLOWED AND INDEFINITELY POSTPONED"). They now render in
+  sentence case, and every council and member page carries a collapsible
+  glossary of the actions and vote values it shows, in plain language
+  (`site/src/lib/localGloss.ts`); an action with no entry shows as
+  recorded with nothing invented. Nineteen West Allis items with no title
+  read "Untitled item" rather than nothing.
+
 ## Notice records are not meetings (2026-09-02, fixed)
 
 West Allis files an open-meetings notice ("Notice of Informal

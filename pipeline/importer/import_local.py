@@ -26,6 +26,8 @@ from importer.person_slugs import slugify
 from importer.roster import load_curation
 
 SEATS_PATH = Path(__file__).resolve().parent / "local_seats.json"
+MERGES_PATH = Path(__file__).resolve().parent / "local_person_merges.json"
+COURTESY = {"ms.", "mr.", "mrs.", "dr."}
 # Milwaukee office-record titles carry the seat: '3rd District'
 TITLE_SEAT_RE = re.compile(r"^(\d+)(?:st|nd|rd|th) District$")
 NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
@@ -139,13 +141,31 @@ def display_name(record: str, person: dict | None) -> str:
     the same record's first and last name, and where the tenant holds no
     person record, to the abbreviation in title case ("Ald. A. Pratt")."""
     record = " ".join(record.split())
+    words = record.split()
+    if words and words[0].lower() in COURTESY:  # "Ms. Sandra Hoeh-Lyon"
+        record = " ".join(words[1:])
     if record != record.upper():
         return record
     first = " ".join(((person or {}).get("PersonFirstName") or "").split())
     last = " ".join(((person or {}).get("PersonLastName") or "").split())
     if first and last:
-        return f"{first} {last}"
+        full = f"{first} {last}"
+        return title_case(full) if full == full.upper() else full
     return title_case(record)
+
+
+def is_placeholder(record_name: str | None) -> bool:
+    """The clerk lists an empty seat as a person named VACANCY."""
+    return (record_name or "").strip().upper() == "VACANCY"
+
+
+def load_merges(tenant: str) -> dict[int, int]:
+    """Curated from-id -> into-id for one person the clerk carries under
+    two ids; every entry states its basis in local_person_merges.json."""
+    if not MERGES_PATH.exists():
+        return {}
+    entries = json.loads(MERGES_PATH.read_text(encoding="utf-8")).get(tenant, [])
+    return {int(e["from"]): int(e["into"]) for e in entries}
 
 
 def ensure_member(
@@ -287,12 +307,22 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
     src = local_dir / tenant
     office = json.loads((src / "officerecords.json").read_text(encoding="utf-8"))
     vote_types = json.loads((src / "votetypes.json").read_text(encoding="utf-8"))
+    merges = load_merges(tenant)
+    canon = lambda pid: merges.get(pid, pid)  # noqa: E731 - one-liner by design
+    # a placeholder "member" the clerk uses for an empty seat is no person
+    office = [
+        {**r, "OfficeRecordPersonId": canon(r["OfficeRecordPersonId"])}
+        for r in office if not is_placeholder(r.get("OfficeRecordFullName"))
+    ]
     curated = load_curation(SEATS_PATH).get(tenant, {})
     profiles = _optional_json(local_dir / "profiles.json", {})
     if profiles.get(tenant, {}).get("seats"):
         profiles[tenant]["seats"] = strip_template_phones(profiles[tenant]["seats"])
     persons = _optional_json(src / "persons.json", {})
     memberships = _optional_json(src / "memberships.json", {})
+    for old_id, new_id in merges.items():
+        persons.setdefault(str(new_id), persons.pop(str(old_id), None))
+        memberships.setdefault(str(new_id), []).extend(memberships.pop(str(old_id), []))
     departments = _optional_json(src / "departments.json", [])
     api_bodies = _optional_json(src / "bodies.json", [])
 
@@ -380,7 +410,9 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
                     # not a vote, so nothing to attribute; counted, never guessed
                     unvalued += 1
                     continue
-                pid, value = v["VotePersonId"], v["VoteValueName"]
+                pid, value = canon(v["VotePersonId"]), v["VoteValueName"]
+                if is_placeholder(v.get("VotePersonName")) or value == "VACANCY":
+                    continue  # an empty seat casts nothing
                 if pid in positions:
                     if positions[pid] == value:
                         duplicated += 1
@@ -389,6 +421,11 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
                     continue
                 positions[pid] = value
                 voter_names[pid] = v["VotePersonName"].strip()
+            if conflicted & set(merges.values()):
+                raise RuntimeError(
+                    f"{tenant} item {item['EventItemId']}: a merged person voted under"
+                    " both ids; revisit local_person_merges.json"
+                )
             conflicting += len(conflicted)
             for person_id, value in positions.items():
                 if person_id in conflicted:
@@ -412,7 +449,9 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
                 if not value:
                     unvalued_rollcalls += 1
                     continue
-                pid = r["RollCallPersonId"]
+                pid = canon(r["RollCallPersonId"])
+                if is_placeholder(r.get("RollCallPersonName")) or value == "VACANCY":
+                    continue  # an empty seat is not anyone's attendance
                 if pid in attendance and attendance[pid] != value:
                     disputed.add(pid)
                 attendance.setdefault(pid, value)

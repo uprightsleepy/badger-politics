@@ -375,3 +375,41 @@ def test_notice_records_are_not_meetings_or_committees(tmp_path, make_db) -> Non
     ).fetchall() == [("Events Committee",)]
     # a future notice is not an upcoming meeting
     assert conn.execute("SELECT COUNT(*) FROM local_upcoming").fetchone()[0] == 0
+
+
+def test_placeholder_seat_and_courtesy_titles_and_caps(tmp_path, make_db) -> None:
+    ev = event_file(100, "2026-07-31", [item(7)], {"7": [
+        vote(9, "ALD. E. F. ANDERSON", "Aye"), vote(1924, "  VACANCY", "Excused"),
+    ]})
+    conn = build(
+        tmp_path, make_db,
+        milwaukee_office=[office(9, "ALD. E. F. ANDERSON", "1st District"),
+                          office(1924, "  VACANCY", "2nd District"),
+                          office(10, "Ms. Sandra Hoeh-Lyon", "3rd District")],
+        milwaukee_events=[ev],
+        persons={"milwaukee": {"9": {"PersonFirstName": "E. F.", "PersonLastName": "ANDERSON"}}},
+    )
+    names = dict(conn.execute("SELECT person_id, name FROM local_members").fetchall())
+    assert names == {9: "E. F. Anderson", 10: "Sandra Hoeh-Lyon"}
+    assert conn.execute("SELECT COUNT(*) FROM local_votes").fetchone()[0] == 1
+
+
+def test_curated_merge_folds_two_ids_into_one_member(tmp_path, make_db, monkeypatch) -> None:
+    import importer.import_local as mod
+    merges = tmp_path / "merges.json"
+    merges.write_text(json.dumps({"milwaukee": [{"from": 1, "into": 2, "basis": "test"}]}))
+    monkeypatch.setattr(mod, "MERGES_PATH", merges)
+    ev1 = event_file(100, "2015-01-06", [item(7)], {"7": [vote(1, "ALD. TEST", "Aye")]})
+    ev2 = event_file(101, "2016-01-05", [item(8)], {"8": [vote(2, "ALD. TEST", "No")]})
+    conn = build(
+        tmp_path, make_db,
+        milwaukee_office=[office(1, "ALD. TEST", "Ald.", start="2012-04-17T00:00:00",
+                                 end="2016-04-18T00:00:00"),
+                          office(2, "ALD. TEST", "1st District", start="2016-04-19T00:00:00")],
+        milwaukee_events=[ev1, ev2],
+    )
+    assert conn.execute("SELECT person_id, slug FROM local_members").fetchall() == [(2, "ald-test")]
+    assert conn.execute("SELECT COUNT(*) FROM local_votes WHERE person_id=2").fetchone()[0] == 2
+    assert conn.execute(
+        "SELECT COUNT(*) FROM local_member_terms WHERE person_id=2"
+    ).fetchone()[0] == 2

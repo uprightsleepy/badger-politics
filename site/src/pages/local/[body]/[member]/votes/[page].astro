@@ -7,6 +7,7 @@ import Base from "../../../../../layouts/Base.astro";
 import Pager from "../../../../../components/Pager.astro";
 import { localBodies, localMembers, localMemberVotes, localMemberVoteYears } from "../../../../../lib/db";
 import { fmtDate } from "../../../../../lib/format";
+import { actionLabel } from "../../../../../lib/localGloss";
 import { PER_PAGE, pageBounds, pageCount } from "../../../../../lib/paging";
 
 export function getStaticPaths() {
@@ -84,9 +85,9 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
           ) : (
             <span class="shrink-0 font-semibold">{v.matter_file ?? "item"}</span>
           )}
-          <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title}</span>
+          <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title ?? "Untitled item"}</span>
         </div>
-        <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{v.action}</p>
+        <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{actionLabel(v.action)}</p>
       </li>
     ))}
   </ul>

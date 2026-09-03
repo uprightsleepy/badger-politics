@@ -12,6 +12,7 @@ import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, loca
 import YearChips from "../../../components/YearChips.astro";
 import { PER_PAGE } from "../../../lib/paging";
 import { fmtDate } from "../../../lib/format";
+import { actionLabel, glossaryFor } from "../../../lib/localGloss";
 
 const RECENT = 300;
 
@@ -53,17 +54,26 @@ const yearPages = localMemberVoteYears(body.tenant, member.person_id).map((y) =>
   return { year: y.year, page };
 });
 // a presiding officer is recorded as Non-Voting, not Present, so no rate for the Chair
-const rated = member.member_type !== "Chair";
+// the mayor presides and votes only to break a tie; a council president
+// (Milwaukee's "Chair" type) is an alderperson who votes like any other
+const presiding = terms.some((t) => t.title === "Mayor");
+const rated = !presiding;
 const tieBreaks = rated ? [] : localMemberTieBreaks(body.tenant, member.person_id);
 const tieAyes = tieBreaks.filter((v) => v.value === "Aye").length;
 // the chair's remaining Ayes joined an already unanimous council
 const joinedAyes = stats.total - stats.noes - stats.other - tieAyes;
+const glossary = glossaryFor(
+  [...tieBreaks, ...soleNoes, ...dissentVotes, ...votes, ...motions].map((r) => r.action),
+  [...new Set([...votes, ...dissentVotes].map((v) => v.value)), ...attendance.values.map((a) => a.value)],
+);
 const followId = `${body.slug}/${member.slug}`;
 const role = member.seat != null
   ? `${body.city} Common Council, District ${member.seat}`
-  : member.member_type === "Chair"
-    ? `Presides over the ${body.name}`
+  : presiding
+    ? `Mayor, presiding over the ${body.name}`
     : body.name;
+const termLabel = (t: string | null) =>
+  t === "Ald." ? "Alderperson" : t === "President" ? "Council President" : (t ?? "Member");
 
 const CAST_STYLE: Record<string, string> = {
   Aye: "bg-moss-50 text-moss-600",
@@ -88,7 +98,7 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
       alternateName: member.record_name && member.record_name !== member.name ? member.record_name : undefined,
       jobTitle: member.seat != null
         ? `Alderperson, District ${member.seat}`
-        : member.member_type === "Chair" ? "Mayor" : "Council member",
+        : presiding ? "Mayor" : "Council member",
       email: member.email ?? undefined,
       telephone: member.phone ?? undefined,
       image: member.image_url ?? undefined,
@@ -141,7 +151,7 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
             <h2 class="font-bold">Service</h2>
             {terms.map((t) => (
               <p class="mt-1">
-                {t.title ?? "Member"}: {fmtDate(t.start)} to {t.end ? fmtDate(t.end) : "present"}
+                {termLabel(t.title)}: {fmtDate(t.start)} to {t.end ? fmtDate(t.end) : "present"}
               </p>
             ))}
             <p class="mt-1 text-xs text-navy-600">From the council's own office records.</p>
@@ -203,7 +213,7 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
                   ) : (
                     c.body_name
                   )}
-                  {c.role && c.role !== "Member" && (
+                  {c.role && /chair|president/i.test(c.role) && (
                     <span class="ml-1 rounded-full bg-gold-100 px-1.5 py-0.5 text-xs font-semibold">{c.role}</span>
                   )}
                 </li>
@@ -250,14 +260,30 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
   </dl>
   <p class="mt-1 max-w-2xl text-xs text-navy-600">
     "Other" is everything the clerk recorded besides Aye or No: excused,
-    absent, abstaining, or presiding without a vote, shown on each row
-    exactly as recorded. "On the losing side" counts Aye and No votes that
+    absent, abstaining, voting "present", or presiding without a vote,
+    shown on each row exactly as recorded. "On the losing side" counts Aye and No votes that
     ended opposite the clerk's recorded outcome, of
     {" "}{outcomes.decided.toLocaleString()} with an outcome on record.
     Attendance is meetings where the roll call records the member present,
     of the meetings where the roll was called with the member listed.{!rated &&
     " A presiding officer casts a vote only to break an even split, so nearly every row below reads Non-Voting."}
   </p>
+  {glossary.length > 0 && (
+    <details class="mt-3 max-w-2xl rounded-lg border border-navy-100 bg-white text-sm">
+      <summary class="cursor-pointer px-4 py-2 font-semibold">What the words on this page mean</summary>
+      <dl class="grid gap-x-4 gap-y-1 px-4 pb-3 sm:grid-cols-[max-content_1fr]">
+        {glossary.map((g) => (
+          <>
+            <dt class="font-semibold">{g.term}</dt>
+            <dd class="text-navy-700">{g.meaning}</dd>
+          </>
+        ))}
+      </dl>
+      <p class="px-4 pb-3 text-xs text-navy-600">
+        The clerk's own words appear on each row and on the linked pages; these are plain-language readings of them.
+      </p>
+    </details>
+  )}
 
   {tieBreaks.length > 0 && (
     <section class="mt-6">
@@ -279,10 +305,10 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
               ) : (
                 <span class="shrink-0 font-bold">{v.matter_file ?? "item"}</span>
               )}
-              <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title}</span>
+              <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title ?? "Untitled item"}</span>
               <span class="shrink-0 text-xs font-semibold tabular-nums">{v.other_ayes}&ndash;{v.other_noes} broken</span>
             </div>
-            <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{v.action}</p>
+            <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{actionLabel(v.action)}</p>
           </li>
         ))}
       </ul>
@@ -311,12 +337,12 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
                 ) : (
                   <span class="shrink-0 font-bold">{v.matter_file ?? "item"}</span>
                 )}
-                <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title}</span>
+                <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title ?? "Untitled item"}</span>
                 <span class="shrink-0 text-xs font-semibold tabular-nums">
                   <span class="text-moss-600">{v.ayes} Aye</span> &ndash; <span class="text-badger-700">1 No</span>
                 </span>
               </div>
-              <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[6.75rem]">{v.action}</p>
+              <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[6.75rem]">{actionLabel(v.action)}</p>
             </li>
           ))}
         </ul>
@@ -350,12 +376,12 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
                 ) : (
                   <span class="shrink-0 font-bold">{v.matter_file ?? "item"}</span>
                 )}
-                <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title}</span>
+                <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title ?? "Untitled item"}</span>
                 <span class="shrink-0 text-xs font-semibold tabular-nums">
                   <span class="text-moss-600">{v.ayes} Aye</span> &ndash; <span class="text-badger-700">{v.noes} No</span>
                 </span>
               </div>
-              <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{v.action}</p>
+              <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{actionLabel(v.action)}</p>
             </li>
           ))}
         </ul>
@@ -381,8 +407,8 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
               ) : (
                 <span class="w-28 shrink-0 truncate font-semibold">{m.matter_file ?? "item"}</span>
               )}
-              <span class="order-last min-w-0 basis-full truncate sm:order-none sm:flex-1">{m.title}</span>
-              <span class="shrink-0 text-xs text-navy-600">{m.action}</span>
+              <span class="order-last min-w-0 basis-full truncate sm:order-none sm:flex-1">{m.title ?? "Untitled item"}</span>
+              <span class="shrink-0 text-xs text-navy-600">{actionLabel(m.action)}</span>
             </li>
           ))}
         </ul>
@@ -418,7 +444,7 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
             ) : (
               <span class="w-28 shrink-0 truncate font-semibold">{v.matter_file ?? "item"}</span>
             )}
-            <span class="order-last min-w-0 basis-full truncate sm:order-none sm:flex-1">{v.title}</span>
+            <span class="order-last min-w-0 basis-full truncate sm:order-none sm:flex-1">{v.title ?? "Untitled item"}</span>
           </li>
         ))}
       </ul>

@@ -1,0 +1,24 @@
+{
+  "_about": "One person the clerk's system carries under two person ids. Each entry folds `from` into `into` (the id with the later office record). Basis for every entry: identical record name, complementary or adjacent service, and not one item voted under both ids (the importer refuses a merge if that ever becomes false).",
+  "milwaukee": [
+    {
+      "from": 1589,
+      "into": 1660,
+      "name": "Ashanti Hamilton",
+      "basis": "Both ids are ALD. HAMILTON with first name Ashanti in the Persons record; 1660 holds office records 2004-2016 and 2020-2022, 1589 holds 2016-2020; votes 2008-2022 across the two ids never fall on the same item."
+    },
+    {
+      "from": 1664,
+      "into": 412,
+      "name": "T. Anthony Zielinski",
+      "basis": "Both ids are ALD. ZIELINSKI; 1664 holds office records 2004-2012 with votes to 2012-04-17, 412 holds 2012-2020 with votes from 2012-05-02; no item voted under both."
+    },
+    {
+      "from": 2699,
+      "into": 2748,
+      "name": "Russell W. Stamper",
+      "basis": "2699 (Russell Stamper) has votes 2014-05-13 to 2015-05-12 and no office record; 2748 (ALD. STAMPER, Russell W.) holds the office records from 2014-05-05 with votes from 2015-06-02; no item voted under both."
+    }
+  ],
+  "westalliswi": []
+}
