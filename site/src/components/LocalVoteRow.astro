@@ -1,0 +1,25 @@
+---
+import type { localMemberVotes } from "../lib/db";
+import { fmtDate } from "../lib/format";
+import { actionLabel, castStyle } from "../lib/localGloss";
+
+interface Props {
+  v: ReturnType<typeof localMemberVotes>[number];
+  dissent?: boolean;
+}
+const { v, dissent = false } = Astro.props;
+const weight = dissent ? "font-bold" : "font-semibold";
+---
+<li class={dissent ? "px-4 py-2" : "px-4 py-1.5"} data-y={dissent ? v.date.slice(0, 4) : undefined}>
+  <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+    <span class={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.value)}`}>{v.value}</span>
+    <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
+    {v.matter_url ? (
+      <a href={v.matter_url} class={`shrink-0 ${weight} underline`}>{v.matter_file ?? "item"}</a>
+    ) : (
+      <span class={`shrink-0 ${weight}`}>{v.matter_file ?? "item"}</span>
+    )}
+    <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title ?? "Untitled item"}</span>{dissent && <> <slot name="tally" /></>}
+  </div>
+  <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{actionLabel(v.action)}</p>
+</li>

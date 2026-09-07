@@ -216,8 +216,8 @@ def run(xlsx_dir: Path, db_path: Path) -> int:
         contest = [r for r in all_rows if (r[0], r[1], r[2]) == key]
         if contest[0][6] < sum(r[5] for r in contest):
             raise RuntimeError(f"{key}: total cast below candidate sum — bad parse")
-    # every statewide contest is a two-party-plus race with 7-figure turnout,
-    # its 72 county aggregates must sum exactly to the statewide totals
+    # Require at least two candidates and plausible statewide totals.
+    # Each candidate's total must equal the sum across all 72 counties.
     for year, office in {(r[0], r[1]) for r in statewide_rows}:
         contest = [r for r in statewide_rows if r[0] == year and r[1] == office]
         total = sum(r[4] for r in contest)

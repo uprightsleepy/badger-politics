@@ -69,6 +69,13 @@ const VOTES: Record<string, string> = {
   "Non-Voting": "took part without a vote (the presiding mayor)",
 };
 
+const CAST_STYLE: Record<string, string> = {
+  Aye: "bg-moss-50 text-moss-600",
+  No: "bg-badger-50 text-badger-700",
+};
+export const castStyle = (value: string): string =>
+  CAST_STYLE[value] ?? "bg-navy-50 text-navy-600";
+
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
 /** A recorded action, readable: all-caps records come down to sentence case. */

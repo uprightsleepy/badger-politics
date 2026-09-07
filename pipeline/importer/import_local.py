@@ -398,16 +398,13 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
                 ),
             )
             actions += 1
-            # One row per (item, person). The source occasionally lists a
-            # voter twice: the same value twice is one fact, kept once; two
-            # different values is the record disagreeing with itself, and no
-            # position is attributed. Both are counted, neither is guessed.
+            # Keep equal repeats once per (item, person); count repeats and conflicts.
+            # Omit conflicting positions; conflicts involving merged IDs abort.
             positions: dict[int, str] = {}
             conflicted: set[int] = set()
             for v in data["votes"].get(str(item["EventItemId"]), []):
                 if not v.get("VoteValueName"):
-                    # the clerk listed the voter but recorded no position:
-                    # not a vote, so nothing to attribute; counted, never guessed
+                    # Count missing positions without attributing a vote.
                     unvalued += 1
                     continue
                 pid, value = canon(v["VotePersonId"]), v["VoteValueName"]
@@ -438,9 +435,8 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
                     (tenant, item["EventItemId"], person_id, value),
                 )
                 votes += 1
-        # attendance, under the same rules as votes: a row with no value is
-        # not a fact, a person listed twice with one value is one fact, and
-        # two values is the record disagreeing with itself
+        # Skip unvalued attendance and keep equal repeats once per person.
+        # Omit conflicts, including merged IDs; attendance conflicts do not abort.
         for item_id, rows in data.get("rollcalls", {}).items():
             attendance: dict[int, str] = {}
             disputed: set[int] = set()
@@ -467,10 +463,8 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
                     (tenant, int(item_id), event["EventId"], pid, value),
                 )
                 rollcalls += 1
-    # Office records are incomplete for earlier years (Milwaukee's carry no
-    # dates for several long-serving members), so a vote outside its
-    # member's recorded dates is reported, not gated: the vote itself is
-    # the tenant's record, the term table is the weaker of the two.
+    # Report votes outside office-record dates without rejecting them:
+    # historical office records are incomplete; vote IDs remain authoritative.
     outside = conn.execute(
         """SELECT COUNT(*) FROM local_votes v
            JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
