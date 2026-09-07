@@ -1,12 +1,7 @@
 name: deploy
 
-# Deploys the site from a commit on main, never from whatever happens to be
-# sitting in a local dist/. A Hosting release replaces the entire site, so
-# every gate below runs before the release, not after.
-#
-# A push releases to dev. Production is a deliberate promotion, run by hand
-# once dev looks right -- this is a public record, so nothing reaches
-# constituents because someone pushed a work-in-progress commit.
+# Build and validate main before replacing the hosted site.
+# Pushes release to dev; production requires an explicit manual promotion.
 on:
   push:
     branches: [main]
@@ -31,9 +26,7 @@ on:
 permissions:
   contents: read
 
-# One release at a time per target, so an automatic dev deploy never
-# delays a promotion to production. Two overlapping releases to the same
-# target would race, and whichever finished last would win.
+# Serialize releases per target to prevent competing replacements.
 concurrency:
   group: deploy-${{ inputs.target || 'badgerpolitics-dev' }}
   cancel-in-progress: false
@@ -104,9 +97,8 @@ jobs:
           echo "object=${latest}#${generation}" >> "$GITHUB_OUTPUT"
           echo "Using ${latest}#${generation}"
 
-      # Actions base-branch caches are readable from pull requests. Keep
-      # the raw database in the private bucket, and fetch this exact object
-      # generation so replacement between resolution and download fails closed.
+      # PRs can read Actions caches. Fetch the raw DB from private GCS,
+      # pinned to the resolved generation to reject intervening replacement.
       - name: Download the snapshot
         env:
           SNAPSHOT_OBJECT: ${{ steps.snap.outputs.object }}
@@ -122,27 +114,20 @@ jobs:
       - name: Confirm the database is intact
         run: |
           set -euo pipefail
-          # a truncated download still produces a file; only a real query proves it
+          # Reject corrupt downloads and empty or partial databases.
           sqlite3 data/wi.sqlite "PRAGMA quick_check;" | grep -qx ok
           bills=$(sqlite3 data/wi.sqlite "SELECT COUNT(*) FROM bills;")
           echo "snapshot holds $bills bills"
-          # guards against releasing a site built from an empty or partial db
           [ "$bills" -ge 15000 ]
 
-      # --ignore-scripts blocks arbitrary install scripts from the whole
-      # dependency tree; better-sqlite3 is a native module and genuinely
-      # needs to build, so it is rebuilt by name rather than by lifting the
-      # blanket ban.
+      # Disable dependency install scripts; build only the required SQLite addon.
       - name: Install (locked, no lifecycle scripts)
         working-directory: site
         run: |
           npm ci --ignore-scripts
           npm rebuild better-sqlite3
 
-      # The JSON API, Atom feeds and calendars are generated from the same
-      # SQLite, are gitignored, and are linked from ordinary pages. Without
-      # this step the build succeeds and the release quietly drops all of
-      # them -- 20,580 links, caught by the link check the first time CI ran.
+      # Regenerate the linked API, feeds, and calendars from this same snapshot.
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - name: Generate the data products
         working-directory: pipeline
@@ -167,8 +152,7 @@ jobs:
         working-directory: site
         run: bash ../.github/scripts/timed.sh pagefind npm run build:search
 
-      # The gate that matters: a Hosting release replaces the whole site, so
-      # a build missing 21 of 23 sessions would delete ~38,000 live pages.
+      # A Hosting release replaces the site; missing sessions would disappear.
       - name: Preflight — build completeness
         working-directory: site
         run: bash ../.github/scripts/timed.sh preflight node scripts/preflight.mjs
@@ -179,10 +163,7 @@ jobs:
           BROWSER_PATH: /usr/bin/google-chrome
         run: |
           set -euo pipefail
-          # links needs no browser, so it runs alongside the three that
-          # do. Those run in sequence: three concurrent Chrome instances on
-          # a four-core runner starved each other into a 30s navigation
-          # timeout, which reads as an a11y failure and is not one.
+          # Run links alongside serial browser checks to avoid Chrome contention.
           bash ../.github/scripts/timed.sh links node scripts/links.mjs > /tmp/links.log 2>&1 &
           links_pid=$!
           browser_failed=0
@@ -208,9 +189,7 @@ jobs:
             --non-interactive \
             --message "${GITHUB_SHA::8} via ${GITHUB_RUN_ID}"
 
-      # Proves the release is actually serving, not just that the API
-      # accepted it. Runs against the public URL, not the local build, and
-      # against whichever target was released.
+      # Verify the released target serves the expected content and headers.
       - name: Smoke-test what is live
         run: |
           set -euo pipefail
@@ -233,14 +212,12 @@ jobs:
             echo "$path -> $code (withheld)"
             [ "$code" = "404" ]
           done
-          # a cached-forever HTML page is the bug that hid a broken deploy for hours
+          # HTML must revalidate so readers receive new releases.
           cc=$(curl -sSI "$base/" | tr -d '\r' | awk -F': ' 'tolower($1)=="cache-control"{print $2}')
           echo "Cache-Control: $cc"
           case "$cc" in *must-revalidate*) ;; *) echo "::error::HTML is not revalidating"; exit 1 ;; esac
 
-      # The CSP only exists once Firebase serves it, so it cannot be tested
-      # before a release. It broke site search the first time it shipped --
-      # Pagefind compiles WebAssembly -- with no symptom a visitor could see.
+      # Test Firebase's live CSP, including Pagefind's WebAssembly requirements.
       - name: Check the CSP against the released site
         working-directory: site
         env:

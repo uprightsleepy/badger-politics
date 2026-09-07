@@ -1,13 +1,6 @@
-"""Precompute simplified SVG paths for every legislative district.
+"""Precompute committed SVG thumbnails from authoritative LTSB boundaries.
 
-The LTSB GeoJSON is 284 KB and holds 99 Assembly polygons at full survey
-precision, which is far more detail than a thumbnail map needs and far too
-much to parse on every one of 132 district pages. Boundaries change once a
-decade, so the paths are generated once and committed.
-
-Every district is projected into one shared viewBox, so a district's
-position and size on the page are true relative to the rest of the state
-rather than each being fitted to its own box.
+A shared viewBox preserves each district's size and position within the state.
 
     uv run python -m importer.district_shapes \
         site/public/data/wi-districts-2024.geojson \
@@ -22,22 +15,12 @@ import sys
 from pathlib import Path
 
 HEIGHT = 420.0
-# The viewBox width is derived from the projection, never fixed: stretching
-# each axis to fill a box chosen in advance is what drew Wisconsin at three
-# quarters of its true width.
-# A point every ~0.6 viewBox units is plenty at thumbnail size; the full
-# precision is a survey artefact, not something a reader can see.
+# Derive width from the projection to avoid stretching; simplify for thumbnail size.
 TOLERANCE = 0.6
 
 
 def mercator_y(lat: float) -> float:
-    """Web Mercator's y, in the same units as longitude in radians.
-
-    Meridians converge toward the pole, so degrees of longitude and
-    latitude are not interchangeable units of distance. Mercator is
-    conformal, which is what an outline needs: local shape is preserved
-    everywhere, so the state and every district keep their real form.
-    """
+    """Mercator y in radians; a shared axis scale preserves local shape."""
     return math.log(math.tan(math.pi / 4 + math.radians(lat) / 2))
 
 
@@ -99,14 +82,11 @@ def main(argv: list[str]) -> int:
         shapes[f"assembly-{ad}"] = to_path(f["geometry"], project)
         senate.setdefault(f["properties"]["sd"], []).append(f["geometry"])
 
-    # a Senate district is exactly three Assembly districts; drawing all
-    # three outlines is honest and needs no polygon union
+    # Each Senate district comprises three Assembly districts; retain their outlines.
     for sd, geoms in senate.items():
         shapes[f"senate-{sd}"] = "".join(to_path(g, project) for g in geoms)
 
-    # The state outline is context behind the highlighted district, so it
-    # is drawn far coarser: at full tolerance it was 69 KB, which is not
-    # worth inlining on 132 pages to show a silhouette.
+    # A coarser state backdrop keeps the SVG small on each district page.
     global TOLERANCE
     TOLERANCE = 4.0
     shapes["_state"] = "".join(to_path(f["geometry"], project) for f in feats)

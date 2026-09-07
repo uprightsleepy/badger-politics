@@ -1,6 +1,4 @@
-"""Read-only data-propagation audit, run on demand (not a deploy gate):
-hunts the defect classes found in Aug 2026 (phantom coverage, silent-tail
-terms, misattribution, mapping drift) plus gate blind spots.
+"""Read-only, on-demand audit of coverage and attribution beyond deploy gates.
 
 Usage: uv run python audit.py [sqlite_path]
 """
@@ -57,13 +55,9 @@ total += check("same-day cross-chamber votes", db.execute("""
     AND a.chamber = 'lower' AND b.chamber = 'upper'
   JOIN people p ON p.id = a.person_id"""))
 
-# 3. member records exist iff docs.legis published a roll-call document
-#    (journal tally lines - committee exec sessions, procedural and
-#    amendment motions - carry counts but no roll and never count toward
-#    attendance). A /votes/ document without records is a scrape failure;
-#    records without a document would be attribution from nowhere.
-#    (zero-count events are attendance rolls - 2011's sv0001/sv0002 file
-#    opening-day CALL OF ROLL under vote-document urls - not vote records)
+# 3. vote documents with nonzero totals require member records; journal-only
+#    tallies have no member roll and never count toward attendance. Zero-count
+#    documents can be attendance rolls (2011 sv0001/sv0002), not vote records.
 total += check("vote events with a roll-call document but zero records", db.execute(f"""
   SELECT e.id, e.bill_id, e.date, e.source_url
   FROM vote_events e JOIN bills b ON b.id = e.bill_id
@@ -185,9 +179,8 @@ total += check("official total_cast below the candidate sum", db.execute("""
   SELECT year, chamber, district FROM election_history
   WHERE total_cast IS NOT NULL
   GROUP BY year, chamber, district HAVING MAX(total_cast) < SUM(votes)"""))
-# every contest winner must share a surname with someone recorded as
-# seated in that seat a month into the new term (nicknames differ;
-# surnames don't). Catches misparsed contests and phantom terms alike.
+# Compare winner surnames with the seat's members one month into the new term;
+# nicknames can differ. Flags misparsed contests and phantom terms.
 def _surname(name):
     return "".join(ch for ch in name.split()[-1].lower() if ch.isalpha())
 
@@ -225,10 +218,8 @@ total += check("election rows for non-sitting people", db.execute("""
   FROM elections e JOIN people p ON p.id = e.person_id
   WHERE p.current_role NOT IN ('Representative','Senator')"""))
 
-# 13. (info) died-without-hearing bills on a same-biennium agenda: the
-#    official bill history is the authority (no "public hearing held"
-#    action), so these are notices for hearings never actually held on
-#    that bill - listed for review, not counted as defects
+# 13. agenda notices do not prove a hearing occurred; bill history is authoritative.
+#    List these for review without counting them as defects.
 print("[..] died_without_hearing bills on a same-biennium agenda notice (info)")
 for r in db.execute("""
   SELECT b.id, b.identifier, h.date

@@ -1,14 +1,7 @@
 """Generate the permanent person -> URL slug map.
 
-Legislator URLs used the raw OCD uuid, which tells a reader nothing and
-which Google's URL guidance advises against. Names are unique across all
-346 people on record, so a name slug is unambiguous today.
-
-The map is committed rather than derived at build time on purpose. A slug
-has to outlive the name that produced it: if a member changes their name,
-the record keeps its URL and the site keeps working. Regenerating only
-ever *adds* entries; an existing id keeps whatever slug it was first
-given. Run after an import that introduces new people:
+Preserve committed entries across name changes. Allocate a unique slug only
+for new IDs. Run after an import that introduces new people:
 
     uv run python -m importer.person_slugs data/wi.sqlite \
         site/src/data/person-slugs.json

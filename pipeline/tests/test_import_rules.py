@@ -1,5 +1,9 @@
 """Importer derivation rules: identifiers, referrals, and the graveyard flag."""
 
+import json
+import runpy
+from pathlib import Path
+
 import pytest
 
 from importer.committees import Committee, CommitteeIndex
@@ -14,6 +18,42 @@ from importer.import_openstates import (
     to_local,
 )
 from importer.roster import Person, Term, load_people, roster_for
+
+
+def _load_vote_fixes(monkeypatch, contents: str) -> dict:
+    from importer import import_openstates
+
+    read_text = Path.read_text
+
+    def read(path, *args, **kwargs):
+        if path == import_openstates.VOTE_FIXES_PATH:
+            return contents
+        return read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read)
+    return runpy.run_path(import_openstates.__file__)["VOTE_NAME_FIXES"]
+
+
+def test_vote_corrections_keep_source_order_and_ignore_metadata(monkeypatch):
+    corrections = {
+        "https://example.org/vote-2": {"names": {"MISSPELLED": "Corrected"}},
+        "_comment": "Reviewed source corrections",
+        "_review": {"date": "2026-09-07"},
+        "https://example.org/vote-1": {"names": {}},
+    }
+    fixes = _load_vote_fixes(monkeypatch, json.dumps(corrections))
+    assert list(fixes) == ["https://example.org/vote-2", "https://example.org/vote-1"]
+    assert fixes["https://example.org/vote-2"] == {"MISSPELLED": "Corrected"}
+    assert fixes["https://example.org/vote-1"] == {}
+
+
+@pytest.mark.parametrize(
+    ("contents", "error"),
+    [("{", json.JSONDecodeError), ('{"https://example.org/vote": {}}', KeyError)],
+)
+def test_invalid_vote_corrections_still_fail_during_import(monkeypatch, contents, error):
+    with pytest.raises(error):
+        _load_vote_fixes(monkeypatch, contents)
 
 
 def action(

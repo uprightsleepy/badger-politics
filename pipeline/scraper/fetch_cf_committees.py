@@ -3,12 +3,9 @@ independent expenditure committees.
 
 Usage: python -m scraper.fetch_cf_committees [--since YYYY-MM] [--until YYYY-MM]
 
-The transaction feed is windowed by date, not by committee, so the same
-pages that carry legislator receipts already carry every other filer's.
-This keeps the rows a candidate committee never files: who funds a PAC,
-what it spends, and money spent for or against a candidate by someone
-else. Candidate-filed rows stay with fetch_cfis so the verified
-legislator attribution is untouched.
+The date-windowed feed includes all filers. Keep non-candidate committee
+transactions and any support/opposition rows. Candidate receipt attribution
+remains in fetch_cfis, using its verified committee map.
 """
 
 from __future__ import annotations
@@ -26,9 +23,7 @@ from scraper.http import session
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "cfis"
 
-# the filer types worth keeping: everything that is not one candidate's
-# own committee. "State Candidate" and "Federal Candidate" are excluded
-# because fetch_cfis already covers the legislator side with a verified map.
+# Candidate committees belong to fetch_cfis; support/opposition rows are kept below.
 KEEP_TYPES = {
     "PAC",
     "Conduit",
@@ -66,8 +61,6 @@ def fetch_month(http: requests.Session, first: str, last: str):
     """(kept transactions, committee registry rows) for one month."""
     rows, registry, skip = [], {}, 0
     while True:
-        # this feed carries every filer's rows, so a page is heavier than
-        # the mapped-committee fetch's and gets a longer timeout
         page = call(
             http, "publicFrontendApi.getTransactions",
             {"take": PAGE, "skip": skip, "sortBy": "date",
@@ -105,9 +98,7 @@ def fetch_month(http: requests.Session, first: str, last: str):
                 "final_recipient_id": (t.get("finalRecipient") or {}).get("id"),
                 "final_recipient_name": _name(t.get("finalRecipient")),
                 "purpose": (t.get("transactionPurpose") or {}).get("name"),
-                # the report this transaction was filed on: the Commission
-                # serves a page per report, which is the closest thing to a
-                # per-filing document a reader can open
+                # The report page provides the reader's filing-level source link.
                 "report_id": ((t.get("reports") or [{}])[0]).get("id"),
                 "report_name": ((t.get("reports") or [{}])[0]).get("name"),
             })

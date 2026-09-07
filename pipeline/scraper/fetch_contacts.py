@@ -2,10 +2,8 @@
 
 Usage: python -m scraper.fetch_contacts [--refresh]
 
-Each sitting member's docs.legis page (URL from their people file) carries
-the office room, telephone, and email. Office contacts only — the people
-files' own email/voice fields double as a cross-check where present.
-Pages are cached; --refresh refetches.
+Cache official office contacts from member-page URLs in the people files;
+--refresh refetches. Check the email's chamber prefix; roster email is a fallback.
 """
 
 from __future__ import annotations
@@ -79,10 +77,7 @@ def main(argv: list[str]) -> int:
             time.sleep(DELAY)
         parsed = parse_page(cache.read_text(encoding="utf-8"))
 
-        # docs.legis is the official record; the people files carry stale
-        # emails and district-office numbers, so they are not compared.
-        # Structural check instead: the email's Rep./Sen. prefix must match
-        # the chamber of the page it was parsed from (catches misparses).
+        # Check the official page's chamber; roster contacts can be stale.
         chamber_prefix = "sen." if "/senate/" in url else "rep."
         if parsed["email"] and not parsed["email"].lower().startswith(chamber_prefix):
             failures.append(

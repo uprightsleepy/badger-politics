@@ -1,16 +1,4 @@
-/** Shared client-side list filter: query against data-text rows, with a
- * live result count and an empty state. Applies once at init (and on
- * pageshow) so a browser-restored query never shows a stale list. The
- * announcement is debounced so typing isn't drowned out; the visual
- * filtering stays immediate. Returns apply() for deep links.
- *
- * With `facetAttr`, the bar's chips single-select on data-<facetAttr> and
- * mirror into the query string, so a filtered view stays shareable and an
- * inbound ?<facetAttr>= link arrives pre-filtered. Chips never remove rows
- * from the page — they only hide them — so the full list stays in the HTML
- * and in the search index. */
-/** Paint a chip row's pressed state: the chips `isOn` picks are on, the
- * rest off. Shared with pages whose facets need their own matching. */
+/** Synchronize chip styling and pressed state with the selected facets. */
 export const paintChips = (
   chips: HTMLButtonElement[],
   isOn: (chip: HTMLButtonElement) => boolean,
@@ -26,6 +14,8 @@ export const paintChips = (
   }
 };
 
+/** Filter rows in place, sync optional facets to the URL, and debounce count
+ * announcements. Reapply on pageshow; return apply() for deep links. */
 export function initRowFilter(opts: {
   input: string;
   rows: string;

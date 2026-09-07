@@ -1,6 +1,4 @@
-/** Pure service-history derivations for legislator profiles — span
- * merging and the attendance heatmap's in-office gating. No DB access,
- * so the recall/resignation rules stay unit-testable. */
+/** Pure service-span and attendance derivations; no database access. */
 import { OPEN_END } from "./sentinels";
 
 export interface TermRow {
@@ -20,8 +18,7 @@ export interface HeatDay {
   served: boolean;
 }
 
-/** Merge biennium-boundary term rows for display; real gaps (recalls,
- * comebacks) are months long and stay visible. */
+/** Merge terms across biennium boundaries while preserving longer service gaps. */
 export const mergeServiceSpans = (terms: TermRow[]): TermRow[] => {
   const spans: TermRow[] = [];
   for (const t of [...terms].sort((a, b) => a.start.localeCompare(b.start))) {
@@ -39,10 +36,8 @@ export const mergeServiceSpans = (terms: TermRow[]): TermRow[] => {
   return spans;
 };
 
-/** A chamber's voting day counts only when it falls inside one of this
- * person's recorded service terms for that chamber. Out-of-office days
- * within the overall span are kept (zeroed) so a mid-year exit shows as
- * "not in office", never as missed votes. */
+/** Count votes only during service in that chamber. Keep zeroed non-service
+ * days in the heatmap so they appear as "not in office", not missed votes. */
 export const buildHeatDays = (
   terms: TermRow[],
   mine: { date: string; chamber: string; cast: number; nv: number }[],
@@ -52,15 +47,8 @@ export const buildHeatDays = (
   for (const chamber of ["lower", "upper"] as const) {
     const chamberTerms = terms.filter((t) => t.chamber === chamber);
     if (!chamberTerms.length) continue;
-    // A term's end date is inclusive: members do cast votes on their last
-    // day, 117 of them on record. The exception is a member who moves
-    // between chambers, where one term ends and the next begins on the
-    // same date. Counting both left them sitting in the chamber they had
-    // just left, so the chamber's votes that day showed as missed. Dan
-    // Knodl's Senate term ended and his Assembly term began on 2025-01-06,
-    // which gave him two tiles for that day and two phantom absences. No
-    // member has ever voted in the chamber they were leaving on such a
-    // day, so the ending term simply does not claim it.
+    // Term ends are inclusive; a same-day chamber transfer belongs only
+    // to the incoming chamber, avoiding false absences in the outgoing one.
     const handover = (t: TermRow) =>
       t.end != null && terms.some((o) => o.chamber !== t.chamber && o.start === t.end);
     const inTerm = (date: string) =>
