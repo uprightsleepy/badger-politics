@@ -10,7 +10,8 @@ SOURCES = STATIC + DYNAMIC
 STAGES = ("legislature", "finance", "community", "federal", "import", "enrich")
 READS = {
     "legislature": ("wi", "people", "scraper_cache"),
-    "finance": ("wi", "people", "sessions", "cfis"),
+    # Committee matching rebuilds legislative history, including roster/term supplements.
+    "finance": ("wi", "people", "sessions", "rosters", "legacy", "cfis"),
     "community": ("people", "subjects", "contacts", "local"),
     "federal": ("federal",),
     "import": tuple(s for s in SOURCES

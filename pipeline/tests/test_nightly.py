@@ -163,6 +163,42 @@ def test_checkpoint_handoff_preserves_openstates_jurisdiction_filename(tmp_path,
     assert json.loads((finance.root / "_data/wi" / name).read_text()) == {"name": "Wisconsin"}
 
 
+def test_finance_restore_preserves_historical_roster_attribution(tmp_path, seeded):
+    from importer.import_openstates import build_rosters
+    from importer.roster import Person, Term, load_legacy_terms
+
+    source = tmp_path / "seed/pipeline"
+    (source / "_data/legacy/wi_legislators.csv").write_text(
+        "leg_id,full_name,last_name,party\nTEST001,Ann Able,Able,Test\n", encoding="utf-8")
+    (source / "_data/legacy/wi_legislator_roles.csv").write_text(
+        "leg_id,type,chamber,term,district,party\nTEST001,member,lower,2011-2012,5,Test\n",
+        encoding="utf-8")
+    (source / "_data/rosters/2013.json").write_text(json.dumps([
+        {"name": "Bo Baker", "chamber": "lower", "district": 9},
+    ]), encoding="utf-8")
+    store = Store()
+    seed(store, source, tmp_path / "historical-seed", REV)
+    legislature = runner(tmp_path, store)
+    legislature.acquire()
+    legislature.restore("legislature")
+    complete(legislature, "legislature")
+    finance = runner(tmp_path, store, "finance")
+    finance.restore("finance")
+
+    people = load_legacy_terms(finance.root / "_data/legacy", [
+        Person("p2", "Bo Baker", "Baker", "Test", None,
+               terms=[Term("lower", 9, "2025-01-06", None)]),
+    ])
+    session_defs = {
+        "2011": {"start_date": "2011-01-03", "end_date": "2013-01-01"},
+        "2013": {"start_date": "2013-01-07", "end_date": "2015-01-01"},
+    }
+    rosters, _ = build_rosters(people, session_defs, set(session_defs),
+                               finance.root / "_data/rosters")
+    assert rosters["2011"].resolve("Ann Able", "lower").id == "legacy/TEST001"
+    assert rosters["2013"].resolve("Bo Baker", "lower").from_listing
+
+
 def test_failed_stage_never_advances_manifest(tmp_path, seeded):
     original = seeded.objects[LATEST]
     r = runner(tmp_path, seeded)
