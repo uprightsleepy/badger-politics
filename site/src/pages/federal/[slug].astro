@@ -13,7 +13,7 @@ import Base from "../../layouts/Base.astro";
 import SourceStrip from "../../components/SourceStrip.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import FederalVoteRow from "../../components/FederalVoteRow.astro";
-import { federalMembers, federalVotesFor, federalCongressStats } from "../../lib/db";
+import { federalMembers, federalVoteKey, federalVotesFor, federalCongressStats } from "../../lib/db";
 import { congressLabel } from "../../lib/federal";
 
 export function getStaticPaths() {
@@ -21,9 +21,7 @@ export function getStaticPaths() {
 }
 
 const { member } = Astro.props;
-// each chamber's files stamp their own id: LIS for senators, bioguide
-// for House members
-const voteKey = member.chamber === "senate" ? member.lis_id! : member.bioguide;
+const voteKey = federalVoteKey(member);
 const votes = federalVotesFor(voteKey);
 const byCongress = federalCongressStats(voteKey);
 const missed = byCongress.reduce((s, c) => s + c.missed, 0);

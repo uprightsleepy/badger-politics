@@ -147,21 +147,24 @@ export const federalMembers = (): FederalMember[] =>
     ? (prep("SELECT * FROM federal_members ORDER BY chamber DESC, district").all() as FederalMember[])
     : [];
 
-/** memberKey is the LIS id for senators, the bioguide for House members
- * -- whichever id that chamber's own files stamp on each position. */
-export const federalVotesFor = (memberKey: string) =>
+/** Use the chamber's source ID: LIS for Senate votes, bioguide for House votes. */
+export const federalVoteKey = (member: FederalMember): string =>
+  member.chamber === "senate" ? member.lis_id! : member.bioguide;
+
+export const federalVotesFor = memoBy((memberKey: string) =>
   prep(
       `SELECT v.*, r.vote_cast FROM federal_votes v
        JOIN federal_vote_records r ON r.vote_id = v.id
        WHERE r.member_id = ?
        ORDER BY v.date DESC, v.number DESC`,
     )
-    .all(memberKey) as {
+    .all(memberKey) as ReadonlyArray<Readonly<{
     id: string; congress: number; session: number; number: number; date: string;
     question: string | null; result: string | null; title: string | null;
     yeas: number; nays: number; majority_requirement: string | null;
     document: string | null; source_url: string; vote_cast: string;
-  }[];
+  }>>,
+);
 
 /** Per-Congress totals for one senator: cast next to missed, the
  * "how are they representing us" summary in four columns. */

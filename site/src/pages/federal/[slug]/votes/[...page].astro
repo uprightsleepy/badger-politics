@@ -7,13 +7,13 @@ import Base from "../../../../layouts/Base.astro";
 import PartyChip from "../../../../components/PartyChip.astro";
 import Pager from "../../../../components/Pager.astro";
 import FederalVoteRow from "../../../../components/FederalVoteRow.astro";
-import { federalMembers, federalVotesFor } from "../../../../lib/db";
+import { federalMembers, federalVoteKey, federalVotesFor } from "../../../../lib/db";
 import { FEDERAL_VOTES_PER_PAGE as PER_PAGE, pageCount } from "../../../../lib/paging";
 
 export function getStaticPaths() {
   return federalMembers()
     .flatMap((m) => {
-      const total = federalVotesFor(m.chamber === "senate" ? m.lis_id! : m.bioguide).length;
+      const total = federalVotesFor(federalVoteKey(m)).length;
       const pages = pageCount(total, PER_PAGE);
       return Array.from({ length: pages }, (_, i) => ({
         params: { slug: m.slug, page: i === 0 ? undefined : String(i + 1) },
@@ -23,7 +23,7 @@ export function getStaticPaths() {
 }
 
 const { member, page, pages } = Astro.props;
-const all = federalVotesFor(member.chamber === "senate" ? member.lis_id! : member.bioguide);
+const all = federalVotesFor(federalVoteKey(member));
 const votes = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 const base = `/federal/${member.slug}/votes/`;
 ---
