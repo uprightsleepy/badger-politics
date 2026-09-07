@@ -1,9 +1,10 @@
 """Bounded archives: regular files only, verified before manual extraction."""
 
 import gzip
+import os
 import shutil
 import tarfile
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 MAX_EXPANDED = 12 * 1024**3
 MAX_FILES = 200_000
@@ -41,8 +42,13 @@ def unpack(source: Path, name: str, root: Path, expected_bytes: int):
     with tarfile.open(source, mode="r|gz") as archive:
         for member in archive:
             path = PurePosixPath(member.name)
+            # OpenStates jurisdiction IDs contain colons in Linux filenames.
+            # Reject drive-qualified components everywhere, and all colons on
+            # Windows where they can address alternate data streams.
             if (path.is_absolute() or not path.parts or path.parts[0] != name
-                    or ".." in path.parts or "\\" in member.name or ":" in member.name
+                    or ".." in path.parts or "\\" in member.name
+                    or any(PureWindowsPath(part).drive for part in path.parts)
+                    or (os.name == "nt" and ":" in member.name)
                     or not member.isfile() or member.name in seen):
                 raise ValueError("Unsafe or duplicate archive member")
             seen.add(member.name)

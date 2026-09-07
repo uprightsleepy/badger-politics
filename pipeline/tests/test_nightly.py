@@ -4,9 +4,11 @@ import copy
 import hashlib
 import io
 import json
+import os
 import sqlite3
 import tarfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -147,6 +149,20 @@ def test_completed_stage_resume_skips_collection_and_new_revision_rejected(tmp_p
         retry.restore("legislature")
 
 
+@pytest.mark.skipif(os.name == "nt", reason="OpenStates colon filenames require a POSIX filesystem")
+def test_checkpoint_handoff_preserves_openstates_jurisdiction_filename(tmp_path, seeded):
+    first = runner(tmp_path, seeded)
+    first.acquire()
+    first.restore("legislature")
+    name = "jurisdiction_ocd-jurisdiction-country:us-state:wi-government.json"
+    (first.root / "_data/wi" / name).write_text('{"name": "Wisconsin"}', encoding="utf-8")
+    complete(first, "legislature")
+
+    finance = runner(tmp_path, seeded, "finance")
+    assert finance.restore("finance")
+    assert json.loads((finance.root / "_data/wi" / name).read_text()) == {"name": "Wisconsin"}
+
+
 def test_failed_stage_never_advances_manifest(tmp_path, seeded):
     original = seeded.objects[LATEST]
     r = runner(tmp_path, seeded)
@@ -265,6 +281,7 @@ def test_sqlite_backup_includes_wal_commits(tmp_path, seeded):
     ("/absolute", tarfile.REGTYPE), ("wi/link", tarfile.SYMTYPE),
     ("wi/hardlink", tarfile.LNKTYPE), ("other/file", tarfile.REGTYPE),
     ("wi/C:stream", tarfile.REGTYPE),
+    ("wi/nested/C:/escape", tarfile.REGTYPE), ("wi/nested/C:escape", tarfile.REGTYPE),
 ])
 def test_archive_rejects_unsafe_members(tmp_path, member_name, kind):
     archive = tmp_path / "input.tar.gz"
@@ -276,6 +293,23 @@ def test_archive_rejects_unsafe_members(tmp_path, member_name, kind):
         bundle.addfile(member, io.BytesIO(b"x") if member.size else None)
     with pytest.raises(ValueError):
         unpack(archive, "wi", tmp_path / "restore", 100)
+
+
+@pytest.mark.parametrize("filename", [
+    "jurisdiction_ocd-jurisdiction-country:us-state:wi-government.json",
+    "record.json:stream",
+])
+def test_archive_rejects_colon_names_on_windows(tmp_path, monkeypatch, filename):
+    archive = tmp_path / "input.tar.gz"
+    with tarfile.open(archive, "w:gz") as bundle:
+        member = tarfile.TarInfo(f"wi/{filename}")
+        member.size = 1
+        bundle.addfile(member, io.BytesIO(b"x"))
+    # Replace this module's os binding without changing pathlib's host platform.
+    monkeypatch.setattr("nightly.archive.os", SimpleNamespace(name="nt"))
+    with pytest.raises(ValueError, match="Unsafe"):
+        unpack(archive, "wi", tmp_path / "restore", 1)
+    assert not list((tmp_path / "restore/wi").iterdir())
 
 
 def test_archive_roundtrip_and_existing_data_protected(tmp_path):
@@ -329,8 +363,6 @@ def test_workflow_sequence_and_private_data_guards():
 
 
 def test_cloud_cli_resolution_and_http_errors_do_not_expose_tokens(monkeypatch):
-    from types import SimpleNamespace
-
     import requests
 
     monkeypatch.setattr("nightly.storage.shutil.which", lambda name: "/tools/" + name)
