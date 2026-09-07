@@ -228,6 +228,11 @@ bounded diagnostic tails are stored beside the checkpoint and expire after
 seven days, followed by the existing seven-day soft-delete window. GCP
 authentication is renewed after each processing step before uploads.
 
+OpenStates jurisdiction filenames contain colons on Linux. Checkpoint
+restores preserve those names on Linux while rejecting Windows drive paths
+and, on Windows, colon names that could address alternate data streams.
+Use Linux (including a Linux filesystem in WSL) to inspect these checkpoints.
+
 For a failed run, rerun the failed jobs in GitHub, or manually dispatch the
 workflow with `resume_run` set to the original numeric run ID. Completed
 stages are reused. Resume requires the same source commit and the same
