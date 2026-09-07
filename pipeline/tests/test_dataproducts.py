@@ -29,6 +29,9 @@ def db_path(tmp_path: Path, make_db) -> Path:
                   'failed_sjr1', 1, 'openstates');
         INSERT INTO bills (id, session_id, identifier, title, source)
           VALUES ('2025-ab9999', '2025', 'AB 9999', 'SECRET LEGISCAN BILL', 'legiscan');
+        INSERT INTO lobbying_interests (bill_id, principal_id, principal, source_url)
+          VALUES ('2025-ab656', 999, 'WITHHELD_LOBBYING_ORGANIZATION',
+                  'https://lobbying.wi.gov/What/BillInformation/2025REG/Information/25090');
         INSERT INTO actions (id, bill_id, date, description, classification)
           VALUES ('a1', '2025-ab656', '2025-06-01', 'Introduced', 'introduction');
         INSERT INTO actions (id, bill_id, date, description, classification)
@@ -140,6 +143,24 @@ def test_filtered_sqlite_has_no_legiscan_rows(built: Path) -> None:
     # the exportable bill is still there
     assert conn.execute("SELECT COUNT(*) FROM bills").fetchone()[0] == 1
     conn.close()
+
+
+def test_lobbying_is_private_even_in_downloadable_database(built: Path, db_path: Path) -> None:
+    marker = b"WITHHELD_LOBBYING_ORGANIZATION"
+    # The local source is preserved for a future approved import.
+    with sqlite3.connect(db_path) as source:
+        assert source.execute("SELECT COUNT(*) FROM lobbying_interests").fetchone()[0] == 1
+    snapshot = built / "exports" / "wi-filtered.sqlite"
+    with sqlite3.connect(snapshot) as public:
+        assert public.execute("SELECT COUNT(*) FROM lobbying_interests").fetchone()[0] == 0
+        assert public.execute("PRAGMA foreign_key_check").fetchall() == []
+    # VACUUM must remove deleted values, not just hide them from SQL queries.
+    assert marker not in snapshot.read_bytes()
+    assert b"lobbying.wi.gov/What/BillInformation" not in snapshot.read_bytes()
+    for directory in (built / "public", built / "exports"):
+        for path in directory.rglob("*"):
+            if path.is_file():
+                assert marker not in path.read_bytes(), path
 
 
 def test_feeds_are_valid_atom(built: Path) -> None:

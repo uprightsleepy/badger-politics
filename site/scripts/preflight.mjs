@@ -208,6 +208,13 @@ if (!robots.includes("sitemap-index.xml")) {
 }
 
 // --- pages that must never 404 --------------------------------------------
+// Removed source pages must not survive a stale local/generated artifact.
+if (await exists("lobbying")) {
+  fail("withheld Eye on Lobbying pages remain in the build");
+} else {
+  pass("withheld lobbying pages absent");
+}
+
 let missingPages = 0;
 for (const p of [
   "index.html",

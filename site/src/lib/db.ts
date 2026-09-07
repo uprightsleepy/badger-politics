@@ -705,40 +705,6 @@ export const committeesFor = (personId: string) =>
     )
     .all(personId) as { id: string; name: string; role: string }[];
 
-/** Lobbying rollups over registrations already linked to bills. */
-export const lobbyingOrgs = () =>
-  prep(
-      `SELECT principal_id AS id, MAX(principal) AS name,
-              COUNT(DISTINCT bill_id) AS bills
-       FROM lobbying_interests GROUP BY principal_id ORDER BY bills DESC, name`,
-    )
-    .all() as { id: number; name: string; bills: number }[];
-
-export const mostLobbiedBills = (sessionId: string, limit: number) =>
-  prep(
-      `SELECT b.id, b.identifier, b.title, b.status, COUNT(*) AS orgs
-       FROM lobbying_interests l JOIN bills b ON b.id = l.bill_id
-       WHERE b.session_id = ? AND b.source != 'legiscan'
-       GROUP BY b.id ORDER BY orgs DESC, b.id LIMIT ?`,
-    )
-    .all(sessionId, limit) as {
-    id: string; identifier: string; title: string | null;
-    status: string | null; orgs: number;
-  }[];
-
-export const orgLobbying = (principalId: number) =>
-  prep(
-      `SELECT l.bill_id, l.principal, l.source_url, b.identifier, b.title,
-              b.status, b.session_id
-       FROM lobbying_interests l JOIN bills b ON b.id = l.bill_id
-       WHERE l.principal_id = ? AND b.source != 'legiscan'
-       ORDER BY b.session_id DESC, b.id`,
-    )
-    .all(principalId) as {
-    bill_id: string; principal: string; source_url: string | null;
-    identifier: string; title: string | null; status: string | null; session_id: string;
-  }[];
-
 /** Share of a member's aye/nay floor votes matching their party's majority
  * position, per session. Presented as a plain number, never a grade. */
 export const partyAgreement = (personId: string, party: string | null) => {
@@ -1192,15 +1158,6 @@ export const subjectsForBill = (billId: string) =>
 export const documentsFor = (billId: string) =>
   prep("SELECT note, url FROM bill_documents WHERE bill_id = ? ORDER BY note")
     .all(billId) as { note: string; url: string }[];
-
-/** Organizations registered as lobbying on a bill (an interest
- * registration, not a for/against position). */
-export const lobbyingFor = (billId: string) =>
-  prep(
-      `SELECT principal_id, principal, source_url FROM lobbying_interests
-       WHERE bill_id = ? ORDER BY principal`,
-    )
-    .all(billId) as { principal_id: number; principal: string; source_url: string | null }[];
 
 /** ---- New laws, veto tracker, key votes ---- */
 

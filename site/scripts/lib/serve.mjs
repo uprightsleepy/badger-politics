@@ -104,11 +104,10 @@ const SAMPLE_PATHS = [
   "/legislators/", "/districts/", "/districts/senate-21/", "/committees/", "/federal/",
   "/calendar/", "/my-reps/", "/elections/2026/", "/elections/2026/senate-5/",
   "/money/", "/money/committees/", "/money/committees/651839/", "/money/independent/",
-  "/lobbying/", "/local/", "/local/milwaukee/", "/local/west-allis/",
+  "/local/", "/local/milwaukee/", "/local/west-allis/",
 ];
 export const samplePages = async () => {
   const dynamic = await Promise.all([
-    firstHref("lobbying", /href="(\/lobbying\/\d+\/)"/),
     firstHref("subjects", /href="(\/subjects\/[^"]+\/)"/),
     firstHref("committees", /href="(\/committees\/[^"]+\/)"/),
     firstHref("federal", /href="(\/federal\/[^"]+\/)"/),

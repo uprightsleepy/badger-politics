@@ -47,7 +47,9 @@ No new paid service or dependency is required.
 
 `run.sh` no longer fetches lobbying pages. It still imports the complete existing
 `_data/lobbying/interests-*.json` archive after rebuilding the database, so this
-change does not discard collected registrations. The site labels them archived.
+change does not discard collected registrations. Registrations are private: the
+site has no lobbying pages or bill panels, and bulk exports delete these rows
+before vacuuming the copied database. Publication requires an approved source.
 `fetch_lobbying.parse_principals()` remains a network-free parser for locally
 saved HTML; it is not a complete manual-upload workflow.
 

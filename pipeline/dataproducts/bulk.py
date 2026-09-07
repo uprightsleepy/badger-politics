@@ -3,9 +3,9 @@
 Written to data/exports/ (NOT the site tree — large files publish to GitHub
 Releases in Phase 6 so the site origin never serves them; plan §11).
 
-The SQLite snapshot is a real copy with every source='legiscan' row deleted
-and VACUUMed out — the ToS boundary holds even for someone who downloads the
-raw database.
+The SQLite snapshot is a copy with LegiScan rows and all Eye on Lobbying
+registrations deleted and VACUUMed out. Private archived records must not be
+recoverable from the downloadable file's free pages.
 """
 
 from __future__ import annotations
@@ -67,6 +67,9 @@ def export_sqlite(db_path: Path, exports_dir: Path) -> Path:
     shutil.copyfile(db_path, snapshot)
     conn = sqlite3.connect(snapshot)
     with conn:
+        # Eye on Lobbying disallows collection. Retain its archive privately,
+        # but do not publish even previously collected registrations.
+        conn.execute("DELETE FROM lobbying_interests")
         conn.execute(
             "DELETE FROM vote_records WHERE vote_event_id IN"
             " (SELECT id FROM vote_events WHERE source = 'legiscan')"
@@ -87,10 +90,11 @@ def export_sqlite(db_path: Path, exports_dir: Path) -> Path:
         "SELECT (SELECT COUNT(*) FROM bills WHERE source='legiscan')"
         " + (SELECT COUNT(*) FROM vote_events WHERE source='legiscan')"
         " + (SELECT COUNT(*) FROM elections WHERE source='legiscan')"
+        " + (SELECT COUNT(*) FROM lobbying_interests)"
     ).fetchone()[0]
     conn.close()
     if remaining:
-        raise RuntimeError(f"provenance filter failed: {remaining} legiscan rows remain")
+        raise RuntimeError(f"provenance filter failed: {remaining} withheld rows remain")
     return snapshot
 
 

@@ -28,12 +28,17 @@ const internal = new Map(); // href -> first page seen on
 const external = new Map();
 const fragments = new Map(); // href without fragment -> Set of fragments used
 let pages = 0;
+let failures = 0;
 
 for await (const file of htmlFiles(DIST)) {
   pages++;
   // scripts hold template literals that look like hrefs; markup only
   const html = (await readFile(file, "utf-8")).replace(/<script[\s\S]*?<\/script>/g, "");
   const page = "/" + file.slice(DIST.length + 1).replaceAll("\\", "/");
+  if (/Registered lobbying interests|lobbying\.wi\.gov\/(?:Who|What)\//i.test(html)) {
+    failures++;
+    console.log(`WITHHELD lobbying records found on ${page}`);
+  }
   for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
     const url = m[1];
     if (url.startsWith("mailto:") || url.startsWith("data:") || url.startsWith("//")) continue;
@@ -54,8 +59,6 @@ for await (const file of htmlFiles(DIST)) {
     }
   }
 }
-
-let failures = 0;
 
 // internal paths must resolve to a built file
 const toFile = (p) => {

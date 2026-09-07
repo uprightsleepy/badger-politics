@@ -2,7 +2,7 @@
 
 Free, independent tracking of the Wisconsin Legislature at
 [badgerpolitics.org](https://badgerpolitics.org): every bill, roll call,
-hearing, veto, campaign dollar and lobbying registration since 2009, plus
+hearing, veto and campaign dollar, plus
 how Wisconsin's members of Congress vote, rebuilt from official records
 and served as a fully static site.
 
@@ -12,7 +12,7 @@ and served as a fully static site.
 
 | Section | What it holds |
 |---|---|
-| Bills | Every proposal in every session since 2009, with status, sponsors, the LRB plain-language analysis, fiscal estimates, lobbying interests, companion bills (from the Legislature's own See Also links), and the full official history with legislator names linked |
+| Bills | Every proposal in every session since 2009, with status, sponsors, the LRB plain-language analysis, fiscal estimates, companion bills (from the Legislature's own See Also links), and the full official history with legislator names linked |
 | Roll calls | Every recorded floor vote, name by name, with party splits and the reader's own legislators pinned |
 | Legislators | Profiles with bills led, key votes selected by rule, votes against party, floor attendance by day, committees, campaign money while in office, compensation, and the complete paged record |
 | Districts and Find My Legislators | Address to district entirely in the browser (Census geocoder for coordinates, bundled LTSB boundaries for the match); nothing is stored anywhere but the device |
@@ -21,7 +21,6 @@ and served as a fully static site.
 | Calendar | Hearings and election days, with iCal feeds and WisconsinEye recordings where they exist; readers who saved an address in a covered city also see their own council's upcoming meetings, on that device only |
 | New Laws, Governor's Desk, Veto Tracker, Partial Veto | Acts by biennium with passage tallies; bills awaiting signature; every veto, partial veto and override attempt; how the partial veto works |
 | Campaign Money | Receipts to sitting legislators windowed to their time in office, contributing committees, and outside spending filing by filing with the Ethics Commission's transaction IDs and report links |
-| Lobbying | Registrations by organization and by bill (an interest, never a for-or-against position) |
 | Federal Delegation | Both U.S. senators and all eight House members, with every floor roll call from the Senate's and House Clerk's own XML (Senate from the 112th Congress, House from 2005) |
 | City Councils | Milwaukee and West Allis Common Council votes, member by member, with every vote that drew a No surfaced and every item linking the clerk's own record; each member page carries the portrait, office contacts, committee assignments, service dates and term end, attendance from the clerk's roll calls, sole No votes and dissent filterable by year, votes on the losing side, motions moved, a paged full record with year navigation, a follow button, an Atom feed and JSON, like a legislator's; district pages draw each district within its city; the address lookup adds the reader's alderpersons |
 | 2026 Ballot | Statewide offices and every legislative seat, with a personal "what is on my ballot" view from the saved district |
@@ -38,7 +37,7 @@ openstates-scrapers (wi, pinned, CLI-only)    ┐
 docs.legis member pages, subject index, LRB   │
 WEC ballot access + certified canvasses       ├─→ archived raw data (_data/) → SQLite → integrity gates → data products + Astro static build → Firebase Hosting
 CFIS tRPC API (campaignfinance.wi.gov)        │
-Eye on Lobbying, WisconsinEye                 │
+WisconsinEye (private archive import)         │
 Senate LIS + House Clerk roll-call XML        ┘
 ```
 
@@ -68,7 +67,7 @@ snapshot CI releases from.
 | Candidates and election results | Wisconsin Elections Commission | ballot access report PDF to CSV; certified ward-by-ward canvasses |
 | District boundaries | LTSB 2024 official files | bundled GeoJSON; the Census geocoder is used for address-to-point only |
 | Campaign finance | CFIS tRPC API (campaignfinance.wi.gov) | legislator receipts in monthly windows since 2008-01 through a verified committee map; every other filer's money since 2025-01, including independent expenditures with their report IDs |
-| Lobbying registrations | Eye on Lobbying (lobbying.wi.gov) | per-session matter grid plus per-bill principal lists |
+| Lobbying registrations | Withheld | Collection removed; archived data is excluded from public pages and exports pending an approved source |
 | Federal roll calls | senate.gov LIS XML, clerk.house.gov EVS XML, unitedstates/congress-legislators roster | per-vote files mirrored once and cached forever; positions keyed by each chamber's own member id |
 | Council votes and attendance | Legistar Web API (`milwaukee`, `westalliswi` tenants: EventItems, Votes, RollCalls); each meeting's InSite page for item links | meetings cached permanently once minutes are Final; votes keyed by each tenant's own person id; an item links to the page the meeting's own page lists for its file number, because InSite's ids are not the API's |
 | Aldermanic district boundaries | Milwaukee open data portal (CC BY shapefile); West Allis city GIS server | one-time generator (`importer/local_shapes.py`), committed GeoJSON; the robots-disallowed city map host is not used |
@@ -201,7 +200,7 @@ provenance-filtered SQLite snapshot. See [/data/](https://badgerpolitics.org/dat
 | Bills, actions, roll calls | 2011-12 through 2025-26 full; 2009-10 partial (official pages list vote totals, not names) |
 | Legislator campaign finance | electronic records 2008 to present, for members with a verified committee link (`docs/curation-worklist.md` holds the human-verification queue) |
 | Committee, PAC and outside spending | every filer's transactions since January 2025 |
-| Lobbying | current session (2025 Regular) |
+| Lobbying | Withheld from public pages and exports pending an approved source |
 | Election results | certified WEC canvasses per seat and statewide office |
 | Federal roll calls | U.S. Senate from the 112th Congress (2011); U.S. House from 2005 |
 | Council votes | Milwaukee from 2008; West Allis from 2015 (earlier minutes record votes inconsistently) |
@@ -274,7 +273,8 @@ change that makes a number look better by guessing is not a fix.
 
 ## Licensing
 
-Code is [Apache-2.0](LICENSE). Legislative, election, campaign finance and
-lobbying data is Wisconsin public record; federal roll calls are U.S.
+Code is [Apache-2.0](LICENSE). Legislative, election and campaign finance
+data comes from Wisconsin public records. Archived lobbying data is withheld
+from publication; federal roll calls are U.S.
 government works. openstates-scrapers is GPL-3.0, subprocess-only (see
 mandate 7). FollowTheMoney data is CC BY-NC-SA and is not redistributed.
