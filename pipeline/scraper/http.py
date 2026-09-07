@@ -15,7 +15,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-USER_AGENT = "badgerpolitics.org data pipeline (contact: hphil.work@gmail.com)"
+USER_AGENT = "badgerpolitics.org data pipeline (contact: https://badgerpolitics.org/about/#contact)"
 
 # Three tries with backoff on connection errors and gateway 5xx, reads
 # only: a nightly run rides out a blip instead of aborting on one 502.

@@ -14,6 +14,12 @@ site/.astro/
 data/*
 !data/.gitkeep
 _data/
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
 
 # Generated data products (rebuilt from SQLite every run)
 site/public/api/
@@ -27,10 +33,33 @@ site/public/logos/
 *.tfstate
 *.tfstate.*
 *.tfvars
+*.tfvars.json
+*.tfplan
+infra/tfplan
+crash.log
+crash.*.log
 
 # Secrets / env
 .env
 .env.*
+gha-creds-*.json
+gcp-service-account*.json
+service-account*.json
+application_default_credentials.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Private correspondence, working research, and local audit output
+.private/
+.public-repo-audit*/
+public-repository-review.md
+# Keep these original working drafts local if they are copied back in.
+docs/deep-research-report.md
+docs/research/badger-politics-site-review.md
+docs/research/badger-politics-ci-improvements.patch
+docs/research/infrastructure-review.md
 
 # OS / editor
 .DS_Store

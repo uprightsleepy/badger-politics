@@ -36,7 +36,7 @@ for (const [entityId, entry] of entries) {
   let page = "";
   try {
     page = (await (await fetch(`https://${entry.domain}`, {
-      headers: { "User-Agent": "badgerpolitics.org build (contact: hphil.work@gmail.com)" },
+      headers: { "User-Agent": "badgerpolitics.org build (contact: https://badgerpolitics.org/about/#contact)" },
       redirect: "follow",
     })).text()).toLowerCase();
   } catch {}

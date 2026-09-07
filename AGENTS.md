@@ -43,6 +43,10 @@ History uses descriptive, sentence-style subjects without mandatory prefixes. Ex
 
 Preserve static serving, SQLite-only storage, verified attribution, and provenance filtering. Never weaken integrity gates. Keep secrets in ignored `.env` files. Never overlap scrapes or build during database imports. Releases use GitHub Actions; follow `docs/deploys.md`.
 
+Keep total infrastructure costs below $10/month excluding domains; prefer $0–5 and improvements without added recurring charges. Estimate combined hosting, storage, ingestion and API costs before adding paid services, leaving headroom for usage spikes.
+
+This repository is public. Keep sent correspondence, personal contact details, raw working drafts, credentials, and audit output outside Git or under ignored `.private/`. Publish redacted templates and use the project contact URL in scripts. Use documented civic buildings for address examples. Review staged files before committing; CI scans history and tracked content for secrets.
+
 ## Scraping & Source Access Rules
 
 Before adding or changing data gathering, review and follow each source site's current `robots.txt`, terms of use, API policies, and published access restrictions. Record policy URLs, review date, and relevant constraints in scraper documentation. Respect disallowed paths, crawl delays, rate limits, and retry instructions; use an identifying User-Agent, caching, and backoff. Do not bypass access controls or scraping restrictions. If rules are unclear or conflict, pause collection from that source until clarified; prefer a permitted official API or bulk download.

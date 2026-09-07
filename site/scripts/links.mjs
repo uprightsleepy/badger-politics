@@ -105,7 +105,7 @@ if (process.argv.includes("--external")) {
   const hosts = [...byHost.values()];
   let nextHost = 0;
   const checkHost = async (list) => {
-    const UA = { "User-Agent": "BadgerPolitics link check (badgerpolitics.org; hphil.work@gmail.com)" };
+    const UA = { "User-Agent": "BadgerPolitics link check (badgerpolitics.org; https://badgerpolitics.org/about/#contact)" };
     const probe = async (url) => {
       let res = await fetch(url, { method: "HEAD", redirect: "follow",
         signal: AbortSignal.timeout(20000), headers: UA });

@@ -79,8 +79,9 @@ for (const p of ["/", "/bills/2025/", "/legislators/", "/money/", "/calendar/"])
 // the two things the CSP could plausibly break
 if (
   !(await check("/my-reps/", async () => {
-    // exercises the Census JSONP path: it appends a script to a third host
-    await page.type("#addr", "7120 W National Ave, West Allis, WI");
+    // West Allis City Hall exercises the Census JSONP path using a public address.
+    // Source: https://www.westalliswi.gov/page/city-facilities-and-hours
+    await page.type("#addr", "7525 W Greenfield Ave, West Allis, WI");
     await page.click("#addr-form button[type=submit]");
     await page.waitForFunction(
       // terminal states only: "Loading your districts" also contains

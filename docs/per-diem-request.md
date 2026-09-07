@@ -28,7 +28,7 @@ Template:
 > nonpartisan public information site.
 >
 > Thank you,
-> Henry ({email})
+> {requester name} ({email})
 
 Notes:
 - Both clerks have released these routinely (they are the source for The

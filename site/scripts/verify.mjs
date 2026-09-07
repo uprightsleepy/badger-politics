@@ -49,14 +49,15 @@ await waitForNoSearchResults(page, "pedophiles");
 const degenerateLinks = await page.$$eval("#search-results > a", (as) => as.length);
 check("search 'pedophiles' returns no junk matches", degenerateLinks === 0, `${degenerateLinks} links`);
 
-// 2. my-reps: West Allis address -> AD 14 (Tenorio) + SD 5 (Hutton).
+// 2. my-reps: West Allis City Hall -> AD 14 (Tenorio) + SD 5 (Hutton).
+// Public fixture: https://www.westalliswi.gov/page/city-facilities-and-hours
 // One bounded retry: the Census geocoder is a third-party round trip and
 // has twice stalled a run that passed minutes later. The assertion is
 // unchanged -- a second timeout still fails the harness.
 let resolved = false;
 for (let attempt = 0; attempt < 2 && !resolved; attempt++) {
   await page.goto("http://127.0.0.1:8931/my-reps/", { waitUntil: "networkidle2" });
-  await page.type("#addr", "7120 W National Ave, West Allis, WI");
+  await page.type("#addr", "7525 W Greenfield Ave, West Allis, WI");
   await page.click("#addr-form button[type=submit]");
   resolved = await page.waitForFunction(
     () => !document.getElementById("result").classList.contains("hidden"),

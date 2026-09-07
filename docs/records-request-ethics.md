@@ -1,15 +1,15 @@
 # Records request: Wisconsin Ethics Commission
 
-**SENT 2026-08-24** to ethics@wi.gov from hphil.work@gmail.com, signed
-Henry Phillips. Awaiting response. § 19.35 sets no fixed deadline
-("as soon as practicable and without delay"); a polite follow-up is
-reasonable after ~2 weeks of silence.
+## Access status
 
-Covers four asks: the committee registrant extract, filed-report
-summary data if available, and a courtesy blessing for automated
-retrieval from both CFIS and Eye on Lobbying.
+A request was sent on 2026-08-24. No response or authorization is recorded
+in this repository. Keep sent correspondence, sender details, and replies
+in private project records. Review current source policies before
+collection; a sent request does not establish permission.
 
----
+## Request template
+
+Recipient: ethics@wi.gov
 
 Subject: Public records request: candidate committee registrant data
 
@@ -43,7 +43,7 @@ you can export routinely.
    from campaignfinance.wi.gov, using the same JSON endpoints the
    website itself loads data from (/api/trpc/...), at low volume —
    roughly one paged, throttled pull per day, with an identifying
-   User-Agent carrying this email address. Since those endpoints aren't
+   User-Agent linking to the project contact page. Since those endpoints aren't
    formally published, I want to ask before making that routine: would
    something like that be acceptable to the Commission, and is there a
    preferred method — a bulk export, the site's spreadsheet downloads,
@@ -63,5 +63,5 @@ for maintaining these systems; the transparency they provide is the
 foundation my site is built on.
 
 Best regards,
-Henry
+{requester name}
 badgerpolitics.org
