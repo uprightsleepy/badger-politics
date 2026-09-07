@@ -74,11 +74,11 @@ import { PLACES_KEY } from "../lib/placesKey";
 
   <script>
     import { savedDistrict, saveDistrict, forgetDistrict } from "../lib/district";
-    import { forgetCityDistrict, saveCityDistrict, savedCityDistrict } from "../lib/cityDistrict";
+    import { forgetCityDistrict, resolveCity, savedCityDistrict } from "../lib/cityDistrict";
     import { attachSuggest } from "../scripts/addressSuggest";
     import { esc } from "../lib/html";
     import { fmtDate, partyChipHtml, shortTitle } from "../lib/format";
-    import { cityDistrictAt, districtAt, districtForAddress } from "../lib/lookup";
+    import { districtAt, districtForAddress } from "../lib/lookup";
     import { forgetPollingPlace, savePollingPlace, savedPollingPlace } from "../lib/pollingPlace";
     import type { LocalReps, RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
 
@@ -318,13 +318,6 @@ import { PLACES_KEY } from "../lib/placesKey";
         statusEl.textContent = `Found: Assembly District ${props.ad}, Senate District ${props.sd}.`;
         document.getElementById("result-heading")!.focus();
       }
-    }
-
-    async function resolveCity(lng: number, lat: number) {
-      // covered-city lookup on the same point; the address goes nowhere new
-      const hit = await cityDistrictAt(lng, lat).catch(() => null);
-      if (hit) saveCityDistrict({ t: hit.tenant, d: hit.district });
-      else forgetCityDistrict();
     }
 
     async function resolvePoint(lng: number, lat: number) {

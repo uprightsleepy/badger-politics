@@ -12,6 +12,7 @@ import argparse
 import re
 import sqlite3
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 from openpyxl import load_workbook
@@ -204,38 +205,51 @@ def run(xlsx_dir: Path, db_path: Path) -> int:
         county_rows.extend(counties)
     if not all_rows:
         raise RuntimeError(f"no legislative contests parsed from {xlsx_dir}")
+    assembly_by_year: dict[int, set[int]] = defaultdict(set)
+    legislative_contests: dict[tuple, list[tuple]] = defaultdict(list)
+    for row in all_rows:
+        legislative_contests[row[:3]].append(row)
+        if row[1] == "lower":
+            assembly_by_year[row[0]].add(row[2])
     # a general election covers all 99 Assembly districts
     for year in {r[0] for r in all_rows}:
-        assembly = {r[2] for r in all_rows if r[0] == year and r[1] == "lower"}
+        assembly = assembly_by_year[year]
         if len(assembly) < 95:
             raise RuntimeError(
                 f"{year}: only {len(assembly)} Assembly districts parsed — format drift?"
             )
     # the official Total Votes Cast can never be below the candidate sum
     for key in {(r[0], r[1], r[2]) for r in all_rows}:
-        contest = [r for r in all_rows if (r[0], r[1], r[2]) == key]
+        contest = legislative_contests[key]
         if contest[0][6] < sum(r[5] for r in contest):
             raise RuntimeError(f"{key}: total cast below candidate sum — bad parse")
+    statewide_contests: dict[tuple, list[tuple]] = defaultdict(list)
+    county_contests: dict[tuple, list[tuple]] = defaultdict(list)
+    for row in statewide_rows:
+        statewide_contests[row[:2]].append(row)
+    for row in county_rows:
+        county_contests[row[:2]].append(row)
     # Require at least two candidates and plausible statewide totals.
     # Each candidate's total must equal the sum across all 72 counties.
     for year, office in {(r[0], r[1]) for r in statewide_rows}:
-        contest = [r for r in statewide_rows if r[0] == year and r[1] == office]
+        contest = statewide_contests[(year, office)]
         total = sum(r[4] for r in contest)
         if len(contest) < 2 or total < 500_000 or contest[0][5] < total:
             raise RuntimeError(
                 f"{year} {office}: {len(contest)} candidates, {total} votes"
                 " — format drift?"
             )
-        counties = {r[2] for r in county_rows if r[0] == year and r[1] == office}
+        county_contest = county_contests[(year, office)]
+        counties = {r[2] for r in county_contest}
         if len(counties) != 72:
             raise RuntimeError(
                 f"{year} {office}: {len(counties)} counties parsed, expected 72"
             )
+        candidate_totals: dict[str, int] = defaultdict(int)
+        for county in county_contest:
+            candidate_totals[county[3]] += county[5]
         for r in contest:
-            county_sum = sum(
-                c[5] for c in county_rows
-                if c[0] == year and c[1] == office and c[3] == r[2]
-            )
+            county_sum = candidate_totals[r[2]]
             if county_sum != r[4]:
                 raise RuntimeError(
                     f"{year} {office} {r[2]}: county sum {county_sum}"
@@ -267,7 +281,7 @@ def run(xlsx_dir: Path, db_path: Path) -> int:
     ).fetchone()[0]
     conn.close()
     print(f"election_history: {len(all_rows)} rows across {seats} contests")
-    contests = len({(r[0], r[1]) for r in statewide_rows})
+    contests = len(statewide_contests)
     print(f"statewide_history: {len(statewide_rows)} rows across {contests} contests;"
           f" {len(county_rows)} county result rows")
     return 0

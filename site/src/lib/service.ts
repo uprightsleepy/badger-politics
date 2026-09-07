@@ -18,6 +18,18 @@ export interface HeatDay {
   served: boolean;
 }
 
+/** Exclude non-service days; recorded nonvoting positions are not absences. */
+export const attendanceTotals = (days: readonly HeatDay[]): { total: number; missed: number } => {
+  let total = 0;
+  let missed = 0;
+  for (const day of days) {
+    if (day.served === false) continue;
+    total += day.total;
+    missed += Math.max(0, day.total - day.cast - day.nv);
+  }
+  return { total, missed };
+};
+
 /** Merge terms across biennium boundaries while preserving longer service gaps. */
 export const mergeServiceSpans = (terms: TermRow[]): TermRow[] => {
   const spans: TermRow[] = [];

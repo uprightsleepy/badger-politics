@@ -1,17 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import ts from "typescript";
+import { moduleUrl } from "./typescript.mjs";
 
 const source = await readFile(new URL("../../src/lib/paging.ts", import.meta.url), "utf8");
-const { outputText, diagnostics } = ts.transpileModule(source, {
-  reportDiagnostics: true,
-  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-});
-assert.deepEqual(diagnostics, []);
-const { yearPageStarts } = await import(
-  `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`
-);
+const { yearPageStarts } = await import(moduleUrl(source));
 
 test("year jumps are empty without votes", () => {
   assert.deepEqual(yearPageStarts([]), []);

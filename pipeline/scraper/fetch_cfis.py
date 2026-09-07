@@ -21,7 +21,7 @@ from pathlib import Path
 
 import requests
 
-from scraper.cfis_api import DELAY, PAGE, call, month_windows
+from scraper.cfis_api import DELAY, PAGE, call, month_windows, transaction_pages
 from scraper.http import session
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "cfis"
@@ -181,13 +181,7 @@ def fetch_window(
     )
     expected = int(count) if isinstance(count, (int, float)) else None
     rows, skip, seen_ids = [], 0, set()
-    while True:
-        page = call(
-            http, "publicFrontendApi.getTransactions",
-            {"take": PAGE, "skip": skip, "sortBy": "date",
-             "sortDirection": "asc", "dateFrom": first, "dateTo": last},
-        )
-        results = page.get("results", [])
+    for results in transaction_pages(http, first, last):
         for t in results:
             seen_ids.add(t["id"])
             committee_id = t.get("createdByEntityId")
@@ -213,9 +207,6 @@ def fetch_window(
                 }
             )
         skip += len(results)
-        if len(results) < PAGE:
-            break
-        time.sleep(DELAY)
     return rows, skip, expected, seen_ids
 
 

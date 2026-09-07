@@ -824,6 +824,18 @@ const windowedAll = <T>(sql: string, extra: Record<string, unknown> = {}): T[] =
 const windowedGet = <T>(sql: string, extra: Record<string, unknown> = {}): T =>
   prep(sql).get({ ...NO_BOUNDS, ...extra }) as T;
 
+// CFIS entity IDs keep distinct donors with the same name separate.
+const topDonorsFor = (person: string, fromType: "Registrant" | "Individual") =>
+  prep(
+      `SELECT from_entity_id AS entityId, MAX(from_name) AS name,
+              SUM(amount) AS total, COUNT(*) AS n
+       FROM contributions c
+       WHERE c.person_id = @person AND ${IN_TERM}
+       AND from_type = @fromType AND from_entity_id IS NOT NULL
+       GROUP BY from_entity_id ORDER BY total DESC LIMIT 5`,
+    )
+    .all({ person, fromType }) as { entityId: number; name: string; total: number; n: number }[];
+
 /** Return null without linked receipt history; otherwise summarize receipts
  * during recorded service, which may total zero. */
 export const moneyFor = (personId: string) => {
@@ -844,16 +856,7 @@ export const moneyFor = (personId: string) => {
       n: number; total: number; individualTotal: number;
       first: string | null; last: string | null;
     };
-  // committee donors grouped by CFIS entity id (collision-proof), never name
-  const committees = prep(
-      `SELECT from_entity_id AS entityId, MAX(from_name) AS name,
-              SUM(amount) AS total, COUNT(*) AS n
-       FROM contributions c
-       WHERE c.person_id = @person AND ${IN_TERM}
-       AND from_type = 'Registrant' AND from_entity_id IS NOT NULL
-       GROUP BY from_entity_id ORDER BY total DESC LIMIT 5`,
-    )
-    .all(P) as { entityId: number; name: string; total: number; n: number }[];
+  const committees = topDonorsFor(personId, "Registrant");
   const occupations = prep(
       `SELECT occupation, SUM(amount) AS total, COUNT(*) AS n
        FROM contributions c
@@ -879,16 +882,7 @@ export const moneyFor = (personId: string) => {
        GROUP BY COALESCE(from_type, 'Other') ORDER BY total DESC`,
     )
     .all(P) as { type: string; total: number; n: number }[];
-  // individual donors grouped by CFIS entity id (collision-proof), never name
-  const individuals = prep(
-      `SELECT from_entity_id AS entityId, MAX(from_name) AS name,
-              SUM(amount) AS total, COUNT(*) AS n
-       FROM contributions c
-       WHERE c.person_id = @person AND ${IN_TERM}
-       AND from_type = 'Individual' AND from_entity_id IS NOT NULL
-       GROUP BY from_entity_id ORDER BY total DESC LIMIT 5`,
-    )
-    .all(P) as { entityId: number; name: string; total: number; n: number }[];
+  const individuals = topDonorsFor(personId, "Individual");
   return { ...summary, entry, committees, occupations, quarters, byType, individuals };
 };
 
