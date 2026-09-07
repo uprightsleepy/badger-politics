@@ -10,9 +10,10 @@ import FollowButton from "../../../components/FollowButton.astro";
 import JsonLd from "../../../components/JsonLd.astro";
 import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, localMemberVotesWithDissent, localMemberTerms, localMemberships, localMemberOutcomes, localMemberMotions, localMemberMotionCount, localMemberAttendance, localMemberVoteYears, localMemberTieBreaks } from "../../../lib/db";
 import YearChips from "../../../components/YearChips.astro";
-import { PER_PAGE } from "../../../lib/paging";
+import LocalVoteRow from "../../../components/LocalVoteRow.astro";
+import { yearPageStarts } from "../../../lib/paging";
 import { fmtDate } from "../../../lib/format";
-import { actionLabel, glossaryFor } from "../../../lib/localGloss";
+import { actionLabel, castStyle, glossaryFor } from "../../../lib/localGloss";
 
 const RECENT = 300;
 
@@ -46,13 +47,7 @@ const yearsOf = (rows: { date: string }[]) => {
   return [...by.entries()].map(([year, n]) => ({ year, n }))
     .sort((a, b) => b.year.localeCompare(a.year));
 };
-// the first page of the paged record that holds each year (newest first)
-let counted = 0;
-const yearPages = localMemberVoteYears(body.tenant, member.person_id).map((y) => {
-  const page = Math.floor(counted / PER_PAGE) + 1;
-  counted += y.n;
-  return { year: y.year, page };
-});
+const yearPages = yearPageStarts(localMemberVoteYears(body.tenant, member.person_id));
 // a presiding officer is recorded as Non-Voting, not Present, so no rate for the Chair
 // the mayor presides and votes only to break a tie; a council president
 // (Milwaukee's "Chair" type) is an alderperson who votes like any other
@@ -75,11 +70,6 @@ const role = member.seat != null
 const termLabel = (t: string | null) =>
   t === "Ald." ? "Alderperson" : t === "President" ? "Council President" : (t ?? "Member");
 
-const CAST_STYLE: Record<string, string> = {
-  Aye: "bg-moss-50 text-moss-600",
-  No: "bg-badger-50 text-badger-700",
-};
-const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
 ---
 
 <Base
@@ -367,22 +357,11 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
       <ScrollPanel label={`${member.name} on votes with dissent`} max="max-h-[28rem]" count={dissentVotes.length}>
         <ul id="dissent-list" class="divide-y divide-navy-100 p-0 text-sm">
           {dissentVotes.map((v) => (
-            <li class="px-4 py-2" data-y={v.date.slice(0, 4)}>
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span class={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.value)}`}>{v.value}</span>
-                <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
-                {v.matter_url ? (
-                  <a href={v.matter_url} class="shrink-0 font-bold underline">{v.matter_file ?? "item"}</a>
-                ) : (
-                  <span class="shrink-0 font-bold">{v.matter_file ?? "item"}</span>
-                )}
-                <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title ?? "Untitled item"}</span>
-                <span class="shrink-0 text-xs font-semibold tabular-nums">
-                  <span class="text-moss-600">{v.ayes} Aye</span> &ndash; <span class="text-badger-700">{v.noes} No</span>
-                </span>
-              </div>
-              <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{actionLabel(v.action)}</p>
-            </li>
+            <LocalVoteRow v={v} dissent>
+              <span slot="tally" class="shrink-0 text-xs font-semibold tabular-nums">
+                <span class="text-moss-600">{v.ayes} Aye</span> &ndash; <span class="text-badger-700">{v.noes} No</span>
+              </span>
+            </LocalVoteRow>
           ))}
         </ul>
       </ScrollPanel>

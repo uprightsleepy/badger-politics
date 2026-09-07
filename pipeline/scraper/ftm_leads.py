@@ -20,6 +20,7 @@ import requests
 from scraper.crosscheck_ftm import (
     fetch_cycle,
     ftm_get,
+    ftm_key,
     ftm_total,
     norm,
     report_quota,
@@ -29,7 +30,9 @@ from scraper.http import session
 WORKLIST = Path(__file__).resolve().parents[2] / "docs" / "curation-worklist.md"
 
 
-def candidate_index(records: list[dict]) -> dict[str, list[tuple[int, int, str]]]:
+def candidate_index(
+    records: list[tuple[int, list[dict]]],
+) -> dict[str, list[tuple[int, int, str]]]:
     """normalized 'first last' -> [(ftm candidate id, cycle, raw name)]."""
     index: dict[str, list] = {}
     for cycle, recs in records:
@@ -37,11 +40,9 @@ def candidate_index(records: list[dict]) -> dict[str, list[tuple[int, int, str]]
             cand = rec.get("Candidate", {})
             raw = cand.get("Candidate", "")
             cid = cand.get("id")
-            last, _, rest = raw.partition(",")
-            tokens = norm(f"{rest} {last}").split()
-            if not tokens or cid is None:
+            key = ftm_key(raw)
+            if not key or cid is None:
                 continue
-            key = f"{tokens[0]} {tokens[-1]}"
             index.setdefault(key, []).append((int(cid), cycle, raw))
     return index
 

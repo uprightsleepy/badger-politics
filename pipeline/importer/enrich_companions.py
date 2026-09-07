@@ -1,15 +1,7 @@
 """Companion-bill edges from the official record's own "See Also" links.
 
-Wisconsin routinely introduces the same legislation in both chambers at
-once. On docs.legis, each proposal page cross-references its twin under
-"See Also"; that declaration is the only source of truth used here.
-Nothing is matched on titles or inferred from similarity: an edge exists
-because the Legislature's page says so, and a "See Also" pointing at a
-proposal we do not hold is dropped, not guessed at.
-
-Proposal URLs come from the scrape's own source records (the bills' page
-URLs as openstates captured them), so no URL is constructed. Fetches are
-throttled and cached under _data/companions_cache/.
+Store both directions for declared links to known bills in the same session.
+Fetch only archived source URLs, with throttling and _data/companions_cache/.
 
 Usage: python -m importer.enrich_companions <sqlite> [scrape_dirs...]
            [--limit N] [--delay S]
@@ -31,9 +23,7 @@ from scraper.http import cached_page, session
 
 CACHE_DIR = Path(__file__).resolve().parents[1] / "_data" / "companions_cache"
 
-# a proposal link inside the See Also block. The links use the short form
-# ("/2025/proposals/sb997", "/2025/proposals/my6/sb1"): the identifier is
-# the last path segment, with an optional special-session fragment before it
+# Proposal links may include a special-session segment before the identifier.
 SEE_ALSO = re.compile(r"See Also(.{0,2000}?)</ul>", re.I | re.S)
 PROPOSAL_LINK = re.compile(
     r'href="[^"]*/proposals/(?:[a-z0-9]+/)?((?:ab|sb|ajr|sjr|ar|sr)\d+)"', re.I
@@ -103,7 +93,7 @@ def enrich(db_path: Path, scrape_dirs: list[Path], limit: int | None, delay: flo
         todo = todo[:limit]
 
     http = session()
-    fetched = edges = unresolved = failed = 0
+    fetched = unresolved = failed = 0
     for (session_id, identifier), url in todo:
         try:
             page, cached = cached_page(http, url, CACHE_DIR)
@@ -120,13 +110,11 @@ def enrich(db_path: Path, scrape_dirs: list[Path], limit: int | None, delay: flo
                 unresolved += 1
                 continue
             bill_id = by_key[(session_id, identifier)]
-            # record both directions: the declaration is one fact about a
-            # pair, and a reader lands on either end of it
+            # Store both directions with the declaring page as provenance.
             for a, b in ((bill_id, comp_id), (comp_id, bill_id)):
                 conn.execute(
                     "INSERT OR IGNORE INTO bill_companions VALUES (?, ?, ?)", (a, b, url)
                 )
-                edges += 1
     conn.commit()
     total = conn.execute("SELECT COUNT(*) FROM bill_companions").fetchone()[0]
     print(

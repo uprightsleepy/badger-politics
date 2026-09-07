@@ -2,11 +2,11 @@
 
 Usage: python -m scraper.fetch_cfis map <sqlite_path>
        python -m scraper.fetch_cfis transactions [--since 2025-01]
+       python -m scraper.fetch_cfis audit [--sample 3]
 
-`map` resolves each sitting legislator to their candidate committee
-(auto-accept only on an unambiguous name match; else listed for curation
-in importer/candidate_committees.json). `transactions` archives receipts
-for mapped committees into monthly JSON files under _data/cfis/.
+`map` accepts unambiguous name matches; other matches require curation in
+importer/candidate_committees.json. `transactions` archives mapped receipts by
+month; `audit` refreshes older months. Both accept --as-of YYYY-MM-DD.
 """
 
 from __future__ import annotations
@@ -36,8 +36,7 @@ def _normalize(text: str) -> str:
     return " ".join(folded.lower().replace(".", " ").replace("-", " ").split())
 
 
-# our people hold state legislative office; a committee named for any other
-# office is never auto-attributed (statewide runs go through curation)
+# Other-office committees require curation, never automatic attribution.
 OTHER_OFFICE_WORDS = {
     "judge", "sheriff", "mayor", "alderman", "alderperson", "county", "school",
     "congress", "congressional", "clerk", "coroner", "court", "supervisor",
@@ -46,17 +45,14 @@ OTHER_OFFICE_WORDS = {
 
 
 def _token_match(committee_word: str, name_word: str) -> bool:
-    """Prefix matching only between substantial tokens: an initial like 'R.'
-    can never satisfy a name word."""
+    """Allow prefixes only for tokens of 3+ characters; initials must match exactly."""
     if len(committee_word) < 3 or len(name_word) < 3:
         return committee_word == name_word
     return committee_word.startswith(name_word) or name_word.startswith(committee_word)
 
 
 def match_committees(person_name: str, hits: list[dict]) -> list[dict]:
-    """Committees safely attributable to this person: candidate/legacy-typed,
-    no other-office words, and EVERY word of the person's name must match a
-    substantial committee-name token."""
+    """Require a candidate/legacy type, no other-office words, and every name token."""
     words = _normalize(person_name).split()
     matched = []
     for h in hits:
@@ -74,9 +70,7 @@ def match_committees(person_name: str, hits: list[dict]) -> list[dict]:
 def name_variants(
     name: str, family_name: str, aliases: list[str]
 ) -> list[str]:
-    """The display name plus aliases that carry independent identity: at
-    least two substantial words, and at least one word beyond the surname
-    (a bare-surname alias like 'RIVERA WAGNER' has no identifying power)."""
+    """Include aliases with two substantial words and a token beyond the surname."""
     surname_tokens = set(_normalize(family_name).split())
     variants = [name]
     for alias in aliases:
@@ -229,8 +223,7 @@ def _fetch_with_retries(
     http: requests.Session, committee_ids: dict, first: str, last: str,
     label: str, attempts: int,
 ) -> tuple[list[dict], int, int | None, set, bool]:
-    """Retake the snapshot until count and pages agree exactly; the newest
-    month is a moving target while filings land."""
+    """Retake until count and pages agree, within the attempt limit."""
     for attempt in range(attempts):
         rows, skip, expected, seen_ids = fetch_window(http, committee_ids, first, last)
         if expected is None or skip == expected:
@@ -245,10 +238,8 @@ def _drift_is_benign(
     http: requests.Session, committee_ids: dict, first: str, last: str,
     seen_ids: set, expected: int, label: str,
 ) -> bool:
-    """The date-sorted view can briefly omit freshly amended rows that the
-    unsorted view still returns. Benign only if every omitted row is one
-    our data can never contain (not an incoming receipt to a mapped
-    committee); anything else stays a hard failure."""
+    """Accept date-sort omissions only when the complete unsorted view proves
+    none is an incoming receipt to a mapped committee."""
     plain = call(
         http, "publicFrontendApi.getTransactions",
         {"take": PAGE, "skip": 0, "dateFrom": first, "dateTo": last},
@@ -273,7 +264,7 @@ def fetch_transactions(since: str, as_of: date | None = None) -> None:
     http = session()
 
     windows = month_windows(since, as_of.strftime("%Y-%m") if as_of else None)
-    # immutable once past; always refresh the two newest months
+    # Refresh the newest two months here; the audit rotates older months.
     refresh = {w[0] for w in windows[-2:]}
     latest = windows[-1][0]
     for label, first, last in windows:
@@ -295,9 +286,7 @@ def fetch_transactions(since: str, as_of: date | None = None) -> None:
 
 
 def audit_archives(sample: int, as_of: date | None = None) -> None:
-    """Re-fetch a rotating sample of archived past months and reconcile
-    against the archive. Amendments legitimately rewrite filed history, so
-    a drifted month is refreshed in place and reported, never left stale."""
+    """Refresh a rotating sample of older months for upstream amendments."""
     committee_ids = load_committee_ids()
     http = session()
     as_of = as_of or date.today()

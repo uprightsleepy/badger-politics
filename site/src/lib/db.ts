@@ -1,20 +1,14 @@
-/** Build-time SQLite access. Runs only during `astro build`, never in the
- * browser. BUILD_SESSIONS (comma-separated session ids) limits which
- * sessions render; default is the current biennium. `all` renders history
- * (Phase 6 merges a prebuilt historical artifact instead). */
+/** Build-time SQLite access. BUILD_SESSIONS selects session IDs, defaults
+ * to the current biennium, or accepts `all` for the complete history. */
 import Database from "better-sqlite3";
 import { resolve } from "node:path";
 import { OPEN_END, OPEN_START } from "./sentinels";
 
-// Resolved from the working directory (always site/ for astro and the
-// verify scripts), not from import.meta.url: the bundler decides how
-// deeply this module is chunked, so a module-relative path silently
-// moves with it.
+// Resolve from site/; the bundler may relocate this module's generated chunk.
 const DB_PATH = resolve(process.cwd(), "../data/wi.sqlite");
 const db = new Database(DB_PATH, { readonly: true, fileMustExist: true });
 
-// better-sqlite3 has no implicit statement cache: each prepare() is a full
-// SQL compile. One compiled statement per SQL string serves the whole build.
+// Reuse prepared statements throughout the build.
 const _stmts = new Map<string, Database.Statement>();
 const prep = (sql: string): Database.Statement => {
   let s = _stmts.get(sql);
@@ -25,9 +19,7 @@ const prep = (sql: string): Database.Statement => {
   return s;
 };
 
-/** Build-time memoization. The database is read-only for the whole build,
- * so anything derived from it is computed once and shared by every page.
- * `once` for parameterless derivations, `memoBy` for keyed ones. */
+/** The database is immutable during a build, so pages can share derived results. */
 const once = <T>(compute: () => T): (() => T) => {
   let value: T;
   let done = false;
@@ -832,13 +824,10 @@ const windowedAll = <T>(sql: string, extra: Record<string, unknown> = {}): T[] =
 const windowedGet = <T>(sql: string, extra: Record<string, unknown> = {}): T =>
   prep(sql).get({ ...NO_BOUNDS, ...extra }) as T;
 
-/** Campaign money summary for one legislator, windowed to their time in
- * office. Three honest states: null = no committee mapped (say "not
- * linked", never "$0"); {total: 0} = mapped but no receipts; else data. */
+/** Return null without linked receipt history; otherwise summarize receipts
+ * during recorded service, which may total zero. */
 export const moneyFor = (personId: string) => {
-  // a mapping with zero receipts across all recorded history means the
-  // member's active committee isn't linked yet (surname-only committee
-  // names never auto-match); show the coverage gap, never a false $0
+  // Missing receipt history is a coverage gap, not a zero-dollar total.
   const mapped = prep("SELECT COUNT(*) AS n FROM contributions WHERE person_id = ?")
     .get(personId) as { n: number };
   if (mapped.n === 0) return null;

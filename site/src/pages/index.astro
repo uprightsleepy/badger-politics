@@ -453,11 +453,7 @@ const sessionName = current.name ?? current.id;
   import { partyChipHtml } from "../lib/format";
   import type { RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
 
-  // Returning visitors get their own two legislators on the front page.
-  // Everything here is read from localStorage and a static JSON file; the
-  // site never learns who is asking.
-  // The lookup completes on this page. Sending someone to /my-reps/ to
-  // finish the homepage's primary action was a needless hand-off.
+  // Show saved representatives inline using browser storage and static JSON.
   const form = document.getElementById("home-addr-form") as HTMLFormElement | null;
   const addr = document.getElementById("home-addr") as HTMLInputElement | null;
   const addrStatus = document.getElementById("home-addr-status");

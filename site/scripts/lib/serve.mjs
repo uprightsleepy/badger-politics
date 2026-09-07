@@ -31,10 +31,7 @@ export const serveDist = async (port) => {
   return server;
 };
 
-// CI exports BROWSER_PATH. Locally, try Chrome before Edge: Edge 151
-// exits 0 the instant puppeteer launches it, which surfaces only as
-// "Failed to launch the browser process: Code: 0". Chrome at the same
-// version drives fine.
+// Honor BROWSER_PATH; prefer Chrome locally because Edge can exit on launch.
 const LOCAL_BROWSERS = [
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
@@ -54,10 +51,7 @@ const findBrowser = () => {
 };
 
 export const launchBrowser = async () => {
-  // A fresh profile per run. Sharing one with the developer's own browser
-  // makes the launch hand off to it and exit 0; sharing a fixed temp path
-  // between runs leaves a lock behind whenever a run is killed. Either way
-  // the harness fails for reasons unrelated to the site.
+  // A fresh profile avoids handoffs to an open browser and stale profile locks.
   const userDataDir = await mkdtemp(join(tmpdir(), "bp-harness-"));
   const browser = await puppeteer.launch({
     executablePath: findBrowser(),
@@ -92,10 +86,8 @@ export const moneyLegislatorHref = async () => {
   return null;
 };
 
-/** The pages the layout and accessibility gates walk: one of every page
- * type, plus the specific pages whose history has bitten. Static paths
- * first; the dynamic ones are read off the built indexes so the list
- * survives a data change. One list, so the two gates never drift apart. */
+/** Shared layout/a11y coverage: page types and regression cases, augmented
+ * below with dynamic links from built indexes. */
 const SAMPLE_PATHS = [
   "/", "/404.html", "/about/", "/data/", "/following/", "/glossary/", "/testify/",
   "/bills/", "/bills/2025/", "/bills/2025/ab656/", "/bills/2025/ab1/", "/bills/2025/sb23/",
@@ -120,18 +112,8 @@ export const samplePages = async () => {
   return [...SAMPLE_PATHS, ...new Set(dynamic.filter(Boolean))];
 };
 
-/** Keep a harness independent of third-party hosts.
- *
- * The legislator directory shows 131 member portraits served from 16
- * outside hosts. Waiting for those made the accessibility and layout
- * gates depend on how fast docs.legis and a dozen campaign sites answer a
- * CI runner, which produced 30s navigation timeouts reported as failures.
- * These harnesses read the DOM and layout, not the pixels.
- *
- * Deliberately NOT used by scripts/csp.mjs: that one runs against the
- * deployed site to check the Content-Security-Policy, where a blocked
- * image is exactly the condition under test.
- */
+/** Block external images, fonts, and media in layout checks to avoid source
+ * latency. Keep them enabled in live CSP checks, where blocking is under test. */
 export const blockThirdPartyAssets = async (page) => {
   await page.setRequestInterception(true);
   page.on("request", (req) => {

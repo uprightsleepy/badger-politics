@@ -1,14 +1,5 @@
 ---
-/** A member's official portrait.
- *
- * Source framing varies a lot, so the crop is biased upward rather than
- * centred: headshots put the head high, and centring cut faces off in a
- * grid. Where the state has no photo on file, a neutral silhouette stands
- * in. It is drawn inline rather than loaded, so it costs no request and
- * takes the site's own palette instead of a generic grey.
- *
- * Sized explicitly so the layout never shifts while an image loads.
- */
+/** Fixed-size official portrait with an upper-biased crop and an inline silhouette fallback. */
 interface Props {
   src?: string | null;
   name: string;

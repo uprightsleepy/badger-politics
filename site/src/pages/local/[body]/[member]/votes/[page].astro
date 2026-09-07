@@ -5,10 +5,9 @@
  * substance is on the clerk's pages, but crawlable for a link path. */
 import Base from "../../../../../layouts/Base.astro";
 import Pager from "../../../../../components/Pager.astro";
+import LocalVoteRow from "../../../../../components/LocalVoteRow.astro";
 import { localBodies, localMembers, localMemberVotes, localMemberVoteYears } from "../../../../../lib/db";
-import { fmtDate } from "../../../../../lib/format";
-import { actionLabel } from "../../../../../lib/localGloss";
-import { PER_PAGE, pageBounds, pageCount } from "../../../../../lib/paging";
+import { PER_PAGE, pageBounds, pageCount, yearPageStarts } from "../../../../../lib/paging";
 
 export function getStaticPaths() {
   return localBodies().flatMap((body) =>
@@ -28,18 +27,7 @@ const { body, member, page, pages, total } = Astro.props;
 const rows = localMemberVotes(body.tenant, member.person_id, PER_PAGE, (page - 1) * PER_PAGE);
 const base = `/local/${body.slug}/${member.slug}`;
 const { first, last } = pageBounds(page, total);
-let counted = 0;
-const yearPages = localMemberVoteYears(body.tenant, member.person_id).map((y) => {
-  const p = Math.floor(counted / PER_PAGE) + 1;
-  counted += y.n;
-  return { year: y.year, page: p };
-});
-
-const CAST_STYLE: Record<string, string> = {
-  Aye: "bg-moss-50 text-moss-600",
-  No: "bg-badger-50 text-badger-700",
-};
-const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
+const yearPages = yearPageStarts(localMemberVoteYears(body.tenant, member.person_id));
 ---
 
 <Base
@@ -76,19 +64,7 @@ const castStyle = (v: string) => CAST_STYLE[v] ?? "bg-navy-50 text-navy-600";
 
   <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
     {rows.map((v) => (
-      <li class="px-4 py-1.5">
-        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <span class={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.value)}`}>{v.value}</span>
-          <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
-          {v.matter_url ? (
-            <a href={v.matter_url} class="shrink-0 font-semibold underline">{v.matter_file ?? "item"}</a>
-          ) : (
-            <span class="shrink-0 font-semibold">{v.matter_file ?? "item"}</span>
-          )}
-          <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title ?? "Untitled item"}</span>
-        </div>
-        <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{actionLabel(v.action)}</p>
-      </li>
+      <LocalVoteRow v={v} />
     ))}
   </ul>
 

@@ -146,17 +146,8 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             "SELECT COUNT(*) FROM cf_transactions t LEFT JOIN cf_committees c"
             " ON c.entity_id = t.filer_entity_id WHERE c.entity_id IS NULL"
         ),
-        # express advocacy is a claim about a named candidate: a stance with
-        # no target is unattributable and must never render
-        # A stance alone does not make a row candidate advocacy: referendum
-        # committees advocate on ballot questions, and parties/PACs flag
-        # ordinary vendor payments the same way. Both legitimately name no
-        # candidate, so requiring one would fail on correct data. What does
-        # hold — and what the display depends on — is that the candidate and
-        # the race travel together: a row naming either names both.
-        # scoped to third-party filers: those are the rows shown as
-        # independent expenditure. A candidate committee's own stanced
-        # spending is never presented that way, so its gaps cannot mislead.
+        # For third-party stanced spending, candidate and race must appear together.
+        # Referendum/vendor rows may have neither; candidate-committee spending is excluded.
         "advocacy naming a race but not the candidate": (
             "SELECT COUNT(*) FROM cf_transactions WHERE stance IS NOT NULL"
             " AND related_office IS NOT NULL"

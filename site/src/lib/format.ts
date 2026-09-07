@@ -44,10 +44,8 @@ export const partyStyle = (party: string | null): string =>
 export const partyLetter = (party: string | null): string =>
   party ? party[0] : "?";
 
-/** The party chip as markup. PartyChip.astro renders this at build time
- * and the client scripts that build their own cards call it directly, so
- * there is one chip. `decorative` hides it from screen readers where the
- * party name sits in text right beside it and would be announced twice. */
+/** Party markup shared by Astro and browser cards. Use decorative when
+ * adjacent text already names the party, avoiding duplicate announcements. */
 export const partyChipHtml = (
   party: string | null,
   { dims = "h-5 w-5 text-xs", decorative = false }: { dims?: string; decorative?: boolean } = {},
@@ -61,9 +59,7 @@ export const partyChipHtml = (
   );
 };
 
-/** Trim to a word boundary for a <title>, which search engines cut around
- * 60 characters including the site name. Truncating mid-word looks broken
- * in a result listing; an ellipsis at a space does not. */
+/** Truncate with an ellipsis, preferring a nearby word boundary. */
 export const clip = (text: string, max: number): string => {
   if (text.length <= max) return text;
   const cut = text.slice(0, max);
@@ -77,19 +73,11 @@ export const sessionYear = (sessionId: string): string => sessionId.slice(0, 4);
 /** Bill titles all open "Relating to: ..."; strip it for compact rows. */
 export const shortTitle = (title: string | null): string =>
   (title ?? "")
-    // 273 titles carry a double space after the prefix; some omit it entirely
+    // Source titles vary in whitespace after the prefix.
     .replace(/^\s*relating to:\s*/i, "")
     .replace(/^./, (c) => c.toUpperCase());
 
-/** Reflow an LRB analysis into paragraphs.
- *
- * The source hard-wraps mid-sentence, so a newline is usually a soft wrap,
- * not a paragraph: splitting on every one produced paragraphs reading
- * "on" and "for". Only 195 of 18,054 analyses use a blank line, so that
- * cannot be the separator either. A line that does not end a sentence is
- * joined to the next; one that does ends the paragraph. Analyses that
- * arrive with whole paragraphs per line are unaffected, since each already
- * ends in a full stop. */
+/** Join source hard wraps; blank lines or terminal punctuation end paragraphs. */
 export const lrbParagraphs = (analysis: string): string[] => {
   const paras: string[] = [];
   let current: string[] = [];
@@ -123,8 +111,7 @@ export const chamberName = (chamber: string | null): string =>
 export const committeeChamber = (chamber: string | null): string =>
   chamber ? chamberName(chamber) : "Joint";
 
-/** One display-name rule for a hearing, shared by the calendar JSON and
- * the hearings list so the same event never shows two names. */
+/** Consistent hearing names for the calendar JSON and hearing list. */
 export const hearingDisplayName = (h: {
   committee_name: string | null;
   committee_chamber: string | null;
@@ -137,13 +124,7 @@ export const hearingDisplayName = (h: {
 export const billSlug = (identifier: string): string =>
   identifier.replace(/\s+/g, "").toLowerCase();
 
-/** A member's URL slug, from the committed map in src/data.
- *
- * These were opaque uuids. The map is a file rather than a derivation so a
- * slug outlives the name that produced it: a member who changes their name
- * keeps their URL, and every link and citation keeps working. Anyone not
- * in the map (a person added since it was last generated) falls back to
- * the old uuid form, which still resolves. */
+/** Committed slugs survive name changes; unmapped people keep the legacy ID fallback. */
 export const personSlug = (personId: string): string =>
   PERSON_SLUGS[personId] ?? personId.replace(/^legacy\//, "legacy-").split("/").pop()!;
 

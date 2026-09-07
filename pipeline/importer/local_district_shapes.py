@@ -1,9 +1,8 @@
 """Precompute SVG paths for the council districts, one drawing per city.
 
 Reads the committed lookup file (site/public/data/local-districts.geojson)
-and writes site/src/data/local-district-shapes.json: each district as a
-path inside its city's own viewBox, plus the city's whole set of districts
-as the backdrop, the way district_shapes.py draws a seat within the state.
+and writes site/src/data/local-district-shapes.json. Each city gets a shared
+viewBox, district paths, and a backdrop containing all its districts.
 Rerun after local_shapes.py; output committed.
 
     uv run python -m importer.local_district_shapes

@@ -40,8 +40,7 @@ TERM_EVENTS_PATH = Path(__file__).resolve().parent / "term_events.json"
 # per-vote name re-attributions for defective source pages (see the JSON)
 VOTE_NAME_FIXES: dict[str, dict[str, str]] = {
     src: entry["names"]
-    for src, entry in json.loads(VOTE_FIXES_PATH.read_text(encoding="utf-8")).items()
-    if not src.startswith("_")
+    for src, entry in load_curation(VOTE_FIXES_PATH).items()
 }
 
 # Presiding officers print as titles on roll calls. Each mapping is a
