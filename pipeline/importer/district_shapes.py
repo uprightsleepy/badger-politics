@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 HEIGHT = 420.0
@@ -29,6 +30,24 @@ def rings(geometry: dict) -> list[list[list[float]]]:
     if geometry["type"] == "Polygon":
         return [geometry["coordinates"][0]]
     return [poly[0] for poly in geometry["coordinates"]]
+
+
+def projection_for(
+    features: list[dict], height: float,
+) -> tuple[Callable[[float, float], tuple[float, float]], float]:
+    """Fit outer rings using one axis scale; return the projection and viewBox width."""
+    lons = [c[0] for f in features for r in rings(f["geometry"]) for c in r]
+    lats = [c[1] for f in features for r in rings(f["geometry"]) for c in r]
+    min_lon, max_lon, min_lat, max_lat = min(lons), max(lons), min(lats), max(lats)
+
+    x0, y0 = math.radians(min_lon), mercator_y(max_lat)
+    scale = height / (mercator_y(max_lat) - mercator_y(min_lat))
+    width = (math.radians(max_lon) - x0) * scale
+
+    def project(lon: float, lat: float) -> tuple[float, float]:
+        return (math.radians(lon) - x0) * scale, (y0 - mercator_y(lat)) * scale
+
+    return project, width
 
 
 def simplify(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -63,17 +82,7 @@ def main(argv: list[str]) -> int:
     data = json.loads(src.read_text(encoding="utf-8"))
     feats = data["features"]
 
-    lons = [c[0] for f in feats for r in rings(f["geometry"]) for c in r]
-    lats = [c[1] for f in feats for r in rings(f["geometry"]) for c in r]
-    min_lon, max_lon, min_lat, max_lat = min(lons), max(lons), min(lats), max(lats)
-
-    # one scale for both axes, so the drawing keeps the projection's shape
-    x0, y0 = math.radians(min_lon), mercator_y(max_lat)
-    scale = HEIGHT / (mercator_y(max_lat) - mercator_y(min_lat))
-    width = (math.radians(max_lon) - x0) * scale
-
-    def project(lon: float, lat: float) -> tuple[float, float]:
-        return (math.radians(lon) - x0) * scale, (y0 - mercator_y(lat)) * scale
+    project, width = projection_for(feats, HEIGHT)
 
     shapes: dict[str, str] = {}
     senate: dict[int, list[dict]] = {}

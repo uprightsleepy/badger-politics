@@ -1,6 +1,8 @@
 /** The reader's saved city-council district, for addresses inside a
  * covered city (Milwaukee, West Allis). Device-only, same as the state
  * districts; this module owns the key. */
+import { cityDistrictAt } from "./lookup";
+
 export type CityDistrict = { t: string; d: number };
 
 const KEY = "bp-city-district";
@@ -27,4 +29,10 @@ export const saveCityDistrict = (c: CityDistrict): void => {
 
 export const forgetCityDistrict = (): void => {
   localStorage.removeItem(KEY);
+};
+
+export const resolveCity = async (lng: number, lat: number): Promise<void> => {
+  const hit = await cityDistrictAt(lng, lat).catch(() => null);
+  if (hit) saveCityDistrict({ t: hit.tenant, d: hit.district });
+  else forgetCityDistrict();
 };

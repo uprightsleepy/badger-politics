@@ -446,8 +446,8 @@ const sessionName = current.name ?? current.id;
 
 <script>
   import { savedDistrict, saveDistrict, forgetDistrict } from "../lib/district";
-  import { forgetCityDistrict, saveCityDistrict, savedCityDistrict } from "../lib/cityDistrict";
-  import { cityDistrictAt, districtAt, districtForAddress } from "../lib/lookup";
+  import { forgetCityDistrict, resolveCity, savedCityDistrict } from "../lib/cityDistrict";
+  import { districtAt, districtForAddress } from "../lib/lookup";
   import { esc } from "../lib/html";
   import { attachSuggest } from "../scripts/addressSuggest";
   import { partyChipHtml } from "../lib/format";
@@ -484,13 +484,6 @@ const sessionName = current.name ?? current.id;
     for (const el of promptEls) el?.classList.remove("hidden");
     cardSaved?.classList.add("hidden");
     addr?.focus();
-  };
-
-  const resolveCity = async (lng: number, lat: number) => {
-    // covered-city lookup on the same point; the address goes nowhere new
-    const hit = await cityDistrictAt(lng, lat).catch(() => null);
-    if (hit) saveCityDistrict({ t: hit.tenant, d: hit.district });
-    else forgetCityDistrict();
   };
 
   const settle = (d: { ad: number; sd: number }) => {

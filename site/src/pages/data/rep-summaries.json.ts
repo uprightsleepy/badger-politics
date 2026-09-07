@@ -15,7 +15,7 @@ import {
   currentSessions,
 } from "../../lib/db";
 import { billSlug, committeeSlug, personSlug } from "../../lib/format";
-import { buildHeatDays } from "../../lib/service";
+import { buildHeatDays, attendanceTotals } from "../../lib/service";
 import type { RepSummary } from "../../lib/wire";
 
 export const GET: APIRoute = () => {
@@ -26,9 +26,8 @@ export const GET: APIRoute = () => {
 
   for (const p of sittingPeople()) {
     const heat = buildHeatDays(termsFor(p.id), personVoteDays(p.id), chamberVoteDays())
-      .filter((d) => d.date >= bienniumStart && d.served !== false);
-    const totalVotes = heat.reduce((s, d) => s + d.total, 0);
-    const missedVotes = heat.reduce((s, d) => s + Math.max(0, d.total - d.cast - d.nv), 0);
+      .filter((d) => d.date >= bienniumStart);
+    const attendance = attendanceTotals(heat);
 
     // "led" = lead author only; co-signing is counted separately below
     const sponsorships = personSponsorships(p.id).filter((s) =>
@@ -51,7 +50,7 @@ export const GET: APIRoute = () => {
         role: c.role,
         slug: committeeSlug(c.id),
       })),
-      attendance: { total: totalVotes, missed: missedVotes },
+      attendance,
       authored: {
         total: authored.length,
         signedOn,

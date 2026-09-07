@@ -9,6 +9,7 @@ import pytest
 from importer.import_cf_committees import run as import_committees
 from importer.import_cfis import run as import_receipts
 from nightly.finance import merge_months, months_for
+from scraper import cfis_api
 from scraper import fetch_cf_committees as collector
 
 
@@ -70,7 +71,8 @@ def test_split_and_unsplit_archives_and_database_are_identical(tmp_path, monkeyp
         return {"results": copy.deepcopy(selected[payload["skip"]:
                                                   payload["skip"] + payload["take"]])}
 
-    monkeypatch.setattr(collector, "call", api)
+    monkeypatch.setattr(cfis_api, "call", api)
+    monkeypatch.setattr(cfis_api, "PAGE", 2)
     monkeypatch.setattr(collector, "PAGE", 2)
     monkeypatch.setattr(collector, "session", lambda: object())
     monkeypatch.setattr(collector.time, "sleep", lambda _: None)

@@ -18,7 +18,7 @@ from pathlib import Path
 
 import requests
 
-from scraper.cfis_api import DELAY, PAGE, call, month_windows
+from scraper.cfis_api import DELAY, PAGE, month_windows, transaction_pages
 from scraper.http import session
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "cfis"
@@ -59,15 +59,8 @@ def _name(entity: dict | None) -> str | None:
 
 def fetch_month(http: requests.Session, first: str, last: str):
     """(kept transactions, committee registry rows) for one month."""
-    rows, registry, skip = [], {}, 0
-    while True:
-        page = call(
-            http, "publicFrontendApi.getTransactions",
-            {"take": PAGE, "skip": skip, "sortBy": "date",
-             "sortDirection": "asc", "dateFrom": first, "dateTo": last},
-            timeout=90,
-        )
-        results = page.get("results", [])
+    rows, registry = [], {}
+    for results in transaction_pages(http, first, last, timeout=90, offset_step=PAGE):
         for t in results:
             filer = t.get("createdByEntity") or {}
             for side in (filer, t.get("from_entity"), t.get("to_entity")):
@@ -102,10 +95,6 @@ def fetch_month(http: requests.Session, first: str, last: str):
                 "report_id": ((t.get("reports") or [{}])[0]).get("id"),
                 "report_name": ((t.get("reports") or [{}])[0]).get("name"),
             })
-        if len(results) < PAGE:
-            break
-        skip += PAGE
-        time.sleep(DELAY)
     return rows, registry
 
 

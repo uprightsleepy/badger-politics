@@ -11,7 +11,6 @@ Rerun after local_shapes.py; output committed.
 from __future__ import annotations
 
 import json
-import math
 import sys
 from pathlib import Path
 
@@ -31,14 +30,7 @@ def main(argv: list[str]) -> int:
 
     shapes: dict[str, str] = {}
     for slug, feats in by_city.items():
-        lons = [c[0] for f in feats for r in ds.rings(f["geometry"]) for c in r]
-        lats = [c[1] for f in feats for r in ds.rings(f["geometry"]) for c in r]
-        x0, y0 = math.radians(min(lons)), ds.mercator_y(max(lats))
-        scale = HEIGHT / (ds.mercator_y(max(lats)) - ds.mercator_y(min(lats)))
-        width = (math.radians(max(lons)) - x0) * scale
-
-        def project(lon: float, lat: float, x0=x0, y0=y0, scale=scale) -> tuple[float, float]:
-            return (math.radians(lon) - x0) * scale, (y0 - ds.mercator_y(lat)) * scale
+        project, width = ds.projection_for(feats, HEIGHT)
 
         for f in feats:
             shapes[f"{slug}-{f['properties']['district']}"] = ds.to_path(f["geometry"], project)
