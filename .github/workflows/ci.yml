@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -16,8 +17,8 @@ jobs:
       run:
         working-directory: pipeline
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - name: Sync dependencies (locked)
         run: uv sync --locked
       - name: Ruff
@@ -29,7 +30,7 @@ jobs:
     name: schema applies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Apply schema to a fresh SQLite database
         run: |
           mkdir -p data
@@ -40,15 +41,16 @@ jobs:
     name: site typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: site/package-lock.json
       # A pull request has no credentials, so it cannot reach the SQLite
       # snapshot the real build reads. An empty database with the real
-      # schema still type-checks every query and component.
+      # schema supports the component typecheck; SQL execution is covered
+      # separately by integration and deployment checks.
       - name: Empty database with the real schema
         run: |
           mkdir -p data
@@ -69,35 +71,26 @@ jobs:
         working-directory: site
         run: |
           set -euo pipefail
-          for f in scripts/*.mjs scripts/lib/*.mjs; do
+          for f in scripts/*.mjs scripts/lib/*.mjs scripts/tests/*.mjs; do
             node --check "$f"
           done
+      - name: Harness readiness regression tests
+        working-directory: site
+        env:
+          BROWSER_PATH: /usr/bin/google-chrome
+        run: npm run test:harness
 
   actions:
     name: workflows pinned + least privilege
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: No workflow may grant blanket write
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - name: Validate action pins, permissions, and release boundaries
+        working-directory: pipeline
         run: |
-          set -euo pipefail
-          # a workflow with no permissions block inherits the repo default,
-          # which can be read-write on every scope
-          for f in .github/workflows/*.yml; do
-            grep -q '^permissions:' "$f" || { echo "::error file=$f::no permissions block"; exit 1; }
-            grep -qE '^\s*contents:\s*write' "$f" && { echo "::error file=$f::grants contents:write"; exit 1; }
-            echo "ok $f"
-          done
-      - name: Deploy workflow never triggers on pull_request
-        run: |
-          set -euo pipefail
-          # a PR-triggered deploy would publish unreviewed code, and with
-          # pull_request_target it would do so with repository secrets
-          if grep -qE '^\s*pull_request(_target)?:' .github/workflows/deploy.yml; then
-            echo "::error::deploy.yml is reachable from a pull request"
-            exit 1
-          fi
-          echo "ok deploy.yml is push/dispatch only"
+          uv sync --locked
+          uv run python check_workflows.py ../.github/workflows
 
   infra:
     name: tofu validate
@@ -106,8 +99,8 @@ jobs:
       run:
         working-directory: infra
     steps:
-      - uses: actions/checkout@v4
-      - uses: opentofu/setup-opentofu@v1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: opentofu/setup-opentofu@9d84900f3238fab8cd84ce47d658d25dd008be2f # v1
       - name: Init (no backend)
         run: tofu init -backend=false
       - name: Validate

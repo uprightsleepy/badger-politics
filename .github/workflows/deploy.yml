@@ -12,6 +12,12 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "pipeline/dataproducts/**"
+      - "pipeline/pyproject.toml"
+      - "pipeline/uv.lock"
+      - "pipeline/check_workflows.py"
+      - ".github/scripts/**"
+      - ".github/workflows/ci.yml"
       - "firebase.json"
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
@@ -24,7 +30,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write # mint the OIDC token for Workload Identity
 
 # One release at a time per target, so an automatic dev deploy never
 # delays a promotion to production. Two overlapping releases to the same
@@ -39,8 +44,16 @@ env:
   TARGET: ${{ inputs.target || 'badgerpolitics-dev' }}
 
 jobs:
+  validate:
+    name: required CI for this revision
+    uses: ./.github/workflows/ci.yml
+
   deploy:
     name: build, verify, release
+    needs: validate
+    permissions:
+      contents: read
+      id-token: write # only the credentialed job can mint an OIDC token
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment:
@@ -50,9 +63,18 @@ jobs:
         && 'https://badgerpolitics.org'
         || 'https://badgerpolitics-dev.web.app' }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Require main for deployment
+        env:
+          DEPLOY_REF: ${{ github.ref }}
+        run: |
+          if [ "$DEPLOY_REF" != "refs/heads/main" ]; then
+            echo "::error::Deployments must run from main"
+            exit 1
+          fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -60,12 +82,12 @@ jobs:
 
       - id: auth
         name: Federate into GCP (no stored key)
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
           service_account: ${{ vars.GCP_DEPLOY_SA }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
 
       - name: Resolve the newest snapshot
         id: snap
@@ -77,28 +99,22 @@ jobs:
             echo "::error::no snapshot in gs://${SNAPSHOT_BUCKET}/snapshots/"
             exit 1
           fi
-          echo "object=$latest" >> "$GITHUB_OUTPUT"
-          echo "key=$(basename "$latest")" >> "$GITHUB_OUTPUT"
-          echo "Using $latest"
+          generation=$(gcloud storage objects describe "$latest" --format='value(generation)')
+          [[ "$generation" =~ ^[0-9]+$ ]]
+          echo "object=${latest}#${generation}" >> "$GITHUB_OUTPUT"
+          echo "Using ${latest}#${generation}"
 
-      # The snapshot is ~90 MB compressed and changes once a night, so a
-      # same-day rerun should not pay egress for it twice.
-      # No restore-keys: an approximate match would silently ship the
-      # wrong night's data. Either this exact snapshot is cached, or it is
-      # downloaded again.
-      - name: Restore cached snapshot
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: data/wi.sqlite.gz
-          key: snapshot-${{ steps.snap.outputs.key }}
-
+      # Actions base-branch caches are readable from pull requests. Keep
+      # the raw database in the private bucket, and fetch this exact object
+      # generation so replacement between resolution and download fails closed.
       - name: Download the snapshot
-        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          SNAPSHOT_OBJECT: ${{ steps.snap.outputs.object }}
         run: |
           set -euo pipefail
           mkdir -p data
-          gcloud storage cp "${{ steps.snap.outputs.object }}" data/wi.sqlite.gz
+          gcloud storage cp "$SNAPSHOT_OBJECT" data/wi.sqlite.gz
+          sha256sum data/wi.sqlite.gz >> "$GITHUB_STEP_SUMMARY"
 
       - name: Expand the snapshot
         run: gunzip -c data/wi.sqlite.gz > data/wi.sqlite
@@ -127,26 +143,35 @@ jobs:
       # SQLite, are gitignored, and are linked from ordinary pages. Without
       # this step the build succeeds and the release quietly drops all of
       # them -- 20,580 links, caught by the link check the first time CI ran.
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - name: Generate the data products
         working-directory: pipeline
         run: |
           uv sync --locked
-          uv run python -m dataproducts.build ../data/wi.sqlite ../site/public/
+          bash ../.github/scripts/timed.sh data-products uv run python -m dataproducts.build ../data/wi.sqlite ../site/public/
+
+      - name: Fetch verified logos
+        working-directory: site
+        env:
+          LOGO_DEV_TOKEN: ${{ secrets.LOGO_DEV_TOKEN }}
+        run: bash ../.github/scripts/timed.sh logos npm run build:logos
 
       - name: Build every session
         working-directory: site
         env:
           BUILD_SESSIONS: all
-          LOGO_DEV_TOKEN: ${{ secrets.LOGO_DEV_TOKEN }}
           PUBLIC_PLACES_KEY: ${{ vars.PUBLIC_PLACES_KEY }}
-        run: npm run build
+        run: bash ../.github/scripts/timed.sh astro npm run build:astro
+
+      - name: Build the complete search index
+        working-directory: site
+        run: bash ../.github/scripts/timed.sh pagefind npm run build:search
 
       # The gate that matters: a Hosting release replaces the whole site, so
       # a build missing 21 of 23 sessions would delete ~38,000 live pages.
       - name: Preflight — build completeness
         working-directory: site
-        run: node scripts/preflight.mjs
+        run: bash ../.github/scripts/timed.sh preflight node scripts/preflight.mjs
 
       - name: Verify the built site
         working-directory: site
@@ -158,11 +183,11 @@ jobs:
           # do. Those run in sequence: three concurrent Chrome instances on
           # a four-core runner starved each other into a 30s navigation
           # timeout, which reads as an a11y failure and is not one.
-          node scripts/links.mjs > /tmp/links.log 2>&1 &
+          bash ../.github/scripts/timed.sh links node scripts/links.mjs > /tmp/links.log 2>&1 &
           links_pid=$!
           browser_failed=0
           for h in responsive a11y verify; do
-            if node "scripts/$h.mjs" > "/tmp/$h.log" 2>&1; then
+            if bash ../.github/scripts/timed.sh "$h" node "scripts/$h.mjs" > "/tmp/$h.log" 2>&1; then
               echo "::group::$h passed"; tail -3 "/tmp/$h.log"; echo "::endgroup::"
             else
               echo "::error::$h failed"; tail -25 "/tmp/$h.log"; browser_failed=1
@@ -171,13 +196,13 @@ jobs:
           if wait "$links_pid"; then
             echo "::group::links passed"; tail -3 /tmp/links.log; echo "::endgroup::"
           else
-            echo "::error::links failed"; grep -E "BROKEN" /tmp/links.log | head -25; browser_failed=1
+            echo "::error::links failed"; tail -25 /tmp/links.log; browser_failed=1
           fi
           exit $browser_failed
 
       - name: Release
         run: |
-          npx --yes firebase-tools@14 deploy \
+          bash .github/scripts/timed.sh release npx --yes firebase-tools@14 deploy \
             --only hosting \
             --project "$TARGET" \
             --non-interactive \
@@ -226,3 +251,41 @@ jobs:
         run: |
           echo "::notice::If a release went out and is bad, roll back with:"
           echo "::notice::npx firebase-tools@14 hosting:rollback --project $TARGET"
+
+      - name: Summarize stage timings
+        if: always()
+        env:
+          SNAPSHOT_OBJECT: ${{ steps.snap.outputs.object }}
+        run: |
+          {
+            echo '## Deployment stage timings'
+            echo "Commit: $GITHUB_SHA"
+            echo "Snapshot: $SNAPSHOT_OBJECT"
+            for file in "$RUNNER_TEMP"/badger-ci/*.time; do
+              [ -f "$file" ] || continue
+              echo
+              echo "### $(basename "$file" .time)"
+              echo '```text'
+              cat "$file"
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain stage timings and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: deploy-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          # Artifact uploads do not apply GitHub's console secret masking.
+          # Keep credentialed logo/release logs out of the downloadable archive.
+          path: |
+            ${{ runner.temp }}/badger-ci/*.time
+            ${{ runner.temp }}/badger-ci/astro.log
+            ${{ runner.temp }}/badger-ci/pagefind.log
+            ${{ runner.temp }}/badger-ci/preflight.log
+            ${{ runner.temp }}/badger-ci/links.log
+            ${{ runner.temp }}/badger-ci/responsive.log
+            ${{ runner.temp }}/badger-ci/a11y.log
+            ${{ runner.temp }}/badger-ci/verify.log
+          if-no-files-found: ignore
+          retention-days: 7

@@ -97,7 +97,8 @@ if [ "$LOCAL" -eq 0 ]; then
   # Compressed: the snapshot goes 397MB -> ~90MB, and CI pulls one on every
   # deploy, so uncompressed egress alone would eat most of the cost ceiling.
   # gcloud storage, not gsutil: gsutil is pinned to Python <=3.12
-  gzip -6 -c ../data/wi.sqlite | gcloud storage cp - "gs://$BUCKET/snapshots/wi-$(date +%F).sqlite.gz"
+  snapshot_id="$(date -u +%Y-%m-%dT%H%M%S)-$(python -c 'import uuid; print(uuid.uuid4().hex)')"
+  gzip -6 -c ../data/wi.sqlite | gcloud storage cp - "gs://$BUCKET/snapshots/wi-${snapshot_id}.sqlite.gz"
 else
   echo "skipping snapshot upload (--local)"
 fi

@@ -2,6 +2,8 @@
  * Usage: node scripts/verify.mjs  (serves dist/ itself on :8931) */
 import { serveDist, launchBrowser } from "./lib/serve.mjs";
 
+import { waitForNoSearchResults } from "./lib/readiness.mjs";
+
 const server = await serveDist(8931);
 
 const browser = await launchBrowser();
@@ -26,7 +28,6 @@ await page.goto("http://127.0.0.1:8931/", { waitUntil: "networkidle2" });
 await page.waitForSelector("#q", { timeout: 30000 });
 await page.type("#q", "child marriage");
 await page.waitForSelector("#search-results a", { timeout: 30000 });
-await new Promise((r) => setTimeout(r, 800));
 const hits = await page.$$eval("#search-results a", (as) =>
   as.slice(0, 5).map((a) => ({ text: a.textContent.trim(), href: a.getAttribute("href") })),
 );
@@ -41,10 +42,7 @@ check(
 // from the previous search; the assertion itself is unchanged.
 await page.$eval("#q", (el) => (el.value = ""));
 await page.type("#q", "pedophiles");
-await page.waitForFunction(
-  () => document.getElementById("search-results").textContent.includes("Nothing matches"),
-  { timeout: 30000 },
-).catch(() => {});
+await waitForNoSearchResults(page, "pedophiles");
 // direct children only: the no-result state deliberately offers recovery
 // links (find-my-legislators, official record) inside a nested block, and
 // those are not junk matches
@@ -76,7 +74,7 @@ check("district saved to localStorage", savedDistrict === '{"ad":14,"sd":5}', sa
 
 // 3. pinning on a bill with a floor vote (AB 656 died unheard - it has no votes)
 await page.goto("http://127.0.0.1:8931/bills/2025/ab1/", { waitUntil: "networkidle2" });
-await new Promise((r) => setTimeout(r, 300));
+await page.waitForSelector("[data-your-reps-note]:not(.hidden)", { timeout: 30000 });
 const pinned = await page.$$eval("[data-your-reps-note]:not(.hidden)", (els) =>
   els.map((el) => el.textContent.trim()),
 );

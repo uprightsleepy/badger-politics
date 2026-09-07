@@ -5,8 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "node scripts/fetch-logos.mjs && astro build && pagefind --site dist",
-    "preview": "astro preview"
+    "build": "npm run build:logos && npm run build:astro && npm run build:search",
+    "preview": "astro preview",
+    "build:logos": "node scripts/fetch-logos.mjs",
+    "build:astro": "astro build",
+    "build:search": "pagefind --site dist",
+    "test:harness": "node --test scripts/tests/*.test.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "3.7.3",

@@ -3,6 +3,8 @@
 import { readFile } from "node:fs/promises";
 import { serveDist, launchBrowser, samplePages, blockThirdPartyAssets } from "./lib/serve.mjs";
 
+import { gotoLayoutReady } from "./lib/readiness.mjs";
+
 const server = await serveDist(8933);
 const PAGES = await samplePages();
 
@@ -24,7 +26,7 @@ const summary = new Map();
 for (const vp of VIEWPORTS) {
   await page.setViewport({ width: vp.width, height: vp.height });
   for (const path of PAGES) {
-    await page.goto(`http://127.0.0.1:8933${path}`, { waitUntil: "networkidle2", timeout: 60000 });
+    await gotoLayoutReady(page, `http://127.0.0.1:8933${path}`);
     await page.evaluate(axeSource);
     const results = await page.evaluate(() =>
       axe.run(document, { runOnly: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"] }),

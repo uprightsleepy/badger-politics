@@ -5,6 +5,8 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { serveDist, launchBrowser, samplePages, blockThirdPartyAssets } from "./lib/serve.mjs";
 
+import { gotoLayoutReady } from "./lib/readiness.mjs";
+
 const server = await serveDist(8935);
 const PAGES = await samplePages();
 
@@ -25,7 +27,7 @@ let failures = 0;
 for (const width of WIDTHS) {
   await page.setViewport({ width, height: 900, deviceScaleFactor: 1 });
   for (const path of PAGES) {
-    await page.goto(`http://127.0.0.1:8935${path}`, { waitUntil: "networkidle2", timeout: 60000 });
+    await gotoLayoutReady(page, `http://127.0.0.1:8935${path}`);
     const overflow = await page.evaluate(() => {
       const doc = document.documentElement;
       const spill = Math.max(doc.scrollWidth, document.body.scrollWidth) - window.innerWidth;

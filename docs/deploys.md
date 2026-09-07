@@ -96,8 +96,10 @@ CI does not scrape. It downloads the newest `*.sqlite.gz` from
 `gs://badgerpolitics-prod-snapshots/snapshots/`, which the nightly job
 writes. Snapshots are gzipped because the database is 397 MB raw and about
 90 MB compressed; at one download per deploy, uncompressed egress alone
-would consume most of the ~$2/month ceiling. The runner also caches the
-snapshot by filename, so several deploys in a day pay for one download.
+would consume most of the ~$2/month ceiling. Each deploy downloads the
+exact resolved GCS object generation. Raw snapshots must not enter Actions
+caches because pull requests can access base-branch caches. New snapshots
+use unique UTC timestamp/UUID names; older dated snapshots remain readable.
 
 This means **a deploy publishes the data as of the last nightly snapshot**,
 not as of the moment you deploy. Site changes go out immediately; data
