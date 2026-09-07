@@ -1,16 +1,11 @@
-# Badger Politics infrastructure (applied in Phase 6 — never `tofu apply`
-# without asking). Planned resources, all free-tier or near-zero cost:
-#   - project services (run, cloudscheduler, artifactregistry, secretmanager)
-#   - GCS bucket: SQLite snapshots, scraper JSON archive, tfstate
-#   - Artifact Registry: pipeline image
-#   - Cloud Run Job: nightly scrape -> import -> build -> deploy
-#   - Cloud Scheduler: 5:15am America/Chicago trigger
-#   - least-privilege service accounts (job SA, GitHub Actions WIF SA)
-#   - Cloud Monitoring log-based alert on job failure -> email
+# Badger Politics infrastructure. Never apply without approval.
+# Site releases already use GitHub Actions and Workload Identity Federation.
+# The nightly parser reuses free public-repository runners and the
+# existing private GCS bucket; see docs/nightly-parser-hosting.md for costs
+# and activation instructions. Terraform does not enable a schedule.
 
 locals {
-  # the deploy projects that actually exist; the nightly job will live in
-  # prod alongside the bucket it snapshots to
+  # Cloud data and identities live in prod; hosting also has a dev target.
   prod_project    = "badgerpolitics-prod"
   dev_project     = "badgerpolitics-dev"
   region          = "us-central1"

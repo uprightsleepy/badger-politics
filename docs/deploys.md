@@ -28,7 +28,7 @@ release a build that does not match the database that produced it.
 | Pull request | `ci.yml` | Ruff, pytest, schema applies, site typecheck, workflow guards, `tofu validate`. No secrets, no deploy. |
 | Push to `main` touching `site/**` | `deploy.yml` | Full gate chain, then release to **dev**. |
 | Manual (`workflow_dispatch`) | `deploy.yml` | Same chain, released to the target you pick. Defaults to **prod** — this is how production is promoted. |
-| Nightly (Cloud Run, pending) | `pipeline/run.sh` | Scrape → import → checks → build → preflight → deploy → snapshot. |
+| Nightly / manual parser | `nightly-parser.yml` | Sequential collection → import → checks → private snapshot. Schedule requires `NIGHTLY_PARSER_ENABLED=true`; hosting remains a separate release. See [parser runbook](nightly-parser-hosting.md). |
 
 Production is never released by pushing. A push rehearses on dev; you
 promote when dev looks right. This is a public record, so nothing reaches
@@ -92,7 +92,7 @@ and organisations fall back to monogram tiles.
 
 ## Where the data comes from
 
-CI does not scrape. It downloads the newest `*.sqlite.gz` from
+The site release workflow does not scrape. It downloads the newest `*.sqlite.gz` from
 `gs://badgerpolitics-prod-snapshots/snapshots/`, which the nightly job
 writes. Snapshots are gzipped because the database is 397 MB raw and about
 90 MB compressed; at one download per deploy, uncompressed egress alone

@@ -1,7 +1,8 @@
 # Badger Politics
 
-Free, static Wisconsin politics site (v1: legislature module). badgerpolitics.org. Nightly Cloud Run Job:
-openstates-scrapers (wi) → SQLite → Astro static build → Firebase Hosting.
+Free, static Wisconsin politics site (v1: legislature module). badgerpolitics.org.
+Nightly GitHub Actions parser: openstates-scrapers (wi) → SQLite → private snapshots.
+Separate gated releases build Astro and publish Firebase Hosting. See docs/nightly-parser-hosting.md.
 
 ## Commands
 - Pipeline (local): `cd pipeline && uv run ./run.sh --local --skip-deploy`

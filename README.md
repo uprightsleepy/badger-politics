@@ -50,9 +50,10 @@ Releases run in GitHub Actions, never from a laptop: a push to `main`
 rehearses on dev, and production is a deliberate promotion
 (`workflow_dispatch`). CI builds from the newest database snapshot in a
 private bucket and runs every gate before publishing. See
-[docs/deploys.md](docs/deploys.md). The scheduled Cloud Run job is not yet
-enabled; today the pipeline is run from a workstation and uploads the
-snapshot CI releases from.
+[docs/deploys.md](docs/deploys.md). The nightly parser uses sequential,
+resumable GitHub Actions jobs and private GCS checkpoints. Scheduled runs
+require a seeded archive and `NIGHTLY_PARSER_ENABLED=true`; see the
+[parser runbook](docs/nightly-parser-hosting.md).
 
 ## Data sources
 
