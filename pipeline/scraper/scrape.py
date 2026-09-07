@@ -2,10 +2,11 @@
 imported). Applies patches/ first, then archives output to _data/ because
 os-update clears its own output dir each run. Never run two concurrently.
 
-Usage: python -m scraper.scrape bills|events [--session ID] [--no-fastmode]
+Usage: python -m scraper.scrape bills|events [--session ID]
 """
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -53,23 +54,28 @@ def archive_output(prefixes: tuple[str, ...], archive_dir: Path) -> int:
     return copied
 
 
-def build_command(target: str, fastmode: bool, extra: list[str]) -> list[str]:
-    """os-update args for a scrape target; fastmode caches + disables throttling."""
+def build_command(target: str, extra: list[str]) -> list[str]:
+    """Keep policy checks available inside either CLI execution environment."""
     args = list(SCRAPERS[target][0])
-    if fastmode and target == "bills":
-        args.append("--fastmode")
+    if any("fastmode" in arg or "resilience" in arg for arg in extra):
+        raise ValueError("Fastmode and identity-rotating resilience mode are disabled")
     args.extend(extra)
     if shutil.which("os-update"):
         # Inside the pipeline image: os-update is on PATH.
         return ["os-update", *args]
     # Local dev: run through the vendored compose 'scrape' service.
-    return ["docker", "compose", "run", "--rm", "scrape", *args]
+    return [
+        "docker", "compose", "run", "--rm",
+        "--volume", f"{PIPELINE_DIR / 'scraper'}:/badger-pipeline/scraper:ro",
+        "--env", "PYTHONPATH=/badger-pipeline:./scrapers",
+        "scrape", *args,
+    ]
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=sorted(SCRAPERS))
-    parser.add_argument("--no-fastmode", action="store_true")
+    parser.add_argument("--no-fastmode", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--session",
         help="scrape one historical session (exact scraper identifier, e.g."
@@ -91,9 +97,13 @@ def main(argv: list[str]) -> int:
         if archive_dir is None:
             slug = ns.session.replace(" ", "-").lower()
             archive_dir = PIPELINE_DIR / "_data" / "sessions" / slug
-    cmd = build_command(ns.target, fastmode=not ns.no_fastmode, extra=extra)
+    cmd = build_command(ns.target, extra=extra)
     print(f"+ {' '.join(cmd)} (cwd={VENDOR_DIR})", flush=True)
-    result = subprocess.run(cmd, cwd=VENDOR_DIR, check=False)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, [
+        str(PIPELINE_DIR), str(VENDOR_DIR / "scrapers"), env.get("PYTHONPATH"),
+    ]))
+    result = subprocess.run(cmd, cwd=VENDOR_DIR, env=env, check=False)
     if result.returncode == 0:
         copied = archive_output(SCRAPERS[ns.target][1], archive_dir or ARCHIVE_DIR)
         print(f"scrape ok: archived {copied} JSON files -> {archive_dir or ARCHIVE_DIR}")

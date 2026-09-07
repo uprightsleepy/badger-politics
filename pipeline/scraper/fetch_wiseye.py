@@ -2,12 +2,10 @@
 
 Usage: python -m scraper.fetch_wiseye [--backfill]
 
-wiseye.org exposes the standard WordPress REST API; robots.txt allows
-all agents with a 10-second crawl delay, which this fetcher honors. We
-store metadata only (date, title, url) and link to their site; nothing
-is republished. Nightly mode fetches the last 21 days; --backfill walks
-the full archive once. A total failure warns and keeps the old archive:
-their outages must never break our run.
+Retrieval is paused as of 2026-09-07: the user agreement requires
+clarification/approval for metadata reuse. Robots allowance alone does
+not establish permission. Retained code may return after site approval
+and a fresh policy review; existing archives are unchanged.
 """
 
 from __future__ import annotations
@@ -20,6 +18,7 @@ from pathlib import Path
 import requests
 
 from scraper.http import session
+from scraper.source_access import SourceAccessError
 
 API = "https://wiseye.org/wp-json/wp/v2/posts"
 DATA_PATH = Path(__file__).resolve().parents[1] / "_data" / "wiseye" / "videos.json"
@@ -53,6 +52,12 @@ def fetch_pages(http: requests.Session, params: dict) -> list[dict]:
 
 
 def main(argv: list[str]) -> int:
+    # May be restored with site approval and a fresh robots.txt/terms review.
+    print("WisconsinEye retrieval paused pending metadata-reuse approval", file=sys.stderr)
+    return 2
+
+
+def collect(argv: list[str]) -> int:
     http = session()
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     existing: dict[str, dict] = {}
@@ -61,7 +66,9 @@ def main(argv: list[str]) -> int:
     params = {} if "--backfill" in argv else {"after": _cutoff()}
     try:
         fresh = fetch_pages(http, params)
-    except Exception as error:  # their outages never break our run
+    except SourceAccessError:
+        raise
+    except requests.RequestException as error:  # outages keep the old archive
         print(f"WARNING: wiseye fetch failed ({error}); keeping old archive", file=sys.stderr)
         return 0
     for v in fresh:

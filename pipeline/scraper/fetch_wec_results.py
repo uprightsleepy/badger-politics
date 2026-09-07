@@ -2,6 +2,9 @@
 
 Usage: python -m scraper.fetch_wec_results
 
+Network downloads are paused pending the WEC access/terms review; existing
+cached reports remain available. See scraper/README.md (2026-09-07 review).
+
 URLs are pinned per election (WEC posts one set of files per certified
 election; they do not change after certification). Add each new general
 election's files after certification, roughly every November of even years.

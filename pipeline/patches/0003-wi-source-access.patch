@@ -1,0 +1,94 @@
+--- a/scrapers/wi/__init__.py
++++ b/scrapers/wi/__init__.py
+@@ -1,4 +1,5 @@
+-from utils import url_xpath
++import lxml.html
++from scraper.http import session as policy_session
+ from openstates.scrape import State
+ from .bills import WIBillScraper
+ from .events import WIEventScraper
+@@ -230,12 +231,10 @@
+     ]
+
+     def get_session_list(self):
+-        user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36"
+-
+-        sessions = url_xpath(
+-            "https://docs.legis.wisconsin.gov/search",
+-            "//select[@name='sessionNumber']/option/text()",
+-            verify=False,
+-            user_agent=user_agent,
++        with policy_session() as http:
++            response = http.get("https://docs.legis.wisconsin.gov/search", timeout=60)
++            response.raise_for_status()
++        sessions = lxml.html.fromstring(response.text).xpath(
++            "//select[@name='sessionNumber']/option/text()"
+         )
+         return [session.strip(" -") for session in sessions]
+--- a/scrapers/wi/bills.py
++++ b/scrapers/wi/bills.py
+@@ -1,3 +1,4 @@
++from scraper.http import configure_session
+ import re
+ import pytz
+ import datetime
+@@ -26,6 +27,14 @@
+     subjects = defaultdict(list)
+     categorizer = Categorizer()
+
++    def __init__(self, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++        configure_session(self)
++        # Our transport owns policy checks, pacing and bounded retries.
++        self.retry_attempts = 0
++        # Preserve bill cache reads without disabling network pacing.
++        self.cache_write_only = False
++
+     def scrape_subjects(self, year, site_id):
+         last_url = None
+         next_url = (
+@@ -39,7 +48,7 @@
+         # that we use to scrape the data
+
+         while last_url != next_url:
+-            html = self.get(next_url, verify=False).text
++            html = self.get(next_url).text
+             doc = lxml.html.fromstring(html)
+             doc.make_links_absolute(next_url)
+
+@@ -113,7 +122,7 @@
+             bill_type = "bill"
+
+         try:
+-            data = self.get(url, verify=False).text
++            data = self.get(url).text
+         except scrapelib.HTTPError:
+             self.warning("skipping URL %s" % url)
+             return
+--- a/scrapers/wi/events.py
++++ b/scrapers/wi/events.py
+@@ -1,3 +1,4 @@
++from scraper.http import configure_session
+ import pytz
+ import dateutil.parser
+
+@@ -16,12 +17,14 @@
+ class WIEventScraper(Scraper, LXMLMixin):
+     _tz = pytz.timezone("US/Central")
+
++    def __init__(self, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++        configure_session(self)
++        # Our transport owns policy checks, pacing and bounded retries.
++        self.retry_attempts = 0
++
+     def scrape(self):
+-        headers = {
+-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36",
+-        }
+-
+-        html = self.get(calurl, headers=headers).text
++        html = self.get(calurl).text
+         # events here are inline in the html as JS variables
+         event_regex = r"({[\n\s]*title(.*?)}),\/\/end event object"
+         event_rows = re.findall(event_regex, html, flags=re.MULTILINE | re.DOTALL)

@@ -1,16 +1,15 @@
 """The shared session identifies itself and rides out transient failures."""
 
-from scraper.http import USER_AGENT, cached_page, session
+from scraper.http import USER_AGENT, PolicyAdapter, cached_page, session
 
 
 def test_session_identifies_and_retries() -> None:
     http = session()
     assert http.headers["User-Agent"] == USER_AGENT
-    retry = http.get_adapter("https://example.test/").max_retries
-    assert retry.total == 3
-    assert 503 in retry.status_forcelist
-    # the final response is handed back, so callers' own 404 probes still work
-    assert retry.raise_on_status is False
+    adapter = http.get_adapter("https://example.test/")
+    assert isinstance(adapter, PolicyAdapter)
+    # Retries must return through the policy/pacing gate, not run inside urllib3.
+    assert adapter.max_retries.total == 0
 
 
 def test_cached_page_serves_the_cache_without_a_session(tmp_path) -> None:

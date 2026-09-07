@@ -2,6 +2,11 @@
 
 Usage: python -m scraper.crosscheck_ftm --cycle 2024 [--db ../data/wi.sqlite]
 
+Network retrieval paused 2026-09-07: the API's robots.txt disallows crawling.
+An API key alone does not resolve this conflict; site approval and a fresh
+policy review are required before restoring requests. Cached research can
+still be read offline.
+
 FTM data is CC BY-NC-SA, research use, 1,000 records/year quota. Raw
 responses are cached under _data/ftm/ so re-runs are free, and nothing
 here is read by the importer or the site build: the comparison report

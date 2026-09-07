@@ -1,4 +1,4 @@
-"""Shared HTTP plumbing for our own fetchers (not the vendored scraper).
+"""Shared HTTP plumbing for fetchers and the patched upstream subprocess.
 
 One place for the identifying User-Agent, transient-failure retries, the
 on-disk page cache the enrichment steps share, and the GitHub-contents-
@@ -13,29 +13,55 @@ from pathlib import Path
 
 import requests
 from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
-USER_AGENT = "badgerpolitics.org data pipeline (contact: https://badgerpolitics.org/about/#contact)"
+from scraper.source_access import ACCESS, USER_AGENT, SourceAccessError
 
-# Three tries with backoff on connection errors and gateway 5xx, reads
-# only: a nightly run rides out a blip instead of aborting on one 502.
-# The last response comes back as-is, so every caller's own status
-# handling (raise_for_status, 404 probes) still sees it.
-RETRY = Retry(
-    total=3,
-    backoff_factor=1.5,
-    status_forcelist=(502, 503, 504),
-    allowed_methods=frozenset({"GET", "HEAD"}),
-    raise_on_status=False,
-)
+
+class PolicyAdapter(HTTPAdapter):
+    """Guard every network hop, including redirects and transient retries."""
+
+    def send(self, request, **kwargs):
+        if not kwargs.get("verify", True):
+            raise SourceAccessError("TLS verification cannot be disabled for collection")
+        request.headers["User-Agent"] = USER_AGENT
+        for attempt in range(4):
+            host, _ = ACCESS.before_request(request.url, request.method)
+            try:
+                response = super().send(request, **kwargs)
+            except (requests.ConnectionError, requests.Timeout):
+                if attempt == 3 or request.method != "GET":
+                    raise
+            else:
+                try:
+                    ACCESS.after_response(host, response)
+                except SourceAccessError:
+                    response.close()
+                    raise
+                if (
+                    response.status_code not in (502, 503, 504)
+                    or attempt == 3
+                    or request.method != "GET"
+                ):
+                    return response
+                response.close()
+            time.sleep(1.5 * 2**attempt)
+        raise AssertionError("unreachable retry state")
+
+
+def configure_session(http: requests.Session) -> requests.Session:
+    """Also used by our runtime patch inside the upstream subprocess."""
+    http.headers["User-Agent"] = USER_AGENT
+    http.verify = True
+    # Retries live above the adapter so every attempt respects source pacing.
+    http.mount("https://", PolicyAdapter(max_retries=0))
+    http.mount("http://", PolicyAdapter(max_retries=0))
+    # scrapelib otherwise supplies its own FTP transport outside this gate.
+    http.mount("ftp://", PolicyAdapter(max_retries=0))
+    return http
 
 
 def session() -> requests.Session:
-    s = requests.Session()
-    s.headers["User-Agent"] = USER_AGENT
-    s.mount("https://", HTTPAdapter(max_retries=RETRY))
-    s.mount("http://", HTTPAdapter(max_retries=RETRY))
-    return s
+    return configure_session(requests.Session())
 
 
 def cached_page(http: requests.Session, url: str, cache_dir: Path) -> tuple[str, bool]:

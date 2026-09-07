@@ -21,7 +21,7 @@ FB_PROJECT="${FB_PROJECT:-badgerpolitics-dev}"
 BUCKET="${BUCKET:-badgerpolitics-prod-snapshots}"
 
 # --- Phase 1: scrape + import (never run two scrapes concurrently) ---
-python -m scraper.scrape bills            # os-update wi bills --scrape --fastmode
+python -m scraper.scrape bills            # os-update wi bills --scrape (policy-checked)
 python -m scraper.scrape events           # os-update wi events --scrape
 python -m scraper.fetch_people            # openstates/people WI roster (YAML)
 python -m scraper.fetch_committees        # committee rosters + chairs (YAML)
@@ -31,12 +31,12 @@ python -m importer.import_openstates _data/wi _data/sessions/*/ ../data/wi.sqlit
 
 # --- Phase 2: derived features + elections (CYCLE = active election year) ---
 CYCLE="${CYCLE:-2026}"
-python -m scraper.fetch_wec                   # WEC ballot-access report (PDF)
+# WEC downloads paused 2026-09-07: terms recheck returned 403; use local reports.
 python -m importer.wec_pdf _data/wec/ballot-access.pdf _data/wec/candidates-${CYCLE}.csv
 python -m importer.elections ../data/wi.sqlite --cycle "$CYCLE"
 python -m importer.import_wec _data/wec/candidates-${CYCLE}.csv ../data/wi.sqlite --cycle "$CYCLE"
 
-python -m scraper.fetch_wec_results           # pinned canvass files (no-op when present)
+# Existing pinned canvass files remain available offline.
 python -m importer.import_wec_results _data/wec-results ../data/wi.sqlite
 
 python -m scraper.fetch_cfis map ../data/wi.sqlite
@@ -49,13 +49,16 @@ python -m importer.import_cfis _data/cfis ../data/wi.sqlite
 python -m scraper.fetch_cf_committees --since 2025-01
 python -m importer.import_cf_committees _data/cfis ../data/wi.sqlite
 
-python -m scraper.fetch_lobbying --refresh    # per-bill registered principals
+# Automated lobbying retrieval removed 2026-09-07: robots.txt disallows crawling.
+# It may return later with site approval and a fresh robots.txt/terms review.
+# Retain the complete local archive: the main import rebuilds the database.
 python -m importer.import_lobbying _data/lobbying ../data/wi.sqlite
 
 python -m scraper.fetch_subjects              # subject index (current refreshes)
 python -m importer.import_subjects _data/subjects ../data/wi.sqlite
 
-python -m scraper.fetch_wiseye                # recording metadata, outage-tolerant
+# WisconsinEye retrieval paused 2026-09-07 pending approval for metadata reuse
+# under its user agreement. Only the existing local archive is read here.
 python -m importer.import_wiseye _data/wiseye/videos.json ../data/wi.sqlite
 
 python -m scraper.fetch_contacts --refresh    # Capitol office contacts (docs.legis)

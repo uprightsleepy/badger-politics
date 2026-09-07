@@ -2,6 +2,10 @@
 
 Usage: python -m scraper.fetch_wec [--url URL] [dest_pdf]
 
+Downloads are paused by source_policies.json as of 2026-09-07 because the
+terms review could not be completed (homepage returned 403). Existing reports
+remain available offline; restore only after completing the source review.
+
 The Wisconsin Elections Commission publishes candidate ballot access as a
 commission-meeting memo whose Appendix B is the "Candidate Tracking by
 Office" table. The URL changes each cycle (and gets superseded when the

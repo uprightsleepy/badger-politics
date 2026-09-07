@@ -4,6 +4,13 @@ Runtime patches applied to the pinned openstates-scrapers submodule working
 tree by `scraper/scrape.py` (via `git apply`, idempotent). The pinned commit
 is never edited in-tree; each patch documents its upstream intent here.
 
+`0003-wi-source-access.patch` is a project integration patch: route Wisconsin
+HTTP requests (including jurisdiction/session discovery) through the reviewed
+source policies in `scraper/http.py`. It removes browser impersonation and
+disabled TLS checks. The wrapper exposes our Apache-2.0 HTTP helpers to the GPL
+subprocess; our application never imports upstream scraper modules. General
+upstream intent: verified TLS, identifying User-Agent, and policy-aware access.
+
 | Patch | Upstream intent |
 |---|---|
 | `0001-wi-events-fixes.patch` | Two `WIEventScraper` fixes, to be submitted as one PR to openstates/openstates-scrapers: (1) committeeschedule.legis.wisconsin.gov now emits `title: "..."` with double quotes while every other field uses single quotes; `extract_field`'s regex only matched single quotes, so every event's title extracted as `None` and the scrape crashed at `re.match(chamber_regex, title)` (scrapers/wi/events.py:64) — the regex now accepts either quote style. (2) Defensive guard: skip (with a warning) any schedule row still missing title or start instead of crashing. |

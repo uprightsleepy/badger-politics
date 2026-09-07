@@ -1,0 +1,207 @@
+{
+  "reviewed_on": "2026-09-07",
+  "documentation": "README.md#source-policy-review-2026-09-07",
+  "sources": {
+    "docs.legis.wisconsin.gov": {
+      "paths": {
+        "GET": [
+          "/search",
+          "/\\d{4}/(?:proposals|related|legislators)/.*",
+          "/document/(?:proposaltext|proposal|session|amendment|fe)/.*"
+        ]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 200,
+        "url": "https://docs.legis.wisconsin.gov/robots.txt",
+        "sha256": "2c3601cc00d63c244d1b954cc362665e1203ca3250a47ee0d38da52226d0a530"
+      }
+    },
+    "committeeschedule.legis.wisconsin.gov": {
+      "paths": {
+        "GET": [
+          "/"
+        ]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 404,
+        "url": "https://committeeschedule.legis.wisconsin.gov/robots.txt"
+      }
+    },
+    "campaignfinance.wi.gov": {
+      "paths": {
+        "GET": [
+          "/api/trpc/publicFrontendApi\\.(?:getTransactions|getTransactionsTotalCount)",
+          "/api/trpc/entity\\.searchEntities"
+        ]
+      },
+      "delay_seconds": 10,
+      "robots": {
+        "status": 200,
+        "url": "https://campaignfinance.wi.gov/robots.txt",
+        "sha256": "1523ab18ab7768892e649637d7fba6e60178c6008ff3d0ea31166635930bf815"
+      }
+    },
+    "elections.wi.gov": {
+      "paused": "Report paths are robots-permitted, but the terms recheck was blocked by HTTP 403. Retain local reports until access/reuse review is complete."
+    },
+    "api.github.com": {
+      "paths": {
+        "GET": [
+          "/repos/openstates/people/contents/data/wi/(?:legislature|retired|executive|committees)"
+        ]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 404,
+        "url": "https://api.github.com/robots.txt"
+      }
+    },
+    "raw.githubusercontent.com": {
+      "paths": {
+        "GET": [
+          "/openstates/people/[^/]+/data/wi/(?:legislature|retired|executive|committees)/[^/]+\\.yml"
+        ]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 404,
+        "url": "https://raw.githubusercontent.com/robots.txt"
+      }
+    },
+    "unitedstates.github.io": {
+      "paths": {
+        "GET": [
+          "/congress-legislators/legislators-current\\.json"
+        ]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 404,
+        "url": "https://unitedstates.github.io/robots.txt"
+      }
+    },
+    "www.senate.gov": {
+      "paths": {
+        "GET": [
+          "/legislative/LIS/roll_call_lists/vote_menu_\\d+_\\d+\\.xml",
+          "/legislative/LIS/roll_call_votes/vote\\d+/vote_\\d+_\\d+_\\d+\\.xml"
+        ]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 200,
+        "url": "https://www.senate.gov/pagelayout/general/one_item_and_teasers/file_not_found.htm",
+        "missing_page": true
+      }
+    },
+    "clerk.house.gov": {
+      "paths": {
+        "GET": [
+          "/evs/\\d{4}/roll\\d+\\.xml"
+        ]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 404,
+        "url": "https://clerk.house.gov/robots.txt"
+      }
+    },
+    "webapi.legistar.com": {
+      "paths": {
+        "GET": [
+          "/v1/(?:milwaukee|westalliswi)/.*"
+        ]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 404,
+        "url": "https://webapi.legistar.com/robots.txt"
+      }
+    },
+    "milwaukee.legistar.com": {
+      "paths": {
+        "GET": [
+          "/(?:Departments|MeetingDetail)\\.aspx"
+        ],
+        "POST": [
+          "/(?:Departments|MeetingDetail)\\.aspx"
+        ]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 404,
+        "url": "https://milwaukee.legistar.com/robots.txt"
+      }
+    },
+    "westalliswi.legistar.com": {
+      "paths": {
+        "GET": [
+          "/(?:Departments|MeetingDetail)\\.aspx"
+        ],
+        "POST": [
+          "/(?:Departments|MeetingDetail)\\.aspx"
+        ]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 404,
+        "url": "https://westalliswi.legistar.com/robots.txt"
+      }
+    },
+    "city.milwaukee.gov": {
+      "paths": {
+        "GET": [
+          "/CommonCouncil/(?:Council-Members|CouncilMembers)/District\\d+/?"
+        ]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 200,
+        "url": "https://city.milwaukee.gov/robots.txt",
+        "sha256": "fe3bf1da646b719222806523ce11f9c8ada05ae8d680e6c3a7b9a78a8899f585"
+      },
+      "deny_query": [
+        "(?i)(?:^|&)PrintPage=yes(?:&|$)"
+      ]
+    },
+    "www.westalliswi.gov": {
+      "paths": {
+        "GET": [
+          "/page/district-(?:one|two|three|four|five)/?"
+        ]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 200,
+        "url": "https://www.westalliswi.gov/robots.txt",
+        "sha256": "7c61907445d74d7d9adc386440dd73e588e7ee99be2942797117ff15bc6b0a4a"
+      }
+    },
+    "lobbying.wi.gov": {
+      "paused": "Automated retrieval removed 2026-09-07: robots disallows all crawling. Requires site approval before restoration."
+    },
+    "wiseye.org": {
+      "paused": "Metadata reuse under the user agreement needs site approval/clarification; retrieval paused 2026-09-07."
+    },
+    "api.followthemoney.org": {
+      "paused": "Robots disallows all crawling; an API key alone does not resolve the conflict. Requires explicit approval."
+    },
+    "milwaukeemaps.milwaukee.gov": {
+      "paused": "Robots disallows general crawlers; retain local boundary files."
+    },
+    "services1.arcgis.com": {
+      "paused": "Robots returned HTTP 403; use the existing local LTSB boundary cache until access is clarified."
+    },
+    "gis.westalliswi.gov": {
+      "paused": "No active downloader; review dataset terms before introducing one."
+    },
+    "data.milwaukee.gov": {
+      "paused": "No active downloader; review dataset terms and permitted resource paths before introducing one."
+    },
+    "img.logo.dev": {
+      "paused": "Automatic logo downloads paused until provider terms and organization identity checks are verified."
+    }
+  }
+}
