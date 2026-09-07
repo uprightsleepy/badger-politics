@@ -172,6 +172,21 @@ Record compressed sizes, elapsed time, and peak memory on rehearsal runs.
 If the total forecast exceeds $2, revisit retention and transfer before
 activation; $10 is the absolute project ceiling, not the operating target.
 
+The September 7 finance split adds three cumulative CFIS handoffs and one
+bundle per committee month. Monthly workers start empty and upload only
+their own transactions and registry; they do not each restore the full
+archive. An offline rehearsal of the frozen seed measured 29.06 MiB per
+cumulative CFIS bundle and at most 23.08 MiB for all 21 monthly bundles
+combined, using the full registry in each month as a conservative bound.
+That adds about 110.26 MiB uploaded and downloaded per successful run,
+3.23 GiB downloaded per 30 nights, and 1.51 GiB stored across seven live
+plus seven soft-delete days (about $0.03/month at the rate above).
+All source handoffs together measured 22.12 GiB per 30 nights; temporary
+SQLite handoffs, snapshots, deployment downloads, diagnostics, metadata
+operations, and retries are additional. Actual source growth and live
+run sizes still require measurement. Monthly merge downloads count toward
+the existing 50 GiB/month guard. No additional GCP resource is required.
+
 ## Terraform changes
 
 - `infra/snapshot-storage.tf` imports the existing bucket into management,
@@ -204,8 +219,10 @@ replaced. [GitHub OIDC claims](https://docs.github.com/en/actions/reference/secu
 ## Stages, contention, and recovery
 
 `nightly-parser.yml` runs CI, then calls `parser-stage.yml` sequentially for
-legislature, finance, community, federal, import, and enrichment. Each job
-has 330 minutes including setup, restoration, and checkpoint upload; the
+legislature, finance mapping, finance receipt refresh, finance audit,
+individual committee months, committee merge, community, federal, import,
+and enrichment. Each job has 330 minutes including setup, restoration, and
+checkpoint upload; the
 processing step has a five-hour deadline. A single stage that exceeds this
 needs a smaller supported source/date boundary. There is no parallel
 scraping and no reduction in source pacing.
@@ -213,6 +230,46 @@ scraping and no reduction in source pacing.
 Finance rebuilds the legislative database for committee matching. Its inputs
 include historical session rosters and legacy service records, which are
 required for historical attribution and the curated term-event checks.
+
+The September 7 rehearsal reached the original finance stage's five-hour
+processing limit. The database rebuild took 17 seconds, committee matching
+about 44 minutes, receipt refresh 41 seconds, and the historical audit
+about 50 minutes. The all-month committee collector then ran for about
+3 hours 25 minutes before the shared deadline stopped it. These are
+observed component timings, not an end-to-end successful runtime.
+
+Finance preparation now checkpoints each of those components separately.
+The run freezes `finance_as_of` at its UTC start date. Receipt refresh and
+the rotating audit use that date even if a retry crosses midnight, and the
+committee plan includes **every month from January 2025 through that
+date's month**, exactly the previous collection range. This freezes window
+selection, not the upstream records themselves. Historical committee
+months are still refreshed on every run, preserving amendment coverage.
+
+The `finance-months` matrix has `max-parallel: 1` and fails fast. Its jobs
+may finish in any order; each uses the existing collector with matching
+`--since` and `--until` values, and creates an immutable monthly bundle and
+completion receipt. Each receipt is bound to the run, revision, baseline
+generation, frozen date, and month. A failed month has no reusable receipt.
+Completed months are reused on resume without another source download.
+
+The merge requires every planned receipt and verified bundle, validates
+transaction IDs and month boundaries, and applies monthly outputs in
+chronological order. The latest chronological committee observation wins.
+Earlier candidate receipts, verified person mappings, and archive files
+outside the refresh range remain intact. Duplicate transaction IDs across
+months stop the run for reconciliation; they are never silently discarded
+by SQLite replacement. A completed coverage marker is required before
+downstream import and publication. Importers still rebuild from the whole
+cumulative archive in one job, after all collection has finished.
+
+CFIS keeps its reviewed ten-second request interval, redaction flag,
+policy checks, and stop-on-throttling behavior. No requests run in parallel.
+A single committee month still has a five-hour processing budget; if one
+exceeds it, subdivide that window through the same complete-merge protocol.
+The split avoids the original shared deadline but does not establish that
+the entire workflow finishes within one night. Rehearse and measure before
+enabling unattended scheduling.
 
 Each job owns an isolated local SQLite file. Import finishes before
 enrichment starts, and SQLite's backup API includes committed WAL writes in
@@ -239,10 +296,15 @@ Use Linux (including a Linux filesystem in WSL) to inspect these checkpoints.
 
 For a failed run, rerun the failed jobs in GitHub, or manually dispatch the
 workflow with `resume_run` set to the original numeric run ID. Completed
-stages are reused. Resume requires the same source commit and the same
-last-successful manifest generation; stale resumes fail. A new run on a
+stages and committee months are reused. Resume requires the same source
+commit and last-successful manifest generation; stale resumes fail. A new run on a
 different commit starts with a blank `resume_run`. Interrupted partial
 stages are rerun; only completed stages have reusable checkpoints.
+
+After merging this split, start a fresh manual `nightly-parser.yml` run with
+blank `resume_run`; checkpoints from the old finance implementation are
+bound to its different revision. Keep the schedule disabled until that
+rehearsal finishes and its runtime and combined cost forecast are reviewed.
 
 Only a successful enrichment/integrity stage produces the final SQLite
 snapshot. Publication copies that immutable candidate to `snapshots/` and
@@ -323,3 +385,17 @@ guards, Terraform formatting, and Terraform validation passed. The pinned
 scraper dependencies were installed for Linux and the CLI help command
 started under Python 3.11 in WSL without fetching records. Live source
 timing and cloud identity enforcement still require the rehearsal above.
+
+Finance-split validation on 2026-09-07: **244 tests passed, 1 Linux-only
+test skipped on Windows**; all 58 targeted finance/checkpoint tests also
+passed on Linux. Ruff and workflow guards passed. Tests compare split and
+unsplit collection against identical mocked source pages, including page
+and month boundaries, amendments, deleted stale rows, historical receipts,
+registry changes, interrupted months, resume, and missing-month rejection.
+An additional offline full-seed rehearsal packed/restored all 21 monthly
+bundles and preserved every archive file. Imports before and after merging
+had identical ordered full-row hashes for 1,042,336 committee transactions,
+1,132 committees, 233,677 candidate receipts, and 315 verified committee
+mappings. Both isolated SQLite files passed `quick_check`. Raw inputs,
+databases, and audit reports remain private. This verifies preservation on
+frozen inputs; the new workflow still needs a live rehearsal on `main`.

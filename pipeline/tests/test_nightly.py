@@ -17,6 +17,8 @@ from check_workflows import validate
 from nightly.__main__ import run_stage
 from nightly.archive import pack, unpack
 from nightly.export_scraper_lock import export
+from nightly.finance import merge_months, months_for
+from nightly.month import MonthRunner
 from nightly.runner import LATEST, LOCK, Runner, seed, source_path
 from nightly.stages import SOURCES, STAGES, WRITES
 from nightly.storage import GCS, Conflict, StorageError
@@ -78,13 +80,22 @@ class Store:
 
 
 @pytest.fixture
-def seeded(tmp_path):
+def seeded(tmp_path, monkeypatch):
+    from datetime import UTC, datetime
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2025, 3, 31, 23, 59, tzinfo=UTC)
+
+    monkeypatch.setattr("nightly.runner.datetime", Clock)
     root = tmp_path / "seed/pipeline"
     root.mkdir(parents=True)
     for name in SOURCES:
         path = source_path(root, name)
         path.mkdir(parents=True)
         (path / "sample.txt").write_text("private source content")
+    (root / "_data/cfis/committees.json").write_text("[]")
     (root.parent / "data").mkdir()
     (root.parent / "data/.bill_counts.json").write_text('{"2025": 100}')
     store = Store()
@@ -99,6 +110,13 @@ def runner(tmp_path, store, stage="legislature", run_id="123", execution="123-1"
 
 
 def complete(r, stage):
+    if stage == "finance-committees":
+        doc = json.loads(r.context.read_text())
+        months = months_for(doc)
+        merge_months(r.root / "_data/cfis", r.scratch / "finance-months", months)
+        (r.scratch / "finance-complete.json").write_text(json.dumps({
+            "run_id": r.run_id, "revision": r.revision, "months": months,
+        }))
     for name in WRITES[stage]:
         if name == "database":
             (r.root.parent / "data").mkdir(exist_ok=True)
@@ -116,11 +134,39 @@ def complete(r, stage):
 def complete_all(tmp_path, store):
     last = None
     for stage in STAGES:
+        if stage == "finance-committees":
+            for month in months_for(last.finance_plan()):
+                monthly = month_runner(tmp_path, store, month)
+                monthly.restore("finance-month")
+                complete_month(monthly)
         last = runner(tmp_path, store, stage)
         last.acquire()
         assert last.restore(stage)
         complete(last, stage)
     return last
+
+
+def month_runner(tmp_path, store, month, execution="123-1"):
+    root = tmp_path / f"{execution}-{month}" / "pipeline"
+    root.mkdir(parents=True, exist_ok=True)
+    return MonthRunner(store, root, "123", REV, execution, month=month)
+
+
+def complete_month(r):
+    source = r.root / "_data/cfis"
+    (source / f"pac-{r.month}.json").write_text("[]")
+    (source / "committees.json").write_text("[]")
+    (r.scratch / "success.json").write_text(json.dumps(r.receipt("finance-month")))
+    r.checkpoint("finance-month")
+
+
+def prepare_finance(tmp_path, store):
+    for stage in ("legislature", "finance", "finance-receipts", "finance-audit"):
+        r = runner(tmp_path, store, stage)
+        r.acquire()
+        r.restore(stage)
+        complete(r, stage)
+    return r
 
 
 def test_lock_excludes_other_runs_and_wrong_release(tmp_path, seeded):
@@ -415,3 +461,149 @@ def test_cloud_cli_resolution_and_http_errors_do_not_expose_tokens(monkeypatch):
         store.metadata("parser-state/latest.json")
     assert "private-token" not in str(error.value)
     assert "signed-upload-session" not in str(error.value)
+
+
+def test_month_resume_and_failure_preserve_full_archive(tmp_path, seeded, monkeypatch):
+    import subprocess
+
+    original = copy.deepcopy(seeded.objects[LATEST])
+    prep = prepare_finance(tmp_path, seeded)
+    plan = prep.finance_plan()
+    first = month_runner(tmp_path, seeded, "2025-01")
+    assert first.restore("finance-month")
+    complete_month(first)
+    checkpoint = copy.deepcopy(seeded.objects[first.run_prefix + "months/2025-01.json"])
+    broken = month_runner(tmp_path, seeded, "2025-02")
+    broken.restore("finance-month")
+
+    def interrupted(command, **kwargs):
+        assert command[1:3] == ["-u", "-m"]
+        assert command[3:] == ["scraper.fetch_cf_committees", "--since", "2025-02",
+                               "--until", "2025-02"]
+        (broken.root / "_data/cfis/pac-2025-02.json").write_text("[partial")
+        raise subprocess.TimeoutExpired(command, 300)
+
+    monkeypatch.setattr("nightly.__main__.subprocess.run", interrupted)
+    with pytest.raises(subprocess.TimeoutExpired):
+        run_stage(broken, "finance-month", "2026")
+    with pytest.raises(FileNotFoundError):
+        broken.checkpoint("finance-month")
+    assert seeded.objects[LATEST] == original
+    assert seeded.objects[first.run_prefix + "months/2025-01.json"] == checkpoint
+    broken.release()
+
+    retry_first = month_runner(tmp_path, seeded, "2025-01", "123-2")
+    retry_first.acquire()
+    assert retry_first.restore("finance-month") is False
+    assert not (retry_first.root / "_data").exists()
+    # Even after the calendar rolls forward, the original plan is authoritative.
+    monkeypatch.setattr("nightly.runner.datetime", SimpleNamespace(now=lambda *_: None))
+    for month in ("2025-03", "2025-02"):
+        retry = month_runner(tmp_path, seeded, month, "123-2")
+        assert retry.restore("finance-month")
+        complete_month(retry)
+    merged = runner(tmp_path, seeded, "finance-committees", execution="123-2")
+    assert merged.restore("finance-committees")
+    complete(merged, "finance-committees")
+    doc = merged.load(merged.run_prefix + "finance-committees.json")
+    assert doc["finance_completed_months"] == months_for(plan)
+    assert doc["finance_as_of"] == "2025-03-31"
+    assert seeded.objects[LATEST] == original
+
+
+def test_merge_requires_every_month_and_counts_transfers(tmp_path, seeded, monkeypatch):
+    prep = prepare_finance(tmp_path, seeded)
+    plan = prep.finance_plan()
+    for month in months_for(plan)[:-1]:
+        r = month_runner(tmp_path, seeded, month)
+        r.restore("finance-month")
+        complete_month(r)
+    merged = runner(tmp_path, seeded, "finance-committees")
+    with pytest.raises(FileNotFoundError):
+        merged.restore("finance-committees")
+    assert not merged.context.exists()
+    assert not (merged.root / "_data").exists()
+    r = month_runner(tmp_path, seeded, months_for(plan)[-1])
+    r.restore("finance-month")
+    complete_month(r)
+    transfer = plan["bundles"]["cfis"]["bytes"] + sum(
+        prep.load_finance_month(plan, month)["bytes"] for month in months_for(plan))
+    monkeypatch.setattr("nightly.runner.MAX_DOWNLOAD", plan["downloaded_bytes"] + transfer - 1)
+    with pytest.raises(ValueError, match="downloads exceed"):
+        merged.restore("finance-committees")
+    monkeypatch.setattr("nightly.runner.MAX_DOWNLOAD", plan["downloaded_bytes"] + transfer)
+    assert merged.restore("finance-committees")
+    assert json.loads(merged.context.read_text())["downloaded_bytes"] == (
+        plan["downloaded_bytes"] + transfer)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("run_id", "456"), ("revision", "b" * 40), ("base_generation", "999"),
+    ("month", "2025-02"), ("finance_as_of", "2025-04-01"),
+])
+def test_month_receipts_cannot_cross_runs_or_plans(tmp_path, seeded, field, value):
+    prep = prepare_finance(tmp_path, seeded)
+    r = month_runner(tmp_path, seeded, "2025-01")
+    r.restore("finance-month")
+    complete_month(r)
+    name = r.run_prefix + "months/2025-01.json"
+    doc, generation = seeded.read_json(name)
+    doc[field] = value
+    seeded.put_json(name, doc, r.scratch, generation)
+    with pytest.raises(ValueError):
+        prep.load_finance_month(prep.finance_plan(), "2025-01")
+
+
+def test_new_run_does_not_inherit_finance_completion(tmp_path, seeded):
+    last = complete_all(tmp_path, seeded)
+    last.publish()
+    last.release()
+    next_run = runner(tmp_path, seeded, run_id="456", execution="456-1")
+    next_run.acquire()
+    assert next_run.restore("legislature")
+    doc = json.loads(next_run.context.read_text())
+    assert "completed_at" not in doc
+    assert "snapshot" not in doc
+    assert "finance_completed_months" not in doc
+
+
+def test_month_rerun_after_publication_skips_expired_month_outputs(tmp_path, seeded):
+    last = complete_all(tmp_path, seeded)
+    last.publish()
+    for name in list(seeded.objects):
+        if "/months/" in name or name.endswith("finance-audit.json"):
+            del seeded.objects[name]
+    last.release()
+    retry = month_runner(tmp_path, seeded, "2025-01", "123-2")
+    retry.acquire()
+    assert retry.restore("finance-month") is False
+    assert months_for(retry.finance_plan()) == ["2025-01", "2025-02", "2025-03"]
+
+
+def test_import_rejects_missing_finance_completion(tmp_path, seeded):
+    last = complete_all(tmp_path, seeded)
+    name = last.run_prefix + "federal.json"
+    doc, generation = seeded.read_json(name)
+    del doc["finance_completed_months"]
+    seeded.put_json(name, doc, last.scratch, generation)
+    del seeded.objects[last.run_prefix + "import.json"]
+    r = runner(tmp_path, seeded, "import", execution="123-2")
+    last.release()
+    r.acquire()
+    with pytest.raises(ValueError, match="partial import"):
+        r.restore("import")
+
+
+@pytest.mark.parametrize("mutation", ["parallel", "partial_matrix", "early_cleanup", "skip_merge"])
+def test_month_workflow_guards(mutation):
+    path = Path(__file__).resolve().parents[2] / ".github/workflows/nightly-parser.yml"
+    workflow = yaml.load(path.read_text(), Loader=yaml.BaseLoader)
+    if mutation == "parallel":
+        workflow["jobs"]["finance-months"]["strategy"]["max-parallel"] = 2
+    elif mutation == "partial_matrix":
+        workflow["jobs"]["finance-months"]["strategy"]["matrix"]["month"] = ["2025-01"]
+    elif mutation == "early_cleanup":
+        workflow["jobs"]["finish"]["needs"].remove("finance-months")
+    else:
+        workflow["jobs"]["community"]["needs"] = "finance-audit"
+    assert validate(workflow, "nightly-parser.yml")

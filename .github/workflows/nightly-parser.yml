@@ -46,8 +46,55 @@ jobs:
       stage: finance
       resume_run: ${{ inputs.resume_run || '' }}
 
-  community:
+  finance-receipts:
     needs: finance
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/parser-stage.yml
+    with:
+      stage: finance-receipts
+      resume_run: ${{ inputs.resume_run || '' }}
+
+  finance-audit:
+    needs: finance-receipts
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/parser-stage.yml
+    with:
+      stage: finance-audit
+      resume_run: ${{ inputs.resume_run || '' }}
+
+  finance-months:
+    needs: finance-audit
+    strategy:
+      # Month outputs are independent; never overlap requests to the source.
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        month: ${{ fromJSON(needs.finance-audit.outputs.months) }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/parser-stage.yml
+    with:
+      stage: finance-month
+      month: ${{ matrix.month }}
+      resume_run: ${{ inputs.resume_run || '' }}
+
+  finance-committees:
+    needs: finance-months
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/parser-stage.yml
+    with:
+      stage: finance-committees
+      resume_run: ${{ inputs.resume_run || '' }}
+
+  community:
+    needs: finance-committees
     permissions:
       contents: read
       id-token: write
@@ -87,7 +134,8 @@ jobs:
       resume_run: ${{ inputs.resume_run || '' }}
 
   finish:
-    needs: [validate, legislature, finance, community, federal, import, enrich]
+    needs: [validate, legislature, finance, finance-receipts, finance-audit, finance-months,
+            finance-committees, community, federal, import, enrich]
     if: always() && needs.validate.result == 'success'
     permissions:
       contents: read

@@ -9,6 +9,8 @@ import sys
 import time
 from pathlib import Path
 
+from nightly.finance import months_for
+from nightly.month import MonthRunner
 from nightly.runner import Runner, seed
 from nightly.stages import STAGES, commands
 from nightly.storage import GCS
@@ -27,24 +29,27 @@ def run_stage(runner: Runner, stage: str, cycle: str):
     started = time.monotonic()
     # Subprocess output can contain private source data. Keep it off public
     # Actions logs. It is uploaded to the private checkpoint prefix separately.
-    with (runner.scratch / f"{stage}.log").open("wb") as log:
-        for command in commands(stage, runner.root, cycle):
-            print(f"Running {command[0]}", flush=True)
+    with (runner.scratch / f"{runner.log_name(stage)}.log").open("wb") as log:
+        for command in commands(stage, runner.root, cycle, context):
+            command_started = time.monotonic()
+            print(f"Running {command[0]} ({runner.log_name(stage)})", flush=True)
             remaining = 5 * 3600 - (time.monotonic() - started)
             if remaining <= 0:
                 raise TimeoutError("Stage reached its five-hour collection budget")
-            subprocess.run([sys.executable, "-m", *command], cwd=runner.root,
+            subprocess.run([sys.executable, "-u", "-m", *command], cwd=runner.root,
                            stdout=log, stderr=subprocess.STDOUT, check=True, timeout=remaining)
-    success.write_text(json.dumps({"stage": stage, "revision": runner.revision,
-                                   "execution": runner.execution}), encoding="utf-8")
+            elapsed = time.monotonic() - command_started
+            print(f"Completed {command[0]} in {elapsed:.0f}s", flush=True)
+    success.write_text(json.dumps(runner.receipt(stage)), encoding="utf-8")
     print(f"Stage completed in {time.monotonic() - started:.0f}s", flush=True)
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("action", choices=("seed", "acquire", "restore", "run", "checkpoint",
-                                       "logs", "publish", "release"))
-    ap.add_argument("--stage", choices=STAGES)
+                                       "logs", "publish", "release", "finance-plan"))
+    ap.add_argument("--stage", choices=(*STAGES, "finance-month"))
+    ap.add_argument("--month", default=os.environ.get("FINANCE_MONTH", ""))
     ap.add_argument("--bucket", default="badgerpolitics-prod-snapshots")
     ap.add_argument("--revision", default=os.environ.get("GITHUB_SHA", ""))
     ap.add_argument("--run-id", default=os.environ.get("NIGHTLY_RUN_ID", ""))
@@ -59,7 +64,12 @@ def main() -> int:
         print("Private source seed created")
         return 0
     execution = f"{os.environ.get('GITHUB_RUN_ID', '')}-{os.environ.get('GITHUB_RUN_ATTEMPT', '')}"
-    runner = Runner(store, root, args.run_id, args.revision, execution)
+    if args.month and args.stage != "finance-month":
+        ap.error("--month is only valid for finance-month")
+    if args.stage == "finance-month":
+        runner = MonthRunner(store, root, args.run_id, args.revision, execution, month=args.month)
+    else:
+        runner = Runner(store, root, args.run_id, args.revision, execution)
     if args.action == "acquire":
         runner.acquire()
     elif args.action == "release":
@@ -79,8 +89,16 @@ def main() -> int:
     elif args.action == "publish":
         runner.publish()
         print("Validated snapshot published; hosting requires a separate release")
+    elif args.action == "finance-plan":
+        months = months_for(runner.finance_plan())
+        output = os.environ.get("GITHUB_OUTPUT")
+        if output:
+            with Path(output).open("a", encoding="utf-8") as stream:
+                stream.write(f"months={json.dumps(months)}\n")
+        print(f"Planned {len(months)} sequential monthly jobs", flush=True)
     elif args.action == "logs":
-        path = runner.scratch / f"{args.stage}.log"
+        label = runner.log_name(args.stage)
+        path = runner.scratch / f"{label}.log"
         if path.exists():
             # Bound failure diagnostics; they remain private and expire with checkpoints.
             limit = 10 * 1024**2
@@ -89,7 +107,7 @@ def main() -> int:
                 stream.seek(max(0, path.stat().st_size - limit))
                 tail.write_bytes(stream.read(limit))
             runner.check_lock()
-            store.upload(runner.run_prefix + f"{args.stage}-{execution}.log", tail)
+            store.upload(runner.run_prefix + f"{label}-{execution}.log", tail)
     return 0
 
 

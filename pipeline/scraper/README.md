@@ -43,6 +43,25 @@ No new paid service or dependency is required.
 | Boundary utilities | [LTSB ArcGIS host](https://services1.arcgis.com/robots.txt) returned 403; [Milwaukee maps](https://milwaukeemaps.milwaukee.gov/robots.txt) disallows general crawlers. New requests are **paused**; committed boundaries/local caches remain. | [Milwaukee open data](https://data.milwaukee.gov/) resource files may be an alternative, but `/api/` is robots-disallowed. No active downloader exists for that host or West Allis GIS; review individual dataset terms before adding one. |
 | Organization logos | `fetch-logos.mjs` now performs **no network requests**. Existing assets/monogram fallback remain. | The former homepage checks lacked individual robots/terms reviews. The logo.dev terms recheck could not be completed (429). Review provider API/caching/attribution terms and each identity-verification source before restoring. |
 
+## Nightly finance windowing (2026-09-07)
+
+The CFIS [robots file](https://campaignfinance.wi.gov/robots.txt) was rechecked
+for the monthly job split; its reviewed fingerprint is unchanged. Keep the
+conservative ten-second interval because the published `Crawl-delay: 10`
+has ambiguous group placement. The collector's shorter page sleep counts
+toward that interval; the transport waits only the remaining time. The split
+does not change source pacing, permitted paths, request shapes, redaction,
+or reuse scope in the review above.
+
+Nightly committee collection uses the existing `--since YYYY-MM --until YYYY-MM`
+interface once per month, with one worker at a time. Every month from January
+2025 through the run's frozen start month is still refreshed. Receipt refresh
+and historical audit accept `--as-of YYYY-MM-DD` to keep their month selection
+and audit rotation stable across job boundaries and retries; this is not an
+upstream point-in-time snapshot. All completed month outputs are merged with
+the prior archive before the full import. Missing, conflicting, or incomplete
+outputs stop publication. See [hosting and recovery](../../docs/nightly-parser-hosting.md).
+
 ## Preserving lobbying data offline
 
 `run.sh` no longer fetches lobbying pages. It still imports the complete existing

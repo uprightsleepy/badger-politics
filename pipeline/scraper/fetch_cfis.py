@@ -268,11 +268,11 @@ def _drift_is_benign(
     return True
 
 
-def fetch_transactions(since: str) -> None:
+def fetch_transactions(since: str, as_of: date | None = None) -> None:
     committee_ids = load_committee_ids()
     http = session()
 
-    windows = month_windows(since)
+    windows = month_windows(since, as_of.strftime("%Y-%m") if as_of else None)
     # immutable once past; always refresh the two newest months
     refresh = {w[0] for w in windows[-2:]}
     latest = windows[-1][0]
@@ -294,13 +294,14 @@ def fetch_transactions(since: str) -> None:
         time.sleep(DELAY)
 
 
-def audit_archives(sample: int) -> None:
+def audit_archives(sample: int, as_of: date | None = None) -> None:
     """Re-fetch a rotating sample of archived past months and reconcile
     against the archive. Amendments legitimately rewrite filed history, so
     a drifted month is refreshed in place and reported, never left stale."""
     committee_ids = load_committee_ids()
     http = session()
-    windows = month_windows("2008-01")
+    as_of = as_of or date.today()
+    windows = month_windows("2008-01", as_of.strftime("%Y-%m"))
     newest = {w[0] for w in windows[-2:]}
     archived = [w for w in windows
                 if w[0] not in newest and (DATA_DIR / f"tx-{w[0]}.json").exists()]
@@ -308,7 +309,7 @@ def audit_archives(sample: int) -> None:
         print("audit: no archived months to sample")
         return
     # deterministic rotation: full history gets covered over successive days
-    offset = date.today().toordinal() * sample
+    offset = as_of.toordinal() * sample
     picks = [archived[(offset + i) % len(archived)] for i in range(min(sample, len(archived)))]
     drifted = 0
     for label, first, last in picks:
@@ -339,16 +340,17 @@ def main(argv: list[str]) -> int:
     if not argv:
         print(__doc__, file=sys.stderr)
         return 2
+    as_of = date.fromisoformat(argv[argv.index("--as-of") + 1]) if "--as-of" in argv else None
     if argv[0] == "map":
         build_map(Path(argv[1]))
         return 0
     if argv[0] == "transactions":
         since = argv[argv.index("--since") + 1] if "--since" in argv else "2025-01"
-        fetch_transactions(since)
+        fetch_transactions(since, as_of)
         return 0
     if argv[0] == "audit":
         sample = int(argv[argv.index("--sample") + 1]) if "--sample" in argv else 3
-        audit_archives(sample)
+        audit_archives(sample, as_of)
         return 0
     print(f"unknown command {argv[0]!r}", file=sys.stderr)
     return 2

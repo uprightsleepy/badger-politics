@@ -7,11 +7,15 @@ STATIC = ("sessions", "wec-results", "lobbying", "wiseye", "rosters", "districts
 DYNAMIC = ("wi", "people", "cfis", "subjects", "contacts", "federal", "local",
            "wec", "lrb_cache", "companions_cache", "scraper_cache")
 SOURCES = STATIC + DYNAMIC
-STAGES = ("legislature", "finance", "community", "federal", "import", "enrich")
+STAGES = ("legislature", "finance", "finance-receipts", "finance-audit", "finance-committees",
+          "community", "federal", "import", "enrich")
 READS = {
     "legislature": ("wi", "people", "scraper_cache"),
     # Committee matching rebuilds legislative history, including roster/term supplements.
     "finance": ("wi", "people", "sessions", "rosters", "legacy", "cfis"),
+    "finance-receipts": ("cfis",),
+    "finance-audit": ("cfis",),
+    "finance-committees": ("cfis",),
     "community": ("people", "subjects", "contacts", "local"),
     "federal": ("federal",),
     "import": tuple(s for s in SOURCES
@@ -21,6 +25,9 @@ READS = {
 WRITES = {
     "legislature": ("wi", "people", "scraper_cache"),
     "finance": ("cfis",),
+    "finance-receipts": ("cfis",),
+    "finance-audit": ("cfis",),
+    "finance-committees": ("cfis",),
     "community": ("subjects", "contacts", "local"),
     "federal": ("federal",),
     "import": ("wec", "database"),
@@ -28,7 +35,10 @@ WRITES = {
 }
 
 
-def commands(stage: str, root: Path, cycle: str) -> list[list[str]]:
+def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str]]:
+    if stage == "finance-month":
+        month = context["month"]
+        return [["scraper.fetch_cf_committees", "--since", month, "--until", month]]
     db = "../data/wi.sqlite"
     sessions = sorted(str(p.relative_to(root)) for p in (root / "_data/sessions").iterdir()
                       if p.is_dir()) if stage in ("finance", "import") else []
@@ -38,10 +48,12 @@ def commands(stage: str, root: Path, cycle: str) -> list[list[str]]:
     stages = {
         "legislature": [["scraper.scrape", "bills"], ["scraper.scrape", "events"],
                         ["scraper.fetch_people"], ["scraper.fetch_committees"]],
-        "finance": [rebuild, ["scraper.fetch_cfis", "map", db],
-                    ["scraper.fetch_cfis", "transactions"],
-                    ["scraper.fetch_cfis", "audit", "--sample", "3"],
-                    ["scraper.fetch_cf_committees", "--since", "2025-01"]],
+        "finance": [rebuild, ["scraper.fetch_cfis", "map", db]],
+        "finance-receipts": [["scraper.fetch_cfis", "transactions",
+                              "--as-of", context["finance_as_of"]]],
+        "finance-audit": [["scraper.fetch_cfis", "audit", "--sample", "3",
+                           "--as-of", context["finance_as_of"]]],
+        "finance-committees": [["nightly.finance"]],
         "community": [["scraper.fetch_subjects"], ["scraper.fetch_contacts", "--refresh"],
                       ["scraper.fetch_local_votes"], ["scraper.fetch_local_profiles"]],
         "federal": [["scraper.fetch_federal_votes"]],
