@@ -1,35 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import test from "node:test";
-import vm from "node:vm";
 import Database from "better-sqlite3";
-import { compile } from "./typescript.mjs";
+import { queries } from "./database.mjs";
 
-const require = createRequire(import.meta.url);
-const source = await readFile(new URL("../../src/lib/db.ts", import.meta.url), "utf8");
-const sentinels = await readFile(new URL("../../src/lib/sentinels.ts", import.meta.url), "utf8");
 const schema = await readFile(new URL("../../../pipeline/importer/schema.sql", import.meta.url), "utf8");
-
-function queries(conn) {
-  const constants = { exports: {} };
-  vm.runInNewContext(compile(sentinels, { commonJS: true }), { exports: constants.exports });
-  const module = { exports: {} };
-  vm.runInNewContext(compile(source, { commonJS: true }), {
-    exports: module.exports,
-    process: { cwd: () => "/synthetic/site", env: {} },
-    require: (name) => {
-      if (name === "./sentinels") return constants.exports;
-      if (name === "node:path") return require(name);
-      assert.equal(name, "better-sqlite3");
-      return function FixtureDatabase(_path, options) {
-        assert.deepEqual({ ...options }, { readonly: true, fileMustExist: true });
-        return conn;
-      };
-    },
-  });
-  return module.exports;
-}
 
 function fixture(t) {
   const conn = new Database(":memory:");
