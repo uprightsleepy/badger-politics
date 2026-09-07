@@ -210,6 +210,10 @@ processing step has a five-hour deadline. A single stage that exceeds this
 needs a smaller supported source/date boundary. There is no parallel
 scraping and no reduction in source pacing.
 
+Finance rebuilds the legislative database for committee matching. Its inputs
+include historical session rosters and legacy service records, which are
+required for historical attribution and the curated term-event checks.
+
 Each job owns an isolated local SQLite file. Import finishes before
 enrichment starts, and SQLite's backup API includes committed WAL writes in
 the private handoff. The `.bill_counts.json` integrity baseline travels in
