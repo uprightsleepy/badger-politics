@@ -1,0 +1,83 @@
+name: parser stage
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        type: string
+        required: true
+      resume_run:
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+    environment: nightly-parser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    env:
+      STAGE: ${{ inputs.stage }}
+      NIGHTLY_RUN_ID: ${{ inputs.resume_run || github.run_id }}
+      CYCLE: "2026"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: false
+      - name: Install locked pipeline dependencies
+        run: uv sync --locked --project pipeline --python 3.11
+      - name: Authenticate for private restore
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_PARSER_SA }}
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+      - name: Acquire this execution's lock
+        working-directory: pipeline
+        run: uv run --locked python -m nightly acquire
+      - name: Restore only this stage's inputs
+        id: restore
+        working-directory: pipeline
+        run: uv run --locked python -m nightly restore --stage "$STAGE"
+      - name: Install the separate pinned scraper CLI
+        if: inputs.stage == 'legislature' && steps.restore.outputs.needed == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p .private
+          uv run --locked --project pipeline python pipeline/nightly/export_scraper_lock.py \
+            pipeline/vendor/openstates-scrapers/poetry.lock > .private/scraper-requirements.txt
+          uv venv --python 3.11 .private/scraper-venv
+          uv pip sync --python .private/scraper-venv/bin/python --require-hashes \
+            .private/scraper-requirements.txt
+          echo "$GITHUB_WORKSPACE/.private/scraper-venv/bin" >> "$GITHUB_PATH"
+      - name: Run collection or parsing (private diagnostics)
+        if: steps.restore.outputs.needed == 'true'
+        timeout-minutes: 300
+        working-directory: pipeline
+        run: uv run --locked python -m nightly run --stage "$STAGE"
+      # GitHub's OIDC assertion is short-lived. Mint a NEW assertion after
+      # the multi-hour step before uploading data or private diagnostics.
+      - name: Refresh authentication after processing
+        if: always() && steps.restore.outputs.needed == 'true'
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_PARSER_SA }}
+      - name: Save completed stage
+        if: success() && steps.restore.outputs.needed == 'true'
+        working-directory: pipeline
+        run: uv run --locked python -m nightly checkpoint --stage "$STAGE"
+      - name: Save private diagnostics
+        if: always() && steps.restore.outputs.needed == 'true'
+        working-directory: pipeline
+        run: uv run --locked python -m nightly logs --stage "$STAGE"

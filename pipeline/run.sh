@@ -20,6 +20,19 @@ done
 FB_PROJECT="${FB_PROJECT:-badgerpolitics-dev}"
 BUCKET="${BUCKET:-badgerpolitics-prod-snapshots}"
 
+# Cloud-writing laptop runs share the scheduler's lock. --local retains its
+# offline-storage behavior and must still be coordinated with other scrapes.
+if [ "$LOCAL" -eq 0 ]; then
+  nightly_lock_owner="local-$(python -c 'import uuid; print(uuid.uuid4().hex)')"
+  python -m nightly.local_lock acquire --owner "$nightly_lock_owner" --bucket "$BUCKET"
+  release_nightly_lock() {
+    status=$?
+    python -m nightly.local_lock release --owner "$nightly_lock_owner" --bucket "$BUCKET" || status=1
+    exit "$status"
+  }
+  trap release_nightly_lock EXIT
+fi
+
 # --- Phase 1: scrape + import (never run two scrapes concurrently) ---
 python -m scraper.scrape bills            # os-update wi bills --scrape (policy-checked)
 python -m scraper.scrape events           # os-update wi events --scrape

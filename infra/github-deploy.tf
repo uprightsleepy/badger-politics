@@ -41,6 +41,9 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "google.subject"           = "assertion.sub"
     "attribute.repository"     = "assertion.repository"
     "attribute.repository_ref" = "assertion.repository + '@' + assertion.ref"
+    # Separate parser identity: require the named workflow, main, and a
+    # scheduled/manual event. In particular, pull_request_target is excluded.
+    "attribute.parser_workflow" = "assertion.workflow_ref + ':' + assertion.ref + ':' + assertion.event_name"
   }
 
   # First gate: the token must come from this repository. Without this, any

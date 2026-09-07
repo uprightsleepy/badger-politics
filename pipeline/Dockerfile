@@ -1,4 +1,4 @@
-# Pipeline image for the nightly Cloud Run Job (built/deployed in Phase 6).
+# Historical placeholder; the nightly GitHub Actions workflow does not use this image.
 # Needs: Python 3.11 (importer + openstates-scrapers as a pinned CLI dep),
 # Node 20 (astro build, pagefind), firebase-tools, gcloud SDK (gsutil).
 FROM python:3.11-slim

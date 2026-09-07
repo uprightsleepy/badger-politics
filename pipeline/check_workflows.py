@@ -29,7 +29,11 @@ def validate(workflow: dict, name: str) -> list[str]:
             for scope, value in grants.items():
                 if value == "write" and scope != "id-token":
                     errors.append(f"{job_name}: forbidden write permission: {scope}")
-            if grants.get("id-token") == "write" and (untrusted or not job.get("environment")):
+            parser_call = (name == "nightly-parser.yml"
+                           and job.get("uses") == "./.github/workflows/parser-stage.yml")
+            if grants.get("id-token") == "write" and (
+                untrusted or not (job.get("environment") or parser_call)
+            ):
                 errors.append(f"{job_name}: OIDC requires a trusted trigger and environment")
         for step in [job, *job.get("steps", [])]:
             action = step.get("uses", "")
@@ -46,6 +50,30 @@ def validate(workflow: dict, name: str) -> list[str]:
         needs = [needs] if isinstance(needs, str) else needs
         if "validate" not in needs:
             errors.append("deploy must depend on validation of its revision")
+    if name == "nightly-parser.yml":
+        if set(events) != {"schedule", "workflow_dispatch"}:
+            errors.append("nightly parser requires only schedule and workflow_dispatch")
+        concurrency = workflow.get("concurrency", {})
+        if (concurrency.get("group") != "nightly-parser"
+                or str(concurrency.get("cancel-in-progress")).lower() != "false"):
+            errors.append("nightly parser requires a fixed, non-cancelling concurrency group")
+        previous = "validate"
+        for stage in ("legislature", "finance", "community", "federal", "import", "enrich"):
+            job = workflow.get("jobs", {}).get(stage, {})
+            if (job.get("needs") != previous
+                    or job.get("uses") != "./.github/workflows/parser-stage.yml"
+                    or job.get("with", {}).get("stage") != stage):
+                errors.append(f"{stage}: parser stages must use the helper and run sequentially")
+            previous = stage
+    if name == "parser-stage.yml":
+        job = workflow.get("jobs", {}).get("stage", {})
+        if (set(events) != {"workflow_call"} or job.get("environment") != "nightly-parser"
+                or job.get("if") != "github.ref == 'refs/heads/main'"
+                or str(job.get("timeout-minutes")) != "330"):
+            errors.append("parser helper requires main, its environment, and bounded runtime")
+        for step in job.get("steps", []):
+            if step.get("uses", "").startswith(("actions/cache", "actions/upload-artifact")):
+                errors.append("parser data must not enter Actions caches or artifacts")
     return errors
 
 

@@ -1,0 +1,123 @@
+name: nightly parser
+
+on:
+  workflow_dispatch:
+    inputs:
+      resume_run:
+        description: "Failed run ID to resume (same commit; blank starts a new run)"
+        type: string
+        default: ""
+  schedule:
+    - cron: "15 5 * * *"
+      timezone: America/Chicago
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-parser
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    # Manual rehearsal is available before unattended collection is enabled.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' || vars.NIGHTLY_PARSER_ENABLED == 'true')
+    uses: ./.github/workflows/ci.yml
+
+  legislature:
+    needs: validate
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/parser-stage.yml
+    with:
+      stage: legislature
+      resume_run: ${{ inputs.resume_run || '' }}
+
+  finance:
+    needs: legislature
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/parser-stage.yml
+    with:
+      stage: finance
+      resume_run: ${{ inputs.resume_run || '' }}
+
+  community:
+    needs: finance
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/parser-stage.yml
+    with:
+      stage: community
+      resume_run: ${{ inputs.resume_run || '' }}
+
+  federal:
+    needs: community
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/parser-stage.yml
+    with:
+      stage: federal
+      resume_run: ${{ inputs.resume_run || '' }}
+
+  import:
+    needs: federal
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/parser-stage.yml
+    with:
+      stage: import
+      resume_run: ${{ inputs.resume_run || '' }}
+
+  enrich:
+    needs: import
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/parser-stage.yml
+    with:
+      stage: enrich
+      resume_run: ${{ inputs.resume_run || '' }}
+
+  finish:
+    needs: [validate, legislature, finance, community, federal, import, enrich]
+    if: always() && needs.validate.result == 'success'
+    permissions:
+      contents: read
+      id-token: write
+    environment: nightly-parser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NIGHTLY_RUN_ID: ${{ inputs.resume_run || github.run_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: false
+      - run: uv sync --locked --project pipeline --python 3.11
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_PARSER_SA }}
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+      - name: Acquire lock for a retried finish job
+        working-directory: pipeline
+        run: uv run --locked python -m nightly acquire
+      - name: Publish only after final integrity checks
+        if: needs.enrich.result == 'success'
+        working-directory: pipeline
+        run: uv run --locked python -m nightly publish
+      - name: Release this execution's lock
+        if: always()
+        working-directory: pipeline
+        run: uv run --locked python -m nightly release
