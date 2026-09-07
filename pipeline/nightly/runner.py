@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from nightly.archive import MAX_EXPANDED, pack, unpack
+from nightly.finance import months_for, require_complete
 from nightly.stages import READS, SOURCES, STAGES, WRITES
 from nightly.storage import Conflict
 
@@ -27,6 +28,17 @@ def source_path(root: Path, name: str) -> Path:
     return root / "_data" / name
 
 
+def validate_bundle(name: str, ref: dict):
+    obj = ref.get("object", "")
+    if (not obj.startswith((PREFIX + "seed/", PREFIX + "checkpoints/"))
+            or not re.fullmatch(r"[a-zA-Z0-9_./-]+", obj) or ".." in obj.split("/")
+            or not re.fullmatch(r"[0-9]+", str(ref.get("generation", "")))
+            or not re.fullmatch(r"[0-9a-f]{64}", ref.get("sha256", ""))
+            or not 0 < ref.get("bytes", 0) <= MAX_STATE
+            or not 0 <= ref.get("expanded_bytes", -1) <= MAX_EXPANDED):
+        raise ValueError(f"Invalid bundle descriptor: {name}")
+
+
 def validate_manifest(doc: dict):
     if doc.get("version") != 1 or set(doc.get("bundles", {})) - {*SOURCES, "database"}:
         raise ValueError("Unknown checkpoint format or source bundle")
@@ -38,14 +50,7 @@ def validate_manifest(doc: dict):
     ):
         raise ValueError("Missing bill-count baseline; never reset the historical integrity gate")
     for name, ref in doc["bundles"].items():
-        obj = ref.get("object", "")
-        if (not obj.startswith((PREFIX + "seed/", PREFIX + "checkpoints/"))
-                or not re.fullmatch(r"[a-zA-Z0-9_./-]+", obj) or ".." in obj.split("/")
-                or not re.fullmatch(r"[0-9]+", str(ref.get("generation", "")))
-                or not re.fullmatch(r"[0-9a-f]{64}", ref.get("sha256", ""))
-                or not 0 < ref.get("bytes", 0) <= MAX_STATE
-                or not 0 <= ref.get("expanded_bytes", -1) <= MAX_EXPANDED):
-            raise ValueError(f"Invalid bundle descriptor: {name}")
+        validate_bundle(name, ref)
     if sum(ref["bytes"] for name, ref in doc["bundles"].items()
            if name != "database") > MAX_STATE:
         raise ValueError("Compressed source state exceeds 1 GiB budget")
@@ -101,6 +106,43 @@ class Runner:
             raise Conflict("A newer successful run exists; stale checkpoints cannot be resumed")
         return False
 
+    def receipt(self, stage: str) -> dict:
+        return {"stage": stage, "revision": self.revision, "execution": self.execution}
+
+    def log_name(self, stage: str) -> str:
+        return stage
+
+    def finance_plan(self) -> dict:
+        latest, _ = self.store.read_json(LATEST)
+        if latest.get("run_id") == self.run_id:
+            validate_manifest(latest)
+            self.same_run(latest)
+            require_complete(latest)
+            return latest
+        doc = self.load(self.run_prefix + "finance-audit.json")
+        self.same_run(doc)
+        self.current_base(doc)
+        if doc.get("stage") != "finance-audit":
+            raise ValueError("Finance preparation has not completed")
+        months_for(doc)
+        return doc
+
+    def load_finance_month(self, doc: dict, month: str) -> dict:
+        if month not in months_for(doc):
+            raise ValueError("Unexpected finance month")
+        receipt, _ = self.store.read_json(self.run_prefix + f"months/{month}.json")
+        self.same_run(receipt)
+        if (receipt.get("version") != 1 or receipt.get("stage") != "finance-month"
+                or receipt.get("month") != month
+                or receipt.get("base_generation") != doc["base_generation"]
+                or receipt.get("finance_as_of") != doc["finance_as_of"]):
+            raise ValueError("Monthly finance checkpoint does not match this run's plan")
+        ref = receipt["bundle"]
+        validate_bundle("cfis", ref)
+        if not ref["object"].startswith(self.run_prefix + f"months/{month}-"):
+            raise ValueError("Monthly finance bundle belongs to a different month/run")
+        return ref
+
     def restore(self, stage: str) -> bool:
         self.check_lock()
         latest, generation = self.store.read_json(LATEST)
@@ -127,11 +169,21 @@ class Runner:
                 raise ValueError("Checkpoint stages must execute in order")
         else:
             doc = copy.deepcopy(latest)
+            for key in ("snapshot", "completed_at", "finance_completed_months"):
+                doc.pop(key, None)
+            now = datetime.now(UTC)
             doc.update(run_id=self.run_id, revision=self.revision, base_generation=generation,
-                       started_at=datetime.now(UTC).strftime("%Y-%m-%dT%H%M%S"),
+                       started_at=now.strftime("%Y-%m-%dT%H%M%S"),
+                       finance_as_of=now.date().isoformat(),
                        downloaded_bytes=0)
+            months_for(doc)
+        if position > STAGES.index("finance-committees"):
+            require_complete(doc)
+        month_refs = {month: self.load_finance_month(doc, month) for month in months_for(doc)} \
+            if stage == "finance-committees" else {}
         required = READS[stage]
-        download = sum(doc["bundles"][name]["bytes"] for name in required)
+        download = (sum(doc["bundles"][name]["bytes"] for name in required)
+                    + sum(ref["bytes"] for ref in month_refs.values()))
         if doc["downloaded_bytes"] + download > MAX_DOWNLOAD:
             raise ValueError("Projected nightly downloads exceed 50 GiB/month; review shard sizing")
         self.root.joinpath("_data").mkdir(exist_ok=True)
@@ -140,6 +192,11 @@ class Runner:
             target = self.scratch / f"{name}.tar.gz"
             self.store.download(ref, target)
             unpack(target, name, self.root / "_data", ref["expanded_bytes"])
+            target.unlink()
+        for month, ref in month_refs.items():
+            target = self.scratch / f"{month}.tar.gz"
+            self.store.download(ref, target)
+            unpack(target, "cfis", self.scratch / "finance-months" / month, ref["expanded_bytes"])
             target.unlink()
         if "scraper_cache" in required:
             cache = source_path(self.root, "scraper_cache")
@@ -160,16 +217,27 @@ class Runner:
         self.context.write_text(json.dumps(doc), encoding="utf-8")
         return True
 
-    def checkpoint(self, stage: str):
+    def checkpoint_context(self, stage: str) -> dict:
         self.check_lock()
         doc = json.loads(self.context.read_text(encoding="utf-8"))
         self.same_run(doc)
         self.current_base(doc)
         receipt = json.loads((self.scratch / "success.json").read_text(encoding="utf-8"))
-        if receipt != {"stage": stage, "revision": self.revision, "execution": self.execution}:
+        if receipt != self.receipt(stage):
             raise ValueError("Stage did not complete successfully in this execution")
         if doc["stage"] != stage:
             raise ValueError("Stage mismatch")
+        return doc
+
+    def checkpoint(self, stage: str):
+        doc = self.checkpoint_context(stage)
+        if stage == "finance-committees":
+            marker = self.scratch / "finance-complete.json"
+            merged = json.loads(marker.read_text(encoding="utf-8"))
+            if merged != {"run_id": self.run_id, "revision": self.revision,
+                          "months": months_for(doc)}:
+                raise ValueError("Finance merge did not complete every planned month")
+            doc["finance_completed_months"] = months_for(doc)
         for name in WRITES[stage]:
             source = source_path(self.root, name)
             if name == "database":
@@ -210,6 +278,7 @@ class Runner:
             return
         if doc.get("stage") != "enrich":
             raise ValueError("Final integrity stage is incomplete")
+        require_complete(doc)
         ref = doc["snapshot"]
         if (not ref["object"].startswith(self.run_prefix)
                 or not re.fullmatch(r"[0-9]+", ref["generation"])):

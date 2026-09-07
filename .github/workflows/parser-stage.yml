@@ -9,6 +9,13 @@ on:
       resume_run:
         type: string
         default: ""
+      month:
+        type: string
+        default: ""
+    outputs:
+      months:
+        description: "Frozen committee month plan"
+        value: ${{ jobs.stage.outputs.months }}
 
 permissions:
   contents: read
@@ -22,10 +29,13 @@ jobs:
     environment: nightly-parser
     runs-on: ubuntu-24.04
     timeout-minutes: 330
+    outputs:
+      months: ${{ steps.plan.outputs.months }}
     env:
       STAGE: ${{ inputs.stage }}
       NIGHTLY_RUN_ID: ${{ inputs.resume_run || github.run_id }}
       CYCLE: "2026"
+      FINANCE_MONTH: ${{ inputs.month }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -44,7 +54,7 @@ jobs:
       - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
       - name: Acquire this execution's lock
         working-directory: pipeline
-        run: uv run --locked python -m nightly acquire
+        run: uv run --locked python -m nightly acquire --stage "$STAGE"
       - name: Restore only this stage's inputs
         id: restore
         working-directory: pipeline
@@ -81,3 +91,8 @@ jobs:
         if: always() && steps.restore.outputs.needed == 'true'
         working-directory: pipeline
         run: uv run --locked python -m nightly logs --stage "$STAGE"
+      - name: Plan sequential committee collection
+        id: plan
+        if: success() && inputs.stage == 'finance-audit'
+        working-directory: pipeline
+        run: uv run --locked python -m nightly finance-plan

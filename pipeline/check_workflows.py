@@ -8,6 +8,8 @@ from pathlib import Path
 
 import yaml
 
+from nightly.stages import STAGES
+
 PIN = re.compile(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}")
 
 
@@ -58,13 +60,29 @@ def validate(workflow: dict, name: str) -> list[str]:
                 or str(concurrency.get("cancel-in-progress")).lower() != "false"):
             errors.append("nightly parser requires a fixed, non-cancelling concurrency group")
         previous = "validate"
-        for stage in ("legislature", "finance", "community", "federal", "import", "enrich"):
+        for stage in STAGES:
+            if stage == "finance-committees":
+                previous = "finance-months"
             job = workflow.get("jobs", {}).get(stage, {})
             if (job.get("needs") != previous
                     or job.get("uses") != "./.github/workflows/parser-stage.yml"
                     or job.get("with", {}).get("stage") != stage):
                 errors.append(f"{stage}: parser stages must use the helper and run sequentially")
             previous = stage
+        months = workflow.get("jobs", {}).get("finance-months", {})
+        strategy = months.get("strategy", {})
+        if (months.get("needs") != "finance-audit"
+                or months.get("uses") != "./.github/workflows/parser-stage.yml"
+                or months.get("with", {}).get("stage") != "finance-month"
+                or months.get("with", {}).get("month") != "${{ matrix.month }}"
+                or str(strategy.get("max-parallel")) != "1"
+                or str(strategy.get("fail-fast")).lower() != "true"
+                or strategy.get("matrix") != {
+                    "month": "${{ fromJSON(needs.finance-audit.outputs.months) }}"}):
+            errors.append("finance-months: require the complete frozen matrix, one job at a time")
+        finish = workflow.get("jobs", {}).get("finish", {})
+        if set(finish.get("needs", [])) != {"validate", "finance-months", *STAGES}:
+            errors.append("finish: must await every parser job before releasing the lock")
     if name == "parser-stage.yml":
         job = workflow.get("jobs", {}).get("stage", {})
         if (set(events) != {"workflow_call"} or job.get("environment") != "nightly-parser"
