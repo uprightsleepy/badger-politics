@@ -205,11 +205,14 @@ class SourceAccess:
         return host, policy
 
     def after_response(self, host: str, response: requests.Response) -> None:
-        # Stop this process rather than risking retries before Retry-After or
-        # GitHub's reset time. Cached policy approval cannot override a denial.
+        # A successful response with Retry-After: 0 asks for no additional delay.
+        retry_after = response.headers.get("Retry-After")
+        retry_required = retry_after is not None and not (
+            200 <= response.status_code < 300 and re.fullmatch(r"[ \t]*0+[ \t]*", retry_after)
+        )
         if response.status_code in (401, 403, 429) or response.headers.get(
             "X-RateLimit-Remaining"
-        ) == "0" or "Retry-After" in response.headers:
+        ) == "0" or retry_required:
             self.stopped.add(host)
             raise SourceAccessError(
                 f"Collection stopped for {host} (HTTP {response.status_code}); "

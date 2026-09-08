@@ -76,6 +76,63 @@ def test_checks_robots_once_and_paces_across_sessions(network):
     assert all(call[3]["verify"] is True for call in calls)
 
 
+@pytest.mark.parametrize("retry_after", ["0", "000", " \t0\t "])
+def test_zero_retry_after_keeps_response_content_and_source_pacing(network, retry_after):
+    access, calls, state, _ = network
+    headers = {"Retry-After": retry_after}
+    state["robots_responses"] = [(200, headers, ROBOTS)]
+    state["records"] = [(200, headers), (200, headers)]
+    assert http.session().get(URL).text == "ok"
+    assert http.session().get(URL).text == "ok"
+    assert [call[0] for call in calls] == [f"https://{HOST}/robots.txt", URL, URL]
+    assert [call[1] for call in calls] == [0, 10, 20]
+    assert HOST in access.checked
+    assert access.stopped == set()
+
+
+@pytest.mark.parametrize("target", ["robots_responses", "records"])
+@pytest.mark.parametrize("status,headers", [
+    (401, {"Retry-After": "0"}), (403, {"Retry-After": "0"}),
+    (429, {"Retry-After": "0"}), (503, {"Retry-After": "0"}),
+    (302, {"Retry-After": "0", "Location": URL}),
+    (200, {"Retry-After": "0", "X-RateLimit-Remaining": "0"}),
+])
+def test_zero_retry_after_does_not_override_denials_or_retry_errors(
+    network, target, status, headers,
+):
+    access, calls, state, _ = network
+    state[target] = [
+        (status, headers, ROBOTS) if target == "robots_responses" else (status, headers),
+    ]
+    with pytest.raises(SourceAccessError):
+        http.session().get(URL)
+    with pytest.raises(SourceAccessError, match="stopped"):
+        http.session().get(URL)
+    assert len(calls) == (1 if target == "robots_responses" else 2)
+    assert HOST in access.stopped
+
+
+@pytest.mark.parametrize("retry_after", [
+    "120", "", "-1", "+0", "0.0", "0, 120", "later", "Fri, 31 Dec 2099 23:59:59 GMT",
+])
+def test_retry_delays_and_unrecognized_values_stop_before_records(network, retry_after):
+    access, calls, state, _ = network
+    state["robots_responses"] = [(200, {"Retry-After": retry_after}, ROBOTS)]
+    with pytest.raises(SourceAccessError):
+        http.session().get(URL)
+    assert len(calls) == 1
+    assert access.checked == {}
+
+
+def test_zero_retry_after_still_requires_the_reviewed_robots_content(network):
+    access, calls, state, _ = network
+    state["robots_responses"] = [(200, {"Retry-After": "0"}, "User-agent: *\nDisallow: /\n")]
+    with pytest.raises(SourceAccessError, match="Robots directives changed"):
+        http.session().get(URL)
+    assert len(calls) == 1
+    assert access.checked == {}
+
+
 @pytest.mark.parametrize("status,body", [
     (200, "User-agent: *\nDisallow: /\n"),
     (200, "<html>Access denied</html>"),
@@ -119,7 +176,7 @@ def test_exhausted_robots_retries_fail_closed(network, failure, message):
 
 @pytest.mark.parametrize("status,headers", [
     (401, {}), (403, {}), (429, {}), (503, {"Retry-After": "120"}),
-    (200, {"Retry-After": "0"}), (200, {"X-RateLimit-Remaining": "0"}),
+    (200, {"Retry-After": "120"}), (200, {"X-RateLimit-Remaining": "0"}),
     (302, {"Location": "/robots.txt", "Retry-After": "120"}),
 ])
 def test_robots_access_and_rate_limits_stop_the_source_without_retry(network, status, headers):

@@ -18,10 +18,11 @@ nightly parser uses the daily policy job's matching checks for up to 24 hours.
 Local commands without `SOURCE_POLICY_REPORT` check live robots.txt and cache
 successful checks in memory for one hour. New directives, changed responses,
 unavailable policies, and unreviewed URLs stop collection.
-HTTP 401/403/429, exhausted API limits, and
-Retry-After stop the source for the rest of the process; wait until the published
-reset before restarting. GET gateway failures have three paced retries. POSTs
-are limited to the read-only Legistar pagination forms and are never retried.
+HTTP 401/403/429, exhausted API limits, and nonzero or unrecognized Retry-After
+values stop the source for the rest of the process; wait until the published
+reset before restarting. A successful 2xx response with a valid zero-second
+Retry-After keeps normal source pacing. GET gateway failures have three paced
+retries. POSTs are limited to read-only Legistar pagination and are never retried.
 
 This is a scoped access review, not a blanket reuse license. Check the linked
 terms again before changing retrieval or reuse, and periodically during operation.
@@ -50,7 +51,7 @@ absolute path through `SOURCE_POLICY_REPORT`, including to the upstream CLI.
 Configured reports are mandatory; there is no automatic live-check fallback.
 Expiry is checked before every record request, including after pacing waits.
 The first request in each collector still observes the source interval, and
-live access denials, Retry-After, and rate limits still stop the source.
+live access denials, retry delays, and exhausted rate limits still stop the source.
 See [scheduling and activation](../../docs/nightly-parser-hosting.md#daily-policy-job).
 
 | Source / collector | Robots result and current decision | Terms / permitted scope |
@@ -83,8 +84,8 @@ unexpected response remains unconfirmed. Raw diagnostics stay private.
 Robots checks retry only connection/timeouts and HTTP 502/503/504, up to three
 times with 30/60/120-second waits (or the source's interval if longer). No record
 request is sent until the live response passes the existing policy checks.
-TLS failures, 401/403/429, Retry-After, exhausted limits, changed fingerprints,
-and unexpected redirects still stop collection. Same-origin robots redirects
+TLS failures, 401/403/429, nonzero or unrecognized Retry-After, exhausted limits,
+changed fingerprints, and unexpected redirects still stop collection. Same-origin robots redirects
 respect the source interval. Failure messages include the status received and
 expected, or the transport error type and number of attempts.
 
@@ -111,6 +112,17 @@ council, district, and current-member pages display a missed-refresh notice.
 Votes and other records still refresh and pass the existing integrity gates.
 Profile output is replaced atomically only after West Allis succeeds. No source
 denial is retried or suppressed, and no paid resource is added.
+
+## Zero-second retry headers (2026-09-08)
+
+The initial daily policy job stopped on West Allis with HTTP 200. A subsequent
+single robots review returned the existing fingerprint and `Retry-After: 0`.
+[RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#section-10.2.3) defines this
+value as a delay in seconds, so zero adds no wait. Successful 2xx responses now
+accept that value while retaining the configured request interval. Access denials,
+exhausted limits, error/redirect responses with Retry-After, and nonzero or malformed
+values still stop collection. Policy fingerprints and source permissions are unchanged.
+The nightly runner must produce a fresh successful report before collection resumes.
 
 ## Nightly finance windowing (2026-09-07)
 
