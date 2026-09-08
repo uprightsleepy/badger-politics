@@ -46,11 +46,17 @@ def network(monkeypatch):
         0, clock[0] + seconds
     ))
     calls = []
-    state = {"robots": ROBOTS, "robots_status": 200, "records": []}
+    state = {"robots": ROBOTS, "robots_status": 200, "robots_responses": [], "records": []}
 
     def send(adapter, request, **kwargs):
         calls.append((request.url, clock[0], request.headers["User-Agent"], kwargs))
         if request.url.endswith("/robots.txt"):
+            if state["robots_responses"]:
+                item = state["robots_responses"].pop(0)
+                if isinstance(item, Exception):
+                    raise item
+                status, headers, body = item
+                return response(request, status, body, headers)
             return response(request, state["robots_status"], state["robots"])
         if state["records"]:
             status, headers = state["records"].pop(0)
@@ -73,7 +79,7 @@ def test_checks_robots_once_and_paces_across_sessions(network):
 @pytest.mark.parametrize("status,body", [
     (200, "User-agent: *\nDisallow: /\n"),
     (200, "<html>Access denied</html>"),
-    (403, "Forbidden"), (429, "Slow down"), (503, "Unavailable"),
+    (403, "Forbidden"), (429, "Slow down"),
     (404, "Not found"),
 ])
 def test_changed_or_unavailable_robots_never_fetches_records(network, status, body):
@@ -82,6 +88,121 @@ def test_changed_or_unavailable_robots_never_fetches_records(network, status, bo
     with pytest.raises(SourceAccessError):
         http.session().get(URL)
     assert [call[0] for call in calls] == [f"https://{HOST}/robots.txt"]
+
+
+@pytest.mark.parametrize("failure", [
+    requests.ConnectTimeout(), requests.ReadTimeout(), requests.ConnectionError(),
+    (502, {}, "Bad gateway"), (503, {}, "Unavailable"), (504, {}, "Gateway timeout"),
+])
+def test_temporary_robots_failure_requires_successful_policy_check_before_records(network, failure):
+    access, calls, state, _ = network
+    state["robots_responses"] = [failure]
+    assert http.session().get(URL).status_code == 200
+    assert [call[0] for call in calls] == [f"https://{HOST}/robots.txt"] * 2 + [URL]
+    assert [call[1] for call in calls] == [0, 30, 40]
+    assert HOST in access.checked
+
+
+@pytest.mark.parametrize("failure,message", [
+    (requests.ConnectTimeout(), "ConnectTimeout, 4 attempts"),
+    ((503, {}, "Unavailable"), "HTTP 503, expected 200"),
+])
+def test_exhausted_robots_retries_fail_closed(network, failure, message):
+    access, calls, state, _ = network
+    state["robots_responses"] = [failure] * 4
+    with pytest.raises(SourceAccessError, match=message):
+        http.session().get(URL)
+    assert [call[0] for call in calls] == [f"https://{HOST}/robots.txt"] * 4
+    assert [call[1] for call in calls] == [0, 30, 90, 210]
+    assert access.checked == {}
+
+
+@pytest.mark.parametrize("status,headers", [
+    (401, {}), (403, {}), (429, {}), (503, {"Retry-After": "120"}),
+    (200, {"Retry-After": "0"}), (200, {"X-RateLimit-Remaining": "0"}),
+    (302, {"Location": "/robots.txt", "Retry-After": "120"}),
+])
+def test_robots_access_and_rate_limits_stop_the_source_without_retry(network, status, headers):
+    access, calls, state, _ = network
+    state["robots_responses"] = [(status, headers, ROBOTS)]
+    with pytest.raises(SourceAccessError, match=f"HTTP {status}"):
+        http.session().get(URL)
+    with pytest.raises(SourceAccessError, match="Collection stopped"):
+        http.session().get(URL)
+    assert len(calls) == 1
+    assert access.checked == {}
+
+
+@pytest.mark.parametrize("error", [
+    requests.exceptions.SSLError(), requests.exceptions.InvalidURL(),
+])
+def test_robots_tls_and_nontransport_errors_are_not_retried(network, error):
+    access, calls, state, _ = network
+    state["robots_responses"] = [error]
+    with pytest.raises(SourceAccessError, match=type(error).__name__):
+        http.session().get(URL)
+    assert len(calls) == 1
+    assert access.checked == {}
+
+
+def test_changed_policy_after_gateway_recovery_still_blocks_records(network):
+    access, calls, state, _ = network
+    state["robots_responses"] = [(503, {}, "Unavailable"), (200, {}, "Disallow: /\n")]
+    with pytest.raises(SourceAccessError, match="Robots directives changed"):
+        http.session().get(URL)
+    assert len(calls) == 2
+    assert access.checked == {}
+
+
+def test_robots_retry_observes_a_longer_source_interval(network):
+    access, calls, state, _ = network
+    access.policies[HOST]["delay_seconds"] = 60
+    state["robots_responses"] = [(502, {}, "Bad gateway")]
+    assert http.session().get(URL).status_code == 200
+    assert [call[1] for call in calls] == [0, 60, 120]
+
+
+def test_robots_redirect_hops_are_paced_and_still_require_reviewed_content(network):
+    _, calls, state, _ = network
+    state["robots_responses"] = [(302, {"Location": "/robots.txt"}, "")]
+    assert http.session().get(URL).status_code == 200
+    assert [call[1] for call in calls] == [0, 10, 20]
+
+
+@pytest.mark.parametrize("location", ["https://example.test/robots.txt", f"http://{HOST}/robots.txt"])
+def test_robots_redirect_cannot_change_origin_or_disable_tls(network, location):
+    access, calls, state, _ = network
+    state["robots_responses"] = [(302, {"Location": location}, "")]
+    with pytest.raises(SourceAccessError, match="Unreviewed robots redirect"):
+        http.session().get(URL)
+    assert len(calls) == 1
+    assert access.checked == {}
+
+
+@pytest.mark.parametrize("failed_city", ["milwaukee", "westalliswi"])
+def test_profile_policy_failure_preserves_archive(tmp_path, monkeypatch, failed_city):
+    from scraper import fetch_local_profiles
+
+    archive = tmp_path / "profiles.json"
+    original = b'{"milwaukee":{"seats":{"1":{"photos":[]}}},"westalliswi":{"districts":{}}}'
+    archive.write_bytes(original)
+    monkeypatch.setattr(fetch_local_profiles, "OUT", archive)
+    monkeypatch.setattr(fetch_local_profiles, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(fetch_local_profiles, "http_session", lambda: object())
+
+    def district(city, n):
+        if city == failed_city and n == 2:
+            raise SourceAccessError("Robots response changed")
+        return {"photos": [], "entries": []}
+
+    monkeypatch.setattr(fetch_local_profiles, "milwaukee_district",
+                        lambda http, n, delay: district("milwaukee", n))
+    monkeypatch.setattr(fetch_local_profiles, "west_allis_district",
+                        lambda http, n, delay: district("westalliswi", n))
+    with pytest.raises(SourceAccessError):
+        fetch_local_profiles.main([])
+    assert archive.read_bytes() == original
+    assert list(tmp_path.iterdir()) == [archive]
 
 
 def test_policy_refresh_blocks_mid_run_change(network):

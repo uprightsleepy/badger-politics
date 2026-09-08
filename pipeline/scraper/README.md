@@ -43,6 +43,26 @@ No new paid service or dependency is required.
 | Boundary utilities | [LTSB ArcGIS host](https://services1.arcgis.com/robots.txt) returned 403; [Milwaukee maps](https://milwaukeemaps.milwaukee.gov/robots.txt) disallows general crawlers. New requests are **paused**; committed boundaries/local caches remain. | [Milwaukee open data](https://data.milwaukee.gov/) resource files may be an alternative, but `/api/` is robots-disallowed. No active downloader exists for that host or West Allis GIS; review individual dataset terms before adding one. |
 | Organization logos | `fetch-logos.mjs` now performs **no network requests**. Existing assets/monogram fallback remain. | The former homepage checks lacked individual robots/terms reviews. The logo.dev terms recheck could not be completed (429). Review provider API/caching/attribution terms and each identity-verification source before restoring. |
 
+## Robots transport recovery (2026-09-08)
+
+The nightly community stage stopped on a Legislature robots connection timeout,
+then on an unexpected Milwaukee robots response. A fresh check of
+[Milwaukee robots](https://city.milwaukee.gov/robots.txt), using the pipeline's
+identifying User-Agent, returned HTTP 200 and the existing reviewed fingerprint.
+The [disclaimer](https://city.milwaukee.gov/Information-and-Services/webpolicies/DisclaimerofLiabilit)
+and [privacy policy](https://city.milwaukee.gov/Information-and-Services/webpolicies/Privacy)
+were rechecked; the existing district-page scope and exclusions remain unchanged.
+The failed runner did not record its response status, so the cause of that
+unexpected response remains unconfirmed. Raw diagnostics stay private.
+
+Robots checks retry only connection/timeouts and HTTP 502/503/504, up to three
+times with 30/60/120-second waits (or the source's interval if longer). No record
+request is sent until the live response passes the existing policy checks.
+TLS failures, 401/403/429, Retry-After, exhausted limits, changed fingerprints,
+and unexpected redirects still stop collection. Same-origin robots redirects
+respect the source interval. Failure messages include the status received and
+expected, or the transport error type and number of attempts.
+
 ## Nightly finance windowing (2026-09-07)
 
 The CFIS [robots file](https://campaignfinance.wi.gov/robots.txt) was rechecked
