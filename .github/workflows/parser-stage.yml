@@ -36,6 +36,7 @@ jobs:
       NIGHTLY_RUN_ID: ${{ inputs.resume_run || github.run_id }}
       CYCLE: "2026"
       FINANCE_MONTH: ${{ inputs.month }}
+      SOURCE_POLICY_REPORT: ${{ github.workspace }}/.private/policies/report.json
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -59,6 +60,10 @@ jobs:
         id: restore
         working-directory: pipeline
         run: uv run --locked python -m nightly restore --stage "$STAGE"
+      - name: Restore checked source policies
+        if: steps.restore.outputs.needed == 'true'
+        working-directory: pipeline
+        run: uv run --locked python -m nightly.policies restore
       - name: Install the separate pinned scraper CLI
         if: inputs.stage == 'legislature' && steps.restore.outputs.needed == 'true'
         run: |

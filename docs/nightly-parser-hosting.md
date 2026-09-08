@@ -227,6 +227,42 @@ processing step has a five-hour deadline. A single stage that exceeds this
 needs a smaller supported source/date boundary. There is no parallel
 scraping and no reduction in source pacing.
 
+### Daily policy job
+
+The same trusted workflow has a separate policy-only run at 04:15
+`America/Chicago`; collection remains at 05:15. Both schedules use
+`NIGHTLY_PARSER_ENABLED`, the workflow concurrency group, and the existing GCS
+execution lock. The policy job checks robots responses without downloading
+records, importing data, or publishing a snapshot. Its processing limit is
+20 minutes; an interrupted check remains unusable until refreshed successfully.
+
+Before the first parser run after merging this change, dispatch **nightly parser**
+on `main` with **policy_only = true** and wait for it to pass. Then dispatch it
+with **policy_only = false** and **resume_run blank**. The Actions run titles
+distinguish `source policy checks` from `nightly parser`.
+
+Each parser stage reads the newest private report from
+`parser-state/checkpoints/policies/`. Every active source must match the current
+policy configuration and have a successful check less than 24 hours old.
+Reports carry pending/failed results as well as successes; readers never fall
+back to an older success. Individual requests also enforce expiry, reviewed
+paths, pacing, and live access/rate-limit responses. See the
+[source policy details](../pipeline/scraper/README.md#shared-daily-checks-2026-09-08).
+
+If a report is missing or expired, run the policy-only job before resuming a
+failed parser. Changed directives or access denials require review; do not edit
+report timestamps or fingerprints to force a pass. Paused sources remain paused,
+and the separate archived-profile rules continue to preserve Milwaukee data.
+
+This reuses the existing identity and append-only checkpoint permissions, with
+no IAM or paid-resource changes. At a conservative 20 KiB per report and two
+reports/day, seven live plus seven soft-delete days use under 1 MiB. Even 40
+parser stages/day downloading a report add under 25 MiB/month. Including listing,
+metadata reads and uploads, the incremental storage/API allowance is under
+$0.02/month at [Cloud Storage's rates](https://cloud.google.com/storage/pricing)
+before free allowances. Source archives,
+SQLite snapshots, and their integrity gates are unchanged.
+
 Finance rebuilds the legislative database for committee matching. Its inputs
 include historical session rosters and legacy service records, which are
 required for historical attribution and the curated term-event checks.
@@ -341,12 +377,14 @@ count baseline and the offline source archive.
    copy; never commit or upload them as Actions artifacts. The parser
    service account deliberately cannot create or replace the seed.
 3. Merge through normal required CI and code-owner review, then manually
-   dispatch `nightly-parser.yml` on `main`. Check stage durations, source
+   dispatch `nightly-parser.yml` on `main` with `policy_only=true`. After that
+   passes, dispatch with `policy_only=false`. Check stage durations, source
    policies, private diagnostics, transferred bytes, and the final snapshot.
    A missing/changed source policy fails closed. Production hosting is not
    automatically released by this workflow.
 4. After a successful rehearsal and combined cost review, set
-   `NIGHTLY_PARSER_ENABLED=true`. The schedule is 05:15 `America/Chicago`.
+   `NIGHTLY_PARSER_ENABLED=true`. Policy checks run at 04:15 and collection
+   at 05:15 `America/Chicago`.
    GitHub may delay/drop scheduled runs and disables public schedules after
    60 days without repository activity. Use GitHub failure notifications and
    inspect `latest.json`'s `completed_at` for freshness. Clear the variable

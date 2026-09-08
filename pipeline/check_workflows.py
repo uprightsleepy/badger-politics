@@ -59,6 +59,31 @@ def validate(workflow: dict, name: str) -> list[str]:
         if (concurrency.get("group") != "nightly-parser"
                 or str(concurrency.get("cancel-in-progress")).lower() != "false"):
             errors.append("nightly parser requires a fixed, non-cancelling concurrency group")
+        schedules = events.get("schedule", []) if isinstance(events, dict) else []
+        if schedules != [
+            {"cron": "15 4 * * *", "timezone": "America/Chicago"},
+            {"cron": "15 5 * * *", "timezone": "America/Chicago"},
+        ]:
+            errors.append("nightly parser requires separate daily policy and parser schedules")
+        policies = workflow.get("jobs", {}).get("policies", {})
+        policy_trigger = "inputs.policy_only || github.event.schedule == '15 4 * * *'"
+        if (policies.get("needs") != "validate" or policies.get("environment") != "nightly-parser"
+                or policies.get("if") != policy_trigger
+                or str(policies.get("timeout-minutes")) != "30"):
+            errors.append("policies: require validation, environment, and a policy-only trigger")
+        policy_steps = policies.get("steps", [])
+        for command in ("acquire", "policies refresh", "release"):
+            invocation = "nightly.policies refresh" if command == "policies refresh" else (
+                f"nightly {command}")
+            matches = [s for s in policy_steps
+                       if s.get("run") == f"uv run --locked python -m {invocation}"]
+            if len(matches) != 1 or (command == "release" and matches[0].get("if") != "always()"):
+                errors.append("policies: require the lock, refresh, and unconditional release")
+        legislature = workflow.get("jobs", {}).get("legislature", {})
+        if legislature.get("if") != (
+            "${{ !inputs.policy_only && github.event.schedule != '15 4 * * *' }}"
+        ):
+            errors.append("legislature: must not collect records during a policy-only run")
         previous = "validate"
         for stage in STAGES:
             if stage == "finance-committees":
@@ -83,12 +108,30 @@ def validate(workflow: dict, name: str) -> list[str]:
         finish = workflow.get("jobs", {}).get("finish", {})
         if set(finish.get("needs", [])) != {"validate", "finance-months", *STAGES}:
             errors.append("finish: must await every parser job before releasing the lock")
+        if finish.get("if") != (
+            "always() && needs.validate.result == 'success'"
+            " && needs.legislature.result != 'skipped'"
+        ):
+            errors.append("finish: must not publish or acquire a lock during policy-only runs")
     if name == "parser-stage.yml":
         job = workflow.get("jobs", {}).get("stage", {})
         if (set(events) != {"workflow_call"} or job.get("environment") != "nightly-parser"
                 or job.get("if") != "github.ref == 'refs/heads/main'"
                 or str(job.get("timeout-minutes")) != "330"):
             errors.append("parser helper requires main, its environment, and bounded runtime")
+        if job.get("env", {}).get("SOURCE_POLICY_REPORT") != (
+            "${{ github.workspace }}/.private/policies/report.json"
+        ):
+            errors.append("parser helper requires a private shared policy report")
+        steps = job.get("steps", [])
+        policy_indices = [i for i, s in enumerate(steps)
+                          if s.get("run") == "uv run --locked python -m nightly.policies restore"]
+        run_indices = [i for i, s in enumerate(steps)
+                       if s.get("name") == "Run collection or parsing (private diagnostics)"]
+        if (len(policy_indices) != 1 or len(run_indices) != 1
+                or policy_indices[0] >= run_indices[0]
+                or steps[policy_indices[0]].get("if") != "steps.restore.outputs.needed == 'true'"):
+            errors.append("parser helper must restore policy checks before collection")
         for step in job.get("steps", []):
             if step.get("uses", "").startswith(("actions/cache", "actions/upload-artifact")):
                 errors.append("parser data must not enter Actions caches or artifacts")

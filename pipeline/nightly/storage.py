@@ -60,6 +60,18 @@ class GCS:
     def metadata(self, name: str) -> dict:
         return self.request("GET", f"{self.base}/{quote(name, safe='')}").json()
 
+    def list_names(self, prefix: str) -> list[str]:
+        names = []
+        params = {"prefix": prefix, "maxResults": 1000, "fields": "items(name),nextPageToken"}
+        for _ in range(10):
+            result = self.request("GET", self.base, params=params).json()
+            names.extend(item["name"] for item in result.get("items", []))
+            token = result.get("nextPageToken")
+            if not token:
+                return names
+            params["pageToken"] = token
+        raise StorageError("Policy report listing exceeds its limit")
+
     def read_json(self, name: str) -> tuple[dict, str]:
         meta = self.metadata(name)
         with self.request("GET", f"{self.base}/{quote(name, safe='')}",
