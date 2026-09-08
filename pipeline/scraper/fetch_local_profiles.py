@@ -1,17 +1,12 @@
 """Official portraits and office contacts for council members, from each
-city's own web pages.
+city's own web pages. Paused Milwaukee retrieval retains the complete archive
+and records its freshness separately from the council's voting records.
 
 Usage: python -m scraper.fetch_local_profiles [--delay S]
 
-Legistar carries no photos, and Milwaukee's person records carry no
-contacts, so these come from the pages the cities publish per district:
-city.milwaukee.gov's Common Council district pages and westalliswi.gov's
-district pages (both allow crawling in robots.txt; twenty small requests
-a night). This fetcher only captures what each page shows, keyed by
-district. The importer attributes a capture to a member under an exact
-rule (the photo's own alt text names the district; the heading above a
-West Allis portrait is the curated name), and anything that does not
-match stays unattributed.
+West Allis district pages refresh normally. Retained Milwaukee profiles carry
+their archived member identities so a replacement member cannot inherit an
+old portrait or contact. Imports keep the existing exact attribution rules.
 """
 
 from __future__ import annotations
@@ -22,17 +17,21 @@ import json
 import re
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
 from lxml import html as lxml_html
 
+from importer.import_local import milwaukee_profile_owners
 from scraper.http import session as http_session
+from scraper.source_access import ACCESS
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "local"
 OUT = DATA_DIR / "profiles.json"
 
 MKE_BASE = "https://city.milwaukee.gov"
+MKE_DISTRICTS = range(1, 16)
 # the city uses both spellings across its district pages
 MKE_PATHS = (
     "/CommonCouncil/Council-Members/District{n}",
@@ -114,22 +113,67 @@ def west_allis_district(http: requests.Session, n: int, delay: float) -> dict:
     return {"page": url, "entries": entries}
 
 
+def retained_milwaukee(profiles: dict) -> dict:
+    """A paused source needs every archived district; never substitute an empty profile."""
+    archived = profiles.get("milwaukee")
+    seats = archived.get("seats") if isinstance(archived, dict) else None
+    if not isinstance(seats, dict) or not {str(n) for n in MKE_DISTRICTS} <= seats.keys():
+        raise RuntimeError("Paused Milwaukee profiles require a complete existing archive")
+    for n in MKE_DISTRICTS:
+        page = seats[str(n)]
+        if (not isinstance(page, dict)
+                or page.get("page") not in {MKE_BASE + p.format(n=n) for p in MKE_PATHS}
+                or not isinstance(page.get("photos"), list)
+                or any(not isinstance(photo, dict)
+                       or not all(isinstance(photo.get(k), str) for k in ("src", "alt"))
+                       for photo in page["photos"])
+                or any(not isinstance(page.get(k), list)
+                       or not all(isinstance(value, str) for value in page[k])
+                       for k in ("mailto", "tel"))):
+            raise RuntimeError(f"Invalid archived Milwaukee profile for district {n}")
+    return archived
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--delay", type=float, default=0.5)
     ns = parser.parse_args(argv)
+    profiles = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {}
+    if not isinstance(profiles, dict) or not isinstance(profiles.get("_refresh", {}), dict):
+        raise RuntimeError("Invalid local profile archive")
+    refresh = profiles.setdefault("_refresh", {})
     http = http_session()
-    profiles = {"milwaukee": {"seats": {}}, "westalliswi": {"districts": {}}}
-    for n in range(1, 16):
-        found = milwaukee_district(http, n, ns.delay)
-        if found is None:
-            print(f"milwaukee district {n}: no page at either path", file=sys.stderr)
-            continue
-        profiles["milwaukee"]["seats"][str(n)] = found
+    if ACCESS.policies["city.milwaukee.gov"].get("paused"):
+        profiles["milwaukee"] = retained_milwaukee(profiles)
+        previous = refresh.get("milwaukee", {})
+        refresh["milwaukee"] = {
+            "state": "retained",
+            "last_success_at": previous.get("last_success_at"),
+            "person_ids": previous["person_ids"] if previous.get("state") == "retained"
+                else milwaukee_profile_owners(DATA_DIR),
+        }
+        print("Milwaukee profiles paused; retained all archived districts", file=sys.stderr)
+    else:
+        profiles["milwaukee"] = {"seats": {}}
+        for n in MKE_DISTRICTS:
+            found = milwaukee_district(http, n, ns.delay)
+            if found is None:
+                print(f"milwaukee district {n}: no page at either path", file=sys.stderr)
+                continue
+            profiles["milwaukee"]["seats"][str(n)] = found
+        refresh["milwaukee"] = {
+            "state": "refreshed", "last_success_at": datetime.now(UTC).isoformat(),
+        }
+    profiles["westalliswi"] = {"districts": {}}
     for n in WA_PAGES:
         profiles["westalliswi"]["districts"][str(n)] = west_allis_district(http, n, ns.delay)
+    refresh["westalliswi"] = {
+        "state": "refreshed", "last_success_at": datetime.now(UTC).isoformat(),
+    }
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(profiles, indent=1), encoding="utf-8")
+    pending = OUT.with_suffix(".json.tmp")
+    pending.write_text(json.dumps(profiles, indent=1), encoding="utf-8")
+    pending.replace(OUT)
     mke = sum(len(s["photos"]) for s in profiles["milwaukee"]["seats"].values())
     wa = sum(1 for d in profiles["westalliswi"]["districts"].values()
              for e in d["entries"] if e["image"])

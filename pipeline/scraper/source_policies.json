@@ -151,6 +151,7 @@
       }
     },
     "city.milwaukee.gov": {
+      "paused": "Council profile retrieval received HTTP 403 from the nightly runner on 2026-09-08; clarify access before resuming. Preserve the existing profile archive offline.",
       "paths": {
         "GET": [
           "/CommonCouncil/(?:Council-Members|CouncilMembers)/District\\d+/?"

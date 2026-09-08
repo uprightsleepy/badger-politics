@@ -36,7 +36,7 @@ No new paid service or dependency is required.
 | OpenStates people/committees; congressional roster | Robots returned 404 on [api.github.com](https://api.github.com/robots.txt), [raw.githubusercontent.com](https://raw.githubusercontent.com/robots.txt), and [unitedstates.github.io](https://unitedstates.github.io/robots.txt). Only the specific roster repositories/paths are enabled, minimum 1 second/request. | [GitHub API terms](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service#h-api-terms), [rate handling](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#handle-rate-limit-errors-appropriately), [people license](https://github.com/openstates/people/blob/main/LICENSE), [congress roster dedication](https://github.com/unitedstates/congress-legislators#public-domain). CC0/public-domain roster data; no unrelated GitHub user data. |
 | Federal roll calls | [House robots](https://clerk.house.gov/robots.txt) returns 404. [Senate robots](https://www.senate.gov/robots.txt) redirects to its specific `file_not_found.htm` page; this known missing response is recorded explicitly, not interpreted as an allow-all file. XML paths only, minimum 1 second/request. | [House rights/reproductions](https://clerk.house.gov/PrivacyPolicy), [Senate XML publication](https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_119_2.htm), [Senate privacy policy](https://www.senate.gov/general/privacy.htm). Attribute factual voting records; no photos, broadcast footage, endorsements, or campaign advertising. |
 | Milwaukee / West Allis council records | Robots returns 404 on [Web API](https://webapi.legistar.com/robots.txt), [Milwaukee InSite](https://milwaukee.legistar.com/robots.txt), [West Allis InSite](https://westalliswi.legistar.com/robots.txt). Reviewed public tenant API and meeting/department pagination only, minimum 1 second/request. | [Published API](https://webapi.legistar.com/Help), [Milwaukee policies](https://city.milwaukee.gov/Information-and-Services/webpolicies). Public meeting/vote facts and source links; no login, unpublished tenants, video or attachments collection. |
-| Council profile pages | [Milwaukee robots](https://city.milwaukee.gov/robots.txt) allows district pages but disallows print queries; [West Allis robots](https://www.westalliswi.gov/robots.txt) disallows `/api/`. District HTML only, minimum 1 second/request. | [Milwaukee disclaimer](https://city.milwaukee.gov/Information-and-Services/webpolicies/DisclaimerofLiabilit), [privacy](https://city.milwaukee.gov/Information-and-Services/webpolicies/Privacy), [West Allis site](https://www.westalliswi.gov/). No separate West Allis terms link found. Capture official office-contact facts and portrait URLs; this collector does not download image files. |
+| Council profile pages | [Milwaukee robots](https://city.milwaukee.gov/robots.txt) returned HTTP 403 from the nightly runner on September 8; retrieval is **paused**, retaining the complete existing profile archive. [West Allis robots](https://www.westalliswi.gov/robots.txt) disallows `/api/`; reviewed district HTML remains enabled, minimum 1 second/request. | [Milwaukee disclaimer](https://city.milwaukee.gov/Information-and-Services/webpolicies/DisclaimerofLiabilit), [privacy](https://city.milwaukee.gov/Information-and-Services/webpolicies/Privacy), [West Allis site](https://www.westalliswi.gov/). No separate West Allis terms link found. Capture official office-contact facts and portrait URLs; this collector does not download image files. |
 | Eye on Lobbying | [Robots](https://lobbying.wi.gov/robots.txt) disallows all crawling. Automated retrieval **removed**; CLI fails without network requests. | May be restored later with **site approval** and a fresh policy review. [Official records access](https://ethics.wi.gov/Pages/AboutUs/PublicRecordsNotice.aspx) offers a route to request an approved extract. |
 | WisconsinEye | [Robots](https://wiseye.org/robots.txt) permits crawling with a 10-second delay, but retrieval is **paused**. | [User agreement](https://wiseye.org/user-agreement/), especially sections 1 and 14, leaves metadata republication uncertain. Obtain approval/clarification before restoring retrieval. Existing local metadata can still match archived hearing links. |
 | FollowTheMoney | [API robots](https://api.followthemoney.org/robots.txt) disallows all crawling. Network requests are **paused**; cached research remains available. | Previously documented API-key/license access does not resolve the current robots conflict. Obtain explicit approval covering automated API use before restoring either research helper. |
@@ -62,6 +62,30 @@ TLS failures, 401/403/429, Retry-After, exhausted limits, changed fingerprints,
 and unexpected redirects still stop collection. Same-origin robots redirects
 respect the source interval. Failure messages include the status received and
 expected, or the transport error type and number of attempts.
+
+## Milwaukee profile pause (2026-09-08)
+
+A later nightly retry reached Milwaukee robots.txt and recorded HTTP 403 before
+requesting any district page. Collection from `city.milwaukee.gov` is now paused
+in `source_policies.json`; clarify access and review the policies linked above
+before restoring it. A successful check from another machine does not override
+the runner's denial. West Allis profile retrieval and both councils' separately
+reviewed Legistar records remain enabled at their existing rates.
+
+The profile collector requires all 15 archived Milwaukee districts and preserves
+their records unchanged. Before the first retained import, it binds them to the
+member IDs in the archived roster; subsequent runs keep those bindings. Run
+profiles before `fetch_local_votes`, as `run.sh` and the nightly stage do. A new
+member in the same seat cannot inherit the former member's cached portrait or
+contact details. Missing, malformed, or ambiguously attributed archives fail.
+
+Refresh metadata records the pause without advancing the last successful
+collection date. Legacy archives have no reliable date, so it remains unknown.
+The importer exposes this status through SQLite metadata and the static API;
+council, district, and current-member pages display a missed-refresh notice.
+Votes and other records still refresh and pass the existing integrity gates.
+Profile output is replaced atomically only after West Allis succeeds. No source
+denial is retried or suppressed, and no paid resource is added.
 
 ## Nightly finance windowing (2026-09-07)
 

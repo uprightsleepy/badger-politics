@@ -1,0 +1,21 @@
+---
+import { meta } from "../lib/db";
+import { fmtDate } from "../lib/format";
+
+interface Props { tenant: string }
+const { tenant } = Astro.props;
+const raw = meta()[`local_profiles_${tenant}`];
+const refresh = raw ? JSON.parse(raw) as {
+  state: "retained" | "refreshed"; last_success_at: string | null;
+} : null;
+---
+
+{refresh?.state === "retained" && (
+  <p class="mt-2 max-w-3xl text-xs text-navy-600" role="note" data-pagefind-ignore>
+    <strong>Profile details may be out of date.</strong>{" "}
+    The city's district pages could not be refreshed. Available portraits and
+    district-page contacts come from previously collected records.
+    {refresh.last_success_at && <> Last collected {fmtDate(refresh.last_success_at.slice(0, 10))}.</>}
+    {" "}Check the city's district page for current details.
+  </p>
+)}
