@@ -1,13 +1,20 @@
 name: nightly parser
+run-name: ${{ (inputs.policy_only || github.event.schedule == '15 4 * * *') && 'source policy checks' || 'nightly parser' }}
 
 on:
   workflow_dispatch:
     inputs:
+      policy_only:
+        description: "Refresh source policy checks only (run before the first parser run)"
+        type: boolean
+        default: false
       resume_run:
         description: "Failed run ID to resume (same commit; blank starts a new run)"
         type: string
         default: ""
   schedule:
+    - cron: "15 4 * * *"
+      timezone: America/Chicago
     - cron: "15 5 * * *"
       timezone: America/Chicago
 
@@ -26,8 +33,46 @@ jobs:
       (github.event_name == 'workflow_dispatch' || vars.NIGHTLY_PARSER_ENABLED == 'true')
     uses: ./.github/workflows/ci.yml
 
+  policies:
+    name: daily source policy checks
+    needs: validate
+    if: inputs.policy_only || github.event.schedule == '15 4 * * *'
+    permissions:
+      contents: read
+      id-token: write
+    environment: nightly-parser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NIGHTLY_RUN_ID: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: false
+      - run: uv sync --locked --project pipeline --python 3.11
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_PARSER_SA }}
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+      - name: Acquire the parser lock
+        working-directory: pipeline
+        run: uv run --locked python -m nightly acquire
+      - name: Check policies and save private results
+        timeout-minutes: 20
+        working-directory: pipeline
+        run: uv run --locked python -m nightly.policies refresh
+      - name: Release this execution's lock
+        if: always()
+        working-directory: pipeline
+        run: uv run --locked python -m nightly release
+
   legislature:
     needs: validate
+    if: ${{ !inputs.policy_only && github.event.schedule != '15 4 * * *' }}
     permissions:
       contents: read
       id-token: write
@@ -136,7 +181,7 @@ jobs:
   finish:
     needs: [validate, legislature, finance, finance-receipts, finance-audit, finance-months,
             finance-committees, community, federal, import, enrich]
-    if: always() && needs.validate.result == 'success'
+    if: always() && needs.validate.result == 'success' && needs.legislature.result != 'skipped'
     permissions:
       contents: read
       id-token: write

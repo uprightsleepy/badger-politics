@@ -18,7 +18,7 @@ import json
 import re
 import sqlite3
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from importer.local_registry import TENANTS
@@ -71,7 +71,7 @@ def strip_template_phones(seats: dict) -> dict:
 
 def attribute_profile(
     spec: dict, name: str, seat: int | None, curated_name: str | None,
-    profiles: dict, person: dict | None,
+    profiles: dict, person: dict | None, person_id: int | None = None,
 ) -> tuple[str | None, str | None, str | None, str | None]:
     """(image_url, image_basis, email, phone) for one sitting member, each
     attributed only under an exact rule; None otherwise.
@@ -88,6 +88,10 @@ def attribute_profile(
     sn = surname(name)
     found = profiles.get(spec["tenant"], {})
     if seat is None:
+        return image, basis, email, phone
+    refresh = profiles.get("_refresh", {}).get(spec["tenant"], {})
+    if (refresh.get("state") == "retained"
+            and refresh.get("person_ids", {}).get(str(seat)) != person_id):
         return image, basis, email, phone
     if spec["tenant"] == "milwaukee":
         page = (found.get("seats") or {}).get(str(seat))
@@ -187,6 +191,45 @@ def ensure_member(
     )
 
 
+def member_seat(
+    records: list[dict], curated: dict, person_id: int,
+) -> tuple[int | None, str | None]:
+    for record in reversed(records):
+        match = TITLE_SEAT_RE.match(record.get("OfficeRecordTitle") or "")
+        if match:
+            return int(match.group(1)), None
+    if str(person_id) in curated:
+        entry = curated[str(person_id)]
+        return entry["seat"], entry["basis"]
+    return None, None
+
+
+def milwaukee_profile_owners(local_dir: Path) -> dict[str, int]:
+    """Bind legacy profiles to the archived roster before collecting a newer roster."""
+    office = json.loads((local_dir / "milwaukee/officerecords.json").read_text(encoding="utf-8"))
+    curated = load_curation(SEATS_PATH).get("milwaukee", {})
+    merges = load_merges("milwaukee")
+    grouped: dict[int, list[dict]] = {}
+    for record in office:
+        if not is_placeholder(record.get("OfficeRecordFullName")):
+            pid = record["OfficeRecordPersonId"]
+            grouped.setdefault(merges.get(pid, pid), []).append(record)
+    owners = {}
+    today = date.today().isoformat()
+    for pid, records in grouped.items():
+        records.sort(key=lambda r: r.get("OfficeRecordStartDate") or "")
+        if not any((r.get("OfficeRecordEndDate") or "")[:10] >= today for r in records):
+            continue
+        seat, _ = member_seat(records, curated, pid)
+        if seat is not None:
+            if str(seat) in owners:
+                raise ValueError("Ambiguous archived Milwaukee profile owner")
+            owners[str(seat)] = pid
+    if set(owners) != {str(n) for n in range(1, 16)}:
+        raise ValueError("Archived Milwaukee roster must identify all 15 profile owners")
+    return owners
+
+
 def import_members(
     conn: sqlite3.Connection, spec: dict, office: list[dict], curated: dict,
     profiles: dict, persons: dict,
@@ -207,16 +250,7 @@ def import_members(
         record_name = latest["OfficeRecordFullName"].strip()
         name = display_name(record_name, persons.get(str(person_id)))
         is_current = any((r.get("OfficeRecordEndDate") or "")[:10] >= today for r in records)
-        # the seat: the tenant's own title, else the curated table
-        seat = seat_basis = None
-        for r in reversed(records):
-            m = TITLE_SEAT_RE.match(r.get("OfficeRecordTitle") or "")
-            if m:
-                seat = int(m.group(1))
-                break
-        if seat is None and str(person_id) in curated:
-            entry = curated[str(person_id)]
-            seat, seat_basis = entry["seat"], entry["basis"]
+        seat, seat_basis = member_seat(records, curated, person_id)
         if seat is not None and not 1 <= seat <= spec["seats"]:
             raise RuntimeError(f"{tenant} person {person_id}: seat {seat} out of range")
         slug = slugify(name) or str(person_id)
@@ -227,7 +261,7 @@ def import_members(
         if is_current:
             image, basis, email, phone = attribute_profile(
                 spec, name, seat, curated.get(str(person_id), {}).get("name"),
-                profiles, persons.get(str(person_id)),
+                profiles, persons.get(str(person_id)), person_id,
             )
             counts["photos"] += image is not None
             counts["emails"] += email is not None
@@ -487,11 +521,35 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
 
 
 def run(local_dir: Path, db_path: Path) -> None:
+    refresh = _optional_json(local_dir / "profiles.json", {}).get("_refresh", {})
+    if not isinstance(refresh, dict) or set(refresh) - {s["tenant"] for s in TENANTS}:
+        raise ValueError("Invalid local profile refresh metadata")
+    for tenant, status in refresh.items():
+        if not isinstance(status, dict) or status.get("state") not in ("refreshed", "retained"):
+            raise ValueError("Invalid local profile refresh status")
+        stamp = status.get("last_success_at")
+        if stamp is not None:
+            if not isinstance(stamp, str) or datetime.fromisoformat(stamp).tzinfo is None:
+                raise ValueError("Invalid local profile refresh date")
+        elif status["state"] == "refreshed":
+            raise ValueError("Refreshed local profiles require a collection date")
+        if status["state"] == "retained":
+            owners = status.get("person_ids")
+            if (tenant != "milwaukee" or not isinstance(owners, dict)
+                    or set(owners) != {str(n) for n in range(1, 16)}
+                    or any(type(pid) is not int or pid <= 0 for pid in owners.values())
+                    or len(set(owners.values())) != 15):
+                raise ValueError("Retained profiles require their archived member identities")
     conn = sqlite3.connect(db_path)
     with conn:
         for table in TABLES:
             conn.execute(f"DELETE FROM {table}")  # noqa: S608 - fixed list above
         conn.execute("DELETE FROM meta WHERE key LIKE 'local_%'")
+        conn.executemany(
+            "INSERT INTO meta (key, value) VALUES (?, ?)",
+            [(f"local_profiles_{tenant}", json.dumps(status))
+             for tenant, status in refresh.items()],
+        )
         for spec in TENANTS:
             stats = import_tenant(conn, spec, local_dir)
             print(

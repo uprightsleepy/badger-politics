@@ -1,4 +1,4 @@
-"""Fail closed unless both the URL and the live robots policy were reviewed.
+"""Require reviewed URLs and a recent, matching robots policy check.
 
 The manifest records narrowly reviewed paths and fingerprints of robots.txt.
 Any policy change requires human review; we deliberately do not interpret new
@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import os
 import re
 import time
 from pathlib import Path
@@ -19,7 +21,9 @@ import requests
 
 USER_AGENT = "badgerpolitics.org data pipeline (contact: https://badgerpolitics.org/about/#contact)"
 MANIFEST = Path(__file__).with_name("source_policies.json")
-POLICY_TTL = 3600  # memory only: each new process checks current policies again
+POLICY_TTL = 3600  # Local commands without a shared report check again in each process.
+REPORT_TTL = 24 * 3600
+REPORT_ENV = "SOURCE_POLICY_REPORT"
 
 
 class SourceAccessError(RuntimeError):
@@ -32,14 +36,51 @@ def robots_fingerprint(text: str) -> str:
     return hashlib.sha256("\n".join(line for line in lines if line).encode()).hexdigest()
 
 
+def policy_digest(policies: dict) -> str:
+    content = json.dumps({"sources": policies, "user_agent": USER_AGENT}, sort_keys=True)
+    return hashlib.sha256(content.encode()).hexdigest()
+
+
+def validate_report(report: dict, policies: dict, now: float) -> None:
+    def timestamp(value):
+        return type(value) in (int, float) and math.isfinite(value) and 0 < value <= now
+
+    if (not isinstance(report, dict) or report.get("version") != 1
+            or report.get("policy_sha256") != policy_digest(policies)
+            or not timestamp(report.get("started_at"))
+            or not isinstance(report.get("sources"), dict)
+            or set(report["sources"]) != set(policies)):
+        raise SourceAccessError("Invalid or mismatched policy report; run the policy-only job")
+    for entry in report["sources"].values():
+        if not isinstance(entry, dict) or entry.get("state") not in (
+            "approved", "blocked", "paused", "pending",
+        ):
+            raise SourceAccessError("Invalid source status in policy report")
+        if entry["state"] == "approved" and (
+            not timestamp(entry.get("checked_at")) or entry["checked_at"] < report["started_at"]
+        ):
+            raise SourceAccessError("Invalid policy check timestamp")
+
+
+def require_approval(report: dict, host: str, now: float) -> None:
+    entry = report["sources"][host]
+    if entry["state"] != "approved":
+        raise SourceAccessError(f"Policy check is {entry['state']} for {host}; review required")
+    if not 0 <= now - entry["checked_at"] < REPORT_TTL:
+        raise SourceAccessError(f"Policy check expired for {host}; run the policy-only job")
+
+
 class SourceAccess:
-    def __init__(self, policies: dict | None = None):
+    def __init__(self, policies: dict | None = None, *, use_report: bool = True):
         self.policies = policies if policies is not None else json.loads(
             MANIFEST.read_text(encoding="utf-8")
         )["sources"]
         self.checked: dict[str, float] = {}
         self.last_request: dict[str, float] = {}
         self.stopped: set[str] = set()
+        self.report_path = os.environ.get(REPORT_ENV) if use_report else None
+        self.report: dict | None = None
+        self.report_clock = (time.time(), time.monotonic())
 
     def source(self, url: str, method: str = "GET") -> tuple[str, dict]:
         parts = urlsplit(url)
@@ -69,6 +110,24 @@ class SourceAccess:
         return host, policy
 
     def verify_robots(self, host: str, policy: dict) -> None:
+        if self.report_path is not None:
+            # A configured report is mandatory: never fall back to an older
+            # success or a live request after a missing/failed daily check.
+            now = max(time.time(), self.report_clock[0] + time.monotonic() - self.report_clock[1])
+            if self.report is None:
+                try:
+                    path = Path(self.report_path)
+                    if path.stat().st_size > 1024 * 1024:
+                        raise ValueError("oversized report")
+                    report = json.loads(path.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    raise SourceAccessError("Policy report missing or unreadable") from None
+                validate_report(report, self.policies, now)
+                self.report = report
+            require_approval(self.report, host, now)
+            # Keep the first request paced even across collector processes.
+            self.last_request.setdefault(host, time.monotonic())
+            return
         checked = self.checked.get(host)
         if checked is not None and time.monotonic() - checked < POLICY_TTL:
             return
@@ -140,12 +199,14 @@ class SourceAccess:
         )
         if remaining > 0:
             time.sleep(remaining)
+        if self.report_path is not None:
+            self.verify_robots(host, policy)  # The pacing wait must not outlast approval.
         self.last_request[host] = time.monotonic()
         return host, policy
 
     def after_response(self, host: str, response: requests.Response) -> None:
         # Stop this process rather than risking retries before Retry-After or
-        # GitHub's reset time. A new scheduled run will review policies again.
+        # GitHub's reset time. Cached policy approval cannot override a denial.
         if response.status_code in (401, 403, 429) or response.headers.get(
             "X-RateLimit-Remaining"
         ) == "0" or "Retry-After" in response.headers:

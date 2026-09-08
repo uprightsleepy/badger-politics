@@ -54,8 +54,9 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
         "finance-audit": [["scraper.fetch_cfis", "audit", "--sample", "3",
                            "--as-of", context["finance_as_of"]]],
         "finance-committees": [["nightly.finance"]],
+        # Bind retained profiles to archived members before refreshing office records.
         "community": [["scraper.fetch_subjects"], ["scraper.fetch_contacts", "--refresh"],
-                      ["scraper.fetch_local_votes"], ["scraper.fetch_local_profiles"]],
+                      ["scraper.fetch_local_profiles"], ["scraper.fetch_local_votes"]],
         "federal": [["scraper.fetch_federal_votes"]],
         "import": [rebuild,
                    ["importer.wec_pdf", "_data/wec/ballot-access.pdf",

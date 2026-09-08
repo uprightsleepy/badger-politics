@@ -183,6 +183,9 @@ def test_robots_redirect_cannot_change_origin_or_disable_tls(network, location):
 def test_profile_policy_failure_preserves_archive(tmp_path, monkeypatch, failed_city):
     from scraper import fetch_local_profiles
 
+    access = SourceAccess()
+    access.policies["city.milwaukee.gov"].pop("paused", None)
+    monkeypatch.setattr(fetch_local_profiles, "ACCESS", access)
     archive = tmp_path / "profiles.json"
     original = b'{"milwaukee":{"seats":{"1":{"photos":[]}}},"westalliswi":{"districts":{}}}'
     archive.write_bytes(original)

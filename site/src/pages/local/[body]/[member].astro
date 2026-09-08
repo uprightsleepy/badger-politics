@@ -6,6 +6,7 @@ import Base from "../../../layouts/Base.astro";
 import SourceStrip from "../../../components/SourceStrip.astro";
 import ScrollPanel from "../../../components/ScrollPanel.astro";
 import Portrait from "../../../components/Portrait.astro";
+import LocalProfileNotice from "../../../components/LocalProfileNotice.astro";
 import FollowButton from "../../../components/FollowButton.astro";
 import JsonLd from "../../../components/JsonLd.astro";
 import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, localMemberVotesWithDissent, localMemberTerms, localMemberships, localMemberOutcomes, localMemberMotions, localMemberMotionCount, localMemberAttendance, localMemberVoteYears, localMemberTieBreaks } from "../../../lib/db";
@@ -131,6 +132,7 @@ const termLabel = (t: string | null) =>
     <aside class="w-full shrink-0 md:w-64" aria-label={`About ${member.name}`}>
       <div class="rounded-lg border border-navy-100 bg-white p-4">
         <Portrait src={member.image_url} name={member.name} size={120} className="mb-3 rounded" />
+        {member.is_current && <LocalProfileNotice tenant={body.tenant} />}
         {member.image_basis && (
           <p class="text-xs text-navy-600">
             Official portrait from <a href={member.image_basis} class="underline">the city's page</a>.

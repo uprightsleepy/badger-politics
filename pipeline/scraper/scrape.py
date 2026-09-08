@@ -12,6 +12,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from scraper.source_access import REPORT_ENV
+
 PIPELINE_DIR = Path(__file__).resolve().parents[1]
 VENDOR_DIR = PIPELINE_DIR / "vendor" / "openstates-scrapers"
 PATCHES_DIR = PIPELINE_DIR / "patches"
@@ -63,11 +65,17 @@ def build_command(target: str, extra: list[str]) -> list[str]:
     if shutil.which("os-update"):
         # Inside the pipeline image: os-update is on PATH.
         return ["os-update", *args]
+    policy_args = []
+    if REPORT_ENV in os.environ:
+        report = Path(os.environ[REPORT_ENV]).resolve(strict=True)
+        policy_args = ["--volume", f"{report}:/badger-policy-report.json:ro",
+                       "--env", f"{REPORT_ENV}=/badger-policy-report.json"]
     # Local dev: run through the vendored compose 'scrape' service.
     return [
         "docker", "compose", "run", "--rm",
         "--volume", f"{PIPELINE_DIR / 'scraper'}:/badger-pipeline/scraper:ro",
         "--env", "PYTHONPATH=/badger-pipeline:./scrapers",
+        *policy_args,
         "scrape", *args,
     ]
 
