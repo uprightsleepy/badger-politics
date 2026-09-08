@@ -18,7 +18,7 @@ from pathlib import Path
 
 import requests
 
-from scraper.cfis_api import DELAY, PAGE, month_windows, transaction_pages
+from scraper.cfis_api import DELAY, PAGE, month_windows, transaction_count, transaction_pages
 from scraper.http import session
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "cfis"
@@ -57,11 +57,16 @@ def _name(entity: dict | None) -> str | None:
     return (entity or {}).get("name")
 
 
-def fetch_month(http: requests.Session, first: str, last: str):
-    """(kept transactions, committee registry rows) for one month."""
+def _fetch_month(http: requests.Session, first: str, last: str, page_size: int | None = None):
+    page_size = PAGE if page_size is None else page_size
+    expected = transaction_count(http, first, last)
     rows, registry = [], {}
-    for results in transaction_pages(http, first, last, timeout=90, offset_step=PAGE):
+    scanned, seen_ids = 0, set()
+    for results in transaction_pages(http, first, last, timeout=90,
+                                     offset_step=page_size, page_size=page_size):
+        scanned += len(results)
         for t in results:
+            seen_ids.add(t["id"])
             filer = t.get("createdByEntity") or {}
             for side in (filer, t.get("from_entity"), t.get("to_entity")):
                 row = committee_of(side)
@@ -95,7 +100,26 @@ def fetch_month(http: requests.Session, first: str, last: str):
                 "report_id": ((t.get("reports") or [{}])[0]).get("id"),
                 "report_name": ((t.get("reports") or [{}])[0]).get("name"),
             })
-    return rows, registry
+    return rows, registry, scanned, expected, seen_ids
+
+
+def fetch_month(http: requests.Session, first: str, last: str):
+    """Return transactions and registry only after full, unique coverage is verified."""
+    page_size = PAGE
+    for attempt in range(3):
+        rows, registry, scanned, expected, seen_ids = _fetch_month(http, first, last, page_size)
+        if scanned == expected == len(seen_ids):
+            if attempt:
+                expected = transaction_count(http, first, last)
+            if scanned == expected:
+                return rows, registry
+        if attempt < 2:
+            print(f"{first[:7]}: incomplete listing ({scanned} rows, {len(seen_ids)} unique,"
+                  f" expected {expected}), retaking")
+            page_size = min(PAGE, 100) if expected <= PAGE else PAGE
+            time.sleep(5)
+    raise RuntimeError(f"CFIS drift: {first[:7]} paged {scanned} rows"
+                       f" ({len(seen_ids)} unique) but count said {expected}")
 
 
 def main(argv: list[str]) -> int:

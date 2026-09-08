@@ -82,6 +82,28 @@ upstream point-in-time snapshot. All completed month outputs are merged with
 the prior archive before the full import. Missing, conflicting, or incomplete
 outputs stop publication. See [hosting and recovery](../../docs/nightly-parser-hosting.md).
 
+## CFIS completeness recovery (2026-09-08)
+
+The [CFIS robots file](https://campaignfinance.wi.gov/robots.txt) passed the existing
+fingerprint check during diagnosis. The [public search guidance](https://ethics.wi.gov/Pages/CampaignFinance/ViewReports.aspx)
+and [reuse notice](https://ethics.wi.gov/Resources/20251021%20Open%20Session%20Materials%20Revised.pdf)
+were rechecked. Keep the reviewed paths, identifying User-Agent, redaction,
+noncommercial civic scope, and ten-second request floor described above.
+
+The transaction endpoint can return incomplete results depending on page size.
+Receipt refresh, historical audit, and committee collection now require scanned
+rows and unique transaction IDs to equal the reported count before writing a
+month. An incomplete month gets at most two retakes, with a five-second wait
+that counts toward the transport's ten-second floor. For counts of at most
+1,000, retakes use 100-row pages; larger months keep 1,000-row pages. Recovery
+also rechecks the count after fetching. Failed attempts are discarded in full;
+missing rows are never excused because they appear irrelevant to receipt filters.
+Access-policy failures still stop collection through the existing transport.
+
+Normal collection keeps 1,000-row pages. Committee collection adds one count
+request per month (about 3.5 minutes across 21 months at the current interval).
+No service or dependency is added. Raw diagnostic responses stay private.
+
 ## Preserving lobbying data offline
 
 `run.sh` no longer fetches lobbying pages. It still imports the complete existing

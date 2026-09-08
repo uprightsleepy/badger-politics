@@ -21,7 +21,7 @@ from pathlib import Path
 
 import requests
 
-from scraper.cfis_api import DELAY, PAGE, call, month_windows, transaction_pages
+from scraper.cfis_api import DELAY, PAGE, call, month_windows, transaction_count, transaction_pages
 from scraper.http import session
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "cfis"
@@ -174,14 +174,11 @@ def load_committee_ids() -> dict:
 
 def fetch_window(
     http: requests.Session, committee_ids: dict, first: str, last: str,
-) -> tuple[list[dict], int, int | None, set]:
-    count = call(
-        http, "publicFrontendApi.getTransactionsTotalCount",
-        {"dateFrom": first, "dateTo": last},
-    )
-    expected = int(count) if isinstance(count, (int, float)) else None
+    *, page_size: int | None = None,
+) -> tuple[list[dict], int, int, set]:
+    expected = transaction_count(http, first, last)
     rows, skip, seen_ids = [], 0, set()
-    for results in transaction_pages(http, first, last):
+    for results in transaction_pages(http, first, last, page_size=page_size):
         for t in results:
             seen_ids.add(t["id"])
             committee_id = t.get("createdByEntityId")
@@ -213,41 +210,24 @@ def fetch_window(
 def _fetch_with_retries(
     http: requests.Session, committee_ids: dict, first: str, last: str,
     label: str, attempts: int,
-) -> tuple[list[dict], int, int | None, set, bool]:
-    """Retake until count and pages agree, within the attempt limit."""
+) -> tuple[list[dict], int, int, set, bool]:
+    """Retake incomplete windows; smaller pages recover inconsistent small listings."""
+    page_size = PAGE
     for attempt in range(attempts):
-        rows, skip, expected, seen_ids = fetch_window(http, committee_ids, first, last)
-        if expected is None or skip == expected:
-            return rows, skip, expected, seen_ids, True
+        rows, skip, expected, seen_ids = fetch_window(
+            http, committee_ids, first, last, page_size=page_size,
+        )
+        if skip == expected == len(seen_ids):
+            if attempt:
+                expected = transaction_count(http, first, last)
+            if skip == expected:
+                return rows, skip, expected, seen_ids, True
         if attempt < attempts - 1:
-            print(f"{label}: count moved during fetch ({skip} vs {expected}), retaking")
+            print(f"{label}: incomplete listing ({skip} rows, {len(seen_ids)} unique,"
+                  f" expected {expected}), retaking")
+            page_size = min(PAGE, 100) if expected <= PAGE else PAGE
             time.sleep(5)
     return rows, skip, expected, seen_ids, False
-
-
-def _drift_is_benign(
-    http: requests.Session, committee_ids: dict, first: str, last: str,
-    seen_ids: set, expected: int, label: str,
-) -> bool:
-    """Accept date-sort omissions only when the complete unsorted view proves
-    none is an incoming receipt to a mapped committee."""
-    plain = call(
-        http, "publicFrontendApi.getTransactions",
-        {"take": PAGE, "skip": 0, "dateFrom": first, "dateTo": last},
-    ).get("results", [])
-    omitted = [t for t in plain if t["id"] not in seen_ids]
-    relevant = [
-        t for t in omitted
-        if (t.get("transactionType") or {}).get("direction") == "INCOMING"
-        and t.get("createdByEntityId") in committee_ids
-    ]
-    if len(plain) != expected or relevant:
-        return False
-    print(
-        f"WARNING: {label} date-sorted view omitted {len(omitted)} "
-        "non-receipt rows; accepted, refreshes nightly"
-    )
-    return True
 
 
 def fetch_transactions(since: str, as_of: date | None = None) -> None:
@@ -257,19 +237,17 @@ def fetch_transactions(since: str, as_of: date | None = None) -> None:
     windows = month_windows(since, as_of.strftime("%Y-%m") if as_of else None)
     # Refresh the newest two months here; the audit rotates older months.
     refresh = {w[0] for w in windows[-2:]}
-    latest = windows[-1][0]
     for label, first, last in windows:
         out = DATA_DIR / f"tx-{label}.json"
         if out.exists() and label not in refresh:
             continue
         rows, skip, expected, seen_ids, matched = _fetch_with_retries(
-            http, committee_ids, first, last, label, attempts=3 if label == latest else 1,
+            http, committee_ids, first, last, label, attempts=3,
         )
-        if not matched and label == latest and expected is not None and expected <= PAGE:
-            matched = _drift_is_benign(http, committee_ids, first, last, seen_ids, expected, label)
         if not matched:
             raise RuntimeError(
-                f"CFIS drift: {label} paged {skip} rows but count said {expected}"
+                f"CFIS drift: {label} paged {skip} rows"
+                f" ({len(seen_ids)} unique) but count said {expected}"
             )
         out.write_text(json.dumps(rows, indent=0), encoding="utf-8")
         print(f"{label}: {skip} scanned, {len(rows)} receipts kept -> {out.name}")
@@ -293,10 +271,13 @@ def audit_archives(sample: int, as_of: date | None = None) -> None:
     picks = [archived[(offset + i) % len(archived)] for i in range(min(sample, len(archived)))]
     drifted = 0
     for label, first, last in picks:
-        rows, skip, expected, _ = fetch_window(http, committee_ids, first, last)
-        if expected is not None and skip != expected:
+        rows, skip, expected, seen_ids, matched = _fetch_with_retries(
+            http, committee_ids, first, last, f"audit {label}", attempts=3,
+        )
+        if not matched:
             raise RuntimeError(
-                f"CFIS drift: audit {label} paged {skip} rows but count said {expected}"
+                f"CFIS drift: audit {label} paged {skip} rows"
+                f" ({len(seen_ids)} unique) but count said {expected}"
             )
         out = DATA_DIR / f"tx-{label}.json"
         old = json.loads(out.read_text(encoding="utf-8"))

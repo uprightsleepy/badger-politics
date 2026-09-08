@@ -63,11 +63,13 @@ def test_split_and_unsplit_archives_and_database_are_identical(tmp_path, monkeyp
     calls = []
 
     def api(http, procedure, payload, **kwargs):
-        assert procedure == "publicFrontendApi.getTransactions"
         assert payload["dateTo"].endswith("T23:59:59")
-        calls.append(copy.deepcopy(payload))
         selected = [row for row in pages
                     if payload["dateFrom"] <= row["date"][:10] <= payload["dateTo"][:10]]
+        if procedure == "publicFrontendApi.getTransactionsTotalCount":
+            return len(selected)
+        assert procedure == "publicFrontendApi.getTransactions"
+        calls.append(copy.deepcopy(payload))
         return {"results": copy.deepcopy(selected[payload["skip"]:
                                                   payload["skip"] + payload["take"]])}
 
@@ -160,11 +162,11 @@ def test_receipt_refresh_and_audit_use_frozen_date(tmp_path, monkeypatch):
     for month in range(1, 13):
         write(tmp_path / f"tx-2024-{month:02}.json", [])
 
-    def audit(http, ids, first, last):
+    def audit(http, ids, first, last, label, attempts):
         audited.append(first)
-        return [], 0, 0, set()
+        return [], 0, 0, set(), True
 
-    monkeypatch.setattr(fetch_cfis, "fetch_window", audit)
+    monkeypatch.setattr(fetch_cfis, "_fetch_with_retries", audit)
     fetch_cfis.audit_archives(3, date(2025, 2, 28))
     expected = audited.copy()
     audited.clear()
