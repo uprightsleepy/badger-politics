@@ -78,21 +78,24 @@ class SourceAccess:
         with requests.Session() as http:
             http.headers["User-Agent"] = USER_AGENT
             for _ in range(6):
-                try:
-                    response = http.get(url, timeout=30, allow_redirects=False)
-                except requests.RequestException as error:
-                    raise SourceAccessError(f"Could not verify robots.txt for {host}") from error
+                response = self._robots_response(http, url, host, policy)
                 if response.is_redirect:
                     url = urljoin(url, response.headers["Location"])
+                    response.close()
                     if urlsplit(url).netloc != host or urlsplit(url).scheme != "https":
                         raise SourceAccessError(f"Unreviewed robots redirect for {host}")
+                    time.sleep(policy["delay_seconds"])
                     continue
                 break
             else:
                 raise SourceAccessError(f"Too many robots redirects for {host}")
         expected = policy["robots"]
         if response.status_code != expected["status"] or url != expected["url"]:
-            raise SourceAccessError(f"Robots response changed for {host}; review scraper/README.md")
+            raise SourceAccessError(
+                f"Robots response changed for {host} (HTTP {response.status_code},"
+                f" expected {expected['status']}; unexpected final URL: {url != expected['url']});"
+                " review scraper/README.md"
+            )
         if "sha256" in expected and robots_fingerprint(response.text) != expected["sha256"]:
             raise SourceAccessError(f"Robots directives changed for {host}; review required")
         # The Senate redirects to a specific missing-page document (documented
@@ -103,6 +106,31 @@ class SourceAccess:
             raise SourceAccessError(f"Missing-page response changed for {host}")
         self.checked[host] = time.monotonic()
         self.last_request[host] = time.monotonic()
+
+    def _robots_response(self, http: requests.Session, url: str, host: str, policy: dict):
+        """Retry transport outages; access decisions and changed policies still stop collection."""
+        for attempt in range(4):
+            try:
+                response = http.get(url, timeout=30, allow_redirects=False)
+            except requests.RequestException as error:
+                transient = isinstance(error, (requests.ConnectionError, requests.Timeout))
+                if (not transient or isinstance(error, requests.exceptions.SSLError)
+                        or attempt == 3):
+                    raise SourceAccessError(
+                        f"Could not verify robots.txt for {host}"
+                        f" ({type(error).__name__}, {attempt + 1} attempts)"
+                    ) from error
+            else:
+                try:
+                    self.after_response(host, response)
+                except SourceAccessError:
+                    response.close()
+                    raise
+                if response.status_code not in (502, 503, 504) or attempt == 3:
+                    return response
+                response.close()
+            time.sleep(max(policy["delay_seconds"], 30 * 2**attempt))
+        raise AssertionError("unreachable robots retry state")
 
     def before_request(self, url: str, method: str) -> tuple[str, dict]:
         host, policy = self.source(url, method)
