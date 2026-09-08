@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 from test_nightly import Store, runner
-from test_source_access import HOST, URL
+from test_source_access import HOST, ROBOTS, URL
 from test_source_access import network as network_fixture
 
 from check_workflows import validate
@@ -54,6 +54,15 @@ def test_processes_share_check_but_keep_first_request_and_session_pacing(cached,
     assert [call[0] for call in calls] == [URL] * 3
     assert [call[1] for call in calls] == [10, 20, 30]
     assert all(call[2] == source_access.USER_AGENT for call in calls)
+
+
+def test_cached_requests_accept_zero_retry_after_and_keep_pacing(cached):
+    _, _, calls, state, _ = cached
+    state["records"] = [(200, {"Retry-After": "0"})] * 2
+    assert http.session().get(URL).text == "ok"
+    assert http.session().get(URL).text == "ok"
+    assert [call[0] for call in calls] == [URL, URL]
+    assert [call[1] for call in calls] == [10, 20]
 
 
 def test_shared_check_expires_mid_process_without_fetching_robots(cached):
@@ -121,6 +130,8 @@ def test_bad_report_never_falls_back_to_live_requests(cached, problem):
 @pytest.mark.parametrize("status,headers", [
     (401, {}), (403, {}), (429, {}), (503, {"Retry-After": "120"}),
     (200, {"X-RateLimit-Remaining": "0"}),
+    (429, {"Retry-After": "0"}),
+    (200, {"Retry-After": "0", "X-RateLimit-Remaining": "0"}),
 ])
 def test_cached_permission_does_not_override_live_access_limits(cached, status, headers):
     _, _, calls, state, _ = cached
@@ -176,9 +187,13 @@ def checked_run(tmp_path, network, monkeypatch):
     return r, access, clock
 
 
-def test_daily_report_roundtrip_and_paused_sources_make_no_requests(checked_run, network, tmp_path):
+@pytest.mark.parametrize("headers", [{}, {"Retry-After": "0"}])
+def test_daily_report_roundtrip_and_paused_sources_make_no_requests(
+    checked_run, network, tmp_path, headers,
+):
     r, access, _ = checked_run
-    _, calls, _, _ = network
+    _, calls, state, _ = network
+    state["robots_responses"] = [(200, headers, ROBOTS)]
     assert policies.refresh(r, access)
     target = tmp_path / "next-stage/report.json"
     policies.restore(r.store, target, access.policies)
