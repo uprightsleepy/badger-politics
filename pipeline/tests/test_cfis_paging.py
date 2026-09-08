@@ -129,7 +129,7 @@ def configure(monkeypatch):
 def collect(kind, http, first=FIRST, last=LAST):
     if kind == "receipts":
         return receipts.fetch_window(http, {20: "p1"}, first, last)
-    return committees.fetch_month(http, first, last)
+    return committees._fetch_month(http, first, last)[:2]
 
 
 @pytest.mark.parametrize("kind,timeout", [("receipts", 60), ("committees", 90)])
@@ -154,9 +154,8 @@ def test_complete_rows_requests_and_sleeps(kind, timeout, scenario, row_count, c
         }, timeout)
         for skip in skips
     ]
-    if kind == "receipts":
-        expected.insert(0, ("publicFrontendApi.getTransactionsTotalCount",
-                            {"dateFrom": FIRST, "dateTo": LAST}, 60))
+    expected.insert(0, ("publicFrontendApi.getTransactionsTotalCount",
+                        {"dateFrom": FIRST, "dateTo": LAST}, 60))
     assert http.requests() == expected
     assert [e for e in http.events if e[0] == "sleep"] == [("sleep", 0.4)] * (len(skips) - 1)
     assert not http.pages
@@ -189,20 +188,22 @@ def test_errors_propagate_without_advancing(
     http = configure(SCENARIOS[scenario])
     with pytest.raises(error):
         collect(kind, http)
-    assert len(http.requests()) == requests_made + (kind == "receipts")
+    assert len(http.requests()) == requests_made + 1
     assert [e for e in http.events if e[0] == "sleep"] == sleeps
 
 
 def test_receipt_count_mismatch_retake_keeps_both_waits(configure):
-    http = configure([page(RAW), page(RAW, RAW), page()], counts=(2, 2))
+    second = {**RAW, "id": 2}
+    http = configure([page(RAW), page(RAW, second), page()], counts=(2, 2, 2))
     assert receipts._fetch_with_retries(http, {20: "p1"}, FIRST, LAST, "fixture", 2) == (
-        [RECEIPT, RECEIPT], 2, 2, {1}, True,
+        [RECEIPT, {**RECEIPT, "id": 2}], 2, 2, {1, 2}, True,
     )
     assert [e for e in http.events if e[0] == "sleep"] == [("sleep", 5), ("sleep", 0.4)]
     assert [proc for proc, _, _ in http.requests()] == [
         "publicFrontendApi.getTransactionsTotalCount", "publicFrontendApi.getTransactions",
         "publicFrontendApi.getTransactionsTotalCount", "publicFrontendApi.getTransactions",
         "publicFrontendApi.getTransactions",
+        "publicFrontendApi.getTransactionsTotalCount",
     ]
 
 
@@ -210,6 +211,6 @@ def test_duplicate_rows_and_latest_registry_observation_are_retained(configure):
     renamed = copy.deepcopy(RAW)
     renamed["from_entity"]["name"] = "Amended PAC Name"
     http = configure([page(RAW, renamed), page()])
-    rows, registry = committees.fetch_month(http, FIRST, LAST)
+    rows, registry = committees._fetch_month(http, FIRST, LAST)[:2]
     assert rows == [COMMITTEE_ROW, {**COMMITTEE_ROW, "other_name": "Amended PAC Name"}]
     assert registry == {**REGISTRY, 30: {**REGISTRY[30], "name": "Amended PAC Name"}}

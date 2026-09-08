@@ -8,6 +8,7 @@ the two archives can never disagree about where a month ends.
 from __future__ import annotations
 
 import json
+import math
 import time
 from collections.abc import Iterator
 from datetime import date, timedelta
@@ -32,23 +33,33 @@ def call(http: requests.Session, proc: str, payload: dict, timeout: int = 60):
 
 def transaction_pages(
     http: requests.Session, first: str, last: str, *, timeout: int = 60,
-    offset_step: int | None = None,
+    offset_step: int | None = None, page_size: int | None = None,
 ) -> Iterator[list[dict]]:
     """Yield date-sorted pages; advance by received rows unless a fixed step is supplied."""
+    size = PAGE if page_size is None else page_size
     skip = 0
     while True:
         page = call(
             http, "publicFrontendApi.getTransactions",
-            {"take": PAGE, "skip": skip, "sortBy": "date",
+            {"take": size, "skip": skip, "sortBy": "date",
              "sortDirection": "asc", "dateFrom": first, "dateTo": last},
             timeout=timeout,
         )
         results = page.get("results", [])
         yield results
-        if len(results) < PAGE:
+        if len(results) < size:
             return
         skip += len(results) if offset_step is None else offset_step
         time.sleep(DELAY)
+
+
+def transaction_count(http: requests.Session, first: str, last: str) -> int:
+    count = call(http, "publicFrontendApi.getTransactionsTotalCount",
+                 {"dateFrom": first, "dateTo": last})
+    if (isinstance(count, bool) or not isinstance(count, (int, float))
+            or not math.isfinite(count) or count < 0 or count != int(count)):
+        raise RuntimeError("CFIS drift: invalid transaction count")
+    return int(count)
 
 
 def month_windows(since: str, until: str | None = None) -> list[tuple[str, str, str]]:
