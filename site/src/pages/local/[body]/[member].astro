@@ -7,6 +7,7 @@ import SourceStrip from "../../../components/SourceStrip.astro";
 import ScrollPanel from "../../../components/ScrollPanel.astro";
 import Portrait from "../../../components/Portrait.astro";
 import LocalProfileNotice from "../../../components/LocalProfileNotice.astro";
+import LocalCoverageNotice from "../../../components/LocalCoverageNotice.astro";
 import FollowButton from "../../../components/FollowButton.astro";
 import JsonLd from "../../../components/JsonLd.astro";
 import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, localMemberVotesWithDissent, localMemberTerms, localMemberships, localMemberOutcomes, localMemberMotions, localMemberMotionCount, localMemberAttendance, localMemberVoteYears, localMemberTieBreaks } from "../../../lib/db";
@@ -14,7 +15,7 @@ import YearChips from "../../../components/YearChips.astro";
 import LocalVoteRow from "../../../components/LocalVoteRow.astro";
 import { yearPageStarts } from "../../../lib/paging";
 import { fmtDate } from "../../../lib/format";
-import { actionLabel, castStyle, glossaryFor } from "../../../lib/localGloss";
+import { actionLabel, castStyle, glossaryFor, isNoVote, isYesVote } from "../../../lib/localGloss";
 
 const RECENT = 300;
 
@@ -32,7 +33,7 @@ const dissentVotes = localMemberVotesWithDissent(body.tenant, member.person_id);
 const terms = localMemberTerms(body.tenant, member.person_id);
 const committees = member.is_current ? localMemberships(body.tenant, member.person_id) : [];
 const outcomes = localMemberOutcomes(body.tenant, member.person_id);
-const soleNoes = dissentVotes.filter((v) => v.value === "No" && v.noes === 1);
+const soleNoes = dissentVotes.filter((v) => isNoVote(v.value) && v.noes === 1);
 const motionCount = localMemberMotionCount(body.tenant, member.person_id);
 const motions = motionCount > 0 ? localMemberMotions(body.tenant, member.person_id, RECENT) : [];
 const attendance = localMemberAttendance(body.tenant, member.person_id);
@@ -49,13 +50,11 @@ const yearsOf = (rows: { date: string }[]) => {
     .sort((a, b) => b.year.localeCompare(a.year));
 };
 const yearPages = yearPageStarts(localMemberVoteYears(body.tenant, member.person_id));
-// a presiding officer is recorded as Non-Voting, not Present, so no rate for the Chair
-// the mayor presides and votes only to break a tie; a council president
-// (Milwaukee's "Chair" type) is an alderperson who votes like any other
+// Mayors preside; council presidents still vote as alderpersons.
 const presiding = terms.some((t) => t.title === "Mayor");
 const rated = !presiding;
 const tieBreaks = rated ? [] : localMemberTieBreaks(body.tenant, member.person_id);
-const tieAyes = tieBreaks.filter((v) => v.value === "Aye").length;
+const tieAyes = tieBreaks.filter((v) => isYesVote(v.value)).length;
 // the chair's remaining Ayes joined an already unanimous council
 const joinedAyes = stats.total - stats.noes - stats.other - tieAyes;
 const glossary = glossaryFor(
@@ -75,7 +74,7 @@ const termLabel = (t: string | null) =>
 
 <Base
   title={`${member.name}, ${body.city}${member.seat != null ? ` District ${member.seat}` : ""}`}
-  description={`${member.name}'s complete ${body.name} voting record from the city's own legislative system: ${stats.total.toLocaleString()} recorded votes.`}
+  description={`${member.name}'s ${body.name} voting record from the city's own legislative system: ${stats.total.toLocaleString()} recorded votes.`}
   filters={{ type: "City Council", city: body.city }}
   breadcrumbs={[
     { name: "City Councils", url: "/local/" },
@@ -124,9 +123,10 @@ const termLabel = (t: string | null) =>
     )}
   </p>
   <SourceStrip
-    sources={[{ label: `${body.name} records (Legistar)`, href: body.insite_url }]}
+    sources={[{ label: `${body.name} records`, href: body.insite_url }]}
     through={stats.last}
   />
+  <LocalCoverageNotice tenant={body.tenant} />
 
   <div class="mt-4 flex flex-col gap-6 md:flex-row">
     <aside class="w-full shrink-0 md:w-64" aria-label={`About ${member.name}`}>
@@ -182,7 +182,7 @@ const termLabel = (t: string | null) =>
             <p class="mt-1">
               {rated
                 ? `Present at ${attendance.present.toLocaleString()} of ${attendance.meetings.toLocaleString()} meetings where the roll was called (${pct(attendance.present, attendance.meetings)}).`
-                : `Listed at ${attendance.meetings.toLocaleString()} meetings where the roll was called; a presiding officer is recorded as Non-Voting rather than Present, so no rate is shown.`}
+                : `Listed at ${attendance.meetings.toLocaleString()} meetings where the roll was called. Presiding officers' attendance labels vary by city, so no rate is shown.`}
             </p>
             <ul class="mt-1 text-xs text-navy-600">
               {attendance.values.map((a) => (
@@ -258,7 +258,7 @@ const termLabel = (t: string | null) =>
     {" "}{outcomes.decided.toLocaleString()} with an outcome on record.
     Attendance is meetings where the roll call records the member present,
     of the meetings where the roll was called with the member listed.{!rated &&
-    " A presiding officer casts a vote only to break an even split, so nearly every row below reads Non-Voting."}
+    " The record also includes presiding entries where the mayor did not cast a vote."}
   </p>
   {glossary.length > 0 && (
     <details class="mt-3 max-w-2xl rounded-lg border border-navy-100 bg-white text-sm">
@@ -346,10 +346,8 @@ const termLabel = (t: string | null) =>
     <section class="mt-6">
       <h2 class="text-xl font-bold">Votes with dissent · {dissentVotes.length.toLocaleString()}</h2>
       <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Every item where at least one member voted No and {member.name}'s
-        position is on record, with the council's tally. Nearly everything
-        passes with every member in favor, so a single No is what sets one
-        record apart from another.
+        Collected items where at least one member voted No and {member.name}'s
+        position is on record, with the council's recorded tally.
         The vote is on the action named under each row: a motion to refer or
         postpone is not the measure itself, and a sponsor can vote No on
         referral and Aye on passage.
@@ -403,12 +401,12 @@ const termLabel = (t: string | null) =>
       The {Math.min(RECENT, stats.total).toLocaleString()} most recent of
       {" "}{stats.total.toLocaleString()} recorded votes; the complete
       record lives in the <a href={body.insite_url} class="underline">city's own system</a>{stats.total > 0 && (
-        <>, and every recorded vote is <a href={`/local/${body.slug}/${member.slug}/votes/1/`} class="underline">paged here</a></>
+        <>, and the collected votes are <a href={`/local/${body.slug}/${member.slug}/votes/1/`} class="underline">paged here</a></>
       )}.
     </p>
     {yearPages.length > 1 && (
       <p class="mt-1 max-w-3xl text-sm text-navy-600" data-pagefind-ignore>
-        Jump to a year in the full record:
+        Jump to a year in the collected record:
         {yearPages.map((y) => (
           <a href={`/local/${body.slug}/${member.slug}/votes/${y.page}/`} class="ml-2 underline tabular-nums">{y.year}</a>
         ))}

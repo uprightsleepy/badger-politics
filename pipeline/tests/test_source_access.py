@@ -295,6 +295,14 @@ def test_policy_refresh_blocks_mid_run_change(network):
     "https://city.milwaukee.gov/CommonCouncil/CouncilMembers/District1?PrintPage=yes",
     "https://campaignfinance.wi.gov/registrant-dashboard",
     "https://campaignfinance.wi.gov/api/trpc/admin.delete",
+    "https://webapi.legistar.com/v1/madison/Matters",
+    "https://webapi.legistar.com/v1/unreviewed/Events",
+    "https://madison.legistar.com/Private.aspx",
+    "https://www.cityofmadison.com/council/district3/",
+    "https://webapi.legistar.com/v1/racine/Events",
+    "https://webapi.legistar.com/v1/cityofappleton/Matters",
+    "https://greenbaywi.api.civicclerk.com/v1/Users",
+    "https://www.kenosha.org/government/common-council/",
 ])
 def test_reviewed_manifest_rejects_restricted_or_unreviewed_urls(url):
     with pytest.raises(SourceAccessError):
@@ -313,9 +321,26 @@ def test_reviewed_manifest_rejects_restricted_or_unreviewed_urls(url):
     "https://webapi.legistar.com/v1/milwaukee/Events/1/EventItems",
     "https://westalliswi.legistar.com/MeetingDetail.aspx?ID=1",
     "https://www.westalliswi.gov/page/district-one",
+    "https://webapi.legistar.com/v1/madison/Events/27791/EventItems",
+    "https://webapi.legistar.com/v1/madison/EventItems/828843/Votes",
+    "https://webapi.legistar.com/v1/madison/EventItems/828843/RollCalls",
+    "https://webapi.legistar.com/v1/madison/Persons/4",
+    "https://madison.legistar.com/MeetingDetail.aspx?ID=1",
+    "https://webapi.legistar.com/v1/cityofappleton/Events/6462/EventItems",
+    "https://webapi.legistar.com/v1/waukesha/EventItems/330128/Votes",
+    "https://cityofappleton.legistar.com/MeetingDetail.aspx?LEGID=6462",
+    "https://waukesha.legistar.com/Departments.aspx",
 ])
 def test_reviewed_manifest_accepts_only_intended_routes(url):
     SourceAccess().source(url)
+
+
+def test_madison_only_allows_public_grid_postbacks():
+    access = SourceAccess()
+    access.source("https://madison.legistar.com/Departments.aspx", "POST")
+    access.source("https://madison.legistar.com/MeetingDetail.aspx?ID=1", "POST")
+    with pytest.raises(SourceAccessError):
+        access.source("https://webapi.legistar.com/v1/madison/Events", "POST")
 
 
 @pytest.mark.parametrize("location", [
@@ -416,4 +441,5 @@ def test_nightly_job_keeps_archives_and_omits_paused_fetchers():
     assert not any("scraper.fetch_" + name in line for line in commands
                    for name in ("lobbying", "wiseye", "wec"))
     policies = json.loads(source_access.MANIFEST.read_text())
-    assert policies["reviewed_on"] == "2026-09-07"
+    assert all(policies["sources"][host].get("paused")
+               for host in ("lobbying.wi.gov", "wiseye.org", "elections.wi.gov"))

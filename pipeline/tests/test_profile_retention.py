@@ -9,6 +9,7 @@ from test_import_local import build, event_file, item, office, vote
 
 from dataproducts.queries import meta
 from importer.import_local import milwaukee_profile_owners, run
+from importer.local_registry import TENANTS
 from nightly.stages import commands
 from scraper import fetch_local_profiles as collector
 from scraper.source_access import SourceAccess, SourceAccessError
@@ -132,7 +133,11 @@ def test_reviewed_reactivation_restores_collection_and_clears_retained_status(ar
     assert after["_refresh"]["milwaukee"]["last_success_at"]
 
 
-def test_import_adds_notice_metadata_without_changing_attribution_or_votes(tmp_path, make_db):
+def test_import_adds_notice_metadata_without_changing_attribution_or_votes(
+    tmp_path, make_db, monkeypatch,
+):
+    monkeypatch.setattr("importer.import_local.TENANTS", [s for s in TENANTS
+                                                       if s.get("provider") != "civicclerk"])
     profiles = archived_profiles()
     conn = build(tmp_path, make_db, profiles=profiles,
                  milwaukee_office=[office(1, "Example", "1st District")],

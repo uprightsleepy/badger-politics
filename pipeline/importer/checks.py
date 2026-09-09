@@ -309,10 +309,13 @@ def check_local(conn: sqlite3.Connection) -> list[str]:
             "SELECT COUNT(*) FROM local_events"
             " WHERE insite_url IS NULL OR insite_url = ''"
         ),
-        # the mayor presides without a seat; every sitting *Member* has one
+        # Some tenants label the mayor as Member; the active office title proves the role.
         "sitting council members missing a seat": (
-            "SELECT COUNT(*) FROM local_members WHERE is_current = 1"
-            " AND member_type = 'Member' AND seat IS NULL"
+            "SELECT COUNT(*) FROM local_members m WHERE m.is_current = 1"
+            " AND m.member_type = 'Member' AND m.seat IS NULL"
+            " AND NOT EXISTS (SELECT 1 FROM local_member_terms t"
+            " WHERE t.tenant = m.tenant AND t.person_id = m.person_id AND t.title = 'Mayor'"
+            " AND t.start <= date('now') AND t.end >= date('now'))"
         ),
         "local memberships -> members": (
             "SELECT COUNT(*) FROM local_memberships s LEFT JOIN local_members m"
@@ -345,7 +348,7 @@ def check_local(conn: sqlite3.Connection) -> list[str]:
         "local tenants with no dissenting vote on record": (
             "SELECT COUNT(*) FROM local_bodies b WHERE NOT EXISTS"
             " (SELECT 1 FROM local_votes v WHERE v.tenant = b.tenant"
-            "  AND v.value = 'No')"
+            "  AND v.value IN ('No', 'Nay'))"
         ),
     }
     failures = []

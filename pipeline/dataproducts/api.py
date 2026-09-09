@@ -176,12 +176,16 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
         files += 1
 
     # city councils: the same record-first shape, keyed by the tenant's ids
+    metadata = queries.meta(conn)
     for body in queries.local_bodies(conn):
         members = queries.local_members(conn, body["tenant"])
+        raw_coverage = metadata.get(f"local_coverage_{body['tenant']}")
+        coverage = {"coverage": json.loads(raw_coverage)} if raw_coverage else {}
         write_json(
             api / "local" / body["slug"] / "index.json",
             {
                 "body": body,
+                **coverage,
                 "members": [
                     {k: m[k] for k in ("person_id", "name", "slug", "seat", "is_current",
                                        "image_url", "vote_count")}
@@ -195,7 +199,7 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
                 continue
             write_json(
                 api / "local" / body["slug"] / f"{m['slug']}.json",
-                {**m, "body": body["slug"],
+                {**m, "body": body["slug"], **coverage,
                  "votes": queries.local_member_votes(conn, body["tenant"], m["person_id"])},
             )
             files += 1

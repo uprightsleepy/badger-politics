@@ -60,19 +60,30 @@ const ACTIONS: Record<string, string> = {
 
 const VOTES: Record<string, string> = {
   "Aye": "voted yes",
+  "Yes": "voted yes",
   "No": "voted no",
+  "Nay": "voted no",
   "Present": "attended but voted neither yes nor no",
   "Pres (virt)": "attended by video",
   "Abstain": "chose not to vote",
+  "Abstained": "chose not to vote",
   "Excused": "absent with notice",
   "Absent": "absent",
   "Non-Voting": "took part without a vote (the presiding mayor)",
+  "Non Voting": "took part without a vote",
+  "Presiding": "presided without casting a vote",
+  "Not Present": "not present",
+  "Recused": "did not participate in the decision because of a conflict of interest",
 };
 
 const CAST_STYLE: Record<string, string> = {
   Aye: "bg-moss-50 text-moss-600",
+  Yes: "bg-moss-50 text-moss-600",
   No: "bg-badger-50 text-badger-700",
+  Nay: "bg-badger-50 text-badger-700",
 };
+export const isNoVote = (value: string): boolean => value === "No" || value === "Nay";
+export const isYesVote = (value: string): boolean => value === "Aye" || value === "Yes";
 export const castStyle = (value: string): string =>
   CAST_STYLE[value] ?? "bg-navy-50 text-navy-600";
 

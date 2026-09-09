@@ -1,11 +1,4 @@
-"""The local governments whose council votes we carry.
-
-One entry per Legistar tenant: the API client id, the council body name
-exactly as the tenant spells it, the year recorded votes become reliable
-(verified in docs/research/local-votes-2026-08.md), and the display
-strings the site shows. Adding a government is adding a row here and
-re-running the fetch; nothing else is tenant-specific.
-"""
+"""Reviewed council sources; expansion order and evidence live in docs/research/."""
 
 from __future__ import annotations
 
@@ -22,6 +15,44 @@ TENANTS: list[dict] = [
         "insite": "https://milwaukee.legistar.com",
     },
     {
+        "tenant": "madison",
+        "slug": "madison",
+        "city": "Madison",
+        "body_display": "Madison Common Council",
+        "body_name": "COMMON COUNCIL",
+        "since": 2025,
+        "seats": 20,
+        "insite": "https://madison.legistar.com",
+        "final_minutes": ("Approved",),
+        "max_new_per_run": 5,
+        "bootstrap_event_id": 27791,
+        "seat_url_pattern": r"https?://www\.cityofmadison\.com/council/district(\d{1,2})/?",
+    },
+    {
+        "tenant": "cityofappleton",
+        "slug": "appleton",
+        "city": "Appleton",
+        "body_display": "Appleton Common Council",
+        "body_name": "Common Council",
+        "since": 2025,
+        "seats": 15,
+        "insite": "https://cityofappleton.legistar.com",
+        "max_new_per_run": 2,
+        "bootstrap_event_id": 6462,
+    },
+    {
+        "tenant": "waukesha",
+        "slug": "waukesha",
+        "city": "Waukesha",
+        "body_display": "Waukesha Common Council",
+        "body_name": "City Council",
+        "since": 2025,
+        "seats": 15,
+        "insite": "https://waukesha.legistar.com",
+        "max_new_per_run": 2,
+        "bootstrap_event_id": 13087,
+    },
+    {
         "tenant": "westalliswi",
         "slug": "west-allis",
         "city": "West Allis",
@@ -32,5 +63,22 @@ TENANTS: list[dict] = [
         "since": 2015,
         "seats": 5,
         "insite": "https://westalliswi.legistar.com",
+    },
+    {
+        "tenant": "greenbaywi",
+        "provider": "civicclerk",
+        "slug": "green-bay",
+        "city": "Green Bay",
+        "body_display": "Green Bay Common Council",
+        "body_name": "Common Council",
+        "since": 2026,
+        "start_date": "2026-07-01",
+        "seats": 12,
+        "insite": "https://greenbaywi.portal.civicclerk.com",
+        "api_base": "https://greenbaywi.api.civicclerk.com/v1",
+        "category_id": 26,
+        "roster_url": "https://www.greenbaywi.gov/617/Common-Council",
+        "max_new_per_run": 2,
+        "bootstrap_event_id": 9565,
     },
 ]

@@ -8,6 +8,7 @@ directory download pattern used by the roster fetchers.
 from __future__ import annotations
 
 import hashlib
+import json
 import time
 from pathlib import Path
 
@@ -15,6 +16,12 @@ import requests
 from requests.adapters import HTTPAdapter
 
 from scraper.source_access import ACCESS, USER_AGENT, SourceAccessError
+
+
+def save_json(path: Path, value) -> None:
+    pending = path.with_suffix(".json.tmp")
+    pending.write_text(json.dumps(value, indent=0), encoding="utf-8")
+    pending.replace(path)
 
 
 class PolicyAdapter(HTTPAdapter):

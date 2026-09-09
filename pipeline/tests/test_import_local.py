@@ -2,8 +2,10 @@
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from importer.import_local import run
+from importer.local_registry import TENANTS
 
 TODAY_END = "2028-04-11T00:00:00"
 
@@ -44,6 +46,12 @@ def vote(person_id: int, name: str, value: str = "Aye") -> dict:
 def write_tenant(root: Path, tenant: str, officerecords, events) -> None:
     d = root / tenant
     d.mkdir(parents=True)
+    spec = next(s for s in TENANTS if s["tenant"] == tenant)
+    if spec.get("max_new_per_run") is not None:
+        (d / "coverage.json").write_text(json.dumps({
+            "since": spec["since"], "listed_meetings": len(events), "pending_meetings": 0,
+            "checked_at": "2026-09-08T00:00:00+00:00",
+        }), encoding="utf-8")
     (d / "officerecords.json").write_text(json.dumps(officerecords), encoding="utf-8")
     (d / "votetypes.json").write_text(
         json.dumps([{"VoteTypeName": v} for v in
@@ -58,12 +66,21 @@ def write_tenant(root: Path, tenant: str, officerecords, events) -> None:
 
 def build(tmp_path: Path, make_db, milwaukee_events=(), westallis_events=(),
           milwaukee_office=(), westallis_office=(), profiles=None, persons=None,
-          memberships=None, bodies=None, upcoming=None, api_bodies=None):
+          memberships=None, bodies=None, upcoming=None, api_bodies=None,
+          madison_office=(), madison_events=(), extra_tenants=None):
     db = tmp_path / "wi.sqlite"
     make_db(db).close()
     local = tmp_path / "local"
     write_tenant(local, "milwaukee", list(milwaukee_office), list(milwaukee_events))
     write_tenant(local, "westalliswi", list(westallis_office), list(westallis_events))
+    write_tenant(local, "madison", list(madison_office), list(madison_events))
+    for spec in TENANTS:
+        if spec.get("provider") == "civicclerk":
+            continue  # This fixture models Legistar's office-record contract.
+        tenant = spec["tenant"]
+        if not (local / tenant).exists():
+            data = (extra_tenants or {}).get(tenant, {})
+            write_tenant(local, tenant, data.get("office", []), data.get("events", []))
     if profiles is not None:
         (local / "profiles.json").write_text(json.dumps(profiles), encoding="utf-8")
     for tenant, data in (persons or {}).items():
@@ -76,7 +93,9 @@ def build(tmp_path: Path, make_db, milwaukee_events=(), westallis_events=(),
         (local / tenant / "upcoming.json").write_text(json.dumps(data), encoding="utf-8")
     for tenant, data in (api_bodies or {}).items():
         (local / tenant / "bodies.json").write_text(json.dumps(data), encoding="utf-8")
-    run(local, db)
+    with patch("importer.import_local.TENANTS", [s for s in TENANTS
+                                               if s.get("provider") != "civicclerk"]):
+        run(local, db)
     import sqlite3
     return sqlite3.connect(db)
 
