@@ -11,6 +11,17 @@ import yaml
 from nightly.stages import STAGES
 
 PIN = re.compile(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}")
+DEPLOY_TRIGGER = (
+    "github.ref == 'refs/heads/main' && "
+    "(github.event_name != 'workflow_run' || "
+    "(github.event.workflow_run.conclusion == 'success' && "
+    "github.event.workflow_run.head_branch == 'main' && "
+    "github.event.workflow_run.head_repository.full_name == github.repository && "
+    "github.event.workflow_run.display_title == 'nightly parser' && "
+    "(github.event.workflow_run.event == 'schedule' || "
+    "github.event.workflow_run.event == 'workflow_dispatch')))"
+)
+DEPLOY_TARGET = "${{ inputs.target || 'badgerpolitics-dev' }}"
 
 
 def validate(workflow: dict, name: str) -> list[str]:
@@ -46,8 +57,25 @@ def validate(workflow: dict, name: str) -> list[str]:
                 if "snapshot-" in settings or "data/wi.sqlite" in settings:
                     errors.append(f"{job_name}: raw snapshots must not enter Actions caches")
     if name == "deploy.yml":
-        if untrusted or not set(events).issubset({"push", "workflow_dispatch"}):
-            errors.append("deploy may only use push or workflow_dispatch")
+        if untrusted or not set(events).issubset({"push", "workflow_dispatch", "workflow_run"}):
+            errors.append("deploy may only use push, workflow_dispatch, or trusted workflow_run")
+        jobs = workflow.get("jobs", {})
+        if "workflow_run" in events:
+            if events["workflow_run"] != {
+                "workflows": ["nightly parser"], "types": ["completed"], "branches": ["main"],
+            }:
+                errors.append("deploy must follow only completed nightly parsers on main")
+            condition = " ".join(jobs.get("validate", {}).get("if", "").split())
+            if condition != DEPLOY_TRIGGER:
+                errors.append("deploy requires a successful main parser, excluding policy checks")
+            if (workflow.get("env", {}).get("TARGET") != DEPLOY_TARGET
+                    or jobs.get("deploy", {}).get("environment", {}).get("name") != DEPLOY_TARGET
+                    or jobs.get("deploy", {}).get("concurrency", {}).get("group") != (
+                        "deploy-${{ inputs.target || 'badgerpolitics-dev' }}")
+                    or str(jobs.get("deploy", {}).get("concurrency", {}).get(
+                        "cancel-in-progress")) != "false"
+                    or "concurrency" in workflow):
+                errors.append("automatic deploys must use dev and serialize releases per target")
         needs = workflow.get("jobs", {}).get("deploy", {}).get("needs", [])
         needs = [needs] if isinstance(needs, str) else needs
         if "validate" not in needs:

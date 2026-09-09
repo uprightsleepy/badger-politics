@@ -88,7 +88,7 @@ def main() -> int:
         print("Private checkpoint saved")
     elif args.action == "publish":
         runner.publish()
-        print("Validated snapshot published; hosting requires a separate release")
+        print("Validated snapshot published; dev release follows successful workflow completion")
     elif args.action == "finance-plan":
         months = months_for(runner.finance_plan())
         output = os.environ.get("GITHUB_OUTPUT")

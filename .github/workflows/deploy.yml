@@ -1,7 +1,7 @@
 name: deploy
 
 # Build and validate main before replacing the hosted site.
-# Pushes release to dev; production requires an explicit manual promotion.
+# Pushes and completed parsers release to dev; production promotion is manual.
 on:
   push:
     branches: [main]
@@ -15,6 +15,10 @@ on:
       - ".github/workflows/ci.yml"
       - "firebase.json"
       - ".github/workflows/deploy.yml"
+  workflow_run:
+    workflows: [nightly parser]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       target:
@@ -26,24 +30,32 @@ on:
 permissions:
   contents: read
 
-# Serialize releases per target to prevent competing replacements.
-concurrency:
-  group: deploy-${{ inputs.target || 'badgerpolitics-dev' }}
-  cancel-in-progress: false
-
 env:
   SNAPSHOT_BUCKET: badgerpolitics-prod-snapshots
-  # a push has no inputs, so it lands on dev by default
+  # Automatic releases have no target input and always land on dev.
   TARGET: ${{ inputs.target || 'badgerpolitics-dev' }}
 
 jobs:
   validate:
     name: required CI for this revision
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.display_title == 'nightly parser' &&
+        (github.event.workflow_run.event == 'schedule' ||
+         github.event.workflow_run.event == 'workflow_dispatch')))
     uses: ./.github/workflows/ci.yml
 
   deploy:
     name: build, verify, release
     needs: validate
+    # Skipped policy/failure events must not displace a queued dev release.
+    concurrency:
+      group: deploy-${{ inputs.target || 'badgerpolitics-dev' }}
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write # only the credentialed job can mint an OIDC token
@@ -66,6 +78,8 @@ jobs:
           fi
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -216,6 +230,19 @@ jobs:
           cc=$(curl -sSI "$base/" | tr -d '\r' | awk -F': ' 'tolower($1)=="cache-control"{print $2}')
           echo "Cache-Control: $cc"
           case "$cc" in *must-revalidate*) ;; *) echo "::error::HTML is not revalidating"; exit 1 ;; esac
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 \
+            "$base/api/v1/meta.json" > "$RUNNER_TEMP/live-meta.json"
+          python3 - "$RUNNER_TEMP/live-meta.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          expected = json.loads(Path("site/public/api/v1/meta.json").read_text())
+          actual = json.loads(Path(sys.argv[1]).read_text())
+          if not expected.get("imported_at") or actual != expected:
+              raise SystemExit("Live data metadata does not match the released snapshot")
+          print(f"Live snapshot imported at {actual['imported_at']}")
+          PY
 
       # Test Firebase's live CSP, including Pagefind's WebAssembly requirements.
       - name: Check the CSP against the released site

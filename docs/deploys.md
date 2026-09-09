@@ -28,9 +28,9 @@ release a build that does not match the database that produced it.
 | Pull request | `ci.yml` | Ruff, pytest, schema applies, site typecheck, workflow guards, `tofu validate`. No secrets, no deploy. |
 | Push to `main` touching `site/**` | `deploy.yml` | Full gate chain, then release to **dev**. |
 | Manual (`workflow_dispatch`) | `deploy.yml` | Same chain, released to the target you pick. Defaults to **prod** — this is how production is promoted. |
-| Nightly / manual parser | `nightly-parser.yml` | Sequential collection → import → checks → private snapshot. Schedule requires `NIGHTLY_PARSER_ENABLED=true`; hosting remains a separate release. See [parser runbook](nightly-parser-hosting.md). |
+| Successful nightly / manual parser on `main` | `nightly-parser.yml` → `deploy.yml` | Collection → import → checks → private snapshot, followed by the full dev release gates. Failed, cancelled, and policy-only runs do not release. The nightly schedule requires `NIGHTLY_PARSER_ENABLED=true`. See [parser runbook](nightly-parser-hosting.md). |
 
-Production is never released by pushing. A push rehearses on dev; you
+Production is never released automatically. Pushes and successful parsers rehearse on dev; you
 promote when dev looks right. This is a public record, so nothing reaches
 constituents as a side effect of committing.
 
@@ -52,6 +52,7 @@ constituents as a side effect of committing.
    asserts 200s on pages, a feed and an API file, and checks that HTML is
    still served with `must-revalidate`. A page cached for an hour once hid
    a broken deploy for exactly that long.
+   The live API metadata must also match the snapshot used for the build.
 
 The gates are also where three latent defects surfaced the first time this
 ran: `npm ci --ignore-scripts` leaves `better-sqlite3` unloadable, the

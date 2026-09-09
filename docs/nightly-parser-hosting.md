@@ -12,7 +12,9 @@ Run the parser on a **standard Linux GitHub-hosted runner** in this public
 repository. Reuse the private `badgerpolitics-prod-snapshots` bucket for
 compressed source state and validated SQLite snapshots. Keep site releases
 in the existing gated `deploy.yml` workflow, with production promotion
-remaining explicit.
+remaining explicit. A successful full parser run on `main` triggers that
+workflow to rebuild and release dev from the newest validated snapshot.
+Failed, cancelled, and policy-only runs do not trigger a release.
 
 `AGENTS.md` sets a total infrastructure ceiling below $10/month excluding
 domains and prefers $0–5. `CLAUDE.md` and the README retain the older
@@ -358,6 +360,12 @@ then advances `latest.json` with a generation precondition. A retry can
 recognize a snapshot already copied before interruption. The two writes
 are not atomic: a complete validated snapshot can be visible to deployment
 before the source-state manifest advances. It never exposes a partial DB.
+
+After the parser succeeds, `deploy.yml` runs CI, builds all sessions, verifies
+the site, and releases dev. The footer's last-pulled date and API `imported_at`
+come from that snapshot; the latest legislative action date only changes when
+the source records do. The release checks live API metadata against its build.
+This reuses the existing runner, Hosting project, and snapshot-download budget.
 
 Locks are not automatically stolen. Normal success/failure cleanup releases
 only its own lock. After cancellation or host failure, inspect the lock's
