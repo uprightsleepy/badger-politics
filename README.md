@@ -22,7 +22,7 @@ and served as a fully static site.
 | New Laws, Governor's Desk, Veto Tracker, Partial Veto | Acts by biennium with passage tallies; bills awaiting signature; every veto, partial veto and override attempt; how the partial veto works |
 | Campaign Money | Receipts to sitting legislators windowed to their time in office, contributing committees, and outside spending filing by filing with the Ethics Commission's transaction IDs and report links |
 | Federal Delegation | Both U.S. senators and all eight House members, with every floor roll call from the Senate's and House Clerk's own XML (Senate from the 112th Congress, House from 2005) |
-| City Councils | Milwaukee and West Allis Common Council votes, member by member, with every vote that drew a No surfaced and every item linking the clerk's own record; each member page carries the portrait, office contacts, committee assignments, service dates and term end, attendance from the clerk's roll calls, sole No votes and dissent filterable by year, votes on the losing side, motions moved, a paged full record with year navigation, a follow button, an Atom feed and JSON, like a legislator's; district pages draw each district within its city; the address lookup adds the reader's alderpersons |
+| City Councils | Milwaukee, Madison and West Allis recorded votes, member profiles, attendance, source links, feeds and JSON. Partial history is labeled. Verified district maps and address lookup currently cover Milwaukee and West Allis. |
 | 2026 Ballot | Statewide offices and every legislative seat, with a personal "what is on my ballot" view from the saved district |
 | Following | Device-only follows for bills, legislators, committees, districts and races, with what changed since the last visit |
 | Data and API | Static JSON API, Atom feeds, iCal calendars, bulk CSV and a provenance-filtered SQLite snapshot, all keyless |
@@ -70,11 +70,11 @@ require a seeded archive and `NIGHTLY_PARSER_ENABLED=true`; see the
 | Campaign finance | CFIS tRPC API (campaignfinance.wi.gov) | legislator receipts in monthly windows since 2008-01 through a verified committee map; every other filer's money since 2025-01, including independent expenditures with their report IDs |
 | Lobbying registrations | Withheld | Collection removed; archived data is excluded from public pages and exports pending an approved source |
 | Federal roll calls | senate.gov LIS XML, clerk.house.gov EVS XML, unitedstates/congress-legislators roster | per-vote files mirrored once and cached forever; positions keyed by each chamber's own member id |
-| Council votes and attendance | Legistar Web API (`milwaukee`, `westalliswi` tenants: EventItems, Votes, RollCalls); each meeting's InSite page for item links | meetings cached permanently once minutes are Final; votes keyed by each tenant's own person id; an item links to the page the meeting's own page lists for its file number, because InSite's ids are not the API's |
+| Council votes and attendance | Legistar Web API (`milwaukee`, `madison`, `westalliswi`); each meeting's InSite page for item links | meetings cached once minutes are settled (`Approved` for Madison, `Final` otherwise); votes retain each tenant's person IDs; links come from the meeting's own page |
 | Aldermanic district boundaries | Milwaukee open data portal (CC BY shapefile); West Allis city GIS server | one-time generator (`importer/local_shapes.py`), committed GeoJSON; the robots-disallowed city map host is not used |
 | West Allis seat roster | the city's own district pages | ten-row curated table (`importer/local_seats.json`), each entry with its basis URL |
 | Council members carried under two ids | `importer/local_person_merges.json`, each entry with its basis (identical record name, complementary service, no item voted under both) | folded into one member; the importer refuses a merge the votes contradict |
-| Council member names, portraits, contacts, committees | the tenant's Persons record for the full name where the office record abbreviates it (Milwaukee lists "ALD. BAUMAN"); the cities' own district pages (city.milwaukee.gov, westalliswi.gov, both `Allow: /`); Legistar Persons, OfficeRecords and each tenant's public Departments listing | a portrait attaches only when the city's page labels it with the member's district (Milwaukee) or name (West Allis); an email or phone only when exactly one is on record; committee links by exact body name against the tenant's own listing, plain text otherwise |
+| Council member names, portraits, contacts, committees | Legistar person/office IDs and public department listings; reviewed city district pages for Milwaukee and West Allis | exact identity and source attribution; Milwaukee profile retrieval is currently paused with its complete archive retained; Madison districts use the same person ID's official council URL, without portrait downloads |
 | Cross-check only | FollowTheMoney API (CC BY-NC-SA) | verification input, never imported or republished |
 | Org logos | logo.dev (`LOGO_DEV_TOKEN`) | build-time fetch for hand-verified org domains only |
 | Address suggestions (optional) | Google Places API (New), only in builds where the `PUBLIC_PLACES_KEY` Actions variable is set | as-you-type suggestions in the address lookups, disclosed in the privacy copy; the submitted address still resolves through the Census geocoder; without the variable the feature is dormant and the site fully keyless |
@@ -204,7 +204,7 @@ provenance-filtered SQLite snapshot. See [/data/](https://badgerpolitics.org/dat
 | Lobbying | Withheld from public pages and exports pending an approved source |
 | Election results | certified WEC canvasses per seat and statewide office |
 | Federal roll calls | U.S. Senate from the 112th Congress (2011); U.S. House from 2005 |
-| Council votes | Milwaukee from 2008; West Allis from 2015 (earlier minutes record votes inconsistently) |
+| Council votes | Milwaukee from 2008; Madison from 2025 with five new meetings per run and visible backfill progress; West Allis from 2015 (earlier minutes record votes inconsistently). [Expansion order and source review](docs/research/wisconsin-city-expansion-2026-09.md). |
 
 ## Local development
 

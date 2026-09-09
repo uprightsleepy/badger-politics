@@ -32,6 +32,13 @@ No new paid service or dependency is required.
 
 ## Shared daily checks (2026-09-08)
 
+Madison council collection was reviewed on September 8, 2026: documented public
+Legistar API GETs and public InSite meeting/department pagination, minimum one
+second per request, with robots returning 404 on both hosts. City terms allow
+public-information reuse subject to protected content; portraits and logos are
+excluded. Its bounded history starts in 2025. See the complete
+[policy evidence, ranked city queue and rollout](../../docs/research/wisconsin-city-expansion-2026-09.md).
+
 The policy-only job checks each active host once using the existing transport;
 paused sources stay paused. It compares the complete normalized robots response
 with the reviewed fingerprint, including comments. Terms and reuse still need

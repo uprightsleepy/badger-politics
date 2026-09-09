@@ -193,6 +193,7 @@ def ensure_member(
 
 def member_seat(
     records: list[dict], curated: dict, person_id: int,
+    person: dict | None = None, seat_url_pattern: str | None = None,
 ) -> tuple[int | None, str | None]:
     for record in reversed(records):
         match = TITLE_SEAT_RE.match(record.get("OfficeRecordTitle") or "")
@@ -201,6 +202,11 @@ def member_seat(
     if str(person_id) in curated:
         entry = curated[str(person_id)]
         return entry["seat"], entry["basis"]
+    if seat_url_pattern and person:
+        url = person.get("PersonWWW") or ""
+        match = re.fullmatch(seat_url_pattern, url)
+        if match:
+            return int(match.group(1)), re.sub(r"^http:", "https:", url)
     return None, None
 
 
@@ -250,7 +256,9 @@ def import_members(
         record_name = latest["OfficeRecordFullName"].strip()
         name = display_name(record_name, persons.get(str(person_id)))
         is_current = any((r.get("OfficeRecordEndDate") or "")[:10] >= today for r in records)
-        seat, seat_basis = member_seat(records, curated, person_id)
+        seat, seat_basis = member_seat(
+            records, curated, person_id, persons.get(str(person_id)), spec.get("seat_url_pattern"),
+        )
         if seat is not None and not 1 <= seat <= spec["seats"]:
             raise RuntimeError(f"{tenant} person {person_id}: seat {seat} out of range")
         slug = slugify(name) or str(person_id)
@@ -339,6 +347,19 @@ def _optional_json(path: Path, default):
 def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict:
     tenant = spec["tenant"]
     src = local_dir / tenant
+    coverage = _optional_json(src / "coverage.json", None)
+    if coverage is None and spec.get("max_new_per_run") is not None:
+        raise ValueError(f"{tenant}: council coverage metadata is required")
+    if coverage is not None:
+        if (not isinstance(coverage, dict) or coverage.get("since") != spec["since"]
+                or any(type(coverage.get(k)) is not int or coverage[k] < 0
+                       for k in ("listed_meetings", "pending_meetings"))
+                or coverage["pending_meetings"] > coverage["listed_meetings"]
+                or not isinstance(coverage.get("checked_at"), str)
+                or datetime.fromisoformat(coverage["checked_at"]).tzinfo is None):
+            raise ValueError(f"{tenant}: invalid council coverage metadata")
+        conn.execute("INSERT INTO meta (key, value) VALUES (?, ?)",
+                     (f"local_coverage_{tenant}", json.dumps(coverage)))
     office = json.loads((src / "officerecords.json").read_text(encoding="utf-8"))
     vote_types = json.loads((src / "votetypes.json").read_text(encoding="utf-8"))
     merges = load_merges(tenant)

@@ -67,6 +67,8 @@ const VOTES: Record<string, string> = {
   "Excused": "absent with notice",
   "Absent": "absent",
   "Non-Voting": "took part without a vote (the presiding mayor)",
+  "Non Voting": "took part without a vote",
+  "Recused": "did not participate in the decision because of a conflict of interest",
 };
 
 const CAST_STYLE: Record<string, string> = {

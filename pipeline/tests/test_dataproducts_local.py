@@ -1,6 +1,7 @@
 """Council members get the same data products as legislators: a JSON
 record and an Atom feed each, keyed by the tenant's ids."""
 
+import json
 from pathlib import Path
 
 from dataproducts import queries
@@ -44,3 +45,18 @@ def test_member_json_and_feed(tmp_path: Path, make_db) -> None:
     feed = (out / "feeds" / "local" / "west-allis" / "kevin-haass.xml").read_text(encoding="utf-8")
     assert "Voted 'No' on R-2026-5580" in feed
     assert "LegislationDetail.aspx?ID=1" in feed
+
+
+def test_local_api_exposes_backfill_coverage(tmp_path, make_db):
+    db = tmp_path / "wi.sqlite"
+    seed(db, make_db)
+    conn = queries.connect(db)
+    coverage = {"since": 2025, "listed_meetings": 40, "pending_meetings": 35,
+                "checked_at": "2026-09-08T00:00:00+00:00"}
+    conn.execute("INSERT INTO meta VALUES (?, ?)",
+                 ("local_coverage_westalliswi", json.dumps(coverage)))
+    out = tmp_path / "public"
+    build_api(conn, out)
+    api = out / "api/v1/local/west-allis"
+    for filename in ("index.json", "kevin-haass.json"):
+        assert json.loads((api / filename).read_text())["coverage"] == coverage

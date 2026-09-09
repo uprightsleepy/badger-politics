@@ -7,6 +7,7 @@ import SourceStrip from "../../../components/SourceStrip.astro";
 import ScrollPanel from "../../../components/ScrollPanel.astro";
 import Portrait from "../../../components/Portrait.astro";
 import LocalProfileNotice from "../../../components/LocalProfileNotice.astro";
+import LocalCoverageNotice from "../../../components/LocalCoverageNotice.astro";
 import FollowButton from "../../../components/FollowButton.astro";
 import JsonLd from "../../../components/JsonLd.astro";
 import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, localMemberVotesWithDissent, localMemberTerms, localMemberships, localMemberOutcomes, localMemberMotions, localMemberMotionCount, localMemberAttendance, localMemberVoteYears, localMemberTieBreaks } from "../../../lib/db";
@@ -75,7 +76,7 @@ const termLabel = (t: string | null) =>
 
 <Base
   title={`${member.name}, ${body.city}${member.seat != null ? ` District ${member.seat}` : ""}`}
-  description={`${member.name}'s complete ${body.name} voting record from the city's own legislative system: ${stats.total.toLocaleString()} recorded votes.`}
+  description={`${member.name}'s ${body.name} voting record from the city's own legislative system: ${stats.total.toLocaleString()} recorded votes.`}
   filters={{ type: "City Council", city: body.city }}
   breadcrumbs={[
     { name: "City Councils", url: "/local/" },
@@ -127,6 +128,7 @@ const termLabel = (t: string | null) =>
     sources={[{ label: `${body.name} records (Legistar)`, href: body.insite_url }]}
     through={stats.last}
   />
+  <LocalCoverageNotice tenant={body.tenant} />
 
   <div class="mt-4 flex flex-col gap-6 md:flex-row">
     <aside class="w-full shrink-0 md:w-64" aria-label={`About ${member.name}`}>
@@ -346,10 +348,8 @@ const termLabel = (t: string | null) =>
     <section class="mt-6">
       <h2 class="text-xl font-bold">Votes with dissent · {dissentVotes.length.toLocaleString()}</h2>
       <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Every item where at least one member voted No and {member.name}'s
-        position is on record, with the council's tally. Nearly everything
-        passes with every member in favor, so a single No is what sets one
-        record apart from another.
+        Collected items where at least one member voted No and {member.name}'s
+        position is on record, with the council's recorded tally.
         The vote is on the action named under each row: a motion to refer or
         postpone is not the measure itself, and a sponsor can vote No on
         referral and Aye on passage.
@@ -403,12 +403,12 @@ const termLabel = (t: string | null) =>
       The {Math.min(RECENT, stats.total).toLocaleString()} most recent of
       {" "}{stats.total.toLocaleString()} recorded votes; the complete
       record lives in the <a href={body.insite_url} class="underline">city's own system</a>{stats.total > 0 && (
-        <>, and every recorded vote is <a href={`/local/${body.slug}/${member.slug}/votes/1/`} class="underline">paged here</a></>
+        <>, and the collected votes are <a href={`/local/${body.slug}/${member.slug}/votes/1/`} class="underline">paged here</a></>
       )}.
     </p>
     {yearPages.length > 1 && (
       <p class="mt-1 max-w-3xl text-sm text-navy-600" data-pagefind-ignore>
-        Jump to a year in the full record:
+        Jump to a year in the collected record:
         {yearPages.map((y) => (
           <a href={`/local/${body.slug}/${member.slug}/votes/${y.page}/`} class="ml-2 underline tabular-nums">{y.year}</a>
         ))}

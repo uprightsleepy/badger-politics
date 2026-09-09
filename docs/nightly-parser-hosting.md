@@ -229,6 +229,15 @@ scraping and no reduction in source pacing.
 
 ### Daily policy job
 
+The Madison expansion changes the source manifest. After merging it, let any
+current parser run finish, then follow the policy-only activation below. Start
+a fresh parser run with `resume_run` blank so it collects Madison before import;
+do not resume an old import checkpoint that lacks the new city's archive.
+The community stage creates that archive automatically; no seed upload or
+infrastructure change is needed. Madison adds at most five previously uncached
+meetings per run and reports pending history on the site. See the
+[city expansion review](research/wisconsin-city-expansion-2026-09.md).
+
 The same trusted workflow has a separate policy-only run at 04:15
 `America/Chicago`; collection remains at 05:15. Both schedules use
 `NIGHTLY_PARSER_ENABLED`, the workflow concurrency group, and the existing GCS

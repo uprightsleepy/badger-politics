@@ -1,11 +1,9 @@
 ---
-/** A council member's complete voting record, paged like a legislator's.
- * The profile shows the most recent 300; a long career runs to tens of
- * thousands. noindex like the legislator pages: derived lists whose
- * substance is on the clerk's pages, but crawlable for a link path. */
+/** Paginated recorded votes; the clerk's pages remain the primary source. */
 import Base from "../../../../../layouts/Base.astro";
 import Pager from "../../../../../components/Pager.astro";
 import LocalVoteRow from "../../../../../components/LocalVoteRow.astro";
+import LocalCoverageNotice from "../../../../../components/LocalCoverageNotice.astro";
 import { localBodies, localMembers, localMemberVotes, localMemberVoteYears } from "../../../../../lib/db";
 import { PER_PAGE, pageBounds, pageCount, yearPageStarts } from "../../../../../lib/paging";
 
@@ -31,7 +29,7 @@ const yearPages = yearPageStarts(localMemberVoteYears(body.tenant, member.person
 ---
 
 <Base
-  title={`${member.name}: every vote, page ${page} of ${pages}`}
+  title={`${member.name}: recorded votes, page ${page} of ${pages}`}
   description={`Votes ${first.toLocaleString()} to ${last.toLocaleString()} of ${total.toLocaleString()} recorded for ${member.name} on the ${body.name}, from the city's own records.`}
   noindex
   searchable={false}
@@ -44,13 +42,14 @@ const yearPages = yearPageStarts(localMemberVoteYears(body.tenant, member.person
   <p class="text-sm text-navy-600">
     <a href={`${base}/`} class="underline">&larr; {member.name}</a>
   </p>
-  <h1 class="mt-1 text-2xl font-bold">Every Recorded Vote</h1>
+  <h1 class="mt-1 text-2xl font-bold">Recorded Votes</h1>
   <p class="mt-1 text-sm text-navy-600">
     {total.toLocaleString()} recorded votes, newest first. Showing
     {" "}{first.toLocaleString()} to {last.toLocaleString()}. The vote is on the
     action named under each row, which is not always the measure itself.
     Each item links to the clerk's page.
   </p>
+  <LocalCoverageNotice tenant={body.tenant} />
   {yearPages.length > 1 && (
     <p class="mt-1 text-sm text-navy-600" data-pagefind-ignore>
       Jump to a year:

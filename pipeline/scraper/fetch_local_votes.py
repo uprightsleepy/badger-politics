@@ -8,9 +8,8 @@ one cached JSON file holding the event, its agenda items, the
 per-member votes for every acted item, each item's own InSite link read
 from the meeting's page (InSite's ids are not the API's), and the
 per-member attendance of every roll-call item. A meeting refetches only while
-its minutes are not Final, so the one-time backfill is exactly that.
-Meetings are fetched newest first, so an interrupted backfill still
-leaves the recent record complete.
+its minutes are not settled under the tenant's reviewed status vocabulary.
+Meetings are fetched newest first after any reviewed bootstrap meeting.
 
 The API is Granicus's public, documented endpoint (no token for these
 tenants, robots.txt absent, OData paging); we identify ourselves and
@@ -26,7 +25,7 @@ import json
 import re
 import sys
 import time
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
@@ -38,6 +37,12 @@ from scraper.http import session
 BASE = "https://webapi.legistar.com/v1"
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "local"
 PAGE = 1000
+
+
+def save_json(path: Path, value) -> None:
+    pending = path.with_suffix(".json.tmp")
+    pending.write_text(json.dumps(value, indent=0), encoding="utf-8")
+    pending.replace(path)
 
 
 def call(http: requests.Session, tenant: str, path: str, delay: float, **params):
@@ -155,20 +160,22 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
     out.mkdir(parents=True, exist_ok=True)
 
     vote_types = call(http, tenant, "VoteTypes", delay)
-    (out / "votetypes.json").write_text(json.dumps(vote_types, indent=0), encoding="utf-8")
+    save_json(out / "votetypes.json", vote_types)
     office = call(
         http, tenant, "OfficeRecords", delay,
         **{"$top": PAGE, "$filter": f"OfficeRecordBodyName eq '{spec['body_name']}'"},
     )
     if len(office) >= PAGE:
         raise RuntimeError(f"{tenant}: office records hit the page cap; add paging")
-    (out / "officerecords.json").write_text(json.dumps(office, indent=0), encoding="utf-8")
+    save_json(out / "officerecords.json", office)
 
     today = date.today().isoformat()
     # for sitting members: their person record (contacts where the tenant
     # fills them in) and every body they sit on, for committee lists
     bodies = call(http, tenant, "Bodies", delay, **{"$top": PAGE})
-    (out / "bodies.json").write_text(json.dumps(bodies, indent=0), encoding="utf-8")
+    if len(bodies) >= PAGE:
+        raise RuntimeError(f"{tenant}: bodies hit the page cap; add paging")
+    save_json(out / "bodies.json", bodies)
     sitting = sorted({
         r["OfficeRecordPersonId"] for r in office
         if (r.get("OfficeRecordEndDate") or "")[:10] >= today
@@ -177,7 +184,7 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
     # abbreviates it, and contacts for sitting members
     people = sorted({r["OfficeRecordPersonId"] for r in office})
     persons = {str(pid): call(http, tenant, f"Persons/{pid}", delay) for pid in people}
-    (out / "persons.json").write_text(json.dumps(persons, indent=0), encoding="utf-8")
+    save_json(out / "persons.json", persons)
     memberships = {
         str(pid): call(
             http, tenant, "OfficeRecords", delay,
@@ -185,19 +192,32 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
         )
         for pid in sitting
     }
-    (out / "memberships.json").write_text(json.dumps(memberships, indent=0), encoding="utf-8")
+    if any(len(rows) >= PAGE for rows in memberships.values()):
+        raise RuntimeError(f"{tenant}: memberships hit the page cap; add paging")
+    save_json(out / "memberships.json", memberships)
     departments = fetch_departments(http, spec["insite"], delay)
-    (out / "departments.json").write_text(json.dumps(departments, indent=0), encoding="utf-8")
-    fetched = cached = 0
+    save_json(out / "departments.json", departments)
+    fetched = cached = pending_count = past_count = newly_fetched = 0
+    limit = spec.get("max_new_per_run")
+    final_minutes = spec.get("final_minutes", ("Final",))
     upcoming = []
-    for event in fetch_events(http, tenant, spec["body_name"], spec["since"], delay):
+    events = fetch_events(http, tenant, spec["body_name"], spec["since"], delay)
+    anchor = spec.get("bootstrap_event_id")
+    if anchor is not None and not (out / f"event_{anchor}.json").exists():
+        if not any(e["EventId"] == anchor for e in events):
+            raise RuntimeError(f"{tenant}: reviewed bootstrap meeting missing from event listing")
+        # Include a verified individual roll call in the first bounded batch.
+        events = sorted(events, key=lambda e: e["EventId"] != anchor)
+    for event in events:
         if (event.get("EventDate") or "")[:10] >= today:
             upcoming.append(event)  # agenda for a meeting not held yet
             continue
+        past_count += 1
         dest = out / f"event_{event['EventId']}.json"
-        if dest.exists():
+        is_new = not dest.exists()
+        if not is_new:
             held = json.loads(dest.read_text(encoding="utf-8"))
-            if held["event"].get("EventMinutesStatusName") == "Final":
+            if held["event"].get("EventMinutesStatusName") in final_minutes:
                 # cached before item links or attendance were kept: filled once
                 changed = False
                 if "links" not in held:
@@ -207,13 +227,16 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
                     held["rollcalls"] = fetch_rollcalls(http, tenant, held["items"], delay)
                     changed = True
                 if changed:
-                    dest.write_text(json.dumps(held, indent=0), encoding="utf-8")
+                    save_json(dest, held)
                 cached += 1
                 continue  # minutes final: the record is settled
-        if budget[0] == 0:
+        if budget[0] == 0 or (is_new and limit is not None and newly_fetched >= limit):
+            pending_count += 1
             continue  # --max-new exhausted; the rest stays for the next run
         budget[0] -= 1
         items = call(http, tenant, f"Events/{event['EventId']}/EventItems", delay)
+        if len(items) >= PAGE:
+            raise RuntimeError(f"{tenant}: meeting items hit the page cap; add paging")
         votes: dict[str, list] = {}
         for item in items:
             if item.get("EventItemActionName"):
@@ -222,17 +245,19 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int
                 )
         links = fetch_links(http, event, spec["insite"], delay)
         rollcalls = fetch_rollcalls(http, tenant, items, delay)
-        dest.write_text(
-            json.dumps({"event": event, "items": items, "votes": votes, "links": links,
-                        "rollcalls": rollcalls}, indent=0),
-            encoding="utf-8",
-        )
+        save_json(dest, {"event": event, "items": items, "votes": votes, "links": links,
+                         "rollcalls": rollcalls})
         fetched += 1
+        newly_fetched += int(is_new)
         if fetched % 25 == 0:
             print(f"{tenant}: {fetched} meetings fetched, at {event['EventDate'][:10]}",
                   flush=True)
     # the meetings not held yet, for the calendar; refreshed every run
-    (out / "upcoming.json").write_text(json.dumps(upcoming, indent=0), encoding="utf-8")
+    save_json(out / "upcoming.json", upcoming)
+    save_json(out / "coverage.json", {
+        "since": spec["since"], "listed_meetings": past_count,
+        "pending_meetings": pending_count, "checked_at": datetime.now(UTC).isoformat(),
+    })
     return fetched, cached
 
 

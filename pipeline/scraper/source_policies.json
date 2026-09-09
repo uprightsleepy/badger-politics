@@ -111,7 +111,8 @@
     "webapi.legistar.com": {
       "paths": {
         "GET": [
-          "/v1/(?:milwaukee|westalliswi)/.*"
+          "/v1/(?:milwaukee|westalliswi)/.*",
+          "/v1/madison/(?:VoteTypes|OfficeRecords|Bodies|Persons/\\d+|Events|Events/\\d+/EventItems|EventItems/\\d+/(?:Votes|RollCalls))"
         ]
       },
       "delay_seconds": 1,
@@ -148,6 +149,17 @@
       "robots": {
         "status": 404,
         "url": "https://westalliswi.legistar.com/robots.txt"
+      }
+    },
+    "madison.legistar.com": {
+      "paths": {
+        "GET": ["/(?:Departments|MeetingDetail)\\.aspx"],
+        "POST": ["/(?:Departments|MeetingDetail)\\.aspx"]
+      },
+      "delay_seconds": 1,
+      "robots": {
+        "status": 404,
+        "url": "https://madison.legistar.com/robots.txt"
       }
     },
     "city.milwaukee.gov": {

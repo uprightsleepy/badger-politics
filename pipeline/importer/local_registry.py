@@ -1,11 +1,4 @@
-"""The local governments whose council votes we carry.
-
-One entry per Legistar tenant: the API client id, the council body name
-exactly as the tenant spells it, the year recorded votes become reliable
-(verified in docs/research/local-votes-2026-08.md), and the display
-strings the site shows. Adding a government is adding a row here and
-re-running the fetch; nothing else is tenant-specific.
-"""
+"""Reviewed council sources; expansion order and evidence live in docs/research/."""
 
 from __future__ import annotations
 
@@ -20,6 +13,20 @@ TENANTS: list[dict] = [
         "since": 2008,
         "seats": 15,
         "insite": "https://milwaukee.legistar.com",
+    },
+    {
+        "tenant": "madison",
+        "slug": "madison",
+        "city": "Madison",
+        "body_display": "Madison Common Council",
+        "body_name": "COMMON COUNCIL",
+        "since": 2025,
+        "seats": 20,
+        "insite": "https://madison.legistar.com",
+        "final_minutes": ("Approved",),
+        "max_new_per_run": 5,
+        "bootstrap_event_id": 27791,
+        "seat_url_pattern": r"https?://www\.cityofmadison\.com/council/district(\d{1,2})/?",
     },
     {
         "tenant": "westalliswi",
