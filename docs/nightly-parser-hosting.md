@@ -238,8 +238,9 @@ infrastructure change is needed. Madison adds at most five previously uncached
 meetings per run, Appleton and Waukesha two each. All report pending history on the site. See the
 [city expansion review](research/wisconsin-city-expansion-2026-09.md).
 
-The same trusted workflow has a separate policy-only run at 04:15
-`America/Chicago`; collection remains at 05:15. Both schedules use
+The same trusted workflow has a separate policy-only run at 23:00
+`America/Chicago`; collection starts at 00:00 (midnight) every night. The named
+time zone follows Central daylight and standard time. Both schedules use
 `NIGHTLY_PARSER_ENABLED`, the workflow concurrency group, and the existing GCS
 execution lock. The policy job checks robots responses without downloading
 records, importing data, or publishing a snapshot. Its processing limit is
@@ -392,8 +393,8 @@ count baseline and the offline source archive.
    A missing/changed source policy fails closed. Production hosting is not
    automatically released by this workflow.
 4. After a successful rehearsal and combined cost review, set
-   `NIGHTLY_PARSER_ENABLED=true`. Policy checks run at 04:15 and collection
-   at 05:15 `America/Chicago`.
+   `NIGHTLY_PARSER_ENABLED=true`. Policy checks run at 23:00 and collection
+   at 00:00 `America/Chicago`.
    GitHub may delay/drop scheduled runs and disables public schedules after
    60 days without repository activity. Use GitHub failure notifications and
    inspect `latest.json`'s `completed_at` for freshness. Clear the variable
@@ -420,9 +421,9 @@ The infrastructure apply completed on 2026-09-07: **1 bucket imported,
 9 resources added, 2 updated, 0 destroyed**. The source seed and live
 rehearsal are separate from that application.
 
-The GitHub environment `nightly-parser` allows the `main` branch, the
-`GCP_PARSER_SA` repository variable points to the applied identity, and
-`NIGHTLY_PARSER_ENABLED=false`. Workflow files must reach `main` through
+At the initial infrastructure application, the GitHub environment `nightly-parser`
+allowed `main`, `GCP_PARSER_SA` pointed to the applied identity, and
+`NIGHTLY_PARSER_ENABLED` was `false`. Workflow files must reach `main` through
 the normal review process before manual dispatch is available there.
 
 Implementation validation on 2026-09-07: the full pipeline suite passed

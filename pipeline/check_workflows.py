@@ -61,12 +61,12 @@ def validate(workflow: dict, name: str) -> list[str]:
             errors.append("nightly parser requires a fixed, non-cancelling concurrency group")
         schedules = events.get("schedule", []) if isinstance(events, dict) else []
         if schedules != [
-            {"cron": "15 4 * * *", "timezone": "America/Chicago"},
-            {"cron": "15 5 * * *", "timezone": "America/Chicago"},
+            {"cron": "0 23 * * *", "timezone": "America/Chicago"},
+            {"cron": "0 0 * * *", "timezone": "America/Chicago"},
         ]:
             errors.append("nightly parser requires separate daily policy and parser schedules")
         policies = workflow.get("jobs", {}).get("policies", {})
-        policy_trigger = "inputs.policy_only || github.event.schedule == '15 4 * * *'"
+        policy_trigger = "inputs.policy_only || github.event.schedule == '0 23 * * *'"
         if (policies.get("needs") != "validate" or policies.get("environment") != "nightly-parser"
                 or policies.get("if") != policy_trigger
                 or str(policies.get("timeout-minutes")) != "30"):
@@ -81,7 +81,7 @@ def validate(workflow: dict, name: str) -> list[str]:
                 errors.append("policies: require the lock, refresh, and unconditional release")
         legislature = workflow.get("jobs", {}).get("legislature", {})
         if legislature.get("if") != (
-            "${{ !inputs.policy_only && github.event.schedule != '15 4 * * *' }}"
+            "${{ !inputs.policy_only && github.event.schedule != '0 23 * * *' }}"
         ):
             errors.append("legislature: must not collect records during a policy-only run")
         previous = "validate"
