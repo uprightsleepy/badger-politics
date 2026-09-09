@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { OPEN_END, OPEN_START } from "./sentinels";
 
 // Resolve from site/; the bundler may relocate this module's generated chunk.
-const DB_PATH = resolve(process.cwd(), "../data/wi.sqlite");
+const DB_PATH = resolve(process.env.WI_DATABASE_PATH ?? "../data/wi.sqlite");
 const db = new Database(DB_PATH, { readonly: true, fileMustExist: true });
 
 // Reuse prepared statements throughout the build.
@@ -1577,14 +1577,11 @@ export const localTenantStats = memoBy((tenant: string) =>
   },
 );
 
-/** Items with dissent: at least one Aye and at least one No recorded.
- * Nearly everything passes with every member in favor, so these are the
- * votes that separate one member's record from another's. Ayes and Noes
- * are recounted from the vote rows themselves. */
+/** Recount recorded Ayes and negative votes (No or Nay), retaining source wording. */
 const DISSENT_SQL = `
   SELECT a.event_item_id, a.matter_file, a.matter_url, a.title, a.action,
          e.date, e.insite_url,
-         SUM(v.value = 'Aye') AS ayes, SUM(v.value = 'No') AS noes
+         SUM(v.value = 'Aye') AS ayes, SUM(v.value IN ('No', 'Nay')) AS noes
   FROM local_actions a
   JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
   JOIN local_votes v ON v.tenant = a.tenant AND v.event_item_id = a.event_item_id
@@ -1609,7 +1606,7 @@ export const localMemberVotesWithDissent = (tenant: string, personId: number) =>
               a.action, e.date, t.ayes, t.noes
        FROM local_votes v
        JOIN (SELECT tenant, event_item_id,
-                    SUM(value = 'Aye') AS ayes, SUM(value = 'No') AS noes
+                    SUM(value = 'Aye') AS ayes, SUM(value IN ('No', 'Nay')) AS noes
              FROM local_votes WHERE tenant = ?
              GROUP BY event_item_id HAVING ayes > 0 AND noes > 0) t
          ON t.tenant = v.tenant AND t.event_item_id = v.event_item_id
@@ -1655,22 +1652,20 @@ export const localUpcomingMeetings = () =>
       }[])
     : [];
 
-/** A presiding officer's Aye/No votes cast while the rest of the body
- * split evenly: the only votes the chair takes part in. The split shown
- * is among the other voters, recounted from the vote rows. */
+/** A presiding officer's votes when the other recorded voters split evenly. */
 export const localMemberTieBreaks = (tenant: string, personId: number) =>
   prep(
       `SELECT v.value, a.matter_file, a.matter_url, a.title, a.action, e.date,
               t.ayes - (v.value = 'Aye') AS other_ayes,
-              t.noes - (v.value = 'No') AS other_noes
+              t.noes - (v.value IN ('No', 'Nay')) AS other_noes
        FROM local_votes v
-       JOIN (SELECT event_item_id, SUM(value = 'Aye') AS ayes, SUM(value = 'No') AS noes
+       JOIN (SELECT event_item_id, SUM(value = 'Aye') AS ayes, SUM(value IN ('No', 'Nay')) AS noes
              FROM local_votes WHERE tenant = ? GROUP BY event_item_id) t
          ON t.event_item_id = v.event_item_id
        JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
        JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
-       WHERE v.tenant = ? AND v.person_id = ? AND v.value IN ('Aye', 'No')
-         AND t.ayes - (v.value = 'Aye') = t.noes - (v.value = 'No')
+       WHERE v.tenant = ? AND v.person_id = ? AND v.value IN ('Aye', 'No', 'Nay')
+         AND t.ayes - (v.value = 'Aye') = t.noes - (v.value IN ('No', 'Nay'))
          AND t.ayes - (v.value = 'Aye') > 0
        ORDER BY e.date DESC`,
     ).all(tenant, tenant, personId) as {
@@ -1691,13 +1686,12 @@ export const localMemberVoteYears = (tenant: string, personId: number) =>
        GROUP BY year ORDER BY year DESC`,
     ).all(tenant, personId) as { year: string; n: number }[];
 
-/** How often the member's Aye or No ended opposite the clerk's recorded
- * outcome; items without a passed flag are left out of both counts. */
+/** Votes opposite the clerk's outcome; omit items without an outcome flag. */
 export const localMemberOutcomes = (tenant: string, personId: number) =>
   prep(
-      `SELECT COALESCE(SUM((v.value = 'No' AND a.passed = 1)
+      `SELECT COALESCE(SUM((v.value IN ('No', 'Nay') AND a.passed = 1)
                         OR (v.value = 'Aye' AND a.passed = 0)), 0) AS lost,
-              COALESCE(SUM(v.value IN ('Aye', 'No') AND a.passed IS NOT NULL), 0) AS decided
+              COALESCE(SUM(v.value IN ('Aye', 'No', 'Nay') AND a.passed IS NOT NULL), 0) AS decided
        FROM local_votes v
        JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
        WHERE v.tenant = ? AND v.person_id = ?`,
@@ -1743,8 +1737,8 @@ export const localMemberAttendance = (tenant: string, personId: number): LocalAt
 export const localMemberVoteStats = (tenant: string, personId: number) =>
   prep(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(v.value = 'No'), 0) AS noes,
-              COALESCE(SUM(v.value NOT IN ('Aye', 'No')), 0) AS other,
+              COALESCE(SUM(v.value IN ('No', 'Nay')), 0) AS noes,
+              COALESCE(SUM(v.value NOT IN ('Aye', 'No', 'Nay')), 0) AS other,
               MAX(e.date) AS last
        FROM local_votes v
        JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id

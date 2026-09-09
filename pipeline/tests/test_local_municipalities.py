@@ -1,4 +1,4 @@
-"""Madison uses recorded identities and explicit coverage, never inferred votes."""
+"""Municipalities share imports while keeping their verified identities and vocabulary."""
 
 import json
 
@@ -6,6 +6,8 @@ import pytest
 from test_import_local import build, event_file, item, office, vote
 
 from importer.import_local import TABLES, run
+from importer.local_registry import TENANTS
+from importer.roster import load_curation
 
 
 def test_madison_person_url_assigns_only_its_own_district(tmp_path, make_db):
@@ -80,3 +82,35 @@ def test_bad_coverage_rolls_back_all_existing_council_data(tmp_path, make_db, in
         run(tmp_path / "local", tmp_path / "wi.sqlite")
     after = {t: conn.execute(f"SELECT * FROM {t}").fetchall() for t in (*TABLES, "meta")}
     assert after == before
+
+
+@pytest.mark.parametrize("tenant,person_id,seat", [
+    ("cityofappleton", 542, 1), ("cityofappleton", 544, 15),
+    ("waukesha", 548, 1), ("waukesha", 600, 15),
+])
+def test_new_cities_use_the_shared_importer_and_curated_ids(
+    tmp_path, make_db, tenant, person_id, seat,
+):
+    conn = build(tmp_path, make_db, extra_tenants={tenant: {
+        "office": [office(person_id, "Recorded Name", "Alderperson"),
+                   office(99999, "Recorded Name", "Alderperson")],
+        "events": [event_file(1, "2025-01-14", [item(7)],
+                              {"7": [vote(person_id, "Recorded Name", "Nay")]})],
+    }})
+    assert conn.execute("SELECT seat FROM local_members WHERE tenant=? AND person_id=?",
+                        (tenant, person_id)).fetchone() == (seat,)
+    assert conn.execute("SELECT seat FROM local_members WHERE tenant=? AND person_id=99999",
+                        (tenant,)).fetchone() == (None,)
+    assert conn.execute("SELECT value FROM local_votes WHERE tenant=?", (tenant,)
+                        ).fetchone() == ("Nay",)
+
+
+def test_curated_new_city_rosters_cover_fifteen_distinct_districts():
+    from importer.import_local import SEATS_PATH
+
+    seats = load_curation(SEATS_PATH)
+    for tenant in ("cityofappleton", "waukesha"):
+        assert sorted(entry["seat"] for entry in seats[tenant].values()) == list(range(1, 16))
+        spec = next(s for s in TENANTS if s["tenant"] == tenant)
+        assert spec["max_new_per_run"] == 2
+        assert spec["since"] == 2025

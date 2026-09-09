@@ -25,12 +25,12 @@ and a minimum one-second interval. Raw captures remain outside Git.
 | --- | --- | ---: | --- |
 | 1 | Milwaukee | 562,407 | Existing collector and history retained. |
 | 2 | Madison | 286,233 | Enable the reviewed collector below; initial history from 2025. |
-| 3 | Green Bay | 106,675 | Review CivicClerk access and individual-vote exports. |
-| 4 | Kenosha | 99,239 | Review the official agenda/video system and recorded-vote format. |
-| 5 | Racine | 77,908 | Verify the current Legistar API tenant and access rules. |
-| 6 | Appleton | 75,452 | Verify the official Legistar link, access rules and district identities. |
+| 3 | Green Bay | 106,675 | Paused: clarify CivicPlus reuse terms and obtain an approved export/integration. |
+| 4 | Kenosha | 99,239 | Paused: city robots returned 403; clarify access. |
+| 5 | Racine | 77,908 | Paused: city terms prohibit systematic automated collection. |
+| 6 | Appleton | 75,452 | Added for dev validation; shared Legistar collector, history from 2025. |
 | 7 | Eau Claire | 72,465 | Review AgendaCenter records and district/at-large representation. |
-| 8 | Waukesha | 70,872 | Verify the current official legislative portal and API. |
+| 8 | Waukesha | 70,872 | Added for dev validation; shared Legistar collector, history from 2025. |
 | 9 | Oshkosh | 67,460 | Source and policy review pending. |
 | 10 | Janesville | 66,929 | Source and policy review pending. |
 | 11 | West Allis | 60,119 | Existing collector and history retained. |
@@ -153,7 +153,14 @@ meetings mean roughly 335–630 vote requests, plus agendas, attendance, links
 and roster refreshes. Allow roughly 10–20 additional minutes per backfill run
 at the current pacing, with source latency, drafts and longer agendas capable
 of increasing that estimate. Measure the first completed community stage
-before raising the limit or adding another city.
+before raising the limit.
+
+Appleton and Waukesha each add at most two uncached meetings per run. Their
+four sampled meetings needed 65 vote requests in total; office/person refreshes,
+attendance and public page pagination add work. Budget roughly 5–10 additional
+minutes for both cities at the existing pacing, or about 15–30 minutes including
+Madison during initial backfill. This is an estimate, not a deadline; measure
+actual stage duration and archive growth before increasing the batch size.
 
 After backfill, settled history adds no repeated meeting requests. Roster
 refreshes and new/draft meetings remain the recurring work. The existing public
@@ -165,22 +172,130 @@ Do not speed up requests to compensate for runtime or add concurrent scrapers.
 ## Sources queued for review
 
 - Green Bay's [official meeting page](https://www.greenbaywi.gov/129/Meetings-Agendas-Minutes)
-  links to [CivicClerk](https://greenbaywi.portal.civicclerk.com). This needs a
-  separate access and data-format review; it is not a Legistar tenant guess.
+  links to [CivicClerk](https://greenbaywi.portal.civicclerk.com).
+  [CivicPlus terms](https://www.civicplus.help/legal-center/docs/civicplus-terms-of-use),
+  sections 7–8, restrict automated request rates and AI-related use, with a
+  limited authorized API/export exception. Portal robots returned 200 with no
+  disallow rules, but that does not resolve reuse permission. No record API was
+  queried. Obtain clarification and an approved export/integration before collection.
 - Kenosha's [official agenda viewer](https://kenosha.granicus.com/AgendaViewer.php?clip_id=6208&view_id=2)
-  is a different Granicus interface; a public per-person API is not verified.
-- Racine's [current council site](https://cityofracinewi.gov/common-council/)
-  and [budget notice](https://cityofracinewi.gov/news/proposed-budget-2026/)
-  identify [its Legistar portal](https://cityofracine.legistar.com/).
-  Verify the actual API tenant independently of that subdomain.
-- Appleton has a [candidate Common Council listing](https://cityofappleton.legistar.com/DepartmentDetail.aspx?GUID=5195F776-2598-4DA1-AEC9-17332BBCE3AC&ID=21236).
-  Confirm the official city link and district attribution before enabling it.
+  uses a different Granicus interface. [City robots](https://www.kenosha.org/robots.txt)
+  returned 403 with the identifying user agent. Collection stopped before any
+  records request; do not use a different host or browser to bypass the denial.
+- Racine's [council site](https://cityofracinewi.gov/government/city-leadership/common-council/)
+  links to [Legistar](https://cityofracine.legistar.com/), but its
+  [terms](https://cityofracinewi.gov/termsofuse/) prohibit systematic automated
+  collection and republishing content in software. No record API was queried.
+  Clarify whether an approved public API/export permits this project’s reuse.
 - Eau Claire's [official meeting page](https://www.eauclairewi.gov/723/Public-Notices-Meetings)
   and [AgendaCenter](https://www.eauclairewi.gov/AgendaCenter) require a separate
   record-format review and support for district and at-large members.
 
 These links are research leads, not collection approvals. None of these
 additional hosts or tenants is added to the runtime allowlist.
+
+## Appleton and Waukesha: shared collection
+
+Reviewed September 8, 2026. [Appleton's council page](https://appletonwi.gov/government/common_council.php)
+links directly to its Legistar calendar. [Waukesha's city site](https://www.waukesha-wi.gov/)
+links to its Legistar calendar, and the [official council roster](https://www.waukesha-wi.gov/about_the_common_council/index.php)
+lists its 15 districts. The returned API meeting links match these official
+portals. No separate website reuse restriction was found in the reviewed city
+pages and their policy links. Retrieval uses the documented
+[public API](https://webapi.legistar.com/Home/Examples) and ordinary public InSite pagination.
+
+| City | API tenant / body | Settled minutes | First bounded batch |
+| --- | --- | --- | --- |
+| Appleton | `cityofappleton` / `138`, `Common Council` | `Final` | September 2, 2026 (`6462`), then newest uncached meeting |
+| Waukesha | `waukesha` / `138`, `City Council` | `Final` | August 18, 2026 (`13087`), then newest uncached meeting |
+
+[Appleton InSite robots](https://cityofappleton.legistar.com/robots.txt),
+[Waukesha InSite robots](https://waukesha.legistar.com/robots.txt), and the
+[shared API robots](https://webapi.legistar.com/robots.txt) returned 404.
+Only the same reviewed API routes and InSite `Departments.aspx` / `MeetingDetail.aspx`
+GET/POST pagination used by Madison are enabled. Keep the one-second per-host
+floor, identifying agent, caching, and stop-on-denial protections. City websites,
+portraits, attachments and video downloads are excluded from this addition.
+Appleton's city robots redirected to its CMS and were not followed; Waukesha's
+city robots returned 404. Neither city website is a runtime collection target.
+
+Both cities leave district numbers out of their office titles and person URLs.
+The existing `local_seats.json` holds all 30 verified district-to-person-ID
+mappings, each with its official roster URL and review date. The shared importer
+uses `(tenant, person_id)`; names never determine a vote or seat join. A new
+unverified alderperson still fails the missing-seat integrity gate. Recheck
+curation after elections or appointments. Appleton labels its mayor as `Member`;
+only a proven active `Mayor` term exempts that person from needing a district.
+Waukesha's council office records omit the mayor; no membership is invented.
+
+The complete returned vote rows in four reviewed meetings were retained:
+
+| City / meeting | Acted items | Individual vote rows | Recorded attendance rows |
+| --- | ---: | ---: | ---: |
+| Appleton September 2, 2026 | 28 | 430 | 16 |
+| Appleton August 19, 2026 | 19 | 273 | 16 |
+| Waukesha September 1, 2026 (draft) | 7 | 105 | 15 |
+| Waukesha August 18, 2026 | 11 | 135 | 30 |
+
+All four contain individual dissent. Three acted items have no individual vote
+rows; those remain actions without inferred member votes. `Nay` counts as a
+negative vote alongside `No` in shared site totals and dissent checks, while
+SQLite, individual rows, feeds and JSON preserve the original wording. Unknown
+positions must still match that tenant's published vocabulary.
+
+Offline comparison preserved all 500,757 Milwaukee/West Allis vote rows and
+the earlier Madison fixture across all ten local tables. All 943 new sampled
+votes matched their source item IDs, person IDs and values exactly; both city
+rosters resolved all 15 districts. The comparison changed no source files and
+passed local integrity checks. Validation also passed 525 Python tests (one
+existing skip), 44 site harness tests, Ruff, Astro checks, and mobile/desktop
+coverage-notice checks with zero accessibility violations.
+
+Initial coverage starts in 2025. The reviewed indexes list 47 past Appleton
+meetings and 50 Waukesha meetings; only two per city were downloaded for this
+review. Nightly backfill uses the same atomic cache, pending-history metadata,
+draft refresh and import rollback behavior described above. Maps and address
+lookup await a separate boundary review. There are no per-city runtime modules.
+
+## Validate in dev
+
+After merge, let the current nightly run finish. Run the nightly workflow with
+`policy_only=true`, then start a fresh run with `policy_only=false` and an empty
+`resume_run`. Once its validated snapshot is published, run the dev release
+workflow from `main`; releases follow [the deployment runbook](../deploys.md).
+The website build alone does not collect the new cities.
+
+Check `/local/appleton/` and `/local/waukesha/`, their 15 district members, and
+their council/member JSON links. Confirm that source links open the matching
+meeting, Nay rows remain Nay, dissent totals agree,
+and pending-history notices remain until backfill finishes. Compare individual
+votes to the clerk's records, including a dissenting motion and a voice vote.
+
+For an isolated local preview, start from the repository root in PowerShell.
+Use a fresh destination and run collection only when no other scrape is active:
+
+```powershell
+if (Test-Path .private/city-dev) { throw "Use a fresh dev directory." }
+New-Item -ItemType Directory .private/city-dev
+Copy-Item -LiteralPath pipeline/_data/local -Destination .private/city-dev/local -Recurse
+Copy-Item -LiteralPath data/wi.sqlite -Destination .private/city-dev/wi.sqlite
+Set-Location pipeline
+uv run python -m scraper.fetch_local_votes --tenant madison --tenant cityofappleton --tenant waukesha --data-dir ../.private/city-dev/local
+if ($LASTEXITCODE -ne 0) { throw "Collection failed; stop here." }
+uv run python -m importer.import_local ../.private/city-dev/local ../.private/city-dev/wi.sqlite
+if ($LASTEXITCODE -ne 0) { throw "Import failed; stop here." }
+uv run python -m importer.checks ../.private/city-dev/wi.sqlite
+if ($LASTEXITCODE -ne 0) { throw "Integrity checks failed; stop here." }
+Set-Location ../site
+$env:WI_DATABASE_PATH = (Resolve-Path ../.private/city-dev/wi.sqlite).Path
+npm run dev
+```
+
+Stop on any failed command. Keep the full existing municipal archive in that
+copy: the importer replaces all local tables in one transaction. `--tenant`
+selects collection only, and the per-city batch limits still apply. Do not use
+private research samples as deployment archives; some contain partial meetings.
+The normal database path remains `data/wi.sqlite` when `WI_DATABASE_PATH` is unset.
 
 ## Full population order
 

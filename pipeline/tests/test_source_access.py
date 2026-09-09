@@ -299,6 +299,10 @@ def test_policy_refresh_blocks_mid_run_change(network):
     "https://webapi.legistar.com/v1/unreviewed/Events",
     "https://madison.legistar.com/Private.aspx",
     "https://www.cityofmadison.com/council/district3/",
+    "https://webapi.legistar.com/v1/racine/Events",
+    "https://webapi.legistar.com/v1/cityofappleton/Matters",
+    "https://greenbaywi.api.civicclerk.com/v1/Events",
+    "https://www.kenosha.org/government/common-council/",
 ])
 def test_reviewed_manifest_rejects_restricted_or_unreviewed_urls(url):
     with pytest.raises(SourceAccessError):
@@ -322,6 +326,10 @@ def test_reviewed_manifest_rejects_restricted_or_unreviewed_urls(url):
     "https://webapi.legistar.com/v1/madison/EventItems/828843/RollCalls",
     "https://webapi.legistar.com/v1/madison/Persons/4",
     "https://madison.legistar.com/MeetingDetail.aspx?ID=1",
+    "https://webapi.legistar.com/v1/cityofappleton/Events/6462/EventItems",
+    "https://webapi.legistar.com/v1/waukesha/EventItems/330128/Votes",
+    "https://cityofappleton.legistar.com/MeetingDetail.aspx?LEGID=6462",
+    "https://waukesha.legistar.com/Departments.aspx",
 ])
 def test_reviewed_manifest_accepts_only_intended_routes(url):
     SourceAccess().source(url)

@@ -154,9 +154,11 @@ def fetch_rollcalls(http, tenant: str, items: list[dict], delay: float) -> dict[
     }
 
 
-def fetch_tenant(http, spec: dict, budget: list[int], delay: float) -> tuple[int, int]:
+def fetch_tenant(
+    http, spec: dict, budget: list[int], delay: float, data_dir: Path | None = None,
+) -> tuple[int, int]:
     tenant = spec["tenant"]
-    out = DATA_DIR / tenant
+    out = (data_dir if data_dir is not None else DATA_DIR) / tenant
     out.mkdir(parents=True, exist_ok=True)
 
     vote_types = call(http, tenant, "VoteTypes", delay)
@@ -265,12 +267,18 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--max-new", type=int, help="fetch at most N meetings per run")
     parser.add_argument("--delay", type=float, default=0.3)
+    parser.add_argument("--tenant", action="append", choices=[s["tenant"] for s in TENANTS],
+                        help="collect only these tenants (repeatable); default: all")
+    parser.add_argument("--data-dir", type=Path, default=DATA_DIR,
+                        help="council archive root; use a separate directory for dev")
     ns = parser.parse_args(argv)
 
     http = session()
     budget = [ns.max_new if ns.max_new is not None else -1]
     for spec in TENANTS:
-        fetched, cached = fetch_tenant(http, spec, budget, ns.delay)
+        if ns.tenant and spec["tenant"] not in ns.tenant:
+            continue
+        fetched, cached = fetch_tenant(http, spec, budget, ns.delay, ns.data_dir)
         print(f"{spec['tenant']}: {fetched} meetings fetched, {cached} already final")
     return 0
 

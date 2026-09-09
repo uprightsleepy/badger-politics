@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from importer.checks import run_checks
+from importer.checks import check_local, run_checks
 
 
 @pytest.fixture()
@@ -91,3 +91,52 @@ def test_orphan_vote_record_fails(db_path: Path, tmp_path: Path) -> None:
     conn.close()
     failures = run_checks(db_path, tmp_path / "counts.json")
     assert any("vote_records -> people" in f for f in failures)
+
+
+@pytest.fixture()
+def local_db(make_db):
+    conn = make_db(":memory:")
+    conn.execute("INSERT INTO local_bodies VALUES ('city', 'city', 'City', 'Council',"
+                 " 'https://example.invalid', 1)")
+    conn.execute("INSERT INTO local_members"
+                 " (tenant, person_id, name, slug, seat, member_type, is_current)"
+                 " VALUES ('city', 1, 'Member', 'member', 1, 'Member', 1)")
+    conn.execute("INSERT INTO local_events VALUES"
+                 " ('city', 1, '2026-01-01', 'Final', 'https://example.invalid/meeting')")
+    conn.execute("INSERT INTO local_actions (tenant, event_item_id, event_id, action)"
+                 " VALUES ('city', 1, 1, 'Adopted')")
+    conn.executemany("INSERT INTO local_vote_types VALUES ('city', ?)",
+                     [(value,) for value in ('Aye', 'No', 'Nay', 'Abstain')])
+    conn.execute("INSERT INTO local_votes VALUES ('city', 1, 1, 'Nay')")
+    yield conn
+    conn.close()
+
+
+@pytest.mark.parametrize("value,passes", [
+    ("No", True), ("Nay", True), ("Aye", False), ("Abstain", False),
+])
+def test_local_dissent_uses_only_recorded_negative_votes(local_db, value, passes):
+    local_db.execute("UPDATE local_votes SET value=?", (value,))
+    failures = check_local(local_db)
+    expected = [] if passes else ["local tenants with no dissenting vote on record: 1 rows"]
+    assert failures == expected
+
+
+def test_nay_must_still_belong_to_the_tenants_vocabulary(local_db):
+    local_db.execute("DELETE FROM local_vote_types WHERE value='Nay'")
+    assert check_local(local_db) == ["local vote values outside the tenant's vocabulary: 1 rows"]
+
+
+@pytest.mark.parametrize("title,start,end,passes", [
+    ("Mayor", "2000-01-01", "9999-12-31", True),
+    ("Mayor", "2000-01-01", "2001-01-01", False),
+    ("Mayor", "9998-01-01", "9999-12-31", False),
+    ("Mayor", "2000-01-01", None, False),
+    ("Alderperson", "2000-01-01", "9999-12-31", False),
+])
+def test_unseated_member_requires_a_proven_active_mayor_term(local_db, title, start, end, passes):
+    local_db.execute("UPDATE local_members SET seat=NULL")
+    local_db.execute("INSERT INTO local_member_terms VALUES ('city', 1, ?, ?, ?)",
+                     (title, start, end))
+    failures = check_local(local_db)
+    assert failures == ([] if passes else ["sitting council members missing a seat: 1 rows"])

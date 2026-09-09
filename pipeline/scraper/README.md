@@ -39,6 +39,15 @@ public-information reuse subject to protected content; portraits and logos are
 excluded. Its bounded history starts in 2025. See the complete
 [policy evidence, ranked city queue and rollout](../../docs/research/wisconsin-city-expansion-2026-09.md).
 
+Appleton and Waukesha received the same scoped review on September 8. Their
+official city sites link to the verified public Legistar tenants; API and
+InSite robots return 404. Only documented API GETs and ordinary meeting/department
+pagination are enabled, with the existing one-second per-host floor and denial
+protections. Each city adds at most two uncached meetings per run from 2025.
+District identities use the shared curated roster; no city-page or portrait
+collector is added. The linked review records policy URLs, samples and dev steps.
+Green Bay, Kenosha and Racine remain paused pending access/reuse clarification.
+
 The policy-only job checks each active host once using the existing transport;
 paused sources stay paused. It compares the complete normalized robots response
 with the reviewed fingerprint, including comments. Terms and reuse still need

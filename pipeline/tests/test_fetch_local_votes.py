@@ -135,3 +135,29 @@ def test_truncated_meeting_response_keeps_cached_record(source, monkeypatch):
     with pytest.raises(RuntimeError, match="page cap"):
         fetch.fetch_tenant(None, MADISON, [-1], 0)
     assert dest.read_bytes() == original
+
+
+def test_cli_selects_cities_and_separate_archive(monkeypatch, tmp_path):
+    calls = []
+    client = object()
+
+    def collect(http, spec, budget, delay, data_dir):
+        assert http is client
+        calls.append((spec["tenant"], budget[0], data_dir))
+        budget[0] -= 1
+        return 1, 0
+
+    monkeypatch.setattr(fetch, "session", lambda: client)
+    monkeypatch.setattr(fetch, "fetch_tenant", collect)
+    assert fetch.main(["--tenant", "waukesha", "--tenant", "cityofappleton",
+                       "--data-dir", str(tmp_path), "--max-new", "3"]) == 0
+    assert calls == [("cityofappleton", 3, tmp_path), ("waukesha", 2, tmp_path)]
+
+
+def test_unreviewed_cli_tenant_fails_without_network(monkeypatch):
+    def unexpected():
+        pytest.fail("Invalid tenant must not create a network session")
+
+    monkeypatch.setattr(fetch, "session", unexpected)
+    with pytest.raises(SystemExit):
+        fetch.main(["--tenant", "racine"])

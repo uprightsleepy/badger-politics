@@ -112,7 +112,7 @@
       "paths": {
         "GET": [
           "/v1/(?:milwaukee|westalliswi)/.*",
-          "/v1/madison/(?:VoteTypes|OfficeRecords|Bodies|Persons/\\d+|Events|Events/\\d+/EventItems|EventItems/\\d+/(?:Votes|RollCalls))"
+          "/v1/(?:madison|cityofappleton|waukesha)/(?:VoteTypes|OfficeRecords|Bodies|Persons/\\d+|Events|Events/\\d+/EventItems|EventItems/\\d+/(?:Votes|RollCalls))"
         ]
       },
       "delay_seconds": 1,
@@ -161,6 +161,22 @@
         "status": 404,
         "url": "https://madison.legistar.com/robots.txt"
       }
+    },
+    "cityofappleton.legistar.com": {
+      "paths": {
+        "GET": ["/(?:Departments|MeetingDetail)\\.aspx"],
+        "POST": ["/(?:Departments|MeetingDetail)\\.aspx"]
+      },
+      "delay_seconds": 1,
+      "robots": {"status": 404, "url": "https://cityofappleton.legistar.com/robots.txt"}
+    },
+    "waukesha.legistar.com": {
+      "paths": {
+        "GET": ["/(?:Departments|MeetingDetail)\\.aspx"],
+        "POST": ["/(?:Departments|MeetingDetail)\\.aspx"]
+      },
+      "delay_seconds": 1,
+      "robots": {"status": 404, "url": "https://waukesha.legistar.com/robots.txt"}
     },
     "city.milwaukee.gov": {
       "paused": "Council profile retrieval received HTTP 403 from the nightly runner on 2026-09-08; clarify access before resuming. Preserve the existing profile archive offline.",

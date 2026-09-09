@@ -229,13 +229,13 @@ scraping and no reduction in source pacing.
 
 ### Daily policy job
 
-The Madison expansion changes the source manifest. After merging it, let any
+The municipal expansion changes the source manifest. After merging it, let any
 current parser run finish, then follow the policy-only activation below. Start
-a fresh parser run with `resume_run` blank so it collects Madison before import;
-do not resume an old import checkpoint that lacks the new city's archive.
-The community stage creates that archive automatically; no seed upload or
+a fresh parser run with `resume_run` blank so it collects all new cities before import;
+do not resume an old import checkpoint that lacks their archives.
+The community stage creates those archives automatically; no seed upload or
 infrastructure change is needed. Madison adds at most five previously uncached
-meetings per run and reports pending history on the site. See the
+meetings per run, Appleton and Waukesha two each. All report pending history on the site. See the
 [city expansion review](research/wisconsin-city-expansion-2026-09.md).
 
 The same trusted workflow has a separate policy-only run at 04:15
