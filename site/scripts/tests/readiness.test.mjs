@@ -166,3 +166,37 @@ test("no-results assertion rejects empty, stale, hidden, and junk-result states"
   });
   await wait();
 });
+
+test("search rejects short prefix fallbacks but keeps genuine stems and exact words", async () => {
+  const source = await readFile(new URL("../../src/pages/index.astro", import.meta.url), "utf-8");
+  const filterSource = source.slice(source.indexOf("const resultFilter ="), source.indexOf("// Recent searches"));
+  const resultFilter = new Function(`${filterSource}; return resultFilter;`)();
+  const makeResult = (id, excerpt) => ({ id, data: async () => ({ url: `/${id}/`, excerpt }) });
+  const filters = { type: "City Council" };
+  const calls = [];
+  const pagefind = {
+    search: async (query, options) => {
+      calls.push(query);
+      assert.deepEqual(options, { filters });
+      const ids = { '"taxes"': ["tax"], '"running"': ["run"], '"pedophiles"': [] }[query];
+      assert.ok(ids, `unexpected exact query ${query}`);
+      return { results: ids.map((id) => ({ id })) };
+    },
+  };
+  const missing = resultFilter("pedophiles", pagefind, filters);
+  assert.equal(await missing(makeResult("initial", "<mark>P.</mark>")), null);
+  assert.equal(await missing(makeResult("acronym", "<mark>PEOs</mark>")), null);
+  const bridges = await Promise.all([
+    missing(makeResult("bridge", "A <mark>Ped</mark> Bridge project")),
+    missing(makeResult("other", "Another <mark>Ped</mark> Bridge project")),
+  ]);
+  assert.deepEqual(bridges, [null, null]);
+  assert.deepEqual(calls, ['"pedophiles"']);
+  assert.ok(await missing(makeResult("real", "A record discussing <mark>pedophiles</mark>")));
+
+  assert.ok(await resultFilter("taxes", pagefind, filters)(makeResult("tax", "<mark>tax</mark>")));
+  assert.ok(await resultFilter("running", pagefind, filters)(makeResult("run", "<mark>run</mark>")));
+  assert.ok(await resultFilter("running taxes", pagefind, filters)(makeResult("tax", "<mark>tax</mark>")));
+  assert.ok(await resultFilter("tax", pagefind, filters)(makeResult("tax", "<mark>tax</mark>")));
+  assert.ok(await resultFilter("marriage", pagefind, filters)(makeResult("marriage", "<mark>marriage</mark>")));
+});

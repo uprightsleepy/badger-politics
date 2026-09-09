@@ -281,22 +281,38 @@ const sessionName = current.name ?? current.id;
     fSession.addEventListener("change", run);
     fOutcome.addEventListener("change", run);
 
-    // Pagefind fuzzes unmatched terms down to fragments ("pedophiles" can
-    // highlight "P." or even "PEOs"). A highlight only validates a result
-    // if it shares a real stem with some query word.
-    const degenerate = (excerpt, query) => {
-      const words = query.toLowerCase().split(/\s+/).map((w) => w.replace(/[^a-z0-9]/g, ""));
-      const marks = [...excerpt.matchAll(/<mark>(.*?)<\/mark>/g)].map((m) =>
-        m[1].replace(/[^A-Za-z0-9]/g, "").toLowerCase(),
-      );
+    // Short highlights need a real stem match, not Pagefind's prefix fallback.
+    const resultFilter = (query, pagefind, filters) => {
+      const words = [...new Set(query.toLowerCase().split(/\s+/)
+        .map((w) => w.replace(/[^a-z0-9]/g, "")).filter(Boolean))];
+      const exact = new Map();
       const shared = (a, b) => {
         let n = 0;
         while (n < a.length && n < b.length && a[n] === b[n]) n++;
         return n;
       };
-      const valid = (m) =>
-        m.length >= 3 && words.some((w) => shared(m, w) >= Math.min(4, m.length, w.length));
-      return marks.length > 0 && !marks.some(valid);
+      return async (result) => {
+        const data = await result.data();
+        const marks = [...data.excerpt.matchAll(/<mark>(.*?)<\/mark>/g)].map((m) =>
+          m[1].replace(/[^A-Za-z0-9]/g, "").toLowerCase(),
+        );
+        if (!marks.length) return data;
+        for (const word of words) {
+          if (marks.some((m) => m.length >= 3 && shared(m, word) >= Math.min(4, word.length))) {
+            return data;
+          }
+        }
+        for (const word of words) {
+          if (!marks.some((m) => m.length === 3 && shared(m, word) === 3)) continue;
+          if (!exact.has(word)) {
+            // Quoted terms retain stemming (taxes → tax, running → run).
+            exact.set(word, pagefind.search(`"${word}"`, { filters })
+              .then((search) => new Set(search.results.map((r) => r.id))));
+          }
+          if ((await exact.get(word)).has(result.id)) return data;
+        }
+        return null;
+      };
     };
 
     // Recent searches, device-only like everything else personal here.
@@ -361,16 +377,18 @@ const sessionName = current.name ?? current.id;
         return;
       }
       pagefind ??= await import("/pagefind/pagefind.js");
-      const search = await pagefind.debouncedSearch(q, { filters: activeFilters() });
+      const filters = activeFilters();
+      const search = await pagefind.debouncedSearch(q, { filters });
       if (search === null || mySeq !== seq) return; // superseded
       // load excerpts lazily: 8 first, top up only if the junk filter bites
-      const loaded = await Promise.all(search.results.slice(0, 8).map((r) => r.data()));
+      const filterResult = resultFilter(q, pagefind, filters);
+      const loaded = await Promise.all(search.results.slice(0, 8).map(filterResult));
       if (mySeq !== seq) return;
-      let good = loaded.filter((r) => !degenerate(r.excerpt, q));
+      let good = loaded.filter(Boolean);
       if (good.length < 8 && search.results.length > 8) {
-        const extra = await Promise.all(search.results.slice(8, 12).map((r) => r.data()));
+        const extra = await Promise.all(search.results.slice(8, 12).map(filterResult));
         if (mySeq !== seq) return;
-        good = good.concat(extra.filter((r) => !degenerate(r.excerpt, q)));
+        good = good.concat(extra.filter(Boolean));
       }
       good = good.slice(0, 8);
       // exact identifiers first: "sb 268" ranks the bill above every page
