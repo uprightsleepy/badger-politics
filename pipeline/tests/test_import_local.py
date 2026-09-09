@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from importer.import_local import run
 from importer.local_registry import TENANTS
@@ -74,6 +75,8 @@ def build(tmp_path: Path, make_db, milwaukee_events=(), westallis_events=(),
     write_tenant(local, "westalliswi", list(westallis_office), list(westallis_events))
     write_tenant(local, "madison", list(madison_office), list(madison_events))
     for spec in TENANTS:
+        if spec.get("provider") == "civicclerk":
+            continue  # This fixture models Legistar's office-record contract.
         tenant = spec["tenant"]
         if not (local / tenant).exists():
             data = (extra_tenants or {}).get(tenant, {})
@@ -90,7 +93,9 @@ def build(tmp_path: Path, make_db, milwaukee_events=(), westallis_events=(),
         (local / tenant / "upcoming.json").write_text(json.dumps(data), encoding="utf-8")
     for tenant, data in (api_bodies or {}).items():
         (local / tenant / "bodies.json").write_text(json.dumps(data), encoding="utf-8")
-    run(local, db)
+    with patch("importer.import_local.TENANTS", [s for s in TENANTS
+                                               if s.get("provider") != "civicclerk"]):
+        run(local, db)
     import sqlite3
     return sqlite3.connect(db)
 

@@ -38,7 +38,7 @@ const districts = [...new Set(seated.map((m) => m.seat!))].sort((a, b) => a - b)
     system, and every item links to the clerk's page for it.
   </p>
   <SourceStrip
-    sources={[{ label: `${body.name} records (Legistar)`, href: body.insite_url }]}
+    sources={[{ label: `${body.name} records`, href: body.insite_url }]}
     through={stats?.last ?? null}
   />
   <LocalCoverageNotice tenant={body.tenant} />

@@ -46,7 +46,36 @@ pagination are enabled, with the existing one-second per-host floor and denial
 protections. Each city adds at most two uncached meetings per run from 2025.
 District identities use the shared curated roster; no city-page or portrait
 collector is added. The linked review records policy URLs, samples and dev steps.
-Green Bay, Kenosha and Racine remain paused pending access/reuse clarification.
+Green Bay uses the shared CivicClerk adapter from July 1, 2026. Its public OData
+schema documents the event and meeting records used by the portal. Collection
+is limited to two meeting downloads per run, with a five-second request floor.
+Native revisions remain in the private archive; missing names or removed votes
+stop replacement. Published records are checked again after seven days or when
+event metadata changes. The current roster refreshes each run without inventing
+term dates. See the [API schema](https://greenbaywi.api.civicclerk.com/v1/$metadata),
+[official roster](https://www.greenbaywi.gov/617/Common-Council), and
+[CivicPlus terms](https://www.civicplus.help/legal-center/docs/civicplus-terms-of-use).
+The API robots file returns 404; the roster path is permitted by the city's
+reviewed robots file. Only `/v1/Events`, `/v1/Meetings/{id}` and the roster page
+are enabled. No authentication, staff endpoints, attachments or video collection.
+
+Racine's API metadata and 15 current
+district identities are verified, with mappings prepared in `local_seats.json`;
+its `Events` endpoint returns HTTP 400 for missing agenda-visibility settings.
+Working meeting retrieval and vote validation are required before activation.
+Affirmative permission is not a prerequisite where no applicable explicit
+restriction prohibits collection.
+Kenosha's Granicus host explicitly disallows our crawler. See the
+[city access review](../../docs/research/municipal-access-routes-2026-09.md).
+Racine and Kenosha remain disabled.
+
+Review restrictions against the actual host, paths and intended use. Missing
+policies or silence about scraping do not require an operator's approval. Record
+explicit prohibitions separately from technical denials, failed policy checks,
+and unverified formats. A website restriction does not automatically cover a
+separate public API. Officially documented public APIs need no separate permission
+request; follow their documented scope, authentication requirements and limits.
+Runtime source scopes, denial protections and pacing still apply.
 
 The policy-only job checks each active host once using the existing transport;
 paused sources stay paused. It compares the complete normalized robots response

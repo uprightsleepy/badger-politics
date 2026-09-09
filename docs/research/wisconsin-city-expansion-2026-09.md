@@ -25,9 +25,9 @@ and a minimum one-second interval. Raw captures remain outside Git.
 | --- | --- | ---: | --- |
 | 1 | Milwaukee | 562,407 | Existing collector and history retained. |
 | 2 | Madison | 286,233 | Enable the reviewed collector below; initial history from 2025. |
-| 3 | Green Bay | 106,675 | Paused: clarify CivicPlus reuse terms and obtain an approved export/integration. |
-| 4 | Kenosha | 99,239 | Paused: city robots returned 403; clarify access. |
-| 5 | Racine | 77,908 | Paused: city terms prohibit systematic automated collection. |
+| 3 | Green Bay | 106,675 | Added for dev validation; shared CivicClerk reader, history from July 1, 2026. |
+| 4 | Kenosha | 99,239 | Request clerk-supplied electronic records; Granicus robots disallows our crawler. |
+| 5 | Racine | 77,908 | API metadata and 15 district identities verified; meeting endpoint needs a server configuration fix before vote validation. |
 | 6 | Appleton | 75,452 | Added for dev validation; shared Legistar collector, history from 2025. |
 | 7 | Eau Claire | 72,465 | Review AgendaCenter records and district/at-large representation. |
 | 8 | Waukesha | 70,872 | Added for dev validation; shared Legistar collector, history from 2025. |
@@ -49,8 +49,13 @@ enable a whole hosting platform to accelerate this queue. For each city:
 
 1. Follow the city's official links to its records system. Review robots,
    terms, API documentation, dataset licenses and published rate limits.
-2. Prefer a documented public API or official bulk export. If access is denied
-   or reuse is unclear, pause that source and request an approved extract.
+2. Prefer a documented public API or official bulk export. Officially documented
+   public APIs need no separate permission request when used within their
+   documented scope, authentication requirements and limits. Missing policies or
+   silence about scraping do not require affirmative permission. Apply explicit
+   restrictions to their actual host, paths and intended use; resolve conflicting
+   applicable rules. Treat failed requests and access denials separately from
+   published prohibitions, and retain runtime denial protections.
 3. Verify council/body IDs, individual vote IDs, roll-call vocabulary, office
    dates, district/at-large seats, and source links against real records.
 4. Test attribution, voice votes, paging, interruption recovery and unchanged
@@ -171,27 +176,44 @@ Do not speed up requests to compensate for runtime or add concurrent scrapers.
 
 ## Sources queued for review
 
+The [detailed access-route review](municipal-access-routes-2026-09.md) identifies
+the recommended next steps and an unsent inquiry template. Racine and Kenosha
+remain disabled; no city or vendor has been contacted. The observations below describe
+collection constraints, not a conclusion that all use of their records is prohibited.
+
 - Green Bay's [official meeting page](https://www.greenbaywi.gov/129/Meetings-Agendas-Minutes)
   links to [CivicClerk](https://greenbaywi.portal.civicclerk.com).
   [CivicPlus terms](https://www.civicplus.help/legal-center/docs/civicplus-terms-of-use),
-  sections 7–8, restrict automated request rates and AI-related use, with a
-  limited authorized API/export exception. Portal robots returned 200 with no
-  disallow rules, but that does not resolve reuse permission. No record API was
-  queried. Obtain clarification and an approved export/integration before collection.
+  restrict interface use, traffic, republication and AI-related use. Portal robots
+  returned 200 with no disallow rules. The subsequently verified public API
+  publishes its OData schema and includes complete named vote arrays for the
+  sampled meetings. The shared reader below uses that documented route, with
+  narrow source scopes, five-second pacing and retained native revisions.
 - Kenosha's [official agenda viewer](https://kenosha.granicus.com/AgendaViewer.php?clip_id=6208&view_id=2)
   uses a different Granicus interface. [City robots](https://www.kenosha.org/robots.txt)
-  returned 403 with the identifying user agent. Collection stopped before any
-  records request; do not use a different host or browser to bypass the denial.
+  returned 403 with the identifying user agent. That failed policy check is not
+  itself published prohibition language, and no record was requested through it.
+  A separate policy-only check of [Granicus robots](https://kenosha.granicus.com/robots.txt)
+  returned 200 with a wildcard `Disallow: /`. Request electronic records from
+  the Clerk/Treasurer instead; no crawler exception for this project is established.
 - Racine's [council site](https://cityofracinewi.gov/government/city-leadership/common-council/)
   links to [Legistar](https://cityofracine.legistar.com/), but its
-  [terms](https://cityofracinewi.gov/termsofuse/) prohibit systematic automated
-  collection and republishing content in software. No record API was queried.
-  Clarify whether an approved public API/export permits this project’s reuse.
+  [terms](https://cityofracinewi.gov/termsofuse/) restrict tools for systematic
+  collection of that website and republishing its content in software.
+  Do not automatically extend those website restrictions to the separately
+  documented public Legistar API. Direct checks verified `cityofracine`, council
+  body 138 and 15 current API identities. The shared district mapping is prepared;
+  the [district 12 page](https://cityofracinewi.gov/government/city-leadership/common-council/cityalderman/district-12/)
+  resolves Rocco DeMark's conflicting board-directory label. Both current and
+  historical `Events` queries returned HTTP 400 for missing agenda-visibility
+  settings. Activation awaits working meeting retrieval, sample vote validation
+  and support for its uppercase vote vocabulary. No permission request is needed
+  for the documented public API; the remaining blocker is technical.
 - Eau Claire's [official meeting page](https://www.eauclairewi.gov/723/Public-Notices-Meetings)
   and [AgendaCenter](https://www.eauclairewi.gov/AgendaCenter) require a separate
   record-format review and support for district and at-large members.
 
-These links are research leads, not collection approvals. None of these
+These sources still need the route and data checks above. None of these
 additional hosts or tenants is added to the runtime allowlist.
 
 ## Appleton and Waukesha: shared collection
@@ -257,6 +279,47 @@ review. Nightly backfill uses the same atomic cache, pending-history metadata,
 draft refresh and import rollback behavior described above. Maps and address
 lookup await a separate boundary review. There are no per-city runtime modules.
 
+## Green Bay: shared CivicClerk reader
+
+The [public portal](https://greenbaywi.portal.civicclerk.com/) uses an anonymous
+API with a published [OData schema](https://greenbaywi.api.civicclerk.com/v1/$metadata).
+Common Council is category 26. The new platform adapter shares the collector CLI,
+SQLite importer and council pages; additional CivicClerk cities can use it through
+configuration and verified identity curation. The
+[access review](municipal-access-routes-2026-09.md#green-bay) records the policy and
+source evidence, including the live event and meeting checks.
+
+Two meetings (July 21 and August 18, 2026) contain 75 motions and 900 individual
+positions. All nested `minutesItemVotes` arrays are read, regardless of false
+`hasVote` flags. Multiple motions on one item remain separate. Yes, No and Abstain
+come from their respective arrays; the site's tallies recognize Yes alongside
+Aye. Attendance and votes implied only by unanimity are never inferred.
+
+The API supplies full names, not person IDs. `local_seats.json` assigns permanent
+internal IDs to verified people and records William Morgan as Bill Morgan's
+officially confirmed alias. Unknown or ambiguous names fail attribution. IDs
+must never be reassigned to a replacement member. Current district membership
+comes from the dated city roster; it does not establish term dates. History
+before July 2026 needs its own roster review before expanding the start date.
+
+Each source item and one-based motion ordinal form a reversible local action ID:
+`item_id * 1000 + ordinal`, with range and collision checks. Native files retain
+the original IDs, names, motion ordering and all other fields. Published minutes
+are labeled Published, not assumed approved. Downloaded July 21 minutes confirm
+the API's 0/1 failed/passed codes, including its 5–7 failed motion.
+
+Requests are sequential with a five-second per-host floor. Each run refreshes
+the roster and paged event index, then downloads at most two meetings, including
+refreshes. Unchanged meeting records are reused for seven days. Changed records
+retain their earlier native revisions; disappearing motions or recorded voters
+stop replacement for review. No new paid service or dependency is needed.
+
+Validation preserved all 501,763 existing vote rows across five cities and all
+806 source files in the isolated comparison, then added exactly 900 Green Bay
+positions. All 75 motion records also matched the native source. Local integrity
+checks passed, as did 553 Python tests (one existing skip), Ruff, site vote-query
+tests, Astro checks and mobile/desktop coverage-notice accessibility checks.
+
 ## Validate in dev
 
 After merge, let the current nightly run finish. Run the nightly workflow with
@@ -265,7 +328,9 @@ After merge, let the current nightly run finish. Run the nightly workflow with
 workflow from `main`; releases follow [the deployment runbook](../deploys.md).
 The website build alone does not collect the new cities.
 
-Check `/local/appleton/` and `/local/waukesha/`, their 15 district members, and
+Check `/local/green-bay/` and its 12 district members, including Bill Morgan's
+recorded William Morgan votes. Verify the July 21 dissent and abstention and the
+July 1, 2026 coverage start. Check `/local/appleton/` and `/local/waukesha/`, their 15 district members, and
 their council/member JSON links. Confirm that source links open the matching
 meeting, Nay rows remain Nay, dissent totals agree,
 and pending-history notices remain until backfill finishes. Compare individual
@@ -280,7 +345,7 @@ New-Item -ItemType Directory .private/city-dev
 Copy-Item -LiteralPath pipeline/_data/local -Destination .private/city-dev/local -Recurse
 Copy-Item -LiteralPath data/wi.sqlite -Destination .private/city-dev/wi.sqlite
 Set-Location pipeline
-uv run python -m scraper.fetch_local_votes --tenant madison --tenant cityofappleton --tenant waukesha --data-dir ../.private/city-dev/local
+uv run python -m scraper.fetch_local_votes --tenant madison --tenant cityofappleton --tenant waukesha --tenant greenbaywi --data-dir ../.private/city-dev/local
 if ($LASTEXITCODE -ne 0) { throw "Collection failed; stop here." }
 uv run python -m importer.import_local ../.private/city-dev/local ../.private/city-dev/wi.sqlite
 if ($LASTEXITCODE -ne 0) { throw "Import failed; stop here." }

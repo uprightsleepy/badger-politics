@@ -1534,7 +1534,7 @@ export const sessionBillFlow = (sessionId: string) => {
 };
 
 
-/** ---- Local council votes (Legistar tenants; enrichment tables) ---- */
+/** Local council votes from reviewed municipal sources. */
 
 export interface LocalBody {
   tenant: string; slug: string; city: string; name: string;
@@ -1577,11 +1577,11 @@ export const localTenantStats = memoBy((tenant: string) =>
   },
 );
 
-/** Recount recorded Ayes and negative votes (No or Nay), retaining source wording. */
+/** Recount positive (Aye or Yes) and negative (No or Nay) votes, retaining source wording. */
 const DISSENT_SQL = `
   SELECT a.event_item_id, a.matter_file, a.matter_url, a.title, a.action,
          e.date, e.insite_url,
-         SUM(v.value = 'Aye') AS ayes, SUM(v.value IN ('No', 'Nay')) AS noes
+         SUM(v.value IN ('Aye', 'Yes')) AS ayes, SUM(v.value IN ('No', 'Nay')) AS noes
   FROM local_actions a
   JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
   JOIN local_votes v ON v.tenant = a.tenant AND v.event_item_id = a.event_item_id
@@ -1606,7 +1606,7 @@ export const localMemberVotesWithDissent = (tenant: string, personId: number) =>
               a.action, e.date, t.ayes, t.noes
        FROM local_votes v
        JOIN (SELECT tenant, event_item_id,
-                    SUM(value = 'Aye') AS ayes, SUM(value IN ('No', 'Nay')) AS noes
+                    SUM(value IN ('Aye', 'Yes')) AS ayes, SUM(value IN ('No', 'Nay')) AS noes
              FROM local_votes WHERE tenant = ?
              GROUP BY event_item_id HAVING ayes > 0 AND noes > 0) t
          ON t.tenant = v.tenant AND t.event_item_id = v.event_item_id
@@ -1656,17 +1656,17 @@ export const localUpcomingMeetings = () =>
 export const localMemberTieBreaks = (tenant: string, personId: number) =>
   prep(
       `SELECT v.value, a.matter_file, a.matter_url, a.title, a.action, e.date,
-              t.ayes - (v.value = 'Aye') AS other_ayes,
+              t.ayes - (v.value IN ('Aye', 'Yes')) AS other_ayes,
               t.noes - (v.value IN ('No', 'Nay')) AS other_noes
        FROM local_votes v
-       JOIN (SELECT event_item_id, SUM(value = 'Aye') AS ayes, SUM(value IN ('No', 'Nay')) AS noes
+       JOIN (SELECT event_item_id, SUM(value IN ('Aye', 'Yes')) AS ayes, SUM(value IN ('No', 'Nay')) AS noes
              FROM local_votes WHERE tenant = ? GROUP BY event_item_id) t
          ON t.event_item_id = v.event_item_id
        JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
        JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
-       WHERE v.tenant = ? AND v.person_id = ? AND v.value IN ('Aye', 'No', 'Nay')
-         AND t.ayes - (v.value = 'Aye') = t.noes - (v.value IN ('No', 'Nay'))
-         AND t.ayes - (v.value = 'Aye') > 0
+       WHERE v.tenant = ? AND v.person_id = ? AND v.value IN ('Aye', 'Yes', 'No', 'Nay')
+         AND t.ayes - (v.value IN ('Aye', 'Yes')) = t.noes - (v.value IN ('No', 'Nay'))
+         AND t.ayes - (v.value IN ('Aye', 'Yes')) > 0
        ORDER BY e.date DESC`,
     ).all(tenant, tenant, personId) as {
     value: string; matter_file: string | null; matter_url: string | null;
@@ -1690,8 +1690,8 @@ export const localMemberVoteYears = (tenant: string, personId: number) =>
 export const localMemberOutcomes = (tenant: string, personId: number) =>
   prep(
       `SELECT COALESCE(SUM((v.value IN ('No', 'Nay') AND a.passed = 1)
-                        OR (v.value = 'Aye' AND a.passed = 0)), 0) AS lost,
-              COALESCE(SUM(v.value IN ('Aye', 'No', 'Nay') AND a.passed IS NOT NULL), 0) AS decided
+                        OR (v.value IN ('Aye', 'Yes') AND a.passed = 0)), 0) AS lost,
+              COALESCE(SUM(v.value IN ('Aye', 'Yes', 'No', 'Nay') AND a.passed IS NOT NULL), 0) AS decided
        FROM local_votes v
        JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
        WHERE v.tenant = ? AND v.person_id = ?`,
@@ -1738,7 +1738,7 @@ export const localMemberVoteStats = (tenant: string, personId: number) =>
   prep(
       `SELECT COUNT(*) AS total,
               COALESCE(SUM(v.value IN ('No', 'Nay')), 0) AS noes,
-              COALESCE(SUM(v.value NOT IN ('Aye', 'No', 'Nay')), 0) AS other,
+              COALESCE(SUM(v.value NOT IN ('Aye', 'Yes', 'No', 'Nay')), 0) AS other,
               MAX(e.date) AS last
        FROM local_votes v
        JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id

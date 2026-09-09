@@ -5,7 +5,7 @@ import json
 import pytest
 from test_import_local import build, event_file, item, office, vote
 
-from importer.import_local import TABLES, run
+from importer.import_local import SEATS_PATH, TABLES, member_seat, run
 from importer.local_registry import TENANTS
 from importer.roster import load_curation
 
@@ -106,11 +106,21 @@ def test_new_cities_use_the_shared_importer_and_curated_ids(
 
 
 def test_curated_new_city_rosters_cover_fifteen_distinct_districts():
-    from importer.import_local import SEATS_PATH
-
     seats = load_curation(SEATS_PATH)
     for tenant in ("cityofappleton", "waukesha"):
         assert sorted(entry["seat"] for entry in seats[tenant].values()) == list(range(1, 16))
         spec = next(s for s in TENANTS if s["tenant"] == tenant)
         assert spec["max_new_per_run"] == 2
         assert spec["since"] == 2025
+
+
+def test_racine_district_conflict_uses_verified_person_ids():
+    seats = load_curation(SEATS_PATH)["cityofracine"]
+    assert sorted(entry["seat"] for entry in seats.values()) == list(range(1, 16))
+    for person_id, district in ((859, 10), (1061, 12)):
+        # The board directory labels both as district 10; the city roster resolves it.
+        records = [office(person_id, "Source display name", "Alder")]
+        seat, basis = member_seat(records, seats, person_id)
+        assert seat == district
+        assert basis == seats[str(person_id)]["basis"]
+    assert member_seat([office(99999, "Rocco DeMark", "Alder")], seats, 99999) == (None, None)

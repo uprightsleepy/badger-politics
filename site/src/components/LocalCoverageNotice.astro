@@ -5,13 +5,15 @@ interface Props { tenant: string }
 const { tenant } = Astro.props;
 const raw = meta()[`local_coverage_${tenant}`];
 const coverage = raw ? JSON.parse(raw) as {
-  since: number; pending_meetings: number;
+  since: number; start_date?: string; pending_meetings: number;
 } : null;
+const start = coverage?.start_date ? new Date(`${coverage.start_date}T00:00:00Z`)
+  .toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }) : null;
 ---
 
 {coverage && (
   <p class="mt-2 max-w-3xl text-xs text-navy-600" role="note">
-    Coverage starts in {coverage.since}.
+    Coverage starts {start ? `on ${start}` : `in ${coverage.since}`}.
     {coverage.pending_meetings > 0 && <>
       {" "}<strong>History is still being collected.</strong>{" "}
       {coverage.pending_meetings.toLocaleString()} listed {coverage.pending_meetings === 1

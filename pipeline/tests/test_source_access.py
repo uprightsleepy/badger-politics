@@ -301,7 +301,7 @@ def test_policy_refresh_blocks_mid_run_change(network):
     "https://www.cityofmadison.com/council/district3/",
     "https://webapi.legistar.com/v1/racine/Events",
     "https://webapi.legistar.com/v1/cityofappleton/Matters",
-    "https://greenbaywi.api.civicclerk.com/v1/Events",
+    "https://greenbaywi.api.civicclerk.com/v1/Users",
     "https://www.kenosha.org/government/common-council/",
 ])
 def test_reviewed_manifest_rejects_restricted_or_unreviewed_urls(url):
@@ -441,4 +441,5 @@ def test_nightly_job_keeps_archives_and_omits_paused_fetchers():
     assert not any("scraper.fetch_" + name in line for line in commands
                    for name in ("lobbying", "wiseye", "wec"))
     policies = json.loads(source_access.MANIFEST.read_text())
-    assert policies["reviewed_on"] == "2026-09-07"
+    assert all(policies["sources"][host].get("paused")
+               for host in ("lobbying.wi.gov", "wiseye.org", "elections.wi.gov"))

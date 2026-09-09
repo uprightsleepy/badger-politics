@@ -23,7 +23,7 @@ const latest = [...stats.values()].map((s) => s?.last).filter(Boolean).sort().at
     time, straight from each city's own legislative system.
   </p>
   <SourceStrip
-    sources={bodies.map((b) => ({ label: `${b.city} (Legistar)`, href: b.insite_url }))}
+    sources={bodies.map((b) => ({ label: `${b.city}`, href: b.insite_url }))}
     through={latest}
   />
 

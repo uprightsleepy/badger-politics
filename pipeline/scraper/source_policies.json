@@ -1,7 +1,21 @@
 {
-  "reviewed_on": "2026-09-07",
-  "documentation": "README.md#source-policy-review-2026-09-07",
+  "reviewed_on": "2026-09-08",
+  "documentation": "README.md#shared-daily-checks-2026-09-08",
   "sources": {
+    "greenbaywi.api.civicclerk.com": {
+      "paths": { "GET": ["/v1/Events", "/v1/Meetings/\\d+"] },
+      "delay_seconds": 5,
+      "robots": { "status": 404, "url": "https://greenbaywi.api.civicclerk.com/robots.txt" }
+    },
+    "www.greenbaywi.gov": {
+      "paths": { "GET": ["/617/Common-Council"] },
+      "delay_seconds": 5,
+      "robots": {
+        "status": 200,
+        "url": "https://www.greenbaywi.gov/robots.txt",
+        "sha256": "28961269f16c315262919fdd37023c4c20caca776390133340526bd9a4699d18"
+      }
+    },
     "docs.legis.wisconsin.gov": {
       "paths": {
         "GET": [

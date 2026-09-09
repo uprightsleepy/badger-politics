@@ -15,7 +15,7 @@ import YearChips from "../../../components/YearChips.astro";
 import LocalVoteRow from "../../../components/LocalVoteRow.astro";
 import { yearPageStarts } from "../../../lib/paging";
 import { fmtDate } from "../../../lib/format";
-import { actionLabel, castStyle, glossaryFor, isNoVote } from "../../../lib/localGloss";
+import { actionLabel, castStyle, glossaryFor, isNoVote, isYesVote } from "../../../lib/localGloss";
 
 const RECENT = 300;
 
@@ -54,7 +54,7 @@ const yearPages = yearPageStarts(localMemberVoteYears(body.tenant, member.person
 const presiding = terms.some((t) => t.title === "Mayor");
 const rated = !presiding;
 const tieBreaks = rated ? [] : localMemberTieBreaks(body.tenant, member.person_id);
-const tieAyes = tieBreaks.filter((v) => v.value === "Aye").length;
+const tieAyes = tieBreaks.filter((v) => isYesVote(v.value)).length;
 // the chair's remaining Ayes joined an already unanimous council
 const joinedAyes = stats.total - stats.noes - stats.other - tieAyes;
 const glossary = glossaryFor(
@@ -123,7 +123,7 @@ const termLabel = (t: string | null) =>
     )}
   </p>
   <SourceStrip
-    sources={[{ label: `${body.name} records (Legistar)`, href: body.insite_url }]}
+    sources={[{ label: `${body.name} records`, href: body.insite_url }]}
     through={stats.last}
   />
   <LocalCoverageNotice tenant={body.tenant} />

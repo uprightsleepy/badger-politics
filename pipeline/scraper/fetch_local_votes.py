@@ -1,20 +1,10 @@
-"""Council votes from the Legistar Web API, tenant by tenant.
+"""Council votes from reviewed public APIs, tenant by tenant.
 
 Usage: python -m scraper.fetch_local_votes [--max-new N] [--delay S]
 
-For each registry tenant (importer/local_registry.py): the body's vote
-vocabulary and office records refresh every run; each council meeting is
-one cached JSON file holding the event, its agenda items, the
-per-member votes for every acted item, each item's own InSite link read
-from the meeting's page (InSite's ids are not the API's), and the
-per-member attendance of every roll-call item. A meeting refetches only while
-its minutes are not settled under the tenant's reviewed status vocabulary.
-Meetings are fetched newest first after any reviewed bootstrap meeting.
-
-The API is Granicus's public, documented endpoint (no token for these
-tenants, robots.txt absent, OData paging); we identify ourselves and
-throttle. See "Do the sources permit API calls and crawling?" in
-docs/research/local-votes-2026-08.md.
+Legistar records include items, named votes, attendance and official links.
+CivicClerk uses its native reader with the same CLI and request budget.
+Source scopes, pacing and review evidence are documented in scraper/README.md.
 """
 
 from __future__ import annotations
@@ -32,17 +22,11 @@ from urllib.parse import quote, urlencode
 import requests
 
 from importer.local_registry import TENANTS
-from scraper.http import session
+from scraper.http import save_json, session
 
 BASE = "https://webapi.legistar.com/v1"
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "local"
 PAGE = 1000
-
-
-def save_json(path: Path, value) -> None:
-    pending = path.with_suffix(".json.tmp")
-    pending.write_text(json.dumps(value, indent=0), encoding="utf-8")
-    pending.replace(path)
 
 
 def call(http: requests.Session, tenant: str, path: str, delay: float, **params):
@@ -157,6 +141,10 @@ def fetch_rollcalls(http, tenant: str, items: list[dict], delay: float) -> dict[
 def fetch_tenant(
     http, spec: dict, budget: list[int], delay: float, data_dir: Path | None = None,
 ) -> tuple[int, int]:
+    if spec.get("provider") == "civicclerk":
+        from scraper.fetch_civicclerk import fetch_tenant as fetch_civicclerk
+
+        return fetch_civicclerk(http, spec, budget, delay, data_dir or DATA_DIR)
     tenant = spec["tenant"]
     out = (data_dir if data_dir is not None else DATA_DIR) / tenant
     out.mkdir(parents=True, exist_ok=True)

@@ -1,14 +1,9 @@
-"""Import council votes from the local Legistar cache into SQLite.
+"""Import council votes from reviewed local archives into SQLite.
 
 Usage: python -m importer.import_local <local_data_dir> <sqlite_path>
 
-Attribution is the tenant's own person id on every vote row; there is no
-name matching. Seats come from office-record titles where the tenant
-records them (Milwaukee's "3rd District") and from the human-verified
-importer/local_seats.json where it does not (West Allis prints "Ald.").
-A member who appears only in vote records (no office record) is kept
-with the tenant's own id and name and no term dates; the import reports
-how many, and never invents dates for them.
+Legistar attribution uses source person IDs. CivicClerk uses verified full
+names and explicit aliases. Unknown term dates remain unknown.
 """
 
 from __future__ import annotations
@@ -21,6 +16,7 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
+from importer.civicclerk import VOTE_FIELDS, adapt_meeting, event_record, roster_members
 from importer.local_registry import TENANTS
 from importer.person_slugs import slugify
 from importer.roster import load_curation
@@ -238,7 +234,7 @@ def milwaukee_profile_owners(local_dir: Path) -> dict[str, int]:
 
 def import_members(
     conn: sqlite3.Connection, spec: dict, office: list[dict], curated: dict,
-    profiles: dict, persons: dict,
+    profiles: dict, persons: dict, current_members: set[int] | None = None,
 ) -> tuple[dict[int, str], dict[str, int]]:
     """Insert members and terms; returns (person_id -> name, profile counts)."""
     tenant = spec["tenant"]
@@ -255,7 +251,9 @@ def import_members(
         latest = records[-1]
         record_name = latest["OfficeRecordFullName"].strip()
         name = display_name(record_name, persons.get(str(person_id)))
-        is_current = any((r.get("OfficeRecordEndDate") or "")[:10] >= today for r in records)
+        is_current = (person_id in current_members if current_members is not None
+                      else any((r.get("OfficeRecordEndDate") or "")[:10] >= today
+                               for r in records))
         seat, seat_basis = member_seat(
             records, curated, person_id, persons.get(str(person_id)), spec.get("seat_url_pattern"),
         )
@@ -283,6 +281,8 @@ def import_members(
              image, basis, email, phone),
         )
         names[person_id] = name
+        if current_members is not None:
+            continue  # A dated current roster does not establish term dates.
         for r in records:
             conn.execute(
                 "INSERT INTO local_member_terms (tenant, person_id, title, start, end)"
@@ -347,11 +347,14 @@ def _optional_json(path: Path, default):
 def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict:
     tenant = spec["tenant"]
     src = local_dir / tenant
+    civicclerk = spec.get("provider") == "civicclerk"
+    curated = load_curation(SEATS_PATH).get(tenant, {})
     coverage = _optional_json(src / "coverage.json", None)
     if coverage is None and spec.get("max_new_per_run") is not None:
         raise ValueError(f"{tenant}: council coverage metadata is required")
     if coverage is not None:
         if (not isinstance(coverage, dict) or coverage.get("since") != spec["since"]
+                or coverage.get("start_date") != spec.get("start_date")
                 or any(type(coverage.get(k)) is not int or coverage[k] < 0
                        for k in ("listed_meetings", "pending_meetings"))
                 or coverage["pending_meetings"] > coverage["listed_meetings"]
@@ -360,8 +363,16 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
             raise ValueError(f"{tenant}: invalid council coverage metadata")
         conn.execute("INSERT INTO meta (key, value) VALUES (?, ?)",
                      (f"local_coverage_{tenant}", json.dumps(coverage)))
-    office = json.loads((src / "officerecords.json").read_text(encoding="utf-8"))
-    vote_types = json.loads((src / "votetypes.json").read_text(encoding="utf-8"))
+    current_members = None
+    if civicclerk:
+        roster = json.loads((src / "roster.json").read_text(encoding="utf-8"))
+        office, current_members = roster_members(roster, spec, curated)
+        vote_types = [{"VoteTypeName": value} for value in VOTE_FIELDS.values()]
+        conn.execute("INSERT INTO meta (key, value) VALUES (?, ?)",
+                     (f"local_roster_{tenant}", json.dumps(roster)))
+    else:
+        office = json.loads((src / "officerecords.json").read_text(encoding="utf-8"))
+        vote_types = json.loads((src / "votetypes.json").read_text(encoding="utf-8"))
     merges = load_merges(tenant)
     canon = lambda pid: merges.get(pid, pid)  # noqa: E731 - one-liner by design
     # a placeholder "member" the clerk uses for an empty seat is no person
@@ -369,7 +380,6 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
         {**r, "OfficeRecordPersonId": canon(r["OfficeRecordPersonId"])}
         for r in office if not is_placeholder(r.get("OfficeRecordFullName"))
     ]
-    curated = load_curation(SEATS_PATH).get(tenant, {})
     profiles = _optional_json(local_dir / "profiles.json", {})
     if profiles.get(tenant, {}).get("seats"):
         profiles[tenant]["seats"] = strip_template_phones(profiles[tenant]["seats"])
@@ -392,11 +402,15 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
             "INSERT INTO local_vote_types (tenant, value) VALUES (?, ?)",
             (tenant, vt["VoteTypeName"]),
         )
-    names, profile_counts = import_members(conn, spec, office, curated, profiles, persons)
+    names, profile_counts = import_members(
+        conn, spec, office, curated, profiles, persons, current_members,
+    )
     membership_rows = import_memberships(conn, spec, memberships, departments, api_bodies)
     # meetings not held yet: date, time and place for the calendar
     n_upcoming = 0
     for e in _optional_json(src / "upcoming.json", []):
+        if civicclerk:
+            e = event_record(e, spec)
         if not e.get("EventInSiteURL"):
             continue
         if "INFORMAL GATHERING" in (e.get("EventComment") or "").upper():
@@ -416,6 +430,8 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
     voter_names: dict[int, str] = {}
     for path in sorted(src.glob("event_*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
+        if civicclerk:
+            data = adapt_meeting(data, spec, curated)
         event, items, links = data["event"], data["items"], data.get("links", {})
         if not items:
             continue  # duplicate or empty event records carry nothing
