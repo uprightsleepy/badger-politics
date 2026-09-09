@@ -299,7 +299,9 @@ def test_gcs_listing_is_scoped_paginated_and_bounded():
         store.list_names(policies.PREFIX)
 
 
-@pytest.mark.parametrize("mutation", ["trigger", "schedule", "release", "collector", "finish"])
+@pytest.mark.parametrize("mutation", [
+    "trigger", "schedule", "timezone", "old_time", "release", "collector", "finish",
+])
 def test_policy_only_workflow_boundaries(mutation):
     path = Path(__file__).resolve().parents[2] / ".github/workflows/nightly-parser.yml"
     workflow = yaml.load(path.read_text(), Loader=yaml.BaseLoader)
@@ -307,6 +309,10 @@ def test_policy_only_workflow_boundaries(mutation):
         workflow["jobs"]["policies"]["if"] = "always()"
     elif mutation == "schedule":
         workflow["on"]["schedule"].pop(0)
+    elif mutation == "timezone":
+        workflow["on"]["schedule"][1]["timezone"] = "UTC"
+    elif mutation == "old_time":
+        workflow["on"]["schedule"][1]["cron"] = "15 5 * * *"
     elif mutation == "release":
         workflow["jobs"]["policies"]["steps"][-1].pop("if")
     elif mutation == "collector":

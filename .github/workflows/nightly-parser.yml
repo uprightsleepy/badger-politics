@@ -1,5 +1,5 @@
 name: nightly parser
-run-name: ${{ (inputs.policy_only || github.event.schedule == '15 4 * * *') && 'source policy checks' || 'nightly parser' }}
+run-name: ${{ (inputs.policy_only || github.event.schedule == '0 23 * * *') && 'source policy checks' || 'nightly parser' }}
 
 on:
   workflow_dispatch:
@@ -13,9 +13,9 @@ on:
         type: string
         default: ""
   schedule:
-    - cron: "15 4 * * *"
+    - cron: "0 23 * * *"
       timezone: America/Chicago
-    - cron: "15 5 * * *"
+    - cron: "0 0 * * *"
       timezone: America/Chicago
 
 permissions:
@@ -36,7 +36,7 @@ jobs:
   policies:
     name: daily source policy checks
     needs: validate
-    if: inputs.policy_only || github.event.schedule == '15 4 * * *'
+    if: inputs.policy_only || github.event.schedule == '0 23 * * *'
     permissions:
       contents: read
       id-token: write
@@ -72,7 +72,7 @@ jobs:
 
   legislature:
     needs: validate
-    if: ${{ !inputs.policy_only && github.event.schedule != '15 4 * * *' }}
+    if: ${{ !inputs.policy_only && github.event.schedule != '0 23 * * *' }}
     permissions:
       contents: read
       id-token: write
