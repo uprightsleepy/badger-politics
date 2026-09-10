@@ -1,27 +1,5 @@
 ---
-/** Where a session's bills actually went, drawn as a Sankey at build time.
- *
- * A cumulative funnel can only say that each stage is a subset of the one
- * above it. It cannot say where the bills that dropped out went, which is
- * the part that matters: almost all of them die in committee without ever
- * being voted on, and a chart of survivors hides that. A flow has to name
- * every branch, so the numbers are forced to add up in public.
- *
- * Horizontal reach carries meaning: a path ends where the bill's journey
- * ended. Dying without a hearing is the shortest trip in the legislature,
- * so it is the shortest path here; law and veto travelled the whole way,
- * so they reach the far edge. Ribbons fade toward their destination
- * rather than sitting as flat blocks, so the eye reads direction.
- *
- * Static SVG, no charting library. The interactivity is one small inline
- * script: hovering (or focusing) any part lights the whole path a bill
- * took and quiets the rest, and clicking goes to the bills themselves.
- * All of it is enhancement, and nothing in the diagram is the only
- * route to a fact: every number and link also exists as plain HTML in
- * the outcome cards, which are shown on phones -- where a Sankey's
- * labels would be too small to read -- and swapped for the diagram on
- * wider screens.
- */
+/** Proportional bill flows, rendered as static SVG with a phone-friendly text view. */
 interface Props {
   flow: {
     introduced: number; enacted: number; vetoed: number; died: number;
@@ -30,62 +8,52 @@ interface Props {
   session: string;
 }
 const { flow, session } = Astro.props;
-
-const MOSS = "#3e7051", GOLD = "#a87a1e", NAVY = "#2d4a73";
-const NAVY_LT = "#9fb3cc", BADGER = "#b33a2b", INK = "#1d2e4a";
-// a colour part-way toward the paper ground, for the pale end of a ribbon
-const mix = (hex: string, t: number) => {
-  const paper = [0xfa, 0xf8, 0xf4];
-  const c = hex.slice(1).match(/../g)!.map((v) => parseInt(v, 16));
-  return "#" + c.map((v, i) => Math.round(v + (paper[i] - v) * t).toString(16).padStart(2, "0")).join("");
-};
-
 const num = (n: number) => n.toLocaleString();
-const pct = (n: number) => Math.round((n / flow.introduced) * 100);
+const share = (n: number) => flow.introduced ? n / flow.introduced * 100 : 0;
+const pct = (n: number) => n > 0 && share(n) < 0.1 ? "<0.1" : share(n).toLocaleString(undefined, {
+  maximumFractionDigits: 1,
+});
 const tipFor = (label: string, n: number) => `${label}: ${num(n)} bills, ${pct(n)}% of all introduced`;
 
-// Ordered top to bottom. Each node's x is where that outcome actually
-// stopped the bill: committee deaths end early, the governor's desk is the
-// far edge. A branch holding a single bucket ends at its own column.
 const branches = [
   {
-    key: "passed", label: "Passed both chambers", n: flow.passedBoth, color: NAVY, x: 420,
+    key: "passed", label: "Passed both chambers", n: flow.passedBoth, color: "#2d4a73",
     href: "/governors-desk/",
     leaves: [
       {
-        key: "enacted", label: "Became law", n: flow.enacted, color: MOSS, x: 640,
+        key: "enacted", label: "Became law", n: flow.enacted, color: "#3e7051",
         href: `/bills/${session}/status/enacted/`,
         note: "Passed both chambers and signed by the governor.",
       },
       {
-        key: "vetoed", label: "Vetoed by the governor", n: flow.vetoed, color: GOLD, x: 640,
+        key: "vetoed", label: "Vetoed by the governor", n: flow.vetoed, color: "#a87a1e",
         href: `/bills/${session}/status/vetoed/`,
         note: "Cleared the legislature, then stopped at the governor's desk.",
       },
     ],
   },
   {
-    key: "moving", label: "Still moving", n: flow.moving, color: NAVY_LT, x: 600,
+    key: "moving", label: "Still moving", n: flow.moving, color: "#657c98",
     href: `/bills/${session}/`,
     leaves: [
       {
-        key: "moving", label: "Still moving", n: flow.moving, color: NAVY_LT, x: 600,
+        key: "moving", label: "Still moving", n: flow.moving, color: "#657c98",
         href: `/bills/${session}/`,
         note: "Neither finished nor recorded as failed when this page was built.",
       },
     ],
   },
   {
-    key: "died", label: "Died without passing", n: flow.died, color: BADGER, x: 280,
+    key: "died", label: "Died without passing", n: flow.died, color: "#b33a2b",
     href: `/bills/${session}/status/failed_sjr1/`,
     leaves: [
       {
-        key: "heard", label: "Heard, then went no further", n: flow.heard, color: NAVY_LT, x: 540,
+        key: "heard", label: "Heard, then went no further", n: flow.heard, color: "#657c98",
         href: `/bills/${session}/status/failed_sjr1/`,
         note: "Got a public hearing but never finished the trip.",
       },
       {
-        key: "nohearing", label: "Never got a public hearing", n: flow.noHearing, color: BADGER, x: 440,
+        key: "nohearing", label: "Never got a public hearing", n: flow.noHearing, color: "#b33a2b",
         href: `/hearing-none/${session}/`,
         note: "Not voted down. Never taken up at all: a committee chair alone decides whether a bill gets heard.",
       },
@@ -93,314 +61,162 @@ const branches = [
   },
 ].filter((b) => b.n > 0);
 
-// every final bucket, for the legend and the text alternative
 const terminals = branches.flatMap((b) => b.leaves.map((l) => ({ ...l, g: b.key })));
-// only branches that actually split are drawn past their own column
-const col2Nodes = branches.flatMap((b) =>
-  b.leaves.length > 1 ? b.leaves.map((l) => ({ ...l, g: b.key })) : [],
-);
-
-const VB_W = 820, VB_H = 300, PAD = 12, GAP = 11, NODE_W = 11;
-const X0 = 92;
-const INNER = VB_H - PAD * 2;
-const maxGaps = Math.max(0, branches.length - 1, col2Nodes.length - 1);
-const scale = (INNER - maxGaps * GAP) / flow.introduced;
+const WIDTH = 1000, PAD = 84, GAP = 64, NODE_W = 4;
+const X0 = 32, X1 = 360, X2 = 698;
+// Every ribbon uses the same scale; spacing never changes a bill count's width.
+const scale = flow.introduced ? 224 / flow.introduced : 0;
 const h = (n: number) => n * scale;
-// centre each column on its own height, so a column that ends early sits
-// level with the others rather than hanging from the top
-const top = (nodes: { n: number }[]) => {
-  const used = nodes.reduce((a, b) => a + h(b.n), 0) + (nodes.length - 1) * GAP;
-  return PAD + (INNER - used) / 2;
-};
-
-let cursor = top(branches);
-const cols1 = branches.map((b) => {
-  const box = { ...b, y: cursor, h: h(b.n) };
-  cursor += box.h + GAP;
-  return box;
+const gaps = Math.max(0, terminals.length - 1) * GAP;
+const HEIGHT = PAD + h(flow.introduced) + gaps + 24;
+let cursor = PAD;
+const leaves = terminals.map((l) => {
+  const node = { ...l, y: cursor, h: h(l.n) };
+  cursor += node.h + GAP;
+  return node;
 });
-cursor = top(col2Nodes);
-const cols2 = new Map(
-  col2Nodes.map((l) => {
-    const box = { ...l, y: cursor, h: h(l.n) };
-    cursor += box.h + GAP;
-    return [l.key, box];
-  }),
-);
-
+const nodes = branches.map((b) => {
+  const children = leaves.filter((l) => l.g === b.key);
+  const first = children[0], last = children[children.length - 1];
+  return { ...b, h: h(b.n), y: (first.y + last.y + last.h - h(b.n)) / 2, children };
+});
+const introTop = PAD + gaps / 2;
+const introLabelY = Math.max(64, introTop - 45);
 const r2 = (n: number) => Math.round(n * 100) / 100;
-const ribbon = (xa: number, ya: number, yb: number, xb: number, yc: number, yd: number) => {
-  const c = (xb - xa) / 2;
-  return (
-    `M${r2(xa)} ${r2(ya)}C${r2(xa + c)} ${r2(ya)} ${r2(xb - c)} ${r2(yc)} ${r2(xb)} ${r2(yc)}` +
-    `L${r2(xb)} ${r2(yd)}C${r2(xb - c)} ${r2(yd)} ${r2(xa + c)} ${r2(yb)} ${r2(xa)} ${r2(yb)}Z`
-  );
+const ribbon = (xa: number, ya: number, xb: number, yb: number, height: number) => {
+  const bend = (xb - xa) * 0.48;
+  return `M${xa} ${r2(ya)}C${xa + bend} ${r2(ya)} ${xb - bend} ${r2(yb)} ${xb} ${r2(yb)}`
+    + `v${r2(height)}C${xb - bend} ${r2(yb + height)} ${xa + bend} ${r2(ya + height)} ${xa} ${r2(ya + height)}Z`;
 };
-
-const introTop = top([{ n: flow.introduced }]);
-let src = introTop;
-// each ribbon fades from pale at its source to full colour at its
-// destination, so the eye reads left-to-right motion instead of blocks
-const flows1 = cols1.map((b) => {
-  const path = ribbon(X0 + NODE_W, src, src + b.h, b.x, b.y, b.y + b.h);
-  src += b.h;
-  return {
-    path, g: b.key, href: b.href, grad: `bfg1-${b.key}`,
-    x1: X0 + NODE_W, x2: b.x, from: mix(b.color, 0.6), to: b.color,
-    tip: tipFor(b.label, b.n),
+let sourceY = introTop;
+const ribbons = nodes.flatMap((b) => {
+  const incoming = {
+    key: b.key, g: b.key, l: "", href: b.href, tip: tipFor(b.label, b.n),
+    path: ribbon(X0 + NODE_W, sourceY, X1, b.y, b.h),
+    x1: X0 + NODE_W, x2: X1, from: "#657c98", to: b.color,
   };
-});
-const flows2 = cols1.flatMap((b) => {
-  if (b.leaves.length < 2) return [];
-  let o = b.y;
-  return b.leaves.map((l) => {
-    const t = cols2.get(l.key)!;
-    const path = ribbon(b.x + NODE_W, o, o + h(l.n), l.x, t.y, t.y + t.h);
-    o += h(l.n);
+  sourceY += b.h;
+  let branchY = b.y;
+  const outgoing = b.children.filter((l) => l.n > 0).map((l) => {
+    const path = ribbon(X1 + NODE_W, branchY, X2, l.y, l.h);
+    branchY += l.h;
     return {
-      path, g: b.key, l: l.key, href: l.href, grad: `bfg2-${l.key}`,
-      x1: b.x + NODE_W, x2: l.x, from: mix(b.color, 0.45), to: l.color,
-      tip: tipFor(l.label, l.n),
+      key: `${b.key}-${l.key}`, g: b.key, l: l.key, href: l.href,
+      tip: tipFor(l.label, l.n), path, x1: X1 + NODE_W, x2: X2, from: b.color, to: l.color,
     };
   });
+  return [incoming, ...outgoing];
 });
-
-const alt =
-  `Flow of ${num(flow.introduced)} bills: ` +
-  terminals.map((l) => `${num(l.n)} ${l.label.toLowerCase()}`).join("; ") + ".";
+const alt = `Flow of ${num(flow.introduced)} bills: `
+  + terminals.map((l) => `${num(l.n)} ${l.label.toLowerCase()}`).join("; ") + ".";
 ---
 
-<figure class="relative mt-4" data-billflow>
-  <svg viewBox={`0 0 ${VB_W} ${VB_H}`} class="hidden w-full sm:block" aria-label={alt}>
-    <defs>
-      {[...flows1, ...flows2].map((f) => (
-        <linearGradient id={f.grad} gradientUnits="userSpaceOnUse" x1={f.x1} x2={f.x2} y1="0" y2="0">
-          <stop offset="0" stop-color={f.from} />
-          <stop offset="1" stop-color={f.to} />
-        </linearGradient>
-      ))}
-    </defs>
-
-    {flows1.map((f) => (
-      <path
-        class="bf-el bf-ribbon"
-        data-g={f.g}
-        data-tip={f.tip}
-        data-href={f.href}
-        d={f.path}
-        fill={`url(#${f.grad})`}
-        style="opacity:0.55"
-      />
-    ))}
-    {flows2.map((f) => (
-      <path
-        class="bf-el bf-ribbon"
-        data-g={f.g}
-        data-l={f.l}
-        data-tip={f.tip}
-        data-href={f.href}
-        d={f.path}
-        fill={`url(#${f.grad})`}
-        style="opacity:0.6"
-      />
-    ))}
-
-    <rect x={X0} y={r2(introTop)} width={NODE_W} height={r2(h(flow.introduced))} fill={INK} rx="2" />
-    {cols1.map((b) => (
-      <a
-        href={b.href}
-        class="bf-el"
-        data-g={b.key}
-        data-tip={tipFor(b.label, b.n)}
-        aria-label={`${b.label}: ${num(b.n)} bills`}
-      >
-        <rect x={b.x} y={r2(b.y)} width={NODE_W} height={r2(b.h)} fill={b.color} rx="2" />
-      </a>
-    ))}
-    {[...cols2.values()].map((l) => (
-      <a
-        href={l.href}
-        class="bf-el"
-        data-g={l.g}
-        data-l={l.key}
-        data-tip={tipFor(l.label, l.n)}
-        aria-label={`${l.label}: ${num(l.n)} bills`}
-      >
-        <rect x={l.x} y={r2(l.y)} width={NODE_W} height={r2(l.h)} fill={l.color} rx="2" />
-      </a>
-    ))}
-
-    {/* a paper halo keeps every label readable where it crosses a ribbon */}
-    <g paint-order="stroke" stroke="#faf8f4" stroke-width="3.5" stroke-linejoin="round">
-      <text
-        x={X0 - 8}
-        y={r2(introTop + h(flow.introduced) / 2 - 2)}
-        text-anchor="end"
-        font-size="13"
-        font-weight="700"
-        fill="#16233a">{num(flow.introduced)}</text>
-      <text
-        x={X0 - 8}
-        y={r2(introTop + h(flow.introduced) / 2 + 11)}
-        text-anchor="end"
-        font-size="10.5"
-        fill="#24395c">bills introduced</text>
-      {cols1.map((b) => (
-        <g class="bf-el" data-g={b.key}>
-          <text x={b.x + NODE_W + 8} y={r2(b.y + b.h / 2 - 2)} font-size="12.5" font-weight="700" fill="#16233a">
-            {num(b.n)}
-          </text>
-          <text x={b.x + NODE_W + 8} y={r2(b.y + b.h / 2 + 10)} font-size="10.5" fill="#24395c">
-            {b.label}
-          </text>
+<figure class="bf-figure mt-6" data-billflow>
+  {flow.introduced > 0 ? (
+    <>
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} class="bf-chart w-full" aria-label={alt}>
+        <defs>
+          {ribbons.map((r) => (
+            <linearGradient id={`bf-${r.key}`} gradientUnits="userSpaceOnUse" x1={r.x1} x2={r.x2}>
+              <stop offset="0" stop-color={r.from} stop-opacity="0.12" />
+              <stop offset="1" stop-color={r.to} stop-opacity="0.32" />
+            </linearGradient>
+          ))}
+        </defs>
+        <g class="bf-headings" aria-hidden="true">
+          <text x={X0} y="16">INTRODUCED</text>
+          <text x={X1} y="16">LEGISLATURE</text>
+          <text x={X2} y="16">OUTCOME</text>
         </g>
-      ))}
-      {[...cols2.values()].map((l) => (
-        <g class="bf-el" data-g={l.g} data-l={l.key}>
-          <text x={l.x + NODE_W + 8} y={r2(l.y + l.h / 2 - 2)} font-size="12.5" font-weight="700" fill="#16233a">
-            {num(l.n)}
-          </text>
-          <text x={l.x + NODE_W + 8} y={r2(l.y + l.h / 2 + 10)} font-size="10.5" fill="#24395c">
-            {l.label}
-          </text>
-        </g>
-      ))}
-    </g>
-  </svg>
+        {ribbons.map((r) => (
+          <a href={r.href} tabindex="-1" aria-hidden="true" data-g={r.g} data-l={r.l} class="bf-ribbon">
+            <path d={r.path} fill={`url(#bf-${r.key})`}><title>{r.tip}</title></path>
+          </a>
+        ))}
+        <rect x={X0} y={r2(introTop)} width={NODE_W} height={r2(h(flow.introduced))} fill="#2d4a73" rx="2" />
+        <text x={X0} y={r2(introLabelY - 20)} class="bf-count">{num(flow.introduced)}</text>
+        <text x={X0} y={r2(introLabelY)} class="bf-label">bills introduced</text>
+        {nodes.map((b) => (
+          <a href={b.href} data-g={b.key} class="bf-node" aria-label={tipFor(b.label, b.n)}>
+            <rect x={X1} y={r2(b.y)} width={NODE_W} height={r2(b.h)} fill={b.color} rx="2" />
+            <text x={X1} y={r2(b.y - 40)} class="bf-count">{num(b.n)}</text>
+            <text x={X1} y={r2(b.y - 20)} class="bf-label">{b.label}</text>
+          </a>
+        ))}
+        {leaves.map((l) => (
+          <a href={l.href} data-g={l.g} data-l={l.key} class="bf-node" aria-label={tipFor(l.label, l.n)}>
+            <rect x={X2} y={r2(l.y)} width={NODE_W} height={r2(l.h)} fill={l.color} rx="2" />
+            <text x={X2 + 18} y={r2(l.y + l.h / 2 - 3)} class="bf-count">
+              {num(l.n)}<tspan dx="10" class="bf-share">{pct(l.n)}%</tspan>
+            </text>
+            <text x={X2 + 18} y={r2(l.y + l.h / 2 + 17)} class="bf-label">{l.label}</text>
+          </a>
+        ))}
+      </svg>
 
-  <div
-    class="bf-tip pointer-events-none absolute z-10 rounded-md bg-navy-900 px-2.5 py-1.5 text-xs font-semibold text-white shadow-md"
-    hidden
-  >
-  </div>
-
-  <ul class="mt-4 grid gap-2 sm:hidden">
-    {terminals.map((l) => (
-      <li>
-        <a
-          href={l.href}
-          data-g={l.g}
-          data-l={l.key}
-          class={`bf-card block h-full rounded-lg border px-4 py-2.5 ${
-            l.key === "nohearing"
-              ? "border-badger-600/30 bg-badger-50 hover:border-badger-600"
-              : "border-navy-100 bg-white hover:border-navy-600"
-          }`}
-        >
-          <span class="flex items-baseline justify-between gap-3 text-sm">
-            <span class="flex items-center gap-2 font-semibold">
-              <span class="h-2.5 w-2.5 shrink-0 rounded-full" style={`background:${l.color}`}></span>
-              {l.label}
-            </span>
-            <span class="font-bold tabular-nums">{num(l.n)}</span>
-          </span>
-          <span class="mt-1.5 block h-1.5 w-full overflow-hidden rounded-full bg-navy-50">
-            <span
-              class="block h-full rounded-full"
-              style={`width:${Math.max(1.5, (l.n / flow.introduced) * 100)}%;background:${l.color}`}
-            ></span>
-          </span>
-          <span class="mt-1 block text-xs text-navy-600">{pct(l.n)}% of all bills. {l.note}</span>
-        </a>
-      </li>
-    ))}
-  </ul>
+      <ul class="bf-outcomes divide-y divide-navy-100">
+        {terminals.map((l) => (
+          <li>
+            <a href={l.href} class="bf-outcome block py-4">
+              <span class="flex items-baseline justify-between gap-4">
+                <span class="flex items-center gap-2.5 text-sm font-medium">
+                  <span class="h-2 w-2 shrink-0 rounded-full" style={`background:${l.color}`} aria-hidden="true"></span>
+                  {l.label}
+                </span>
+                <span class="text-lg font-semibold tabular-nums">{num(l.n)}</span>
+              </span>
+              <span class="mt-2 block h-1 w-full overflow-hidden rounded-full bg-navy-50" aria-hidden="true">
+                <span class="block h-full rounded-full" style={`width:${share(l.n)}%;background:${l.color}`}></span>
+              </span>
+              <span class="mt-2 block text-xs leading-relaxed text-navy-600">{pct(l.n)}% of all bills. {l.note}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </>
+  ) : <p class="text-sm text-navy-600">No bills recorded for this session yet.</p>}
 </figure>
 
 <style>
-  /* slow enough to read as a change of emphasis, not a flash */
-  .bf-el {
-    transition: opacity 0.3s ease;
+  .bf-figure { container-type: inline-size; }
+  .bf-chart { display: none; }
+  @container (min-width: 840px) {
+    .bf-chart { display: block; }
+    .bf-outcomes { display: none; }
   }
-  .bf-ribbon {
-    cursor: pointer;
-  }
-  /* while something is hovered or focused, everything off its path recedes
-     -- quietly, so the rest of the diagram stays legible underneath */
-  svg.bf-focus .bf-el:not(.bf-hot) {
-    opacity: 0.18 !important;
-  }
-  svg.bf-focus .bf-ribbon.bf-hot {
-    opacity: 0.85 !important;
-  }
-  .bf-card.bf-hot {
-    border-color: var(--color-navy-600);
-  }
-  svg a:focus-visible {
-    outline: 2px solid var(--color-navy-700);
-    outline-offset: 2px;
-  }
+  .bf-headings { fill: var(--color-navy-600); font-size: 10px; font-weight: 600; letter-spacing: 1.6px; }
+  .bf-count { fill: var(--color-ink); font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .bf-share { fill: var(--color-navy-600); font-size: 13px; font-weight: 400; }
+  .bf-label { fill: var(--color-navy-700); font-size: 15px; }
+  .bf-ribbon { transition: opacity 0.2s ease; }
+  .bf-chart.bf-focus .bf-ribbon:not(.bf-hot) { opacity: 0.2; }
+  .bf-node:hover .bf-label, .bf-node:focus-visible .bf-label, .bf-outcome:hover { text-decoration: underline; }
+  .bf-node:focus-visible { outline: 2px solid var(--color-navy-700); outline-offset: 5px; }
   @media (prefers-reduced-motion: reduce) {
-    .bf-el {
-      transition: none;
-    }
+    .bf-ribbon { transition: none; }
+  }
+  @media (forced-colors: active) {
+    .bf-chart { display: none; }
+    .bf-outcomes { display: block; }
   }
 </style>
 
 <script>
-  // Hover, focus and click for the flow. Everything here is enhancement:
-  // the legend already carries every number and link as plain HTML.
-  for (const fig of document.querySelectorAll<HTMLElement>("[data-billflow]")) {
-    const svg = fig.querySelector("svg");
-    const tip = fig.querySelector<HTMLElement>(".bf-tip");
-    if (!svg || !tip) continue;
-
-    // Lighting a leaf lights its whole path: the leaf's own pieces plus the
-    // branch that feeds it. Lighting a branch lights the branch and all its
-    // leaves. Cards participate in both directions.
-    const set = (g: string, l?: string) => {
-      svg.classList.add("bf-focus");
-      for (const e of fig.querySelectorAll<HTMLElement>(".bf-el, .bf-card")) {
-        const eg = (e as HTMLElement).dataset.g;
-        const el = (e as HTMLElement).dataset.l;
-        const hot = l ? el === l || (eg === g && !el) : eg === g;
-        e.classList.toggle("bf-hot", hot);
+  for (const figure of document.querySelectorAll<HTMLElement>("[data-billflow]")) {
+    const svg = figure.querySelector("svg");
+    if (!svg) continue;
+    const emphasize = (target: EventTarget | null) => {
+      const node = target instanceof Element ? target.closest<SVGElement>("[data-g]") : null;
+      svg.classList.toggle("bf-focus", !!node);
+      for (const ribbon of svg.querySelectorAll<SVGElement>(".bf-ribbon")) {
+        const sameBranch = ribbon.dataset.g === node?.dataset.g;
+        const sameLeaf = !node?.dataset.l || !ribbon.dataset.l || ribbon.dataset.l === node.dataset.l;
+        ribbon.classList.toggle("bf-hot", sameBranch && sameLeaf);
       }
     };
-    const clear = () => {
-      svg.classList.remove("bf-focus");
-      for (const e of fig.querySelectorAll(".bf-hot")) e.classList.remove("bf-hot");
-      tip.hidden = true;
-    };
-
-    const from = (t: EventTarget | null) =>
-      t instanceof Element ? t.closest<HTMLElement>("[data-g]") : null;
-
-    fig.addEventListener("pointerover", (e) => {
-      const t = from(e.target);
-      if (!t) return clear();
-      set(t.dataset.g!, t.dataset.l);
-      if (t.dataset.tip) {
-        tip.textContent = t.dataset.tip;
-        tip.hidden = false;
-      } else {
-        tip.hidden = true;
-      }
-    });
-    fig.addEventListener("pointerout", (e) => {
-      if (!from((e as PointerEvent).relatedTarget)) clear();
-    });
-    fig.addEventListener("pointermove", (e) => {
-      if (tip.hidden) return;
-      const r = fig.getBoundingClientRect();
-      tip.style.left = `${Math.min(e.clientX - r.left + 14, r.width - tip.offsetWidth - 4)}px`;
-      tip.style.top = `${e.clientY - r.top - 34}px`;
-    });
-
-    // keyboard: focusing a node link lights its path the same way
-    fig.addEventListener("focusin", (e) => {
-      const t = from(e.target);
-      if (t) set(t.dataset.g!, t.dataset.l);
-    });
-    fig.addEventListener("focusout", (e) => {
-      if (!from((e as FocusEvent).relatedTarget)) clear();
-    });
-
-    // ribbons are not in the tab order (the node links and cards are), but
-    // a pointer click on one goes to the same place
-    fig.addEventListener("click", (e) => {
-      const p = e.target instanceof Element && e.target.closest<SVGPathElement>("path[data-href]");
-      if (p) window.location.assign(p.dataset.href!);
-    });
+    figure.addEventListener("pointerover", (event) => emphasize(event.target));
+    figure.addEventListener("pointerleave", () => emphasize(figure.contains(document.activeElement) ? document.activeElement : null));
+    figure.addEventListener("focusin", (event) => emphasize(event.target));
+    figure.addEventListener("focusout", (event) => emphasize(event.relatedTarget));
   }
 </script>
