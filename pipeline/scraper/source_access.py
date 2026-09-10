@@ -132,8 +132,8 @@ class SourceAccess:
         if checked is not None and time.monotonic() - checked < POLICY_TTL:
             return
         url = f"https://{host}/robots.txt"
-        # Separate transport is used ONLY for robots.txt and its same-origin
-        # redirects. No record requests can use this unchecked session.
+        # This transport fetches robots only; cross-origin redirects must name
+        # the exact reviewed final policy URL. Record redirects remain guarded.
         with requests.Session() as http:
             http.headers["User-Agent"] = USER_AGENT
             for _ in range(6):
@@ -141,7 +141,8 @@ class SourceAccess:
                 if response.is_redirect:
                     url = urljoin(url, response.headers["Location"])
                     response.close()
-                    if urlsplit(url).netloc != host or urlsplit(url).scheme != "https":
+                    if (urlsplit(url).scheme != "https"
+                            or (urlsplit(url).netloc != host and url != policy["robots"]["url"])):
                         raise SourceAccessError(f"Unreviewed robots redirect for {host}")
                     time.sleep(policy["delay_seconds"])
                     continue

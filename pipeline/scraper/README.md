@@ -59,6 +59,37 @@ The API robots file returns 404; the roster path is permitted by the city's
 reviewed robots file. Only `/v1/Events`, `/v1/Meetings/{id}` and the roster page
 are enabled. No authentication, staff endpoints, attachments or video collection.
 
+Green Bay portrait support was reviewed September 9, 2026 against the same
+[robots file](https://www.greenbaywi.gov/robots.txt), roster, CivicPlus terms,
+[city copyright notice](https://www.greenbaywi.gov/site/copyright), and
+[privacy page](https://www.greenbaywi.gov/privacy). The existing roster request
+also captures same-origin portrait URLs whose alt text uniquely matches the
+member's full name. The importer checks the name, district and source again.
+No image files are downloaded or copied, and request scopes and the five-second
+floor are unchanged. Native roster revisions retain the attribution evidence.
+Older snapshots remain usable without portraits; the next roster refresh adds them.
+
+Appleton and Waukesha portrait rosters were also reviewed September 9, 2026:
+[Appleton council](https://appletonwi.gov/government/common_council.php) and
+[Waukesha council](https://www.waukesha-wi.gov/about_the_common_council/index.php).
+Each named district card supplies its own image; imports require both the full
+name and district to match the current member. Two roster requests per run add
+about ten seconds at the five-second floor. No image files are downloaded.
+Neither roster/footer published a separate scraping or image-use restriction.
+[Waukesha robots](https://www.waukesha-wi.gov/robots.txt) returns 404.
+[Appleton robots](https://appletonwi.gov/robots.txt) redirects to the exact
+[Revize policy URL](https://cms2.revize.com/revize/appletonwi/robots.txt), which
+returns 404. Only that reviewed cross-origin policy redirect is allowed;
+changed URLs/statuses and access denials still stop collection. No CMS record
+routes are enabled. These new hosts require a fresh daily policy report.
+
+Madison's [robots](https://www.cityofmadison.com/robots.txt) permits `/council`,
+but its [Conditions & Use](https://www.cityofmadison.com/policy/conditions)
+explicitly requires permission to reuse images. Its
+[data policy](https://www.cityofmadison.com/policy/data) grants no image rights.
+Madison portraits remain uncollected, with official roster and policy links on
+the site. Its separately reviewed legislative records continue normally.
+
 Racine's API metadata and 15 current
 district identities are verified, with mappings prepared in `local_seats.json`;
 its `Events` endpoint returns HTTP 400 for missing agenda-visibility settings.
@@ -225,3 +256,49 @@ rebuilds the entire table. Keep original HTML, session, official source URL and
 download date outside public Git. Validate and merge partial approved updates
 into the existing archive before running an import. Archive importers fail on
 missing input rather than silently substituting empty data.
+## Federal campaign finance (2026-09-09)
+
+The [FEC bulk downloads](https://www.fec.gov/data/browse-data/?tab=bulk-data) publish
+the [all-candidate summary format](https://www.fec.gov/campaign-finance-data/all-candidates-file-description/).
+Collection uses only `www.fec.gov/files/bulk-downloads/YYYY/weballYY.zip`:
+one current-cycle file per nightly federal stage (193 KB at review), no API key
+or paid service. The [robots file](https://www.fec.gov/robots.txt) permits this
+route and specifies a ten-second interval, enforced by the shared transport.
+The official link redirects to the FEC's exact GovCloud S3 host
+`cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com`;
+its `robots.txt` returns 404. Only `/bulk-downloads/YYYY/weballYY.zip` on that
+host is approved, also at ten seconds. Other buckets and paths remain blocked.
+The [privacy/security policy](https://www.fec.gov/about/privacy-and-security-policy/)
+and [data-use guidance](https://www.fec.gov/updates/using-information-obtained-from-fec-reports/)
+were reviewed. This civic display uses candidate aggregates, no donor contact lists.
+Keep the raw ZIP and validated summary in the private federal archive; no browser
+requests or new hosting resources are required. The added storage is under 1 MB
+per snapshot at the reviewed file size, within the existing cost target.
+
+FEC IDs come from the existing congressional roster, filtered by current chamber;
+never match candidate names. Store dollars as integer cents, preserve blanks,
+reporting dates, refunds, and authorized-committee transfers. The display reports
+the FEC's gross totals with its transfer caveat; it does not combine federal money,
+state campaigns, or outside spending. Federal donor-level detail links to the FEC.
+
+`importer/federal_campaigns.json` links federal members to explicitly verified
+state campaign committees. Tiffany's gubernatorial committee is CFIS entity 16621,
+registration 0104212, verified against his campaign disclosure, CFIS registry, and
+the January 2026 state filing. Identically named unregistered entities are excluded.
+The existing reviewed CFIS monthly scans retain that committee's transactions
+without adding requests, changing pacing, or weakening completeness checks.
+Monthly coverage travels with the registry; the importer stores campaign records
+separately and preserves the existing PAC and legislator tables. State totals stay
+hidden until every cycle month through the snapshot's month has been collected.
+The first full nightly run backfills 2025 onward; all committee activity in that
+period is included, including activity before a campaign announcement.
+
+After merging, run the policy-only workflow to approve the updated manifest before
+manually starting collection, or allow the scheduled policy check to run first.
+An old policy report is intentionally invalid for the expanded source manifest.
+Portrait loading note: Appleton's council image URLs redirect to
+`cms2.revize.com/revize/appletonwi/`; that host's root `robots.txt` disallows
+general crawlers from images. Collect only the image URL metadata on the permitted
+city roster, and leave image loading to visitors' browsers. Do not download images
+or run automated image-load checks against that host. Waukesha redirects portraits
+to its `webfile.waukesha-wi.gov/waukeshawi25/` image host (robots 404 at review).

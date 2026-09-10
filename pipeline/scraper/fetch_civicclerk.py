@@ -76,7 +76,8 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float, data_dir: Pa
     curated = load_curation(SEATS_PATH)[spec["tenant"]]
     now = datetime.now(UTC)
     roster = {"source_url": spec["roster_url"], "checked_at": now.isoformat(),
-              "members": parse_roster(call(http, spec["roster_url"], delay).text)}
+              "members": parse_roster(call(http, spec["roster_url"], delay).text,
+                                      spec["roster_url"])}
     retain_revision(out / "roster.json", roster)
     roster_members(roster, spec, curated)
     save_json(out / "roster.json", roster)

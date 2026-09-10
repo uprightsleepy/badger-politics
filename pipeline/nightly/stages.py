@@ -57,7 +57,8 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
         # Bind retained profiles to archived members before refreshing office records.
         "community": [["scraper.fetch_subjects"], ["scraper.fetch_contacts", "--refresh"],
                       ["scraper.fetch_local_profiles"], ["scraper.fetch_local_votes"]],
-        "federal": [["scraper.fetch_federal_votes"]],
+        "federal": [["scraper.fetch_federal_votes"],
+                    ["scraper.fetch_federal_finance", "--as-of", context["finance_as_of"]]],
         "import": [rebuild,
                    ["importer.wec_pdf", "_data/wec/ballot-access.pdf",
                     f"_data/wec/candidates-{cycle}.csv"],
@@ -72,6 +73,7 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
                    ["importer.import_wiseye", "_data/wiseye/videos.json", db],
                    ["importer.import_contacts", "_data/contacts/contacts.json", db],
                    ["importer.import_federal", "_data/federal", db],
+                   ["importer.federal_finance", "_data/federal", db],
                    ["importer.import_local", "_data/local", db]],
         "enrich": [["importer.enrich_lrb", db], ["importer.enrich_companions", db],
                    ["importer.checks", db]],

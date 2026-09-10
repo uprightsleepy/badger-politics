@@ -10,6 +10,13 @@ const refresh = raw ? JSON.parse(raw) as {
 } : null;
 ---
 
+{tenant === "madison" && (
+  <p class="mt-2 max-w-3xl text-xs text-navy-600" role="note" data-pagefind-ignore>
+    Portraits are available on <a href="https://www.cityofmadison.com/council" class="underline">the city's roster</a>.
+    Madison <a href="https://www.cityofmadison.com/policy/conditions" class="underline">requires permission to reuse its images</a>.
+  </p>
+)}
+
 {refresh?.state === "retained" && (
   <p class="mt-2 max-w-3xl text-xs text-navy-600" role="note" data-pagefind-ignore>
     <strong>Profile details may be out of date.</strong>{" "}

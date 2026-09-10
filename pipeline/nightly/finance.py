@@ -38,6 +38,12 @@ def read_registry(path: Path) -> dict[int, dict]:
         key = row.get("entity_id")
         if type(key) is not int or key <= 0 or key in result or not row.get("name"):
             raise ValueError("Invalid or duplicate committee registry entry")
+        if "campaign_months" in row:
+            months = row["campaign_months"]
+            if (not isinstance(months, list) or any(not isinstance(m, str)
+                    or not re.fullmatch(r"20\d{2}-(0[1-9]|1[0-2])", m) for m in months)
+                    or sorted(set(months)) != months):
+                raise ValueError("Invalid state campaign coverage months")
         result[key] = row
     return result
 
@@ -61,7 +67,9 @@ def validate_month(directory: Path, month: str):
     if {p.name for p in directory.iterdir()} != {f"pac-{month}.json", "committees.json"}:
         raise ValueError("Monthly output must contain exactly its transactions and registry")
     validate_transactions(directory / f"pac-{month}.json", month, set())
-    read_registry(directory / "committees.json")
+    for entry in read_registry(directory / "committees.json").values():
+        if "campaign_months" in entry and entry["campaign_months"] != [month]:
+            raise ValueError("Campaign coverage must match its verified monthly scan")
 
 
 def merge_months(archive: Path, inputs: Path, months: list[str]):
@@ -82,7 +90,11 @@ def merge_months(archive: Path, inputs: Path, months: list[str]):
         validate_transactions(directory / f"pac-{month}.json", month, seen)
         # Match the unsplit collector: the latest chronological observation wins,
         # irrespective of the order in which matrix jobs finished.
-        registry.update(read_registry(directory / "committees.json"))
+        for entity_id, entry in read_registry(directory / "committees.json").items():
+            previous = registry.get(entity_id, {}).get("campaign_months", [])
+            if entry.get("campaign_months") is not None:
+                entry["campaign_months"] = sorted(set(previous + entry["campaign_months"]))
+            registry[entity_id] = entry
     for month in months:
         target = archive / f"pac-{month}.json"
         pending = target.with_suffix(".pending")

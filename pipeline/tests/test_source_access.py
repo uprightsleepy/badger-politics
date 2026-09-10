@@ -76,6 +76,33 @@ def test_checks_robots_once_and_paces_across_sessions(network):
     assert all(call[3]["verify"] is True for call in calls)
 
 
+def test_exact_reviewed_cross_origin_robots_redirect_is_paced(network):
+    access, calls, state, _ = network
+    final = "https://cms2.revize.com/revize/appletonwi/robots.txt"
+    access.policies[HOST]["robots"] = {"status": 404, "url": final}
+    state["robots_responses"] = [(302, {"Location": final}, ""), (404, {}, "Missing")]
+    http.session().get(URL)
+    assert [(c[0], c[1]) for c in calls] == [
+        (f"https://{HOST}/robots.txt", 0), (final, 10), (URL, 20),
+    ]
+
+
+@pytest.mark.parametrize("target", [
+    "https://cms2.revize.com/revize/other/robots.txt",
+    "http://cms2.revize.com/revize/appletonwi/robots.txt",
+    "https://unreviewed.example/robots.txt",
+])
+def test_reviewed_policy_redirect_does_not_allow_other_targets(network, target):
+    access, calls, state, _ = network
+    access.policies[HOST]["robots"] = {
+        "status": 404, "url": "https://cms2.revize.com/revize/appletonwi/robots.txt",
+    }
+    state["robots_responses"] = [(302, {"Location": target}, "")]
+    with pytest.raises(SourceAccessError, match="robots redirect"):
+        http.session().get(URL)
+    assert len(calls) == 1
+
+
 @pytest.mark.parametrize("retry_after", ["0", "000", " \t0\t "])
 def test_zero_retry_after_keeps_response_content_and_source_pacing(network, retry_after):
     access, calls, state, _ = network

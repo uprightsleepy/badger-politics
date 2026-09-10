@@ -117,6 +117,7 @@ export const glossaryFor = (
     }
   }
   for (const v of values) {
+    if (["yes", "no"].includes(norm(v))) continue;
     const meaning = VOTES[v.trim()];
     if (meaning && !seen.has(`v:${v}`)) {
       seen.add(`v:${v}`);

@@ -1,7 +1,37 @@
 {
-  "reviewed_on": "2026-09-08",
+  "reviewed_on": "2026-09-09",
   "documentation": "README.md#shared-daily-checks-2026-09-08",
   "sources": {
+    "cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com": {
+      "paths": { "GET": ["/bulk-downloads/20\\d{2}/weball\\d{2}\\.zip"] },
+      "delay_seconds": 10,
+      "robots": {
+        "status": 404,
+        "url": "https://cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com/robots.txt"
+      }
+    },
+    "www.fec.gov": {
+      "paths": { "GET": ["/files/bulk-downloads/20\\d{2}/weball\\d{2}\\.zip"] },
+      "delay_seconds": 10,
+      "robots": {
+        "status": 200,
+        "url": "https://www.fec.gov/robots.txt",
+        "sha256": "8d7562c7bb7229b4607c30ce56e3833db1fca6613b252aaee0c2faa79b3b86de"
+      }
+    },
+    "appletonwi.gov": {
+      "paths": { "GET": ["/government/common_council\\.php"] },
+      "delay_seconds": 5,
+      "robots": {
+        "status": 404,
+        "url": "https://cms2.revize.com/revize/appletonwi/robots.txt"
+      }
+    },
+    "www.waukesha-wi.gov": {
+      "paths": { "GET": ["/about_the_common_council/index\\.php"] },
+      "delay_seconds": 5,
+      "robots": { "status": 404, "url": "https://www.waukesha-wi.gov/robots.txt" }
+    },
     "greenbaywi.api.civicclerk.com": {
       "paths": { "GET": ["/v1/Events", "/v1/Meetings/\\d+"] },
       "delay_seconds": 5,
