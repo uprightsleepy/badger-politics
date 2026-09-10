@@ -186,10 +186,8 @@ const sessionName = current.name ?? current.id;
       What happened to {flow.introduced.toLocaleString()} bills?
     </h2>
     <p class="mt-1 max-w-3xl text-sm text-navy-600">
-      Every bill of the {sessionName}, traced from introduction to where it
-      stopped. The farther a path reaches, the farther the bill got; the
-      branches add up to the total at each split, counted from the official
-      bill histories.
+      Follow every bill of the {sessionName} from introduction to its outcome.
+      Ribbon widths show bill counts, and each split adds up to its source total.
     </p>
     <BillFlow flow={flow} session={current.id} />
     <p class="mt-3 max-w-3xl text-xs text-navy-600">
