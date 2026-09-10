@@ -3,7 +3,7 @@
 Usage: python -m scraper.fetch_cf_committees [--since YYYY-MM] [--until YYYY-MM]
 
 Reuse the complete monthly feed for non-candidate filers, express advocacy,
-and verified state campaigns of federal members. Legislator receipts retain
+and verified state campaigns. Legislator receipts retain
 their existing fetch_cfis attribution.
 """
 

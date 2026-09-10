@@ -1,3 +1,4 @@
+import copy
 import io
 import json
 import sqlite3
@@ -94,15 +95,26 @@ def test_fec_failed_refresh_rolls_back_existing_data(tmp_path):
         assert "integer cents" in check_campaign_finance(db)[0]
 
 
-def test_state_campaign_reuses_scan_without_changing_existing_money(tmp_path, monkeypatch, make_db):
+@pytest.mark.parametrize("entity_id,name,assigned_id,bioguide", [
+    (16621, "Tiffany for Wisconsin", "0104212", "T000165"),
+    (16295, "Crowley for Wisconsin", "0105751", None),
+])
+def test_state_campaign_reuses_scan_without_changing_existing_money(
+    tmp_path, monkeypatch, make_db, entity_id, name, assigned_id, bioguide,
+):
     from test_nightly_finance import raw_transaction
     source = raw_transaction(1, "2026-01-31T23:59:59Z",
-                             name="Tiffany for Wisconsin", candidate=True)
-    source["createdByEntityId"] = source["createdByEntity"]["id"] = 16621
-    source["createdByEntity"]["committee"]["assignedCommitteeId"] = "0104212"
+                             name=name, candidate=True)
+    source["createdByEntityId"] = source["createdByEntity"]["id"] = entity_id
+    source["createdByEntity"]["committee"]["assignedCommitteeId"] = assigned_id
     pac = raw_transaction(2, "2026-01-15T00:00:00Z")
-    monkeypatch.setattr(collector, "transaction_count", lambda *_: 2)
-    monkeypatch.setattr(collector, "transaction_pages", lambda *_, **kw: iter([[source, pac]]))
+    unrelated = copy.deepcopy(source)
+    unrelated["id"] = 3
+    unrelated["createdByEntityId"] = unrelated["createdByEntity"]["id"] = 999999
+    unrelated["createdByEntity"]["committee"]["assignedCommitteeId"] = "OTHER"
+    monkeypatch.setattr(collector, "transaction_count", lambda *_: 3)
+    monkeypatch.setattr(collector, "transaction_pages",
+                        lambda *_, **kw: iter([[source, pac, unrelated]]))
     monkeypatch.setattr(collector, "session", lambda: object())
     monkeypatch.setattr(collector.time, "sleep", lambda _: None)
     monkeypatch.setattr(collector, "DATA_DIR", tmp_path)
@@ -114,8 +126,35 @@ def test_state_campaign_reuses_scan_without_changing_existing_money(tmp_path, mo
     with sqlite3.connect(db_path) as db:
         assert db.execute("SELECT id FROM cf_transactions").fetchall() == [(2,)]
         assert db.execute("SELECT id FROM state_campaign_transactions").fetchall() == [(1,)]
-        assert db.execute("SELECT * FROM state_campaign_coverage").fetchall() == [
-            (16621, "2026-01")]
+        coverage = db.execute("SELECT * FROM state_campaign_coverage ORDER BY entity_id").fetchall()
+        assert coverage == [
+            (16295, "2026-01"), (16621, "2026-01")]
+        assert db.execute("SELECT bioguide FROM state_campaigns WHERE entity_id=?",
+                          (entity_id,)).fetchone() == (bioguide,)
     source["createdByEntity"]["committee"]["assignedCommitteeId"] = "OTHER"
     with pytest.raises(ValueError, match="identity changed"):
         collector.fetch_month(object(), "2026-01-01", "2026-01-31T23:59:59")
+
+
+def test_older_archives_preserve_advocacy_without_claiming_new_campaign_coverage(tmp_path, make_db):
+    registry = [{"entity_id": 16295, "name": "Crowley for Wisconsin",
+                 "committee_type": "State Candidate", "assigned_id": "0105751"}]
+    rows = [{"id": 1, "filer_entity_id": 16295, "filer_type": "State Candidate",
+             "direction": "OUTGOING", "date": "2026-01-01", "amount": 12.34, "stance": "FOR"}]
+    (tmp_path / "committees.json").write_text(json.dumps(registry))
+    (tmp_path / "pac-2026-01.json").write_text(json.dumps(rows))
+    db_path = tmp_path / "db.sqlite"
+    make_db(db_path).close()
+    import_committees(tmp_path, db_path)
+    with sqlite3.connect(db_path) as db:
+        assert db.execute("SELECT * FROM state_campaign_coverage").fetchall() == []
+        assert db.execute("SELECT id, amount FROM cf_transactions").fetchall() == [(1, 12.34)]
+        assert db.execute("SELECT id, amount FROM state_campaign_transactions").fetchall() == [
+            (1, 12.34)]
+    registry[0]["assigned_id"] = "WRONG"
+    (tmp_path / "committees.json").write_text(json.dumps(registry))
+    with pytest.raises(ValueError, match="identity mismatch"):
+        import_committees(tmp_path, db_path)
+    with sqlite3.connect(db_path) as db:
+        assert db.execute("SELECT id, amount FROM state_campaign_transactions").fetchall() == [
+            (1, 12.34)]
