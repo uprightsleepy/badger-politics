@@ -20,9 +20,9 @@ const fmtMoney = (value: number) => value.toLocaleString("en-US", {
   </p> : <>
     <dl data-campaign-totals class="mt-4 flex flex-wrap gap-4">
       <div class="flex-auto"><dt class="text-sm text-navy-600">Reported spending</dt>
-        <dd class="mt-1 whitespace-nowrap text-2xl font-bold tabular-nums">{fmtMoney(c.totals.spending ?? 0)}</dd></div>
+        <dd class="mt-1 whitespace-nowrap text-xl font-bold tabular-nums sm:text-2xl">{fmtMoney(c.totals.spending ?? 0)}</dd></div>
       <div class="flex-auto"><dt class="text-sm text-navy-600">Reported receipts</dt>
-        <dd class="mt-1 whitespace-nowrap text-2xl font-bold tabular-nums">{fmtMoney(c.totals.receipts ?? 0)}</dd></div>
+        <dd class="mt-1 whitespace-nowrap text-xl font-bold tabular-nums sm:text-2xl">{fmtMoney(c.totals.receipts ?? 0)}</dd></div>
     </dl>
     <p class="mt-3 text-sm text-navy-600">
       {c.totals.count.toLocaleString()} transactions collected for {c.start}–{c.end}.

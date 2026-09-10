@@ -4,7 +4,7 @@ interface Props { status: string | null; chamber: string | null; classification?
 const { status, chamber, classification = null } = Astro.props;
 const { steps, reached, failed } = stepperState(status, chamber, classification);
 ---
-<ol class="flex items-start" aria-label="How this bill becomes law">
+<ol class="flex flex-col gap-3 min-[400px]:flex-row min-[400px]:items-start min-[400px]:gap-0" aria-label="How this bill becomes law">
   {steps.map((step, i) => {
     const done = i < reached;
     const stopped = failed && i === reached - 1;
@@ -15,15 +15,15 @@ const { steps, reached, failed } = stepperState(status, chamber, classification)
         : "border-navy-300 bg-white";
     const state = stopped ? "stopped here" : done ? "completed" : "not reached";
     return (
-      <li class="flex flex-1 flex-col items-center text-center">
-        <div class="flex w-full items-center">
-          <div class={`h-0.5 flex-1 ${i === 0 ? "invisible" : done ? "bg-navy-700" : "bg-navy-300"}`} />
+      <li class="flex min-w-0 flex-1 items-center gap-2 min-[400px]:flex-col min-[400px]:gap-0 min-[400px]:text-center">
+        <div class="flex items-center min-[400px]:w-full">
+          <div class={`hidden h-0.5 flex-1 min-[400px]:block ${i === 0 ? "invisible" : done ? "bg-navy-700" : "bg-navy-300"}`} />
           <span class={`step-token flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${circle}`} aria-hidden="true">
             {stopped ? "✕" : done ? "✓" : ""}
           </span>
-          <div class={`h-0.5 flex-1 ${i === steps.length - 1 ? "invisible" : i < reached - 1 ? "bg-navy-700" : "bg-navy-300"}`} />
+          <div class={`hidden h-0.5 flex-1 min-[400px]:block ${i === steps.length - 1 ? "invisible" : i < reached - 1 ? "bg-navy-700" : "bg-navy-300"}`} />
         </div>
-        <span class={`mt-1.5 px-1 text-[0.6875rem] leading-tight sm:text-xs ${done ? "font-semibold text-ink" : "text-navy-600"}`}>
+        <span class={`min-w-0 px-1 text-xs leading-tight min-[400px]:mt-1.5 min-[400px]:text-[0.6875rem] sm:text-xs ${done ? "font-semibold text-ink" : "text-navy-600"}`}>
           {step.label}<span class="sr-only">, {state}</span>
         </span>
       </li>
