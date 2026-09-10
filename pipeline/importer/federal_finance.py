@@ -1,4 +1,4 @@
-"""FEC cycle summaries and explicitly verified state campaigns of federal members."""
+"""FEC cycle summaries and explicitly verified state campaign identities."""
 
 from __future__ import annotations
 
@@ -12,8 +12,10 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-CAMPAIGNS = json.loads(Path(__file__).with_name("federal_campaigns.json").read_text())
-STATE_CAMPAIGNS = {c["entity_id"]: {**c, "bioguide": b} for b, c in CAMPAIGNS.items()}
+STATE_CAMPAIGNS = {
+    c["entity_id"]: c
+    for c in json.loads(Path(__file__).with_name("state_campaigns.json").read_text())
+}
 AMOUNTS = {
     "receipts": 5, "transfers_in": 6, "disbursements": 7, "transfers_out": 8,
     "cash_start": 9, "cash_end": 10, "candidate_contributions": 11,

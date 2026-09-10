@@ -281,11 +281,17 @@ reporting dates, refunds, and authorized-committee transfers. The display report
 the FEC's gross totals with its transfer caveat; it does not combine federal money,
 state campaigns, or outside spending. Federal donor-level detail links to the FEC.
 
-`importer/federal_campaigns.json` links federal members to explicitly verified
-state campaign committees. Tiffany's gubernatorial committee is CFIS entity 16621,
-registration 0104212, verified against his campaign disclosure, CFIS registry, and
-the January 2026 state filing. Identically named unregistered entities are excluded.
-The existing reviewed CFIS monthly scans retain that committee's transactions
+`importer/state_campaigns.json` lists explicitly verified state campaigns, with
+an optional federal member ID. Tiffany's gubernatorial committee is CFIS entity
+16621, registration 0104212; Crowley's is entity 16295, registration 0105751.
+Each identity is verified against the campaign disclosure, CFIS registry, and
+January 2026 state filing linked in the curation. Crowley's identity and the
+[CFIS robots](https://campaignfinance.wi.gov/robots.txt), [public search guidance](https://ethics.wi.gov/Pages/CampaignFinance/ViewReports.aspx),
+and [reuse notice, pp. 8–9](https://ethics.wi.gov/Resources/20251021%20Open%20Session%20Materials%20Revised.pdf)
+were rechecked September 10, 2026. The existing noncommercial civic use, ten-second
+floor, PII redaction and reviewed JSON routes remain applicable. No new source
+scope is added. Similarly named committees and outside groups are excluded.
+The existing reviewed CFIS monthly scans retain these committees' transactions
 without adding requests, changing pacing, or weakening completeness checks.
 Monthly coverage travels with the registry; the importer stores campaign records
 separately and preserves the existing PAC and legislator tables. State totals stay

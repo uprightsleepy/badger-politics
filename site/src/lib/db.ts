@@ -166,7 +166,7 @@ export const federalMoneyFor = (bioguide: string): FederalFinance[] =>
       ON f.candidate_id=c.candidate_id AND f.cycle=c.cycle
     WHERE c.bioguide=? ORDER BY c.cycle DESC`).all(bioguide) as FederalFinance[] : [];
 
-interface StateCampaign {
+export interface StateCampaign {
   entity_id: number; candidate: string; office: string; committee: string;
   cycle: number; source_url: string;
 }
@@ -174,28 +174,35 @@ export const stateCampaignsFor = (bioguide: string) => {
   if (!hasTable("state_campaigns")) return [];
   const campaigns = prep("SELECT * FROM state_campaigns WHERE bioguide=? ORDER BY cycle DESC")
     .all(bioguide) as StateCampaign[];
-  return campaigns.map((campaign) => {
-    const start = `${campaign.cycle - 1}-01`;
-    const end = [meta().imported_at?.slice(0, 7) ?? start, `${campaign.cycle}-12`].sort()[0];
-    const months = (prep(`SELECT month FROM state_campaign_coverage
-      WHERE entity_id=? AND month BETWEEN ? AND ? ORDER BY month`)
-      .all(campaign.entity_id, start, end) as { month: string }[]).map((r) => r.month);
-    const expected = (Number(end.slice(0, 4)) - (campaign.cycle - 1)) * 12 + Number(end.slice(5));
-    const complete = months.length === expected && months[0] === start && months.at(-1) === end;
-    const totals = prep(`SELECT COUNT(*) AS count, MAX(date) AS last,
-      SUM(CASE WHEN direction='INCOMING' THEN amount ELSE 0 END) AS receipts,
-      SUM(CASE WHEN direction='OUTGOING' THEN amount ELSE 0 END) AS spending
-      FROM state_campaign_transactions WHERE filer_entity_id=? AND date BETWEEN ? AND ?`)
-      .get(campaign.entity_id, `${start}-01`, `${end}-31`) as {
-        count: number; last: string | null; receipts: number | null; spending: number | null;
-      };
-    const donors = prep(`SELECT other_entity_id, other_name AS name, SUM(amount) AS total
-      FROM state_campaign_transactions WHERE filer_entity_id=? AND direction='INCOMING'
-        AND other_entity_id IS NOT NULL AND date BETWEEN ? AND ?
-      GROUP BY other_entity_id ORDER BY total DESC, other_entity_id LIMIT 10`)
-      .all(campaign.entity_id, `${start}-01`, `${end}-31`) as { name: string; total: number }[];
-    return { ...campaign, complete, months, start, end, totals, donors };
-  });
+  return campaigns.map(stateCampaignMoney);
+};
+
+/** Curated campaigns can be shown as pending before their first complete import. */
+export const stateCampaignMoney = (campaign: StateCampaign) => {
+  const start = `${campaign.cycle - 1}-01`;
+  const end = [meta().imported_at?.slice(0, 7) ?? start, `${campaign.cycle}-12`].sort()[0];
+  const collected = hasTable("state_campaigns") && hasTable("state_campaign_coverage")
+    && hasTable("state_campaign_transactions") && prep(`SELECT 1 FROM state_campaigns
+      WHERE entity_id=? AND cycle=? AND committee=?`)
+      .get(campaign.entity_id, campaign.cycle, campaign.committee);
+  const months = collected ? (prep(`SELECT month FROM state_campaign_coverage
+    WHERE entity_id=? AND month BETWEEN ? AND ? ORDER BY month`)
+    .all(campaign.entity_id, start, end) as { month: string }[]).map((r) => r.month) : [];
+  const expected = (Number(end.slice(0, 4)) - (campaign.cycle - 1)) * 12 + Number(end.slice(5));
+  const complete = expected > 0 && months.length === expected && months[0] === start && months.at(-1) === end;
+  const totals = complete ? prep(`SELECT COUNT(*) AS count, MAX(date) AS last,
+    SUM(CASE WHEN direction='INCOMING' THEN amount ELSE 0 END) AS receipts,
+    SUM(CASE WHEN direction='OUTGOING' THEN amount ELSE 0 END) AS spending
+    FROM state_campaign_transactions WHERE filer_entity_id=? AND date BETWEEN ? AND ?`)
+    .get(campaign.entity_id, `${start}-01`, `${end}-31`) as {
+      count: number; last: string | null; receipts: number | null; spending: number | null;
+    } : null;
+  const donors = complete ? prep(`SELECT other_entity_id, other_name AS name, SUM(amount) AS total
+    FROM state_campaign_transactions WHERE filer_entity_id=? AND direction='INCOMING'
+      AND other_entity_id IS NOT NULL AND date BETWEEN ? AND ?
+    GROUP BY other_entity_id ORDER BY total DESC, other_entity_id LIMIT 10`)
+    .all(campaign.entity_id, `${start}-01`, `${end}-31`) as { name: string; total: number }[] : [];
+  return { ...campaign, complete, months, start, end, totals, donors };
 };
 
 /** Use the chamber's source ID: LIS for Senate votes, bioguide for House votes. */

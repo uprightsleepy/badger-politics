@@ -1,0 +1,32 @@
+[
+  {
+    "bioguide": "T000165",
+    "candidate": "Tom Tiffany",
+    "office": "Wisconsin governor",
+    "cycle": 2026,
+    "entity_id": 16621,
+    "committee": "Tiffany for Wisconsin",
+    "assigned_id": "0104212",
+    "source_url": "https://campaignfinance.wi.gov/browse-data/registrant/16621",
+    "identity_sources": [
+      "https://tomtiffany.com/",
+      "https://campaignfinance.wi.gov/report-download/0104212-CF-2--2026_January_Continuing--ORIGINAL--full--2026-01-16-01-01-22.pdf"
+    ],
+    "verified": "2026-09-09"
+  },
+  {
+    "bioguide": null,
+    "candidate": "David Crowley",
+    "office": "Wisconsin governor",
+    "cycle": 2026,
+    "entity_id": 16295,
+    "committee": "Crowley for Wisconsin",
+    "assigned_id": "0105751",
+    "source_url": "https://campaignfinance.wi.gov/browse-data/registrant/16295",
+    "identity_sources": [
+      "https://www.crowleyforwi.com/",
+      "https://campaignfinance.wi.gov/report-download/0105751-CF-2--2026_January_Continuing--AMENDED--full--2026-01-16-05-01-16.pdf"
+    ],
+    "verified": "2026-09-10"
+  }
+]
