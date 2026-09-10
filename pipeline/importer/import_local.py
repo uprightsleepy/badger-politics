@@ -16,7 +16,14 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
-from importer.civicclerk import VOTE_FIELDS, adapt_meeting, event_record, roster_members
+from importer.civicclerk import (
+    VOTE_FIELDS,
+    adapt_meeting,
+    event_record,
+    name_key,
+    portrait_url,
+    roster_members,
+)
 from importer.local_registry import TENANTS
 from importer.person_slugs import slugify
 from importer.roster import load_curation
@@ -89,6 +96,13 @@ def attribute_profile(
     if (refresh.get("state") == "retained"
             and refresh.get("person_ids", {}).get(str(seat)) != person_id):
         return image, basis, email, phone
+    if spec.get("profile_url") and found.get("page") == spec["profile_url"]:
+        hits = [m for m in found.get("members", []) if m["seat"] == seat
+                and name_key(m["name"]) == name_key(curated_name or name)]
+        if len(hits) == 1 and hits[0].get("image"):
+            if not portrait_url(hits[0]["image"], found["page"]):
+                raise ValueError("Invalid municipal portrait origin")
+            image, basis = hits[0]["image"], found["page"]
     if spec["tenant"] == "milwaukee":
         page = (found.get("seats") or {}).get(str(seat))
         if page:
@@ -265,10 +279,13 @@ def import_members(
         used_slugs.add(slug)
         image = basis = email = phone = None
         if is_current:
+            identity = curated.get(str(person_id), {})
             image, basis, email, phone = attribute_profile(
-                spec, name, seat, curated.get(str(person_id), {}).get("name"),
+                spec, name, seat, identity.get("profile_name", identity.get("name")),
                 profiles, persons.get(str(person_id)), person_id,
             )
+            if current_members is not None and latest.get("OfficeRecordImageUrl"):
+                image, basis = latest["OfficeRecordImageUrl"], latest["OfficeRecordImageBasis"]
             counts["photos"] += image is not None
             counts["emails"] += email is not None
             counts["phones"] += phone is not None

@@ -359,6 +359,31 @@ def check_local(conn: sqlite3.Connection) -> list[str]:
     return failures
 
 
+def check_campaign_finance(conn: sqlite3.Connection) -> list[str]:
+    from importer.federal_finance import AMOUNTS
+
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    queries = {}
+    if "federal_finance" in tables:
+        queries["FEC summaries without verified candidate coverage"] = (
+            "SELECT COUNT(*) FROM federal_finance f LEFT JOIN federal_finance_coverage c"
+            " ON c.bioguide=f.bioguide AND c.candidate_id=f.candidate_id AND c.cycle=f.cycle"
+            " WHERE c.bioguide IS NULL")
+        queries["FEC amounts not stored as integer cents"] = (
+            "SELECT COUNT(*) FROM federal_finance WHERE "
+            + " OR ".join(f"typeof({key}) NOT IN ('integer', 'null')" for key in AMOUNTS))
+    if "state_campaign_transactions" in tables:
+        queries["state campaign transactions without a verified committee"] = (
+            "SELECT COUNT(*) FROM state_campaign_transactions t"
+            " LEFT JOIN state_campaigns c ON c.entity_id=t.filer_entity_id"
+            " LEFT JOIN cf_committees r ON r.entity_id=t.filer_entity_id"
+            " WHERE c.entity_id IS NULL OR r.entity_id IS NULL"
+            " OR t.filer_type != 'State Candidate' OR t.direction NOT IN ('INCOMING', 'OUTGOING')"
+            " OR t.amount IS NULL")
+    return [f"{label}: {bad} rows" for label, query in queries.items()
+            if (bad := conn.execute(query).fetchone()[0])]
+
+
 def run_checks(db_path: Path, counts_file: Path) -> list[str]:
     conn = sqlite3.connect(db_path)
     try:
@@ -367,6 +392,7 @@ def run_checks(db_path: Path, counts_file: Path) -> list[str]:
         failures += check_referential_integrity(conn)
         failures += check_federal(conn)
         failures += check_local(conn)
+        failures += check_campaign_finance(conn)
     finally:
         conn.close()
     return failures

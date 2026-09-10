@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { DIST } from "./lib/serve.mjs";
 
-const DB_PATH = fileURLToPath(new URL("../../data/wi.sqlite", import.meta.url));
+const DB_PATH = process.env.WI_DATABASE_PATH ?? fileURLToPath(new URL("../../data/wi.sqlite", import.meta.url));
 const db = new Database(DB_PATH, { readonly: true });
 
 let failures = 0;

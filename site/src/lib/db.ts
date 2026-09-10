@@ -147,6 +147,57 @@ export const federalMembers = (): FederalMember[] =>
     ? (prep("SELECT * FROM federal_members ORDER BY chamber DESC, district").all() as FederalMember[])
     : [];
 
+export interface FederalFinance {
+  candidate_id: string; cycle: number; fetched_at: string; coverage_end: string | null;
+  receipts: number | null; disbursements: number | null; cash_end: number | null;
+  debts: number | null; individual_contributions: number | null;
+  committee_contributions: number | null; party_contributions: number | null;
+  candidate_contributions: number | null; transfers_in: number | null;
+  transfers_out: number | null; individual_refunds: number | null; committee_refunds: number | null;
+}
+
+export const federalMoneyFor = (bioguide: string): FederalFinance[] =>
+  hasTable("federal_finance_coverage") ? prep(`
+    SELECT c.candidate_id, c.cycle, c.fetched_at, f.coverage_end,
+           f.receipts, f.disbursements, f.cash_end, f.debts, f.individual_contributions,
+           f.committee_contributions, f.party_contributions, f.candidate_contributions,
+           f.transfers_in, f.transfers_out, f.individual_refunds, f.committee_refunds
+    FROM federal_finance_coverage c LEFT JOIN federal_finance f
+      ON f.candidate_id=c.candidate_id AND f.cycle=c.cycle
+    WHERE c.bioguide=? ORDER BY c.cycle DESC`).all(bioguide) as FederalFinance[] : [];
+
+interface StateCampaign {
+  entity_id: number; candidate: string; office: string; committee: string;
+  cycle: number; source_url: string;
+}
+export const stateCampaignsFor = (bioguide: string) => {
+  if (!hasTable("state_campaigns")) return [];
+  const campaigns = prep("SELECT * FROM state_campaigns WHERE bioguide=? ORDER BY cycle DESC")
+    .all(bioguide) as StateCampaign[];
+  return campaigns.map((campaign) => {
+    const start = `${campaign.cycle - 1}-01`;
+    const end = [meta().imported_at?.slice(0, 7) ?? start, `${campaign.cycle}-12`].sort()[0];
+    const months = (prep(`SELECT month FROM state_campaign_coverage
+      WHERE entity_id=? AND month BETWEEN ? AND ? ORDER BY month`)
+      .all(campaign.entity_id, start, end) as { month: string }[]).map((r) => r.month);
+    const expected = (Number(end.slice(0, 4)) - (campaign.cycle - 1)) * 12 + Number(end.slice(5));
+    const complete = months.length === expected && months[0] === start && months.at(-1) === end;
+    const totals = prep(`SELECT COUNT(*) AS count, MAX(date) AS last,
+      SUM(CASE WHEN direction='INCOMING' THEN amount ELSE 0 END) AS receipts,
+      SUM(CASE WHEN direction='OUTGOING' THEN amount ELSE 0 END) AS spending
+      FROM state_campaign_transactions WHERE filer_entity_id=? AND date BETWEEN ? AND ?`)
+      .get(campaign.entity_id, `${start}-01`, `${end}-31`) as {
+        count: number; last: string | null; receipts: number | null; spending: number | null;
+      };
+    const donors = prep(`SELECT other_entity_id, other_name AS name, SUM(amount) AS total
+      FROM state_campaign_transactions WHERE filer_entity_id=? AND direction='INCOMING'
+        AND other_entity_id IS NOT NULL AND date BETWEEN ? AND ?
+      GROUP BY other_entity_id ORDER BY total DESC, other_entity_id LIMIT 10`)
+      .all(campaign.entity_id, `${start}-01`, `${end}-31`) as { name: string; total: number }[];
+    return { ...campaign, complete, months, start, end, totals, donors };
+  });
+};
+
 /** Use the chamber's source ID: LIS for Senate votes, bioguide for House votes. */
 export const federalVoteKey = (member: FederalMember): string =>
   member.chamber === "senate" ? member.lis_id! : member.bioguide;
@@ -1603,7 +1654,7 @@ export const localActionsWithDissent = (tenant: string, limit: number) =>
 export const localMemberVotesWithDissent = (tenant: string, personId: number) =>
   prep(
       `SELECT v.value, v.event_item_id, a.matter_file, a.matter_url, a.title,
-              a.action, e.date, t.ayes, t.noes
+              a.action, e.date, e.insite_url, t.ayes, t.noes
        FROM local_votes v
        JOIN (SELECT tenant, event_item_id,
                     SUM(value IN ('Aye', 'Yes')) AS ayes, SUM(value IN ('No', 'Nay')) AS noes
@@ -1617,7 +1668,7 @@ export const localMemberVotesWithDissent = (tenant: string, personId: number) =>
     )
     .all(tenant, tenant, personId) as {
     value: string; event_item_id: number; matter_file: string | null;
-    matter_url: string | null; title: string | null; action: string; date: string;
+    matter_url: string | null; title: string | null; action: string; date: string; insite_url: string;
     ayes: number; noes: number;
   }[];
 
@@ -1626,7 +1677,7 @@ export const localMemberVotes = (
 ) =>
   prep(
       `SELECT v.value, v.event_item_id, a.matter_file, a.matter_url, a.title,
-              a.action, e.date
+              a.action, e.date, e.insite_url
        FROM local_votes v
        JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
        JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
@@ -1635,7 +1686,7 @@ export const localMemberVotes = (
     )
     .all(tenant, personId, limit, offset) as {
     value: string; event_item_id: number; matter_file: string | null;
-    matter_url: string | null; title: string | null; action: string; date: string;
+    matter_url: string | null; title: string | null; action: string; date: string; insite_url: string;
   }[];
 
 /** The councils' next scheduled meetings, for the calendar's device-only
@@ -1655,7 +1706,7 @@ export const localUpcomingMeetings = () =>
 /** A presiding officer's votes when the other recorded voters split evenly. */
 export const localMemberTieBreaks = (tenant: string, personId: number) =>
   prep(
-      `SELECT v.value, a.matter_file, a.matter_url, a.title, a.action, e.date,
+      `SELECT v.value, a.matter_file, a.matter_url, a.title, a.action, e.date, e.insite_url,
               t.ayes - (v.value IN ('Aye', 'Yes')) AS other_ayes,
               t.noes - (v.value IN ('No', 'Nay')) AS other_noes
        FROM local_votes v
@@ -1670,7 +1721,7 @@ export const localMemberTieBreaks = (tenant: string, personId: number) =>
        ORDER BY e.date DESC`,
     ).all(tenant, tenant, personId) as {
     value: string; matter_file: string | null; matter_url: string | null;
-    title: string | null; action: string; date: string;
+    title: string | null; action: string; date: string; insite_url: string;
     other_ayes: number; other_noes: number;
   }[];
 
@@ -1701,14 +1752,14 @@ export const localMemberOutcomes = (tenant: string, personId: number) =>
 export const localMemberMotions = (tenant: string, personId: number, limit: number) =>
   prep(
       `SELECT a.event_item_id, a.matter_file, a.matter_url, a.title, a.action, a.passed,
-              e.date
+              e.date, e.insite_url
        FROM local_actions a
        JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
        WHERE a.tenant = ? AND a.mover_id = ?
        ORDER BY e.date DESC, a.event_item_id DESC LIMIT ?`,
     ).all(tenant, personId, limit) as {
     event_item_id: number; matter_file: string | null; matter_url: string | null;
-    title: string | null; action: string; passed: number | null; date: string;
+    title: string | null; action: string; passed: number | null; date: string; insite_url: string;
   }[];
 export const localMemberMotionCount = (tenant: string, personId: number) =>
   (prep(`SELECT COUNT(*) AS n FROM local_actions WHERE tenant = ? AND mover_id = ?`)

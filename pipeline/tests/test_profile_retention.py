@@ -43,6 +43,7 @@ def archive(tmp_path, monkeypatch):
     monkeypatch.setattr(collector, "DATA_DIR", tmp_path)
     monkeypatch.setattr(collector, "OUT", path)
     monkeypatch.setattr(collector, "http_session", lambda: object())
+    monkeypatch.setattr(collector, "PROFILE_SOURCES", [])
     monkeypatch.setattr(collector, "milwaukee_district",
                         lambda *args: pytest.fail("paused request"))
     monkeypatch.setattr(collector, "west_allis_district", lambda http, n, delay: {

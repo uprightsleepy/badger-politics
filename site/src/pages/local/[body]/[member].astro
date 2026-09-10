@@ -15,7 +15,7 @@ import YearChips from "../../../components/YearChips.astro";
 import LocalVoteRow from "../../../components/LocalVoteRow.astro";
 import { yearPageStarts } from "../../../lib/paging";
 import { fmtDate } from "../../../lib/format";
-import { actionLabel, castStyle, glossaryFor, isNoVote, isYesVote } from "../../../lib/localGloss";
+import { glossaryFor, isNoVote, isYesVote } from "../../../lib/localGloss";
 
 const RECENT = 300;
 
@@ -288,20 +288,9 @@ const termLabel = (t: string | null) =>
       </p>
       <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
         {tieBreaks.map((v) => (
-          <li class="px-4 py-2">
-            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-              <span class={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.value)}`}>{v.value}</span>
-              <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
-              {v.matter_url ? (
-                <a href={v.matter_url} class="shrink-0 font-bold underline">{v.matter_file ?? "item"}</a>
-              ) : (
-                <span class="shrink-0 font-bold">{v.matter_file ?? "item"}</span>
-              )}
-              <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title ?? "Untitled item"}</span>
-              <span class="shrink-0 text-xs font-semibold tabular-nums">{v.other_ayes}&ndash;{v.other_noes} broken</span>
-            </div>
-            <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{actionLabel(v.action)}</p>
-          </li>
+          <LocalVoteRow v={v}>
+            <span slot="tally" class="font-semibold tabular-nums">{v.other_ayes}&ndash;{v.other_noes} broken</span>
+          </LocalVoteRow>
         ))}
       </ul>
     </section>
@@ -311,31 +300,19 @@ const termLabel = (t: string | null) =>
     <section class="mt-6">
       <h2 class="text-xl font-bold">Sole No votes · {soleNoes.length.toLocaleString()}</h2>
       <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Items where {member.name} cast the only No.
-        The vote is on the action named under each row: a motion to refer or
-        postpone is not the measure itself, and a sponsor can vote No on
-        referral and Aye on passage.
-        Each links to the clerk's page.
+        Items where {member.name} cast the only No. Each row names the action
+        voted on, which may be a referral or postponement rather than final passage,
+        and links to the clerk's record.
       </p>
       <YearChips target="sole-no-list" label={`Filter the sole No votes by year`} years={yearsOf(soleNoes)} />
       <ScrollPanel label={`${member.name}'s sole No votes`} max="max-h-[24rem]" count={soleNoes.length}>
         <ul id="sole-no-list" class="divide-y divide-navy-100 p-0 text-sm">
           {soleNoes.map((v) => (
-            <li class="px-4 py-2" data-y={v.date.slice(0, 4)}>
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
-                {v.matter_url ? (
-                  <a href={v.matter_url} class="shrink-0 font-bold underline">{v.matter_file ?? "item"}</a>
-                ) : (
-                  <span class="shrink-0 font-bold">{v.matter_file ?? "item"}</span>
-                )}
-                <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title ?? "Untitled item"}</span>
-                <span class="shrink-0 text-xs font-semibold tabular-nums">
-                  <span class="text-moss-600">{v.ayes} Aye</span> &ndash; <span class="text-badger-700">1 No</span>
-                </span>
-              </div>
-              <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[6.75rem]">{actionLabel(v.action)}</p>
-            </li>
+            <LocalVoteRow v={v} dissent>
+              <span slot="tally" class="font-semibold tabular-nums">
+                <span class="text-moss-600">{v.ayes} Aye</span> &ndash; <span class="text-badger-700">1 No</span>
+              </span>
+            </LocalVoteRow>
           ))}
         </ul>
       </ScrollPanel>
@@ -346,12 +323,9 @@ const termLabel = (t: string | null) =>
     <section class="mt-6">
       <h2 class="text-xl font-bold">Votes with dissent · {dissentVotes.length.toLocaleString()}</h2>
       <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Collected items where at least one member voted No and {member.name}'s
-        position is on record, with the council's recorded tally.
-        The vote is on the action named under each row: a motion to refer or
-        postpone is not the measure itself, and a sponsor can vote No on
-        referral and Aye on passage.
-        Each links to the clerk's page.
+        Items where at least one member voted No, showing {member.name}'s vote
+        and the council's tally. Each row names the action voted on, which may
+        be a referral or postponement rather than final passage, and links to the clerk's record.
       </p>
       <YearChips target="dissent-list" label={`Filter the votes with dissent by year`} years={yearsOf(dissentVotes)} />
       <ScrollPanel label={`${member.name} on votes with dissent`} max="max-h-[28rem]" count={dissentVotes.length}>
@@ -379,16 +353,7 @@ const termLabel = (t: string | null) =>
       <ScrollPanel label={`Motions moved by ${member.name}`} max="max-h-[28rem]" count={Math.min(RECENT, motionCount)}>
         <ul class="divide-y divide-navy-100 p-0 text-sm">
           {motions.map((m) => (
-            <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-1.5">
-              <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(m.date)}</span>
-              {m.matter_url ? (
-                <a href={m.matter_url} class="w-28 shrink-0 truncate font-semibold underline">{m.matter_file ?? "item"}</a>
-              ) : (
-                <span class="w-28 shrink-0 truncate font-semibold">{m.matter_file ?? "item"}</span>
-              )}
-              <span class="order-last min-w-0 basis-full truncate sm:order-none sm:flex-1">{m.title ?? "Untitled item"}</span>
-              <span class="shrink-0 text-xs text-navy-600">{actionLabel(m.action)}</span>
-            </li>
+            <LocalVoteRow v={m} />
           ))}
         </ul>
       </ScrollPanel>
@@ -415,16 +380,7 @@ const termLabel = (t: string | null) =>
     <ScrollPanel label={`${member.name}'s recent votes`} max="max-h-[32rem]" count={Math.min(RECENT, stats.total)}>
       <ul class="divide-y divide-navy-100 p-0 text-sm">
         {votes.map((v) => (
-          <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-1.5">
-            <span class={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.value)}`}>{v.value}</span>
-            <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
-            {v.matter_url ? (
-              <a href={v.matter_url} class="w-28 shrink-0 truncate font-semibold underline">{v.matter_file ?? "item"}</a>
-            ) : (
-              <span class="w-28 shrink-0 truncate font-semibold">{v.matter_file ?? "item"}</span>
-            )}
-            <span class="order-last min-w-0 basis-full truncate sm:order-none sm:flex-1">{v.title ?? "Untitled item"}</span>
-          </li>
+          <LocalVoteRow v={v} />
         ))}
       </ul>
     </ScrollPanel>

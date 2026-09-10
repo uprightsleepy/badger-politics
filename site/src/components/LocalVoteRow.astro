@@ -1,25 +1,33 @@
 ---
-import type { localMemberVotes } from "../lib/db";
 import { fmtDate } from "../lib/format";
 import { actionLabel, castStyle } from "../lib/localGloss";
+import { recordText } from "../lib/recordText.mjs";
 
 interface Props {
-  v: ReturnType<typeof localMemberVotes>[number];
+  v: {
+    date: string; value?: string; title: string | null; action: string;
+    matter_file: string | null; matter_url: string | null; insite_url: string;
+  };
   dissent?: boolean;
 }
 const { v, dissent = false } = Astro.props;
-const weight = dissent ? "font-bold" : "font-semibold";
 ---
-<li class={dissent ? "px-4 py-2" : "px-4 py-1.5"} data-y={dissent ? v.date.slice(0, 4) : undefined}>
-  <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-    <span class={`w-20 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-bold ${castStyle(v.value)}`}>{v.value}</span>
-    <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
-    {v.matter_url ? (
-      <a href={v.matter_url} class={`shrink-0 ${weight} underline`}>{v.matter_file ?? "item"}</a>
-    ) : (
-      <span class={`shrink-0 ${weight}`}>{v.matter_file ?? "item"}</span>
+<li class="px-4 py-3" data-y={dissent ? v.date.slice(0, 4) : undefined}>
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+    {v.value && (
+      <span class={`shrink-0 rounded-full px-3 py-0.5 text-center font-bold ${castStyle(v.value)}`}>{v.value}</span>
     )}
-    <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{v.title ?? "Untitled item"}</span>{dissent && <> <slot name="tally" /></>}
+    <time datetime={v.date} class="shrink-0 tabular-nums text-navy-600">{fmtDate(v.date)}</time>
+    {v.matter_file && (
+      <a href={v.matter_url || v.insite_url} class="min-h-6 break-words font-semibold leading-6 underline">{v.matter_file}</a>
+    )}
+    {Astro.slots.has("tally") && <span class="ml-auto"><slot name="tally" /></span>}
   </div>
-  <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[12.5rem]">{actionLabel(v.action)}</p>
+  <p class="mt-1.5 whitespace-pre-line break-words">
+    {recordText(v.title) || "Untitled item"}
+  </p>
+  <p class="mt-1 whitespace-pre-line break-words text-xs text-navy-600">
+    <span class="font-semibold">Action:</span>{" "}{recordText(actionLabel(v.action))}
+    {" · "}<a href={v.insite_url} class="inline-block min-h-6 leading-6 underline">Meeting record</a>
+  </p>
 </li>

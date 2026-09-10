@@ -4,9 +4,8 @@ and records its freshness separately from the council's voting records.
 
 Usage: python -m scraper.fetch_local_profiles [--delay S]
 
-West Allis district pages refresh normally. Retained Milwaukee profiles carry
-their archived member identities so a replacement member cannot inherit an
-old portrait or contact. Imports keep the existing exact attribution rules.
+West Allis district pages and the Appleton/Waukesha council rosters refresh
+normally. Retained Milwaukee profiles remain tied to archived member identities.
 """
 
 from __future__ import annotations
@@ -19,11 +18,14 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urljoin
 
 import requests
 from lxml import html as lxml_html
 
+from importer.civicclerk import name_key, portrait_url
 from importer.import_local import milwaukee_profile_owners
+from importer.local_registry import TENANTS
 from scraper.http import session as http_session
 from scraper.source_access import ACCESS
 
@@ -47,6 +49,41 @@ WA_PAGES = {
 }
 PHONE_RE = re.compile(r"\(?\b414\)?[\s.-]?\d{3}[\s.-]?\d{4}\b")
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.gov")
+PROFILE_SOURCES = [s for s in TENANTS if s.get("profile_url")]
+
+
+def roster_profiles(page: str, spec: dict) -> dict:
+    """One portrait per named district card, shared across municipal rosters."""
+    tree = lxml_html.fromstring(page)
+    base = urljoin(spec["profile_url"], next(iter(tree.xpath("//base/@href")), ""))
+    directory = spec["profile_layout"] == "directory"
+    cards = tree.xpath("//div[@class='row'][div/h2]" if directory
+                       else "//div[@class='alderperson']")
+    members = []
+    for card in cards:
+        heading = card.xpath(".//h2" if directory else "./h3")
+        if len(heading) != 1:
+            continue
+        text = " ".join(heading[0].itertext()).strip()
+        seat = re.search(r"\bDistrict\s+(\d+)\b", text)
+        if not seat:
+            continue
+        name = text.split(", District")[0] if directory else card.xpath("string(./h4)").strip()
+        name_key(name)
+        if directory:
+            images = [match[1] for style in card.xpath(".//div[@class='rz-block-img']/@style")
+                      if (match := re.search(r"url\(['\"]?([^'\")]+)['\"]?\)", style))]
+        else:
+            images = card.xpath("./img/@src")
+        urls = {urljoin(base, src) for src in images}
+        image = next(iter(urls)) if len(urls) == 1 else None
+        if image and not portrait_url(image, spec["profile_url"]):
+            image = None
+        members.append({"name": name, "seat": int(seat[1]), "image": image})
+    if (len(members) != spec["seats"]
+            or {m["seat"] for m in members} != set(range(1, spec["seats"] + 1))):
+        raise ValueError(f"{spec['tenant']}: incomplete profile roster")
+    return {"page": spec["profile_url"], "members": members}
 
 
 def milwaukee_district(http: requests.Session, n: int, delay: float) -> dict | None:
@@ -170,6 +207,13 @@ def main(argv: list[str]) -> int:
     refresh["westalliswi"] = {
         "state": "refreshed", "last_success_at": datetime.now(UTC).isoformat(),
     }
+    for spec in PROFILE_SOURCES:
+        response = http.get(spec["profile_url"], timeout=60)
+        response.raise_for_status()
+        profiles[spec["tenant"]] = roster_profiles(response.text, spec)
+        refresh[spec["tenant"]] = {
+            "state": "refreshed", "last_success_at": datetime.now(UTC).isoformat(),
+        }
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     pending = OUT.with_suffix(".json.tmp")
     pending.write_text(json.dumps(profiles, indent=1), encoding="utf-8")

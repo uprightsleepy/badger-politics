@@ -30,6 +30,8 @@ TENANTS: list[dict] = [
     },
     {
         "tenant": "cityofappleton",
+        "profile_url": "https://appletonwi.gov/government/common_council.php",
+        "profile_layout": "directory",
         "slug": "appleton",
         "city": "Appleton",
         "body_display": "Appleton Common Council",
@@ -42,6 +44,8 @@ TENANTS: list[dict] = [
     },
     {
         "tenant": "waukesha",
+        "profile_url": "https://www.waukesha-wi.gov/about_the_common_council/index.php",
+        "profile_layout": "council",
         "slug": "waukesha",
         "city": "Waukesha",
         "body_display": "Waukesha Common Council",

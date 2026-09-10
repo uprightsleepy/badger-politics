@@ -1,12 +1,5 @@
 ---
-/** Wisconsin's people in Washington, and how every one of them votes.
- *
- * A deliberately narrow module: floor roll calls for the full
- * delegation, each chamber from its own official records. It does not
- * track federal bills, hearings, or money -- those live on
- * congress.gov, and the page says so rather than pretending coverage
- * it does not have.
- */
+/** Wisconsin congressional votes and campaign finance. */
 import Base from "../../layouts/Base.astro";
 import SourceStrip from "../../components/SourceStrip.astro";
 import PartyChip from "../../components/PartyChip.astro";
@@ -31,9 +24,9 @@ const recentFor = (m: (typeof members)[number]) =>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
     The state's two U.S. senators and eight House members, with every
     floor vote each has cast, from their chamber's official records.
-    This module covers floor votes only. Federal
-    bills, hearings and campaign money live on
-    <a href="https://www.congress.gov" class="underline">congress.gov</a> and
+    Each profile also tracks campaign money from the FEC and verified Wisconsin campaign committees. Federal
+    bills and hearings are available on
+    <a href="https://www.congress.gov" class="underline">congress.gov</a>; federal filings are at
     <a href="https://www.fec.gov" class="underline">fec.gov</a>.
   </p>
   <SourceStrip
@@ -70,7 +63,7 @@ const recentFor = (m: (typeof members)[number]) =>
               </ul>
             )}
             <p class="mt-2 text-sm">
-              <a href={`/federal/${s.slug}/`} class="underline">Every roll call &rarr;</a>
+              <a href={`/federal/${s.slug}/`} class="underline">Votes and campaign money &rarr;</a>
             </p>
           </div>
         );

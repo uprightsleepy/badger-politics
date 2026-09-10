@@ -4,9 +4,10 @@ import SourceStrip from "../../../components/SourceStrip.astro";
 import Portrait from "../../../components/Portrait.astro";
 import LocalProfileNotice from "../../../components/LocalProfileNotice.astro";
 import LocalCoverageNotice from "../../../components/LocalCoverageNotice.astro";
+import LocalVoteRow from "../../../components/LocalVoteRow.astro";
 import { localBodies, localMembers, localMemberTerms, localTenantStats, localActionsWithDissent, localUpcomingMeetings } from "../../../lib/db";
 import { fmtDate } from "../../../lib/format";
-import { actionLabel, glossaryFor } from "../../../lib/localGloss";
+import { glossaryFor } from "../../../lib/localGloss";
 
 export function getStaticPaths() {
   return localBodies().map((b) => ({ params: { body: b.slug }, props: { body: b } }));
@@ -94,7 +95,7 @@ const districts = [...new Set(seated.map((m) => m.seat!))].sort((a, b) => a - b)
           {seated.filter((m) => m.seat === d).map((m) => (
             <a href={`/local/${body.slug}/${m.slug}/`} class="mt-1.5 flex items-center gap-2 font-semibold underline">
               <Portrait src={m.image_url} name={m.name} size={40} />
-              <span class="min-w-0 truncate">{m.name}</span>
+              <span class="min-w-0 break-words">{m.name}</span>
             </a>
           ))}
         </li>
@@ -107,7 +108,7 @@ const districts = [...new Set(seated.map((m) => m.seat!))].sort((a, b) => a - b)
           </p>
           <a href={`/local/${body.slug}/${m.slug}/`} class="mt-1.5 flex items-center gap-2 font-semibold underline">
             <Portrait src={m.image_url} name={m.name} size={40} />
-            <span class="min-w-0 truncate">{m.name}</span>
+            <span class="min-w-0 break-words">{m.name}</span>
           </a>
         </li>
       ))}
@@ -115,6 +116,9 @@ const districts = [...new Set(seated.map((m) => m.seat!))].sort((a, b) => a - b)
     <p class="mt-2 text-xs text-navy-600">
       Council seats in Wisconsin are nonpartisan, so no party is shown.
       Available portraits and contacts come from the city's published records.
+      {body.tenant !== "madison" && current.length > 0 && current.every((m) => !m.image_url) && (
+        <> Portraits have not yet been collected for this council.</>
+      )}
     </p>
   </section>
 
@@ -128,24 +132,11 @@ const districts = [...new Set(seated.map((m) => m.seat!))].sort((a, b) => a - b)
       </p>
       <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
         {dissent.map((a) => (
-          <li class="px-4 py-2">
-            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-              <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(a.date)}</span>
-              {a.matter_url ? (
-                <a href={a.matter_url} class="shrink-0 font-bold underline">{a.matter_file ?? "item"}</a>
-              ) : (
-                <span class="shrink-0 font-bold">{a.matter_file ?? "item"}</span>
-              )}
-              <span class="order-last min-w-0 basis-full break-words sm:order-none sm:flex-1">{a.title ?? "Untitled item"}</span>
-              <span class="shrink-0 font-semibold tabular-nums">
-                <span class="text-moss-600">{a.ayes} Aye</span> &ndash; <span class="text-badger-700">{a.noes} No</span>
-              </span>
-            </div>
-            <p class="mt-0.5 break-words text-xs text-navy-600 sm:pl-[6.75rem]">
-              {actionLabel(a.action)}
-              {" "}&middot; <a href={a.insite_url} class="underline">meeting record</a>
-            </p>
-          </li>
+          <LocalVoteRow v={a}>
+            <span slot="tally" class="font-semibold tabular-nums">
+              <span class="text-moss-600">{a.ayes} Aye</span> &ndash; <span class="text-badger-700">{a.noes} No</span>
+            </span>
+          </LocalVoteRow>
         ))}
       </ul>
       {glossary.length > 0 && (

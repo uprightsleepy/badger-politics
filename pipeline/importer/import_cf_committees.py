@@ -1,19 +1,23 @@
-"""Load the CFIS committee registry and non-candidate committee money.
+"""Load CFIS committee money and separately attributed state campaigns.
 
 Usage: python -m importer.import_cf_committees <cfis_dir> <sqlite_path>
 
 Reads scraper.fetch_cf_committees archives (committees.json, pac-YYYY-MM.json).
-Candidate-committee receipts are NOT touched here; they stay in
-`contributions` with their verified person mapping.
+Legislator receipts stay in `contributions`; curated state campaigns use
+separate tables so existing PAC totals and donor rankings remain unchanged.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
+import re
 import sqlite3
 import sys
 from pathlib import Path
+
+from importer.federal_finance import STATE_CAMPAIGNS
 
 FIELDS = (
     "id", "filer_entity_id", "filer_type", "direction", "date", "amount",
@@ -42,6 +46,35 @@ def run(cfis_dir: Path, db_path: Path) -> int:
             conn.execute(f"ALTER TABLE cf_transactions ADD COLUMN {col} {kind}")
     kept = 0
     with conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS state_campaigns (
+            entity_id INTEGER PRIMARY KEY, bioguide TEXT, candidate TEXT, office TEXT,
+            cycle INTEGER, committee TEXT, source_url TEXT)""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS state_campaign_coverage (
+            entity_id INTEGER, month TEXT, PRIMARY KEY(entity_id, month))""")
+        conn.execute("CREATE TABLE IF NOT EXISTS state_campaign_transactions AS"
+                     " SELECT * FROM cf_transactions WHERE 0")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS state_campaign_transaction_id"
+                     " ON state_campaign_transactions(id)")
+        conn.execute("DELETE FROM state_campaign_transactions")
+        conn.execute("DELETE FROM state_campaign_coverage")
+        conn.execute("DELETE FROM state_campaigns")
+        by_id = {row["entity_id"]: row for row in registry}
+        for entity_id, campaign in STATE_CAMPAIGNS.items():
+            conn.execute("INSERT INTO state_campaigns VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (entity_id, campaign["bioguide"], campaign["candidate"],
+                          campaign["office"], campaign["cycle"], campaign["committee"],
+                          campaign["source_url"]))
+            entry = by_id.get(entity_id, {})
+            if entry and (entry["name"] != campaign["committee"]
+                          or entry["assigned_id"] != campaign["assigned_id"]):
+                raise ValueError("State campaign registry identity mismatch")
+            for month in entry.get("campaign_months", []):
+                if (not isinstance(month, str)
+                        or not re.fullmatch(r"20\d{2}-(0[1-9]|1[0-2])", month)
+                        or not (cfis_dir / f"pac-{month}.json").exists()):
+                    raise ValueError("State campaign coverage archive is missing")
+                conn.execute("INSERT INTO state_campaign_coverage VALUES (?, ?)",
+                             (entity_id, month))
         conn.execute("DELETE FROM cf_committees")
         conn.executemany(
             "INSERT INTO cf_committees (entity_id, name, committee_type, assigned_id)"
@@ -54,6 +87,20 @@ def run(cfis_dir: Path, db_path: Path) -> int:
             rows = json.loads(path.read_text(encoding="utf-8"))
             batch = []
             for r in rows:
+                if r.get("filer_entity_id") in STATE_CAMPAIGNS:
+                    if (r.get("amount") is None or r.get("direction") not in
+                            ("INCOMING", "OUTGOING") or r.get("filer_type") != "State Candidate"):
+                        raise ValueError("Invalid curated state campaign transaction")
+                    if not math.isfinite(float(r["amount"])):
+                        raise ValueError("Invalid state campaign dollar amount")
+                    conn.execute(
+                        f"INSERT INTO state_campaign_transactions ({', '.join(FIELDS)})"
+                        f" VALUES ({', '.join('?' * len(FIELDS))})",
+                        tuple(r.get(f) for f in FIELDS),
+                    )
+                    # Preserve pre-existing express-advocacy rows in the original table.
+                    if not r.get("stance"):
+                        continue
                 # a filer and an amount are the minimum for an attributable row
                 if not r.get("filer_entity_id") or r.get("amount") is None:
                     continue

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
+from urllib.parse import urljoin, urlsplit
 
 from lxml import html
 
@@ -43,13 +44,27 @@ def resolve_name(name: str, identities: dict) -> int:
         raise ValueError(f"Unreviewed CivicClerk member: {name!r}") from None
 
 
-def parse_roster(page: str) -> list[dict]:
-    """Read named district headings, excluding navigation and contact details."""
+def portrait_url(url: str, source_url: str) -> bool:
+    parsed = urlsplit(url)
+    return parsed.scheme == "https" and parsed.netloc == urlsplit(source_url).netloc
+
+
+def parse_roster(page: str, source_url: str | None = None) -> list[dict]:
+    """Match portraits only by the full name on the same official roster."""
+    tree = html.fromstring(page)
     found = []
-    for heading in html.fromstring(page).xpath("//h3"):
+    for heading in tree.xpath("//h3"):
         match = re.fullmatch(r"(.+),\s*District\s+(\d+)", heading.text_content().strip())
         if match:
-            found.append({"name": match[1].strip(), "seat": int(match[2])})
+            member = {"name": match[1].strip(), "seat": int(match[2])}
+            if source_url:
+                images = {urljoin(source_url, img.get("src"))
+                          for img in tree.xpath("//img[@src and @alt]")
+                          if img.get("alt").strip()
+                          and name_key(img.get("alt")) == name_key(member["name"])}
+                if len(images) == 1 and portrait_url(next(iter(images)), source_url):
+                    member["portrait"] = {"url": images.pop(), "name": member["name"]}
+            found.append(member)
     return found
 
 
@@ -67,8 +82,16 @@ def roster_members(snapshot: dict, spec: dict, curated: dict) -> tuple[list[dict
             raise ValueError("CivicClerk roster changed; review district attribution")
         current.add(pid)
         seats.add(seat)
-        office.append({"OfficeRecordPersonId": pid, "OfficeRecordFullName": member["name"],
-                       "OfficeRecordMemberType": "Member"})
+        record = {"OfficeRecordPersonId": pid, "OfficeRecordFullName": member["name"],
+                  "OfficeRecordMemberType": "Member"}
+        portrait = member.get("portrait")
+        if portrait:
+            if (name_key(portrait["name"]) != name_key(member["name"])
+                    or not portrait_url(portrait["url"], snapshot["source_url"])):
+                raise ValueError("Invalid CivicClerk portrait attribution")
+            record.update(OfficeRecordImageUrl=portrait["url"],
+                          OfficeRecordImageBasis=snapshot["source_url"])
+        office.append(record)
     if seats != set(range(1, spec["seats"] + 1)):
         raise ValueError("Incomplete CivicClerk district roster")
     return office, current

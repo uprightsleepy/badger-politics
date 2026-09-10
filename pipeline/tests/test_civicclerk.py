@@ -29,6 +29,66 @@ def roster():
             "members": parse_roster(ROSTER_HTML)}
 
 
+def test_roster_portraits_require_unique_full_names_and_same_origin():
+    page = ROSTER_HTML + '''
+    <img src="/ImageRepository/Document?documentID=1" alt=" Pat Example ">
+    <img src="/ImageRepository/Document?documentID=2" alt="Lee Another">
+    <img src="/ImageRepository/Document?documentID=3" alt="Lee Another">
+    <img src="/wrong.jpg" alt="Example">
+    <img src="/logo.png" alt="City logo">
+    '''
+    members = parse_roster(page, SPEC["roster_url"])
+    assert members[0]["portrait"] == {
+        "url": "https://www.greenbaywi.gov/ImageRepository/Document?documentID=1",
+        "name": "Pat Example",
+    }
+    assert "portrait" not in members[1]
+    for src in ("https://another.example/headshot.jpg", "javascript:alert(1)",
+                "data:image/png;base64,AAA", "http://www.greenbaywi.gov/photo.jpg"):
+        assert "portrait" not in parse_roster(
+            ROSTER_HTML + f'<img src="{src}" alt="Pat Example">', SPEC["roster_url"],
+        )[0]
+    assert "portrait" not in parse_roster(
+        '<h3>New Member, District 1</h3><img src="/old.jpg" alt="Pat Example">',
+        SPEC["roster_url"],
+    )[0]
+
+
+@pytest.mark.parametrize("portrait", [
+    {"name": "Another Person", "url": "https://www.greenbaywi.gov/photo.jpg"},
+    {"name": "Pat Example", "url": "https://unreviewed.example/photo.jpg"},
+])
+def test_roster_rejects_misattributed_archived_portrait(portrait):
+    snapshot = roster()
+    snapshot["members"][0]["portrait"] = portrait
+    with pytest.raises(ValueError, match="portrait attribution"):
+        roster_members(snapshot, SPEC, CURATED)
+
+
+def test_official_roster_portraits_reach_shared_import(source, tmp_path, make_db, monkeypatch):
+    fetch.fetch_tenant(source.http, SPEC, [-1], 0, source.root)
+    snapshot = roster()
+    snapshot["members"] = parse_roster(
+        ROSTER_HTML + '<img src="/ImageRepository/Document?documentID=1" alt="Pat Example">',
+        SPEC["roster_url"],
+    )
+    save_json(source.out / "roster.json", snapshot)
+    before = {p: p.read_bytes() for p in source.out.rglob("*.json")}
+    db = tmp_path / "portraits.sqlite"
+    conn = make_db(db)
+    monkeypatch.setattr(import_local, "TENANTS", [SPEC])
+    import_local.run(source.root, db)
+    photos = conn.execute(
+        "SELECT image_url,image_basis FROM local_members ORDER BY seat").fetchall()
+    assert photos == [
+        (snapshot["members"][0]["portrait"]["url"], SPEC["roster_url"]), (None, None),
+    ]
+    assert conn.execute("SELECT COUNT(*) FROM local_votes").fetchone() == (8,)
+    assert conn.execute("SELECT COUNT(*) FROM local_actions").fetchone() == (6,)
+    assert {p: p.read_bytes() for p in before} == before
+    conn.close()
+
+
 def event(event_id=11):
     return {"id": event_id, "agendaId": event_id + 100, "eventCategoryId": 26,
             "eventDate": "2026-07-21T18:00:00Z", "isPublished": "Published",

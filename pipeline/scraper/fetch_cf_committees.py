@@ -1,11 +1,10 @@
-"""Non-candidate committee money from CFIS: PACs, conduits, parties, and
-independent expenditure committees.
+"""CFIS committee money, including explicitly curated state campaigns.
 
 Usage: python -m scraper.fetch_cf_committees [--since YYYY-MM] [--until YYYY-MM]
 
-The date-windowed feed includes all filers. Keep non-candidate committee
-transactions and any support/opposition rows. Candidate receipt attribution
-remains in fetch_cfis, using its verified committee map.
+Reuse the complete monthly feed for non-candidate filers, express advocacy,
+and verified state campaigns of federal members. Legislator receipts retain
+their existing fetch_cfis attribution.
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ from pathlib import Path
 
 import requests
 
+from importer.federal_finance import STATE_CAMPAIGNS
 from scraper.cfis_api import DELAY, PAGE, month_windows, transaction_count, transaction_pages
 from scraper.http import session
 
@@ -75,7 +75,14 @@ def _fetch_month(http: requests.Session, first: str, last: str, page_size: int |
             ftype = ((filer.get("committee") or {}).get("committeeType") or {}).get("name")
             stance = t.get("supportStance")
             # keep non-candidate filers, plus any stanced row whoever filed it
-            if ftype not in KEEP_TYPES and not stance:
+            campaign = STATE_CAMPAIGNS.get(t.get("createdByEntityId"))
+            if campaign:
+                observed = committee_of(filer)
+                if (not observed or observed["name"] != campaign["committee"]
+                        or observed["assigned_id"] != campaign["assigned_id"]
+                        or ftype != "State Candidate"):
+                    raise ValueError("Curated state campaign identity changed")
+            if ftype not in KEEP_TYPES and not stance and not campaign:
                 continue
             direction = (t.get("transactionType") or {}).get("direction")
             other = t.get("from_entity") if direction == "INCOMING" else t.get("to_entity")
@@ -135,6 +142,13 @@ def main(argv: list[str]) -> int:
     for label, first, last in month_windows(ns.since, ns.until):
         out = DATA_DIR / f"pac-{label}.json"
         rows, month_registry = fetch_month(http, first, last)
+        for entity_id, campaign in STATE_CAMPAIGNS.items():
+            entry = month_registry.setdefault(entity_id, {
+                "entity_id": entity_id, "name": campaign["committee"],
+                "committee_type": "State Candidate", "assigned_id": campaign["assigned_id"],
+            })
+            entry["campaign_months"] = sorted(set(
+                registry.get(entity_id, {}).get("campaign_months", []) + [label]))
         registry.update(month_registry)
         out.write_text(json.dumps(rows, indent=0), encoding="utf-8")
         total += len(rows)
@@ -144,6 +158,10 @@ def main(argv: list[str]) -> int:
     reg_path = DATA_DIR / "committees.json"
     if reg_path.exists():
         existing = {c["entity_id"]: c for c in json.loads(reg_path.read_text(encoding="utf-8"))}
+        for entity_id, entry in registry.items():
+            if "campaign_months" in entry:
+                entry["campaign_months"] = sorted(set(entry["campaign_months"]
+                    + existing.get(entity_id, {}).get("campaign_months", [])))
         existing.update(registry)
         registry = existing
     reg_path.write_text(

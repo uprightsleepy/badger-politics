@@ -99,17 +99,25 @@ const SAMPLE_PATHS = [
   "/local/", "/local/milwaukee/", "/local/west-allis/",
 ];
 export const samplePages = async () => {
+  const councils = (await readdir(join(DIST, "local"), { withFileTypes: true }).catch(() => []))
+    .filter((entry) => entry.isDirectory());
+  const localPages = await Promise.all(councils.map(async ({ name }) => {
+    const index = `local/${name}`;
+    const member = await firstHref(index, /href="(\/local\/[^/]+\/[^/"]+\/)"/);
+    const district = await firstHref(index, /href="(\/local\/[^/]+\/district\/\d+\/)"/);
+    const history = member ? await firstHref(member.slice(1), /href="(\/local\/[^/]+\/[^/]+\/votes\/1\/)"/) : null;
+    return [`/${index}/`, member, district, history];
+  }));
   const dynamic = await Promise.all([
     firstHref("subjects", /href="(\/subjects\/[^"]+\/)"/),
     firstHref("committees", /href="(\/committees\/[^"]+\/)"/),
     firstHref("federal", /href="(\/federal\/[^"]+\/)"/),
-    firstHref("local/milwaukee", /href="(\/local\/milwaukee\/[^"]+\/)"/),
     // one legislator page with full cards, and one whose money card
     // carries the timeline chart (coverage differs between the two)
     firstLegislatorHref(),
     moneyLegislatorHref(),
   ]);
-  return [...SAMPLE_PATHS, ...new Set(dynamic.filter(Boolean))];
+  return [...new Set([...SAMPLE_PATHS, ...dynamic, ...localPages.flat()].filter(Boolean))];
 };
 
 /** Block external images, fonts, and media in layout checks to avoid source

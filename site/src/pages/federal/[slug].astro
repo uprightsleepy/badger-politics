@@ -1,17 +1,9 @@
 ---
-/** One senator's Senate record, career-deep: every Congress they have
- * served, from the Senate's own per-vote XML.
- *
- * Attribution is the Senate's LIS member id on every position, so there
- * is no matching step to get wrong. "Missed" means recorded as Not
- * Voting -- the Senate's files make no excused/absent distinction, and
- * the page says what it counts. The full roll-call list lives on
- * paginated pages; this one carries the summary a constituent actually
- * asks for: how much, how often missed, and what lately.
- */
+/** Federal votes and separately attributed campaign finance. */
 import Base from "../../layouts/Base.astro";
 import SourceStrip from "../../components/SourceStrip.astro";
 import PartyChip from "../../components/PartyChip.astro";
+import FederalMoney from "../../components/FederalMoney.astro";
 import FederalVoteRow from "../../components/FederalVoteRow.astro";
 import { federalMembers, federalVoteKey, federalVotesFor, federalCongressStats } from "../../lib/db";
 import { congressLabel } from "../../lib/federal";
@@ -32,7 +24,7 @@ const recent = votes.slice(0, 25);
 
 <Base
   title={`${member.name}, ${member.chamber === "senate" ? "U.S. Senator" : `U.S. Representative, WI-${member.district}`}`}
-  description={`${member.name}'s complete U.S. Senate voting record since ${sinceYear}, from the Senate's official roll calls: ${votes.length.toLocaleString()} votes, ${missed} missed.`}
+  description={`${member.name}'s ${member.chamber === "senate" ? "Senate" : "House"} voting record since ${sinceYear}, from official roll calls: ${votes.length.toLocaleString()} votes, ${missed} missed.`}
   breadcrumbs={[{ name: "Federal delegation", url: "/federal/" }]}
   filters={{ type: "Legislator", chamber: member.chamber === "senate" ? "U.S. Senate" : "U.S. House", party: member.party }}
 >
@@ -46,7 +38,7 @@ const recent = votes.slice(0, 25);
   <p class="mt-1 text-sm text-navy-700">
     {member.chamber === "senate"
       ? "U.S. Senator for Wisconsin"
-      : `U.S. Representative for Wisconsin's ${member.district}th district`} since {sinceYear} &middot; term ends {member.term_end.slice(0, 4)} &middot;
+      : `U.S. Representative for WI-${member.district}`} since {sinceYear} &middot; term ends {member.term_end.slice(0, 4)} &middot;
     <a href={`https://www.congress.gov/member/${member.slug}/${member.bioguide}`} class="underline">
       official profile &#8599;
     </a>
@@ -76,6 +68,8 @@ const recent = votes.slice(0, 25);
     </div>
   </dl>
 
+  <FederalMoney bioguide={member.bioguide} />
+
   <section class="mt-6">
     <h2 class="text-xl font-bold">Congress by Congress</h2>
     <div class="mt-2 max-w-xl overflow-x-auto">
@@ -102,6 +96,8 @@ const recent = votes.slice(0, 25);
       </table>
     </div>
   </section>
+
+
 
   <section class="mt-6">
     <h2 class="text-xl font-bold">Latest roll calls</h2>
