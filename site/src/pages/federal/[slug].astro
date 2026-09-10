@@ -72,7 +72,12 @@ const recent = votes.slice(0, 25);
 
   <section class="mt-6">
     <h2 class="text-xl font-bold">Congress by Congress</h2>
-    <div class="mt-2 max-w-xl overflow-x-auto">
+    <div
+      class="mt-2 max-w-xl overflow-x-auto"
+      role="region"
+      tabindex="0"
+      aria-label={`${member.name}'s votes per Congress, scrollable`}
+    >
       <table class="w-full rounded-lg border border-navy-100 bg-white text-sm">
         <caption class="sr-only">{member.name}'s roll calls and missed votes per Congress</caption>
         <thead>
