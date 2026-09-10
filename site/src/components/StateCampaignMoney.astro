@@ -18,11 +18,11 @@ const fmtMoney = (value: number) => value.toLocaleString("en-US", {
     <strong>Spending not yet available.</strong> Collection is incomplete ({c.months.length} months collected).
     Totals will appear after every month through {c.end} is verified. Missing records do not mean zero spending or receipts.
   </p> : <>
-    <dl class="mt-4 grid grid-cols-1 gap-4 min-[440px]:grid-cols-2">
-      <div><dt class="text-sm text-navy-600">Reported spending</dt>
-        <dd class="mt-1 break-words text-2xl font-bold tabular-nums">{fmtMoney(c.totals.spending ?? 0)}</dd></div>
-      <div><dt class="text-sm text-navy-600">Reported receipts</dt>
-        <dd class="mt-1 break-words text-2xl font-bold tabular-nums">{fmtMoney(c.totals.receipts ?? 0)}</dd></div>
+    <dl data-campaign-totals class="mt-4 flex flex-wrap gap-4">
+      <div class="flex-auto"><dt class="text-sm text-navy-600">Reported spending</dt>
+        <dd class="mt-1 whitespace-nowrap text-2xl font-bold tabular-nums">{fmtMoney(c.totals.spending ?? 0)}</dd></div>
+      <div class="flex-auto"><dt class="text-sm text-navy-600">Reported receipts</dt>
+        <dd class="mt-1 whitespace-nowrap text-2xl font-bold tabular-nums">{fmtMoney(c.totals.receipts ?? 0)}</dd></div>
     </dl>
     <p class="mt-3 text-sm text-navy-600">
       {c.totals.count.toLocaleString()} transactions collected for {c.start}–{c.end}.
