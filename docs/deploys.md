@@ -60,6 +60,10 @@ browser harnesses could not start on Linux, and the JSON API, Atom feeds
 and calendars were never generated outside `run.sh` — so a site-only build
 would have released with all 20,580 of those links broken.
 
+Validate layout changes in Linux Chrome before merging. The deployment runner's
+system font can be wider than Windows fonts, so a Windows-only responsive pass
+does not establish that the release check will pass.
+
 ## Credentials
 
 There is no service-account key anywhere. GitHub Actions federates into
