@@ -51,15 +51,25 @@ const findBrowser = () => {
 };
 
 export const launchBrowser = async () => {
+  const executablePath = findBrowser();
   // A fresh profile avoids handoffs to an open browser and stale profile locks.
   const userDataDir = await mkdtemp(join(tmpdir(), "bp-harness-"));
-  const browser = await puppeteer.launch({
-    executablePath: findBrowser(),
-    headless: true,
-    userDataDir,
-    // the sandbox needs kernel namespaces the GitHub runner does not grant
-    args: process.env.CI ? ["--no-sandbox", "--disable-dev-shm-usage"] : [],
-  });
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      executablePath,
+      headless: true,
+      userDataDir,
+      // Avoid waiting for Chrome to print a WebSocket endpoint on a busy runner.
+      pipe: true,
+      timeout: 60000,
+      // the sandbox needs kernel namespaces the GitHub runner does not grant
+      args: process.env.CI ? ["--no-sandbox", "--disable-dev-shm-usage"] : [],
+    });
+  } catch (error) {
+    await rm(userDataDir, { recursive: true, force: true, maxRetries: 3 }).catch(() => {});
+    throw error;
+  }
   browser.on("disconnected", () => {
     rm(userDataDir, { recursive: true, force: true }).catch(() => {});
   });
