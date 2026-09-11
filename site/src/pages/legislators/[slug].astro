@@ -2,10 +2,11 @@
 import Base from "../../layouts/Base.astro";
 import SourceStrip from "../../components/SourceStrip.astro";
 import VoteHeatmap from "../../components/VoteHeatmap.astro";
-import MoneyTimeline from "../../components/MoneyTimeline.astro";
+import MoneyFilters from "../../components/MoneyFilters.astro";
+import ProfileMoneyView from "../../components/ProfileMoneyView.astro";
+import { moneyViews } from "../../lib/money-periods";
 import FollowButton from "../../components/FollowButton.astro";
 import MaybeLink from "../../components/MaybeLink.astro";
-import OrgLogo from "../../components/OrgLogo.astro";
 import VoteRow from "../../components/VoteRow.astro";
 import JsonLd from "../../components/JsonLd.astro";
 import {
@@ -19,9 +20,7 @@ import {
   termsFor,
   partyAgreement,
   electionHistoryFor,
-  moneyFor,
   personIdByName,
-  hasDonorPage,
   partyBreaks,
   keyVotesFor,
   committeesFor,
@@ -33,7 +32,6 @@ import {
   roleAbbr,
   chamberName,
   fmtDate,
-  fmtMoney,
   monthYear,
   billSlug,
   shortTitle,
@@ -133,19 +131,7 @@ const KEY_VOTE_STYLES: Record<string, string> = {
   "veto override": "bg-badger-50 text-badger-700",
 };
 // composition legend: CFIS source types, exactly as committees report them
-const TYPE_LABELS: Record<string, string> = {
-  Individual: "Individuals",
-  Registrant: "Political committees",
-  Business: "Businesses & other entities",
-  Self: "The candidate themselves",
-};
-const TYPE_BAR: Record<string, string> = {
-  Individual: "bg-navy-600",
-  Registrant: "bg-moss-600",
-  Business: "bg-gold-600",
-};
 const partyPlural = person.party === "Democratic" ? "Democrats" : "Republicans";
-const money = sitting ? moneyFor(person.id) : null;
 const history = sitting ? electionHistoryFor(person.chamber, person.district) : [];
 const surname = person.name.split(" ").pop()!.toLowerCase();
 // Wisconsin's three roles: the first name on a bill is its lead author,
@@ -548,119 +534,10 @@ const tally = TALLY_ORDER.map((status) => ({
       {sitting && (
         <section class="mt-6">
           <h2 id="money" class="scroll-mt-4 text-xl font-bold">Campaign money</h2>
-          {money === null ? (
-            <p class="mt-2 rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-700">
-              This legislator's campaign committee isn't linked in our data yet,
-              so no fundraising is shown. This is a coverage gap, not a report
-              of zero fundraising. <a href="/about/#money" class="underline">How this data works</a>
-            </p>
-          ) : money.total === 0 ? (
-            <p class="mt-2 rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-700">
-              No contributions reported to this legislator's committee since
-              they took office ({monthYear(money.entry)}).
-              <a href="/about/#money" class="underline"> How this data works</a>
-            </p>
-          ) : (
-            <div class="mt-2 rounded-lg border border-navy-100 bg-white p-4 text-sm">
-              <p>
-                <span class="text-2xl font-bold">{fmtMoney(money.total)}</span>
-                <span class="text-navy-600">
-                  {" "}raised across {money.n.toLocaleString()} reported receipts
-                  since taking office, {monthYear(money.entry)} to {fmtDate(money.last)}
-                </span>
-              </p>
-              <MoneyTimeline quarters={money.quarters} entry={money.entry} terms={terms} />
-              {money.byType.length > 0 && (
-                <div class="mt-3">
-                  <h3 class="font-bold">Where it came from</h3>
-                  <div class="mt-1 flex h-3 w-full overflow-hidden rounded-full bg-navy-100" aria-hidden="true">
-                    {money.byType.map((t) => (
-                      <span
-                        class={`h-full ${TYPE_BAR[t.type] ?? "bg-navy-300"}`}
-                        style={`width: ${(t.total / money.total) * 100}%`}
-                      ></span>
-                    ))}
-                  </div>
-                  <ul class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
-                    {money.byType.map((t) => (
-                      <li class="flex items-center gap-1">
-                        <span class={`h-2.5 w-2.5 rounded-full ${TYPE_BAR[t.type] ?? "bg-navy-300"}`} aria-hidden="true"></span>
-                        {TYPE_LABELS[t.type] ?? t.type}:{" "}
-                        <strong>{fmtMoney(t.total)}</strong>
-                        <span class="text-navy-600">({((t.total / money.total) * 100).toFixed(0)}%)</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <p class="mt-0.5 text-xs text-navy-600">
-                    Source types exactly as the committee reported each receipt to CFIS.
-                  </p>
-                </div>
-              )}
-              <div class="mt-3 grid gap-4 sm:grid-cols-2">
-                {money.committees.length > 0 && (
-                  <div class="min-w-0">
-                    <h3 class="font-bold">Top contributing committees</h3>
-                    <p class="text-xs text-navy-600">PACs, party and other political committees</p>
-                    <ul class="mt-1 space-y-1">
-                      {money.committees.map((c) => (
-                        <li class="flex items-center gap-2">
-                          <OrgLogo entityId={c.entityId} name={c.name} />
-                          <MaybeLink href={hasDonorPage(c.entityId) ? `/money/committees/${c.entityId}/` : null}>
-                            {c.name}
-                          </MaybeLink>
-                          <span class="shrink-0 font-semibold">{fmtMoney(c.total)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {money.individuals.length > 0 && (
-                  <div class="min-w-0">
-                    <h3 class="font-bold">Top individual donors</h3>
-                    <p class="text-xs text-navy-600">
-                      cumulative across all their reported receipts, by CFIS donor identity
-                    </p>
-                    <ul class="mt-1 space-y-0.5">
-                      {money.individuals.map((d) => (
-                        <li class="flex items-baseline gap-2">
-                          <span class="min-w-0 flex-1 truncate">{d.name}</span>
-                          <span class="shrink-0 text-xs text-navy-600">{d.n} receipts</span>
-                          <span class="shrink-0 font-semibold">{fmtMoney(d.total)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {money.occupations.length > 0 && (
-                  <div class="min-w-0">
-                    <h3 class="font-bold">Top occupations of individual donors</h3>
-                    <p class="text-xs text-navy-600">
-                      as reported by donors; individuals gave {fmtMoney(money.individualTotal)} in total
-                    </p>
-                    <ul class="mt-1 space-y-0.5">
-                      {money.occupations.map((o) => (
-                        <li class="flex items-baseline gap-2">
-                          <span class="min-w-0 flex-1 truncate">{o.occupation}</span>
-                          <span class="shrink-0 font-semibold">{fmtMoney(o.total)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <p class="mt-3 text-xs text-navy-600">
-                Source: Wisconsin Ethics Commission campaign finance filings
-                (campaignfinance.wi.gov), refreshed nightly. Wisconsin law bars
-                corporations from contributing to candidates; money comes from
-                individuals and political committees.
-                Totals cover this legislator's candidate committees while in
-                office, including any runs for other offices. Electronic
-                records begin in 2008, so the longest-serving members' totals
-                start there.
-                <a href="/about/#money" class="underline"> Full methodology</a>
-              </p>
-            </div>
-          )}
+          <MoneyFilters />
+          {moneyViews().map((view) => <div data-money-period={view.period.key} data-money-scope={view.scope} hidden={!view.isDefault}>
+            <ProfileMoneyView personId={person.id} view={view} />
+          </div>)}
         </section>
       )}
 

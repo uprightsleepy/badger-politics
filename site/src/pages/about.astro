@@ -88,7 +88,7 @@ const pulledOn = meta().imported_at?.slice(0, 10);
 
     <h3 id="money" class="mt-6 text-lg font-bold">Campaign money</h3>
     <p>
-      Fundraising figures come from committees' own filings with the Wisconsin
+      Reported receipts come from committees' own filings with the Wisconsin
       Ethics Commission, via
       <a href="https://campaignfinance.wi.gov" class="underline">campaignfinance.wi.gov</a>,
       covering electronic records from 2008 to today. Some things to know when
@@ -118,11 +118,17 @@ const pulledOn = meta().imported_at?.slice(0, 10);
         other offices.
       </li>
       <li>
-        Totals are a <strong>rolling window since each member took
-        office</strong>, dated from their first recorded floor vote. Money
-        raised before they held office, including the campaign that first
-        elected them, is not counted. Electronic filings begin in 2008, so
-        members who took office earlier are counted from then.
+        The <strong>current two-year reporting period</strong> is shown by default,
+        including collected receipts before taking office. Earlier periods and
+        <strong>all available history</strong> remain available. The optional
+        service filter counts only receipts within recorded legislative terms,
+        excluding gaps between terms. These dates come from service records, not floor votes.
+        Electronic records begin in July 2008; missing filings and amendments can leave gaps.
+      </li>
+      <li>
+        <strong>Receipts are broader than donations.</strong> They can include loans,
+        transfers, refunds, and in-kind support. Receipts minus spending is not cash on hand.
+        The latest transaction date describes the collected records, not proof that every filing is present.
       </li>
       <li>
         Committees are linked to legislators only when the link is certain.

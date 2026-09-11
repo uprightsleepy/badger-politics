@@ -2,9 +2,10 @@
 import Base from "../../../layouts/Base.astro";
 import SourceStrip from "../../../components/SourceStrip.astro";
 import OrgLogo from "../../../components/OrgLogo.astro";
-import PartyChip from "../../../components/PartyChip.astro";
-import StanceChip from "../../../components/StanceChip.astro";
-import { donorCommittees, donorCommitteeFor, cfCommitteeFor, cfTypeOf } from "../../../lib/db";
+import MoneyFilters from "../../../components/MoneyFilters.astro";
+import DonorMoneyView from "../../../components/DonorMoneyView.astro";
+import { moneyViews } from "../../../lib/money-periods";
+import { donorCommittees, cfTypeOf } from "../../../lib/db";
 import { fmtMoney, fmtDate, personSlug, roleAbbr } from "../../../lib/format";
 
 export function getStaticPaths() {
@@ -14,10 +15,6 @@ export function getStaticPaths() {
   }));
 }
 const { committee } = Astro.props;
-const { recipients, byParty } = donorCommitteeFor(committee.entityId);
-// the committee's own filings: who funds it and what it spends. Present
-// only for committees whose filings we hold; absent is a coverage gap.
-const own = cfCommitteeFor(committee.entityId);
 const kind = cfTypeOf(committee.entityId);
 ---
 
@@ -28,7 +25,7 @@ const kind = cfTypeOf(committee.entityId);
     { name: "Money", url: "/money/" },
     { name: "Committees", url: "/money/committees/" },
   ]}
-  description={`${committee.name} has given ${fmtMoney(committee.total)} to ${committee.recipients} sitting Wisconsin legislators.`}
+  description={`${committee.name}: reported receipts to sitting Wisconsin legislators, by reporting period.`}
 >
   <p class="text-sm text-navy-600">
     <a href="/money/" class="underline">Campaign money</a> ·
@@ -42,149 +39,15 @@ const kind = cfTypeOf(committee.entityId);
     )}
   </div>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    What this committee has given to sitting Wisconsin legislators, from Ethics Commission filings, counted only while each member was in office.
+    What this committee has given to sitting Wisconsin legislators, from Ethics Commission filings, with full-period receipts by default and an optional service filter.
   </p>
   <SourceStrip
     sources={[{ label: "Wisconsin Ethics Commission (CFIS)", href: "https://cfis.wi.gov" }]}
-    through={committee.last ?? null}
+    through={null}
   />
 
-  <div class="mt-4 grid max-w-3xl gap-3 sm:grid-cols-3 [&>div]:min-w-0">
-    <div class="rounded-lg border border-navy-100 bg-white p-4">
-      <p class="text-2xl font-bold">{fmtMoney(committee.total)}</p>
-      <p class="text-sm text-navy-600">
-        given across {committee.n.toLocaleString()} receipts,
-        {fmtDate(committee.first)} to {fmtDate(committee.last)}
-      </p>
-    </div>
-    <div class="rounded-lg border border-navy-100 bg-white p-4">
-      <p class="text-2xl font-bold">{committee.recipients}</p>
-      <p class="text-sm text-navy-600">sitting legislators received money while in office</p>
-    </div>
-    <div class="rounded-lg border border-navy-100 bg-white p-4">
-      <p class="mb-1 text-sm text-navy-600">given to legislators, by their party</p>
-      {byParty.map((p) => (
-        <p class="flex items-center gap-2 text-sm">
-          <PartyChip party={p.party} size="sm" decorative />
-          <span class="min-w-0 flex-1 truncate">{p.party ?? "Unknown"}</span>
-          <span class="font-semibold">{fmtMoney(p.total)}</span>
-        </p>
-      ))}
-    </div>
-  </div>
-
-  <section class="mt-6 max-w-3xl">
-    <h2 class="text-xl font-bold">Recipients</h2>
-    <div
-      class="mt-2 max-h-96 overflow-y-auto rounded-lg border border-navy-100 bg-white scroll-body"
-      role="region"
-      tabindex="0"
-      aria-label="All recipients"
-    >
-    <ol class="divide-y divide-navy-100 text-sm">
-      {recipients.map((r, i) => (
-        <li class="flex items-center gap-2 px-4 py-1.5">
-          <span class="w-6 shrink-0 text-right text-xs text-navy-600" aria-hidden="true">{i + 1}.</span>
-          <PartyChip party={r.party} size="sm" />
-          <a href={`/legislators/${personSlug(r.id)}/`} class="min-w-0 flex-1 truncate py-1 underline">
-            {r.name}
-          </a>
-          <span class="sr-only shrink-0 text-xs text-navy-600 sm:not-sr-only sm:inline">
-            {roleAbbr(r.chamber)} {r.district}
-          </span>
-          <span class="sr-only shrink-0 text-xs text-navy-600 md:not-sr-only md:inline">
-            {r.n} receipt{r.n > 1 ? "s" : ""}
-          </span>
-          <span class="w-24 shrink-0 text-right font-semibold">{fmtMoney(r.total)}</span>
-        </li>
-      ))}
-    </ol>
-    </div>
-  </section>
-
-  <p class="mt-6 max-w-3xl text-xs text-navy-600">
-    Source: Wisconsin Ethics Commission campaign finance filings, CFIS filer
-    id {committee.entityId}. Totals count receipts to sitting legislators
-    only, from each member's time in office; giving to former members,
-    challengers, or before a member took office is not shown. A committee's
-    money comes from its own contributors; a contribution is not an
-    endorsement of any particular vote.
-    <a href="/about/#money" class="underline"> Full methodology</a>
-  </p>
-
-  {own && (own.raised > 0 || own.spent > 0) && (
-    <section class="mt-8">
-      <h2 class="text-xl font-bold">This committee's own money</h2>
-      <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        What {committee.name} reported raising and spending in its own
-        filings, {own.first && own.last ? `${fmtDate(own.first)} to ${fmtDate(own.last)}` : "this biennium"}.
-        Contributions below the state's itemization threshold are reported
-        as totals, not by donor, so the lists below are its
-        <em>itemized</em> money, never every dollar.
-      </p>
-      <div class="mt-3 flex flex-wrap gap-6 rounded-lg border border-navy-100 bg-white p-4 text-sm">
-        <p><span class="block text-xs text-navy-600">Raised</span>
-          <span class="text-xl font-bold">{fmtMoney(own.raised)}</span></p>
-        <p><span class="block text-xs text-navy-600">Spent</span>
-          <span class="text-xl font-bold">{fmtMoney(own.spent)}</span></p>
-        <p><span class="block text-xs text-navy-600">Transactions</span>
-          <span class="text-xl font-bold">{own.n.toLocaleString()}</span></p>
-      </div>
-      <div class="mt-4 grid gap-6 lg:grid-cols-2">
-        {([
-          ["Largest itemized donors to it", own.donors, true],
-          ["Largest payees", own.payees, false],
-        ] as [string, typeof own.donors, boolean][]).map(([heading, rows, showType]) => rows.length > 0 && (
-          <div class="min-w-0">
-            <h3 class="font-bold">{heading} · {rows.length}</h3>
-            <div
-              class="mt-1 max-h-96 overflow-y-auto rounded-lg border border-navy-100 bg-white scroll-body"
-              role="region"
-              tabindex="0"
-              aria-label={heading}
-            >
-              <ul class="divide-y divide-navy-100 text-sm">
-                {rows.map((d) => (
-                  <li class="flex items-baseline gap-3 px-3 py-1.5">
-                    <span class="min-w-0 flex-1 truncate" title={d.name}>{d.name}</span>
-                    {showType && (
-                      <span class="hidden w-20 shrink-0 text-right text-xs text-navy-600 sm:block">
-                        {d.type ?? ""}
-                      </span>
-                    )}
-                    <span class="w-28 shrink-0 text-right font-semibold tabular-nums">
-                      {fmtMoney(d.total)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  )}
-
-  {own && own.advocacy.length > 0 && (
-    <section class="mt-8">
-      <h2 class="text-xl font-bold">Spending for and against candidates · {own.advocacy.length}</h2>
-      <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Express advocacy: money spent to support or oppose a candidate
-        independently. It never appears in that candidate's own filings.
-      </p>
-      <ul class="mt-3 space-y-1">
-        {own.advocacy.map((a) => (
-          <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
-            <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(a.date)}</span>
-            <StanceChip stance={a.stance} />
-            <span class="min-w-0 flex-1">{a.related_name ?? "(candidate not named in the filing)"}</span>
-            {a.related_office && (
-              <span class="shrink-0 text-xs text-navy-600">{a.related_office}{a.related_district ? ` ${a.related_district}` : ""}</span>
-            )}
-            <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(a.amount)}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )}
+  <MoneyFilters />
+  {moneyViews().map((view) => <div data-money-period={view.period.key} data-money-scope={view.scope} hidden={!view.isDefault}>
+    <DonorMoneyView entityId={committee.entityId} name={committee.name} view={view} />
+  </div>)}
 </Base>

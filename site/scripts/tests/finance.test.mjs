@@ -83,3 +83,68 @@ test("missing receipt coverage remains distinct from zero receipts during servic
     assert.deepEqual(result.individuals, []);
   }
 });
+
+test("full-period receipts include pre-office history without changing the service view", (t) => {
+  const db = fixture(t);
+  const history = { start: "2007-01-01", end: "2026-12-31", inOffice: 0 };
+  const full = db.moneyFor("member", history);
+  assert.equal(full.total, 18311);
+  assert.equal(full.n, 20);
+  assert.equal(full.committees.find((c) => c.entityId === 10).total, 8100);
+  assert.equal(full.quarters.reduce((total, q) => total + q.total, 0), full.total);
+  assert.equal(full.byType.reduce((total, type) => total + type.total, 0), full.total);
+  const service = db.moneyFor("member", { ...history, inOffice: 1 });
+  assert.equal(service.total, 10311);
+  assert.equal(service.n, 19, "overlapping terms must not duplicate receipts");
+  for (const person of ["outside", "no-terms"]) {
+    assert.equal(db.moneyFor(person, history).total, 2000);
+    assert.equal(db.moneyFor(person, { ...history, inOffice: 1 }).total, 0);
+  }
+  assert.equal(db.moneyFor("unlinked", history), null);
+});
+
+test("overview, profiles, and donor recipients share period and service boundaries", (t) => {
+  const db = fixture(t);
+  const current = { start: "2025-01-01", end: "2026-12-31", inOffice: 0 };
+  const overview = db.moneyOverview(current);
+  assert.equal(overview.total, 21311);
+  assert.equal(overview.total, ["member", "other", "outside", "no-terms"]
+    .reduce((total, id) => total + db.moneyFor(id, current).total, 0));
+  const donor = db.donorCommitteeFor(10, current);
+  assert.equal(donor.summary.total, donor.recipients.reduce((total, r) => total + r.total, 0));
+  assert.equal(donor.summary.total, donor.byParty.reduce((total, p) => total + p.total, 0));
+  assert.equal(db.moneyOverview({ ...current, inOffice: 1 }).total, 17311);
+  const earlier = db.moneyFor("member", { start: "2023-01-01", end: "2024-12-31", inOffice: 0 });
+  assert.equal(earlier.total, 8000);
+  assert.equal(earlier.n, 1, "the day immediately before the current period stays in the previous period");
+  const empty = db.moneyFor("member", { start: "2027-01-01", end: "2028-12-31", inOffice: 0 });
+  assert.equal(empty.n, 0);
+  assert.equal(empty.total, 0);
+  assert.deepEqual(structuredClone(empty.committees), []);
+});
+
+test("committee filings use the selected dates without a legislator service filter", (t) => {
+  const conn = new Database(":memory:");
+  t.after(() => conn.close());
+  conn.exec(schema);
+  conn.exec(`INSERT INTO cf_committees (entity_id,name,committee_type) VALUES
+    (1,'Example PAC','PAC'), (2,'Candidate committee','State Candidate');
+    INSERT INTO cf_transactions (id,filer_entity_id,direction,date,amount,other_name,stance,related_name) VALUES
+    (1,1,'INCOMING','2024-12-31',100,'Earlier donor',NULL,NULL),
+    (2,1,'INCOMING','2025-01-01',50,'Current donor',NULL,NULL),
+    (3,1,'OUTGOING','2026-12-31',20,'Current payee','FOR','Example candidate'),
+    (4,1,'OUTGOING','2027-01-01',30,'Later payee','AGAINST','Example candidate'),
+    (5,2,'OUTGOING','2025-01-01',500,'Candidate advertising','FOR','Example candidate');`);
+  const db = queries(conn);
+  const bounds = { start: "2025-01-01", end: "2026-12-31", inOffice: 1 };
+  const current = db.cfCommitteeFor(1, bounds);
+  assert.equal(current.raised, 50);
+  assert.equal(current.spent, 20);
+  assert.equal(current.n, 2);
+  assert.equal(current.donors[0].name, "Current donor");
+  assert.equal(current.payees[0].name, "Current payee");
+  assert.equal(current.advocacy.length, 1);
+  assert.equal(current.advocacy[0].date, "2026-12-31");
+  assert.equal(db.cfCommitteeFor(1).n, 4, "history remains available");
+  assert.equal(db.cfCommitteeFor(2, bounds), null, "partial candidate advertising must not stand in for total campaign money");
+});

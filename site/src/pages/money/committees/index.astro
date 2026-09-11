@@ -1,15 +1,15 @@
 ---
 import Base from "../../../layouts/Base.astro";
 import FilterBar from "../../../components/FilterBar.astro";
+import MoneyFilters from "../../../components/MoneyFilters.astro";
+import MoneyCoverage from "../../../components/MoneyCoverage.astro";
+import { moneyViews } from "../../../lib/money-periods";
 import OrgLogo from "../../../components/OrgLogo.astro";
-import { donorCommittees, cfTypeOf } from "../../../lib/db";
+import { donorCommittees, donorCommitteesFor, cfTypeOf } from "../../../lib/db";
 import { fmtMoney } from "../../../lib/format";
 
 const committees = donorCommittees();
-// chip order follows the list's own weighting, biggest group first
-// 513 of these donors never appear in the harvested registry, so their type
-// is a coverage gap, not a category. It is named as one, and sorted last
-// however large it is.
+// Larger types come first; missing registry types remain an explicit coverage gap.
 const UNKNOWN = "Type unknown";
 const typeCounts = new Map<string, number>();
 for (const c of committees) {
@@ -31,9 +31,10 @@ const typeFacets = [...typeCounts]
   <h1 class="mt-1 text-2xl font-bold">Contributing Committees</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
     Every political committee that has given at least $1,000 to sitting
-    legislators while in office, from Ethics Commission filings. Each links
-    to its full recipient list.
+    legislators in the collected history, plus retained historical profiles.
+    Amounts and recipient counts follow the selected reporting period.
   </p>
+  <MoneyFilters />
   <FilterBar
     id="committee-filter"
     statusId="committee-filter-status"
@@ -43,8 +44,13 @@ const typeFacets = [...typeCounts]
     facetLabel="Filter by the kind of committee"
     facets={typeFacets}
   />
+  {moneyViews().map((view) => {
+    const selected = donorCommitteesFor(view.bounds);
+    const dates = selected.flatMap((c) => [c.first, c.last]).filter(Boolean).sort();
+    return <div data-money-period={view.period.key} data-money-scope={view.scope} hidden={!view.isDefault}>
+      <MoneyCoverage period={view.period} first={dates[0] ?? null} last={dates.at(-1) ?? null} scope={view.scope} />
   <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
-    {committees.map((c) => (
+    {selected.map((c) => (
       <li data-committee-row data-ctype={cfTypeOf(c.entityId) ?? UNKNOWN} data-text={c.name.toLowerCase()}>
         <a href={`/money/committees/${c.entityId}/`} class="flex items-center gap-3 px-4 py-2 hover:bg-navy-50">
           <OrgLogo entityId={c.entityId} name={c.name} />
@@ -62,17 +68,31 @@ const typeFacets = [...typeCounts]
       </li>
     ))}
   </ul>
+    </div>;
+  })}
   <p id="committee-no-match" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600"></p>
 
   <script>
     import { initRowFilter } from "../../../scripts/rowFilter";
-    initRowFilter({
+    const selector = "[data-money-period]:not([hidden]) [data-committee-row]";
+    const apply = initRowFilter({
       input: "committee-filter",
-      rows: "[data-committee-row]",
+      rows: selector,
       status: "committee-filter-status",
       noMatch: "committee-no-match",
       noun: "committees",
       facetAttr: "ctype",
     });
+    const refresh = () => {
+      const rows = [...document.querySelectorAll<HTMLElement>(selector)];
+      document.querySelectorAll<HTMLButtonElement>('[data-facet-for="ctype"]').forEach((chip) => {
+        const kind = chip.dataset.facet;
+        const count = kind ? rows.filter((r) => r.dataset.ctype === kind).length : rows.length;
+        chip.textContent = `${kind || "All"} ${count.toLocaleString()}`;
+      });
+      apply();
+    };
+    document.addEventListener("money-period-change", refresh);
+    refresh();
   </script>
 </Base>

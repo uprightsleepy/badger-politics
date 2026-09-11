@@ -109,6 +109,8 @@ def build_map(db_path: Path) -> None:
             if not k.startswith("_")
         }
 
+    previous = json.loads(MAP_PATH.read_text(encoding="utf-8")) if MAP_PATH.exists() else []
+
     http = session()
     mapped, unresolved = [], []
     for person_id, name in people:
@@ -116,6 +118,10 @@ def build_map(db_path: Path) -> None:
         if override:
             if override.get("skip"):
                 continue
+            if override.get("retain_existing"):
+                mapped.extend(m for m in previous
+                              if m["person_id"] == person_id
+                              and m["entity_id"] != override["entity_id"])
             mapped.append(
                 {"person_id": person_id, "person": name,
                  "entity_id": override["entity_id"],
@@ -154,6 +160,13 @@ def build_map(db_path: Path) -> None:
             unresolved.append({"person": name, "person_id": person_id,
                                "hits": [h["name"] for h in hit_list[:5]]})
 
+    owners = {}
+    for entry in mapped:
+        entity_id = entry["entity_id"]
+        if entity_id in owners and owners[entity_id] != entry["person_id"]:
+            raise ValueError(f"CFIS committee {entity_id} maps to multiple legislators")
+        owners[entity_id] = entry["person_id"]
+    mapped = list({(m["person_id"], m["entity_id"]): m for m in mapped}.values())
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     MAP_PATH.write_text(json.dumps(mapped, indent=1), encoding="utf-8")
     print(f"mapped {len(mapped)} committees -> {MAP_PATH}")

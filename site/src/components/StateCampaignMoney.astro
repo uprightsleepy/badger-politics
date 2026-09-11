@@ -25,10 +25,11 @@ const fmtMoney = (value: number) => value.toLocaleString("en-US", {
         <dd class="mt-1 whitespace-nowrap text-xl font-bold tabular-nums sm:text-2xl">{fmtMoney(c.totals.receipts ?? 0)}</dd></div>
     </dl>
     <p class="mt-3 text-sm text-navy-600">
-      {c.totals.count.toLocaleString()} transactions collected for {c.start}–{c.end}.
+      {c.totals.count.toLocaleString()} transactions collected for the {c.cycle - 1}–{c.cycle} reporting period.
+      {c.totals.first && ` Earliest collected transaction: ${fmtDate(c.totals.first)}.`}
       {c.totals.last && ` Latest reported transaction: ${fmtDate(c.totals.last)}.`}
       Includes committee activity before the campaign announcement and any transfers or other income.
-      These totals do not establish cash on hand.
+      Filings or amendments may be missing. These totals do not establish cash on hand.
     </p>
     {c.donors.length > 0 && <details class="mt-3 text-sm">
       <summary class="cursor-pointer py-1 font-semibold">Largest reported sources of receipts</summary>
