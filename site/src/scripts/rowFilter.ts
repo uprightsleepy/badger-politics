@@ -28,7 +28,6 @@ export function initRowFilter(opts: {
   const input = document.getElementById(opts.input) as HTMLInputElement;
   const status = document.getElementById(opts.status)!;
   const noMatch = document.getElementById(opts.noMatch)!;
-  const rows = document.querySelectorAll<HTMLElement>(opts.rows);
   const chips = opts.facetAttr
     ? [
         ...document.querySelectorAll<HTMLButtonElement>(
@@ -44,6 +43,7 @@ export function initRowFilter(opts: {
   const paint = () => paintChips(chips, (chip) => (chip.dataset.facet ?? "") === facet);
 
   const apply = () => {
+    const rows = document.querySelectorAll<HTMLElement>(opts.rows);
     const q = input.value.toLowerCase();
     let shown = 0;
     rows.forEach((row) => {

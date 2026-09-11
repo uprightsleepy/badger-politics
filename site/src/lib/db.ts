@@ -3,6 +3,7 @@
 import Database from "better-sqlite3";
 import { resolve } from "node:path";
 import { OPEN_END, OPEN_START } from "./sentinels";
+import type { MoneyBounds } from "./money-periods";
 
 // Resolve from site/; the bundler may relocate this module's generated chunk.
 const DB_PATH = resolve(process.env.WI_DATABASE_PATH ?? "../data/wi.sqlite");
@@ -190,12 +191,12 @@ export const stateCampaignMoney = (campaign: StateCampaign) => {
     .all(campaign.entity_id, start, end) as { month: string }[]).map((r) => r.month) : [];
   const expected = (Number(end.slice(0, 4)) - (campaign.cycle - 1)) * 12 + Number(end.slice(5));
   const complete = expected > 0 && months.length === expected && months[0] === start && months.at(-1) === end;
-  const totals = complete ? prep(`SELECT COUNT(*) AS count, MAX(date) AS last,
+  const totals = complete ? prep(`SELECT COUNT(*) AS count, MIN(date) AS first, MAX(date) AS last,
     SUM(CASE WHEN direction='INCOMING' THEN amount ELSE 0 END) AS receipts,
     SUM(CASE WHEN direction='OUTGOING' THEN amount ELSE 0 END) AS spending
     FROM state_campaign_transactions WHERE filer_entity_id=? AND date BETWEEN ? AND ?`)
     .get(campaign.entity_id, `${start}-01`, `${end}-31`) as {
-      count: number; last: string | null; receipts: number | null; spending: number | null;
+      count: number; first: string | null; last: string | null; receipts: number | null; spending: number | null;
     } : null;
   const donors = complete ? prep(`SELECT other_entity_id, other_name AS name, SUM(amount) AS total
     FROM state_campaign_transactions WHERE filer_entity_id=? AND direction='INCOMING'
@@ -876,9 +877,9 @@ const IN_TERM = `EXISTS (
 )`;
 const WINDOWED = `(
   SELECT c.* FROM contributions c
-  WHERE ${IN_TERM} AND c.date >= @start AND c.date <= @end
+  WHERE (@inOffice = 0 OR ${IN_TERM}) AND c.date >= @start AND c.date <= @end
 ) c`;
-const NO_BOUNDS = { start: OPEN_START, end: OPEN_END };
+const NO_BOUNDS = { start: OPEN_START, end: OPEN_END, inOffice: 1 };
 
 const windowedAll = <T>(sql: string, extra: Record<string, unknown> = {}): T[] =>
   prep(sql).all({ ...NO_BOUNDS, ...extra }) as T[];
@@ -886,42 +887,41 @@ const windowedGet = <T>(sql: string, extra: Record<string, unknown> = {}): T =>
   prep(sql).get({ ...NO_BOUNDS, ...extra }) as T;
 
 // CFIS entity IDs keep distinct donors with the same name separate.
-const topDonorsFor = (person: string, fromType: "Registrant" | "Individual") =>
+const topDonorsFor = (person: string, fromType: "Registrant" | "Individual", bounds: MoneyBounds) =>
   prep(
       `SELECT from_entity_id AS entityId, MAX(from_name) AS name,
               SUM(amount) AS total, COUNT(*) AS n
-       FROM contributions c
-       WHERE c.person_id = @person AND ${IN_TERM}
+       FROM ${WINDOWED}
+       WHERE c.person_id = @person
        AND from_type = @fromType AND from_entity_id IS NOT NULL
        GROUP BY from_entity_id ORDER BY total DESC LIMIT 5`,
     )
-    .all({ person, fromType }) as { entityId: number; name: string; total: number; n: number }[];
+    .all({ ...NO_BOUNDS, ...bounds, person, fromType }) as { entityId: number; name: string; total: number; n: number }[];
 
-/** Return null without linked receipt history; otherwise summarize receipts
- * during recorded service, which may total zero. */
-export const moneyFor = (personId: string) => {
+/** Null means no linked history; a selected period may contain no receipts or net to zero. */
+export const moneyFor = (personId: string, bounds: MoneyBounds = {}) => {
   // Missing receipt history is a coverage gap, not a zero-dollar total.
   const mapped = prep("SELECT COUNT(*) AS n FROM contributions WHERE person_id = ?")
     .get(personId) as { n: number };
   if (mapped.n === 0) return null;
   const entry = officeEntryFor(personId);
-  const P = { person: personId };
+  const P = { ...NO_BOUNDS, ...bounds, person: personId };
   const summary = prep(
       `SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total,
               COALESCE(SUM(CASE WHEN from_type = 'Individual' THEN amount ELSE 0 END), 0)
                 AS individualTotal,
               MIN(date) AS first, MAX(date) AS last
-       FROM contributions c WHERE c.person_id = @person AND ${IN_TERM}`,
+       FROM ${WINDOWED} WHERE c.person_id = @person`,
     )
     .get(P) as {
       n: number; total: number; individualTotal: number;
       first: string | null; last: string | null;
     };
-  const committees = topDonorsFor(personId, "Registrant");
+  const committees = topDonorsFor(personId, "Registrant", bounds);
   const occupations = prep(
       `SELECT occupation, SUM(amount) AS total, COUNT(*) AS n
-       FROM contributions c
-       WHERE c.person_id = @person AND ${IN_TERM} AND from_type = 'Individual'
+       FROM ${WINDOWED}
+       WHERE c.person_id = @person AND from_type = 'Individual'
        AND occupation IS NOT NULL AND TRIM(occupation) != ''
        GROUP BY LOWER(TRIM(occupation)) ORDER BY total DESC LIMIT 5`,
     )
@@ -931,19 +931,19 @@ export const moneyFor = (personId: string) => {
       `SELECT substr(date, 1, 4) || '-Q' ||
               ((CAST(substr(date, 6, 2) AS INTEGER) + 2) / 3) AS q,
               SUM(amount) AS total
-       FROM contributions c
-       WHERE c.person_id = @person AND ${IN_TERM} AND date != ''
+       FROM ${WINDOWED}
+       WHERE c.person_id = @person AND date != ''
        GROUP BY q ORDER BY q`,
     )
     .all(P) as { q: string; total: number }[];
   // composition by CFIS source type, exactly as the committee reported it
   const byType = prep(
       `SELECT COALESCE(from_type, 'Other') AS type, SUM(amount) AS total, COUNT(*) AS n
-       FROM contributions c WHERE c.person_id = @person AND ${IN_TERM}
+       FROM ${WINDOWED} WHERE c.person_id = @person
        GROUP BY COALESCE(from_type, 'Other') ORDER BY total DESC`,
     )
     .all(P) as { type: string; total: number; n: number }[];
-  const individuals = topDonorsFor(personId, "Individual");
+  const individuals = topDonorsFor(personId, "Individual", bounds);
   return { ...summary, entry, committees, occupations, quarters, byType, individuals };
 };
 
@@ -979,12 +979,8 @@ const coverage = once(() => ({
     .get() as { n: number }).n,
 }));
 
-/** Statewide rollup of the same contribution data shown on profiles,
- * each member's receipts windowed to their time in office, optionally
- * intersected with an election-cycle date range. Covers only
- * legislators with a linked committee; rankings compare within that
- * covered set, never beyond it. */
-export const moneyOverview = (bounds: Record<string, string> = {}) => {
+/** The profile receipt data, grouped within the same period and service scope. */
+export const moneyOverview = (bounds: MoneyBounds = {}) => {
   const summary = windowedGet<{
     n: number; total: number; first: string | null; last: string | null;
   }>(
@@ -1004,9 +1000,7 @@ export const moneyOverview = (bounds: Record<string, string> = {}) => {
      WHERE c.from_type = 'Registrant'`,
     bounds,
   ).t;
-  const agg = Object.keys(bounds).length
-    ? windowedAll<CommitteeAgg>(COMMITTEE_AGG, bounds)
-    : committeeAggAll();
+  const agg = committeeAggFor(bounds);
   const topCommittees = [...agg].sort((a, b) => b.total - a.total).slice(0, 20);
   const widestCommittees = [...agg]
     .sort((a, b) => b.recipients - a.recipients || b.total - a.total)
@@ -1039,37 +1033,70 @@ export const moneyOverview = (bounds: Record<string, string> = {}) => {
   };
 };
 
-// the lifetime (no-bounds) aggregate is shared by the money overview's
-// Lifetime view and the donor-page set; callers never mutate it in place
-const committeeAggAll = once(() => windowedAll<CommitteeAgg>(COMMITTEE_AGG));
-
-/** Committee donors that get their own page: at least $1,000 given to
- * sitting legislators while in office. */
-export const donorCommittees = once(() =>
-  committeeAggAll()
-    .filter((c) => c.total >= 1000)
-    .sort((a, b) => b.total - a.total),
+// Share each period's donor aggregation across the overview and donor pages.
+const committeeAgg = memoBy((key: string) =>
+  windowedAll<CommitteeAgg>(COMMITTEE_AGG, JSON.parse(key)),
 );
+const committeeAggFor = (bounds: MoneyBounds = {}) =>
+  committeeAgg(JSON.stringify({ ...NO_BOUNDS, ...bounds }));
+
+/** Include full-history donors at $1,000 and retain existing donor URLs. */
+export const donorCommittees = once(() => {
+  const retained = new Set(committeeAggFor().filter((c) => c.total >= 1000).map((c) => c.entityId));
+  return committeeAggFor({ inOffice: 0 })
+    .filter((c) => c.total >= 1000 || retained.has(c.entityId))
+    .sort((a, b) => b.total - a.total);
+});
+
+export const donorCommitteesFor = (bounds: MoneyBounds) =>
+  committeeAggFor(bounds).filter((c) => hasDonorPage(c.entityId)).sort((a, b) => b.total - a.total);
 
 const donorIds = once(() => new Set(donorCommittees().map((c) => c.entityId)));
 export const hasDonorPage = (entityId: number | null): boolean =>
   entityId != null && donorIds().has(entityId);
 
-/** One committee donor's giving to sitting legislators, in-office windowed. */
-export const donorCommitteeFor = (entityId: number) => ({
-  recipients: windowedAll<{
+// Aggregate once per view instead of rescanning all receipts for every donor page.
+const donorDetails = memoBy((key: string) => {
+  const bounds = JSON.parse(key);
+  const recipients = windowedAll<{
+    entityId: number;
     id: string; name: string; party: string | null; chamber: string | null;
     district: number | null; total: number; n: number; first: string; last: string;
   }>(
-    `SELECT c.person_id AS id, p.name, p.party, p.chamber, p.district,
+    `SELECT c.from_entity_id AS entityId, c.person_id AS id, p.name, p.party, p.chamber, p.district,
             SUM(c.amount) AS total, COUNT(*) AS n,
             MIN(c.date) AS first, MAX(c.date) AS last
      FROM ${WINDOWED} JOIN people p ON p.id = c.person_id
-     WHERE c.from_entity_id = @entityId
-     GROUP BY c.person_id ORDER BY total DESC`,
-    { entityId },
-  ),
-  byParty: partyTotals("WHERE c.from_entity_id = @entityId", { entityId }),
+     WHERE c.from_entity_id IS NOT NULL AND c.from_type = 'Registrant'
+     GROUP BY c.from_entity_id, c.person_id ORDER BY total DESC`,
+    bounds,
+  );
+  const byParty = windowedAll<{
+    entityId: number; party: string | null; total: number; legislators: number;
+  }>(
+    `SELECT c.from_entity_id AS entityId, p.party, SUM(c.amount) AS total,
+            COUNT(DISTINCT c.person_id) AS legislators
+     FROM ${WINDOWED} JOIN people p ON p.id = c.person_id
+     WHERE c.from_entity_id IS NOT NULL AND c.from_type = 'Registrant'
+     GROUP BY c.from_entity_id, p.party ORDER BY total DESC`,
+    bounds,
+  );
+  const group = <T extends { entityId: number }>(rows: T[]) => {
+    const result = new Map<number, Omit<T, "entityId">[]>();
+    for (const { entityId, ...row } of rows) {
+      if (!result.has(entityId)) result.set(entityId, []);
+      result.get(entityId)!.push(row);
+    }
+    return result;
+  };
+  return { recipients: group(recipients), byParty: group(byParty) };
+});
+
+/** One committee donor's giving to today's legislators within the selected scope. */
+export const donorCommitteeFor = (entityId: number, bounds: MoneyBounds = {}) => ({
+  summary: committeeAggFor(bounds).find((c) => c.entityId === entityId) ?? null,
+  recipients: donorDetails(JSON.stringify({ ...NO_BOUNDS, ...bounds })).recipients.get(entityId) ?? [],
+  byParty: donorDetails(JSON.stringify({ ...NO_BOUNDS, ...bounds })).byParty.get(entityId) ?? [],
 });
 
 /** Committees for the directory and each committee's own page: membership,
@@ -1446,7 +1473,8 @@ export const cfTypeOf = (entityId: number | null): string | null =>
   entityId == null ? null : cfCommittees().get(entityId)?.committee_type ?? null;
 
 /** One committee's money: totals, top donors, top recipients. */
-export const cfCommitteeFor = (entityId: number) => {
+export const cfCommitteeFor = (entityId: number, bounds: MoneyBounds = {}) => {
+  const P = { start: bounds.start ?? OPEN_START, end: bounds.end ?? OPEN_END, entityId };
   const committee = prep("SELECT * FROM cf_committees WHERE entity_id = ?")
     .get(entityId) as CfCommittee | undefined;
   if (!committee) return null;
@@ -1462,8 +1490,8 @@ export const cfCommitteeFor = (entityId: number) => {
       `SELECT COALESCE(SUM(CASE WHEN direction = 'INCOMING' THEN amount END), 0) AS raised,
               COALESCE(SUM(CASE WHEN direction = 'OUTGOING' THEN amount END), 0) AS spent,
               COUNT(*) AS n, MIN(date) AS first, MAX(date) AS last
-       FROM cf_transactions WHERE filer_entity_id = ?`,
-    ).get(entityId) as {
+       FROM cf_transactions WHERE filer_entity_id = @entityId AND date >= @start AND date <= @end`,
+    ).get(P) as {
       raised: number; spent: number; n: number; first: string | null; last: string | null;
     };
   const side = (direction: "INCOMING" | "OUTGOING") =>
@@ -1471,11 +1499,11 @@ export const cfCommitteeFor = (entityId: number) => {
         `SELECT other_entity_id AS entityId, MAX(other_name) AS name,
                 MAX(other_type) AS type, SUM(amount) AS total, COUNT(*) AS n
          FROM cf_transactions
-         WHERE filer_entity_id = ? AND direction = ? AND other_name IS NOT NULL
+         WHERE filer_entity_id = @entityId AND date >= @start AND date <= @end AND direction = @direction AND other_name IS NOT NULL
          GROUP BY COALESCE(other_entity_id, other_name)
          ORDER BY total DESC LIMIT 50`,
       )
-      .all(entityId, direction) as {
+      .all({ ...P, direction }) as {
         entityId: number | null; name: string; type: string | null;
         total: number; n: number;
       }[];
@@ -1486,10 +1514,10 @@ export const cfCommitteeFor = (entityId: number) => {
     payees: side("OUTGOING"),
     advocacy: prep(
         `SELECT date, amount, stance, related_name, related_office, related_district, purpose
-         FROM cf_transactions WHERE filer_entity_id = ? AND stance IS NOT NULL
+         FROM cf_transactions WHERE filer_entity_id = @entityId AND date >= @start AND date <= @end AND stance IS NOT NULL
          AND related_name IS NOT NULL
          ORDER BY date DESC LIMIT 100`,
-      ).all(entityId) as {
+      ).all(P) as {
         date: string; amount: number; stance: string; related_name: string | null;
         related_office: string | null; related_district: string | null; purpose: string | null;
       }[],

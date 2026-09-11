@@ -181,7 +181,7 @@ jobs:
           bash ../.github/scripts/timed.sh links node scripts/links.mjs > /tmp/links.log 2>&1 &
           links_pid=$!
           browser_failed=0
-          for h in responsive a11y verify; do
+          for h in responsive a11y verify money-periods; do
             if bash ../.github/scripts/timed.sh "$h" node "scripts/$h.mjs" > "/tmp/$h.log" 2>&1; then
               echo "::group::$h passed"; tail -3 "/tmp/$h.log"; echo "::endgroup::"
             else

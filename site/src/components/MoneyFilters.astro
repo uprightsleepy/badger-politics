@@ -1,0 +1,65 @@
+---
+import { currentMoneyCycle, moneyPeriods } from "../lib/money-periods";
+interface Props { office?: boolean; }
+const { office = true } = Astro.props;
+const periods = moneyPeriods();
+---
+<div data-money-filters data-current-period={currentMoneyCycle()} class="mt-4 flex flex-wrap items-end gap-4 rounded-xl border border-navy-100 bg-white p-4">
+  <label class="flex min-w-0 flex-col gap-1 text-sm font-semibold">
+    Reporting period
+    <select data-money-period-select class="min-h-11 max-w-full rounded-lg border border-navy-600 bg-white px-3 py-2">
+      {periods.map((p) => <option value={p.key}>{p.label}</option>)}
+    </select>
+  </label>
+  {office && <label class="flex min-h-11 items-center gap-2 text-sm">
+    <input data-money-office type="checkbox" class="h-4 w-4" />
+    Only receipts while in legislative office
+  </label>}
+  <p data-money-status role="status" class="sr-only"></p>
+</div>
+<noscript><p class="mt-2 text-sm text-navy-600">The current period is shown. Enable JavaScript to select earlier periods or all available history.</p></noscript>
+<script>
+  const filters = document.querySelector<HTMLElement>("[data-money-filters]");
+  if (filters) {
+    const period = filters.querySelector<HTMLSelectElement>("[data-money-period-select]")!;
+    const office = filters.querySelector<HTMLInputElement>("[data-money-office]");
+    const status = filters.querySelector<HTMLElement>("[data-money-status]")!;
+    const options = new Set([...period.options].map((o) => o.value));
+    const current = filters.dataset.currentPeriod!;
+    const update = (push = false) => {
+      const scope = office
+        ? (office.checked ? "office" : "all")
+        : (new URLSearchParams(location.search).get("scope") === "office" ? "office" : "all");
+      document.querySelectorAll<HTMLElement>("[data-money-period]").forEach((view) => {
+        view.hidden = view.dataset.moneyPeriod !== period.value
+          || (view.dataset.moneyScope !== undefined && view.dataset.moneyScope !== scope);
+      });
+      document.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((link) => {
+        const url = new URL(link.href, location.href);
+        if (url.origin !== location.origin || !/^\/(money\/(?:committees\/(?:\d+\/)?)?|legislators\/[^/]+\/|federal\/[^/]+\/)$/.test(url.pathname)) return;
+        url.searchParams.set("period", period.value);
+        url.searchParams.set("scope", scope);
+        link.href = url.pathname + url.search + url.hash;
+      });
+      if (push) {
+        const url = new URL(location.href);
+        url.searchParams.set("period", period.value);
+        url.searchParams.set("scope", scope);
+        history.pushState(null, "", url);
+      }
+      status.textContent = `Showing ${period.selectedOptions[0].textContent}${office?.checked ? ", while in legislative office" : ""}`;
+      document.dispatchEvent(new Event("money-period-change"));
+    };
+    const restore = () => {
+      const params = new URLSearchParams(location.search);
+      const requested = params.get("period") ?? current;
+      period.value = options.has(requested) ? requested : current;
+      if (office) office.checked = params.get("scope") === "office";
+      update();
+    };
+    period.addEventListener("change", () => update(true));
+    office?.addEventListener("change", () => update(true));
+    window.addEventListener("popstate", restore);
+    restore();
+  }
+</script>

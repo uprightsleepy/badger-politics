@@ -1,0 +1,19 @@
+---
+import { fmtDate } from "../lib/format";
+import type { MoneyPeriod } from "../lib/money-periods";
+interface Props {
+  period: MoneyPeriod;
+  first: string | null;
+  last: string | null;
+  scope?: string;
+}
+const { period, first, last, scope = "all" } = Astro.props;
+---
+<p class="mt-3 text-sm text-navy-600" data-money-coverage>
+  {period.key === "all" ? "All available history." : `${fmtDate(period.start)}–${fmtDate(period.end)}.`}
+  {" "}{scope === "office" ? "Receipts during recorded legislative service only." : "Includes collected receipts before taking office."}
+  {last ? <> Latest reported transaction: <strong>{fmtDate(last)}</strong>.
+    {first && <> Earliest collected receipt in this view: {fmtDate(first)}.</>}</>
+    : <> No receipts collected for this selection. Missing records do not establish zero fundraising.</>}
+  {" "}Filings and amendments may be missing; totals cover collected records.
+</p>

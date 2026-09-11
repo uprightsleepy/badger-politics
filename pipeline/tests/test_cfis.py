@@ -89,3 +89,58 @@ def test_month_windows_run_to_each_month_last_instant() -> None:
     # a bare date bound parses as midnight and drops the last day's rows
     assert windows[0][1:] == ("2025-11-01", "2025-11-30T23:59:59")
     assert windows[1][2] == "2025-12-31T23:59:59"
+
+
+def test_curated_filer_retains_historical_mappings(tmp_path, make_db, monkeypatch):
+    from scraper import fetch_cfis
+
+    db = tmp_path / "wi.sqlite"
+    conn = make_db(db)
+    conn.execute("INSERT INTO people (id, name, current_role)"
+                 " VALUES ('p1', 'Example Member', 'Representative')")
+    conn.commit()
+    conn.close()
+    mapping = tmp_path / "committee_map.json"
+    historical = {"person_id": "p1", "person": "Example Member", "entity_id": 10,
+                  "committee": "Earlier committee", "matched": "auto"}
+    mapping.write_text(json.dumps([historical, {**historical, "entity_id": 20}]))
+    curated = tmp_path / "curated.json"
+    curated.write_text(json.dumps({"p1": {
+        "entity_id": 20, "committee": "Verified filing committee", "retain_existing": True,
+    }}))
+    monkeypatch.setattr(fetch_cfis, "MAP_PATH", mapping)
+    monkeypatch.setattr(fetch_cfis, "CURATED_PATH", curated)
+    monkeypatch.setattr(fetch_cfis, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(fetch_cfis, "load_person_details", lambda: {})
+    monkeypatch.setattr(fetch_cfis, "session", lambda: None)
+    fetch_cfis.build_map(db)
+    rows = json.loads(mapping.read_text())
+    assert len(rows) == 2
+    assert rows[0] == historical
+    assert rows[1]["entity_id"] == 20
+    assert rows[1]["committee"] == "Verified filing committee"
+    assert rows[1]["matched"] == "curated"
+
+
+def test_curated_conflicting_owner_leaves_previous_map_intact(tmp_path, make_db, monkeypatch):
+    from scraper import fetch_cfis
+
+    db = tmp_path / "wi.sqlite"
+    conn = make_db(db)
+    conn.executemany("INSERT INTO people (id, name, current_role)"
+                     " VALUES (?, ?, 'Representative')", [("p1", "First"), ("p2", "Second")])
+    conn.commit()
+    conn.close()
+    mapping = tmp_path / "committee_map.json"
+    mapping.write_text("[]")
+    curated = tmp_path / "curated.json"
+    curated.write_text(json.dumps({person: {"entity_id": 20, "committee": "Conflicting filer"}
+                                   for person in ["p1", "p2"]}))
+    monkeypatch.setattr(fetch_cfis, "MAP_PATH", mapping)
+    monkeypatch.setattr(fetch_cfis, "CURATED_PATH", curated)
+    monkeypatch.setattr(fetch_cfis, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(fetch_cfis, "load_person_details", lambda: {})
+    monkeypatch.setattr(fetch_cfis, "session", lambda: None)
+    with pytest.raises(ValueError, match="multiple legislators"):
+        fetch_cfis.build_map(db)
+    assert mapping.read_text() == "[]"

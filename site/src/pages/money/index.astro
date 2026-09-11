@@ -2,143 +2,55 @@
 import Base from "../../layouts/Base.astro";
 import SourceStrip from "../../components/SourceStrip.astro";
 import MoneyView from "../../components/MoneyView.astro";
+import MoneyFilters from "../../components/MoneyFilters.astro";
 import StateCampaignMoney from "../../components/StateCampaignMoney.astro";
 import campaigns from "../../../../pipeline/importer/state_campaigns.json";
 import { moneyOverview, stateCampaignMoney } from "../../lib/db";
-import { fmtDate } from "../../lib/format";
+import { currentMoneyCycle, moneyPeriods, moneyViews } from "../../lib/money-periods";
 
-const all = moneyOverview();
-const governors = campaigns.filter((c) => c.office === "Wisconsin governor" && c.cycle === 2026)
-  .map(stateCampaignMoney);
-const newestYear = Number((all.last ?? "2026").slice(0, 4));
-const currentCycle = newestYear % 2 ? newestYear + 1 : newestYear;
-const cycles: number[] = [];
-for (let y = currentCycle; y >= 2008; y -= 2) cycles.push(y);
-const views = [
-  { key: "all", label: "Lifetime", m: all, cycle: undefined as string | undefined },
-  ...cycles.map((y) => ({
-    key: String(y),
-    label: y === currentCycle ? `${y} (current)` : String(y),
-    m: moneyOverview({ start: `${y - 1}-01-01`, end: `${y}-12-31` }),
-    cycle: String(y),
-  })),
-];
-// recent money is what most readers came for; lifetime is one tap away
-const DEFAULT_KEY = String(currentCycle);
-const defaultView = views.find((v) => v.key === DEFAULT_KEY)!;
+const all = moneyOverview({ inOffice: 0 });
+const governors = campaigns.filter((c) => c.office === "Wisconsin governor").map(stateCampaignMoney);
+const periods = moneyPeriods();
+const current = String(currentMoneyCycle());
 ---
-
-<Base
-  title="Campaign Money"
-  description="Wisconsin governor campaign spending and receipts, plus legislative fundraising by election cycle."
->
+<Base title="Campaign Money" description="Wisconsin campaign receipts and spending by reporting period, with available history and coverage gaps.">
   <h1 class="text-2xl font-bold">Campaign Money</h1>
-  <SourceStrip
-    sources={[{ label: "Wisconsin Ethics Commission (CFIS)", href: "https://cfis.wi.gov" }]}
-    through={null}
-  />
+  <SourceStrip sources={[{ label: "Wisconsin Ethics Commission", href: "https://campaignfinance.wi.gov" }]} through={null} />
+  <MoneyFilters />
   <section id="governor-campaigns" class="mt-6" aria-labelledby="governor-money">
-    <h2 id="governor-money" class="text-xl font-bold">Governor campaigns · 2026</h2>
+    <h2 id="governor-money" class="text-xl font-bold">Governor campaigns</h2>
     <p class="mt-1 max-w-3xl text-sm text-navy-700">
-      Reported spending and receipts for Tom Tiffany and David Crowley's state campaign committees,
-      covering 2025–2026. Federal campaigns and outside-group spending are excluded.
-      These are the two campaigns tracked here, not a complete candidate list.
+      Reported spending and receipts for the state campaign committees tracked here.
+      Federal campaigns and outside-group spending are separate. This is not a complete candidate list.
+      The legislative service filter does not apply to these committees.
     </p>
-    <div class="mt-4 grid items-start gap-4 lg:grid-cols-2">
-      {governors.map((c) => <StateCampaignMoney campaign={c} title={c.candidate} />)}
-    </div>
+    {periods.map((period) => {
+      const selected = governors.filter((c) => period.key === "all" || String(c.cycle) === period.key);
+      return <div data-money-period={period.key} hidden={period.key !== current}>
+        {selected.length ? <div class="mt-4 grid items-start gap-4 lg:grid-cols-2">
+          {selected.map((c) => <StateCampaignMoney campaign={c} title={c.candidate} />)}
+        </div> : <p class="mt-3 text-sm text-navy-600">Governor campaign records have not been collected for {period.label}. This is a coverage gap.</p>}
+      </div>;
+    })}
   </section>
-
   <h2 class="mt-8 text-xl font-bold">Legislative campaigns</h2>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    The money invested in Wisconsin's sitting legislators, from Wisconsin
-    Ethics Commission filings{all.last && ` through ${fmtDate(all.last)}`}.
-    Showing the current election cycle by default; Lifetime covers
-    everything since each member took office (electronic records begin in
-    2008). <a href="/money/committees/" class="underline">Browse all contributing committees</a> ·
-    <a href="/about/#money" class="underline">How this data works</a>
+    Receipts to verified campaign committees of today's legislators. The current two-year period is shown by default,
+    including collected receipts before taking office. Select earlier periods or all available history above.
+    <a href="/money/committees/" class="underline"> Browse contributing committees</a> ·
+    <a href="/about/#money" class="underline"> How this data works</a>
   </p>
   <p class="mt-2 max-w-3xl rounded-lg border border-gold-500 bg-gold-100 px-3 py-2 text-sm">
-    Coverage note: {all.covered} of {all.sitting} sitting legislators are
-    linked to their campaign committee so far. Totals and rankings cover only
-    those {all.covered}. The rest are a coverage gap, not zero fundraising.
+    Coverage note: {all.covered} of {all.sitting} sitting legislators have collected receipt history.
+    Totals and rankings cover that subset. Missing records do not mean zero fundraising.
   </p>
-
-  <div class="mt-4 hidden flex-wrap gap-2 sm:flex" role="group" aria-label="Filter by election cycle">
-    {views.map((v) => (
-      <button
-        type="button"
-        data-cycle-btn={v.key}
-        aria-pressed={v.key === DEFAULT_KEY ? "true" : "false"}
-        class="rounded-full border border-navy-600 bg-white px-3 py-2 text-sm font-semibold
-               hover:ring-2 hover:ring-navy-600 focus-visible:ring-2 focus-visible:ring-navy-600
-               aria-pressed:border-navy-800 aria-pressed:bg-navy-800 aria-pressed:text-white"
-      >
-        {v.label}
-      </button>
-    ))}
-  </div>
-  <!-- phones get a stepper instead of eleven wrapping pills -->
-  <div class="mt-4 flex items-center gap-3 sm:hidden" role="group" aria-label="Filter by election cycle">
-    <button
-      type="button"
-      id="cycle-older"
-      aria-label="Older cycle"
-      class="rounded-lg border border-navy-600 bg-white px-4 py-2 font-bold
-             focus-visible:ring-2 focus-visible:ring-navy-600 disabled:opacity-40"
-    >←</button>
-    <span id="cycle-label" class="min-w-28 text-center text-sm font-semibold">{defaultView.label}</span>
-    <button
-      type="button"
-      id="cycle-newer"
-      aria-label="Newer cycle"
-      class="rounded-lg border border-navy-600 bg-white px-4 py-2 font-bold
-             focus-visible:ring-2 focus-visible:ring-navy-600 disabled:opacity-40"
-    >→</button>
-  </div>
-  <p id="cycle-status" role="status" class="sr-only"></p>
-
-  {views.map((v) => (
-    <div data-money-view={v.key} hidden={v.key !== DEFAULT_KEY}>
-      <MoneyView m={v.m} cycle={v.cycle} />
-    </div>
-  ))}
-
+  {moneyViews().map((view) => <div data-money-period={view.period.key} data-money-scope={view.scope} hidden={!view.isDefault}>
+    <MoneyView m={moneyOverview(view.bounds)} view={view} />
+  </div>)}
   <p class="mt-6 max-w-3xl text-xs text-navy-600">
-    Source: Wisconsin Ethics Commission campaign finance filings
-    (campaignfinance.wi.gov), refreshed nightly. Cycle views count a member's
-    receipts only after they took office; the campaign that first elected
-    them is not included. Committee donors are grouped by their registered
-    CFIS entity id, never by name matching. Individual donors are shown only
-    in aggregate.
+    Reported receipts include loans, transfers, refunds, and in-kind support; they do not establish cash on hand.
+    All available history begins no earlier than July 2008 and may have gaps.
+    Committee donors are grouped by official entity ID. Individual donors are aggregated here.
     <a href="/about/#money" class="underline"> Full methodology</a>
   </p>
-
-  <script>
-    // one selection model drives both the pill row (sm+) and the stepper
-    // (phones): views ordered newest-first, "All time" at the newest end
-    const buttons = [...document.querySelectorAll<HTMLButtonElement>("[data-cycle-btn]")];
-    const status = document.getElementById("cycle-status")!;
-    const label = document.getElementById("cycle-label")!;
-    const older = document.getElementById("cycle-older") as HTMLButtonElement;
-    const newer = document.getElementById("cycle-newer") as HTMLButtonElement;
-    let index = buttons.findIndex((b) => b.getAttribute("aria-pressed") === "true");
-
-    function select(i: number) {
-      index = i;
-      const key = buttons[i].dataset.cycleBtn!;
-      const name = buttons[i].textContent!.trim();
-      buttons.forEach((x, xi) => x.setAttribute("aria-pressed", String(xi === i)));
-      document.querySelectorAll<HTMLElement>("[data-money-view]").forEach((v) => {
-        v.hidden = v.dataset.moneyView !== key;
-      });
-      label.textContent = name;
-      older.disabled = i === buttons.length - 1;
-      newer.disabled = i === 0;
-      status.textContent = `Showing ${name}`;
-    }
-    buttons.forEach((b, i) => b.addEventListener("click", () => select(i)));
-    older.addEventListener("click", () => select(index + 1));
-    newer.addEventListener("click", () => select(index - 1));
-  </script>
 </Base>

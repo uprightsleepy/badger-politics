@@ -1,9 +1,5 @@
 ---
-/** Quarterly fundraising bars since taking office, rendered as static
- * SVG at build time. Bar width adapts to the span so the drawing keeps
- * its aspect ratio; a tick marks election quarters alongside the gold
- * fill, and a details table carries the per-quarter numbers for
- * keyboard, touch, and screen reader use. */
+/** Quarterly receipts for the selected period; terms optionally shade service gaps. */
 import { fmtMoney, monthYear } from "../lib/format";
 
 interface Props {
@@ -35,6 +31,7 @@ for (let y = startYear; y <= endYear; y++) {
   }
 }
 const max = Math.max(...series.map((d) => d.total), 1);
+const min = Math.min(...series.map((d) => d.total), 0);
 const peak = series.reduce((a, b) => (b.total > a.total ? b : a), series[0]);
 
 const GAP = 2, H = 96, PAD_TOP = 6, PAD_BOTTOM = 18;
@@ -43,9 +40,10 @@ const BAR = Math.max(3, Math.round(560 / series.length) - GAP);
 const width = series.length * (BAR + GAP) + GAP;
 const height = H + PAD_TOP + PAD_BOTTOM;
 const x = (i: number) => GAP + i * (BAR + GAP);
-const barH = (v: number) => Math.max(v > 0 ? 1.5 : 0, (v / max) * H);
+const baseline = PAD_TOP + H * max / (max - min);
+const barH = (v: number) => v === 0 ? 0 : Math.max(1.5, Math.abs(v) / (max - min) * H);
 const isElectionQ = (d: { year: number; qn: number }) => d.year % 2 === 0 && d.qn === 4;
-const label = `Quarterly fundraising since taking office, ${monthYear(entry)}: ${series.length} quarters`;
+const label = `Reported receipts by quarter from ${monthYear(entry)}: ${series.length} quarters`;
 ---
 
 {series.length > 1 && (
@@ -56,7 +54,7 @@ const label = `Quarterly fundraising since taking office, ${monthYear(entry)}: $
       role="img"
       aria-label={label}
     >
-      <line x1="0" y1={PAD_TOP + H} x2={width} y2={PAD_TOP + H} stroke="#d9e2ee" stroke-width="1" />
+      <line x1="0" y1={baseline} x2={width} y2={baseline} stroke="#d9e2ee" stroke-width="1" />
       {series.map((d, i) => (
         <>
           {!quarterServed(d.year, d.qn) ? (
@@ -65,7 +63,7 @@ const label = `Quarterly fundraising since taking office, ${monthYear(entry)}: $
             <>
               <rect
                 x={x(i)}
-                y={PAD_TOP + H - barH(d.total)}
+                y={d.total >= 0 ? baseline - barH(d.total) : baseline}
                 width={BAR}
                 height={barH(d.total)}
                 fill={isElectionQ(d) ? "#a87a1e" : "#2d4a73"}
@@ -84,7 +82,7 @@ const label = `Quarterly fundraising since taking office, ${monthYear(entry)}: $
       )}
     </svg>
     <figcaption class="mt-1 text-xs text-navy-600">
-      Receipts by quarter since taking office. Gold bars with a tick under
+      Receipts by quarter in the selected period. Gold bars with a tick under
       them are election quarters{series.some((d) => !quarterServed(d.year, d.qn)) ? "; shaded stretches are time out of office" : ""};
       peak {fmtMoney(peak.total)} in {peak.q.replace("-", " ")}.
     </figcaption>
