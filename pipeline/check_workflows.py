@@ -24,6 +24,9 @@ DEPLOY_TRIGGER = (
 DEPLOY_TARGET = "${{ inputs.target || 'badgerpolitics-dev' }}"
 
 
+POLICY_CRON = "0 19 * * *"
+PARSER_CRON = "0 20 * * *"
+
 def validate(workflow: dict, name: str) -> list[str]:
     errors = []
     permissions = workflow.get("permissions")
@@ -89,12 +92,12 @@ def validate(workflow: dict, name: str) -> list[str]:
             errors.append("nightly parser requires a fixed, non-cancelling concurrency group")
         schedules = events.get("schedule", []) if isinstance(events, dict) else []
         if schedules != [
-            {"cron": "0 23 * * *", "timezone": "America/Chicago"},
-            {"cron": "0 0 * * *", "timezone": "America/Chicago"},
+            {"cron": POLICY_CRON, "timezone": "America/Chicago"},
+            {"cron": PARSER_CRON, "timezone": "America/Chicago"},
         ]:
             errors.append("nightly parser requires separate daily policy and parser schedules")
         policies = workflow.get("jobs", {}).get("policies", {})
-        policy_trigger = "inputs.policy_only || github.event.schedule == '0 23 * * *'"
+        policy_trigger = f"inputs.policy_only || github.event.schedule == '{POLICY_CRON}'"
         if (policies.get("needs") != "validate" or policies.get("environment") != "nightly-parser"
                 or policies.get("if") != policy_trigger
                 or str(policies.get("timeout-minutes")) != "30"):
@@ -109,7 +112,7 @@ def validate(workflow: dict, name: str) -> list[str]:
                 errors.append("policies: require the lock, refresh, and unconditional release")
         legislature = workflow.get("jobs", {}).get("legislature", {})
         if legislature.get("if") != (
-            "${{ !inputs.policy_only && github.event.schedule != '0 23 * * *' }}"
+            "${{ !inputs.policy_only && github.event.schedule != '" + POLICY_CRON + "' }}"
         ):
             errors.append("legislature: must not collect records during a policy-only run")
         previous = "validate"
