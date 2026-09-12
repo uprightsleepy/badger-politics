@@ -1,5 +1,5 @@
 import PERSON_SLUGS from "../data/person-slugs.json";
-import { esc } from "./html";
+import { esc } from "./html.ts";
 
 export const STATUS_LABELS: Record<string, string> = {
   introduced: "Introduced",

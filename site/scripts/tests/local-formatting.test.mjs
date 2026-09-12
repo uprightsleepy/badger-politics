@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readFile } from "node:fs/promises";
-import ts from "typescript";
 import { recordText } from "../../src/lib/recordText.mjs";
 
 test("source HTML becomes readable text without losing words, amounts or comparisons", () => {
@@ -23,9 +21,7 @@ test("source markup is never emitted as executable HTML", () => {
 });
 
 test("glossaries omit self-evident Yes/No entries but retain useful explanations", async () => {
-  const source = await readFile(new URL('../../src/lib/localGloss.ts', import.meta.url), 'utf8');
-  const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } });
-  const { glossaryFor } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+  const { glossaryFor } = await import('../../src/lib/localGloss.ts');
   assert.deepEqual(glossaryFor([], ['Yes', 'No']), []);
   assert.deepEqual(glossaryFor(['REFERRED', 'referred', 'unreviewed action'], ['Aye', 'Nay', 'Abstain']), [
     { term: 'Referred', meaning: 'sent to a committee for review before the council decides' },

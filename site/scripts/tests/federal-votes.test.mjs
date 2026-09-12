@@ -3,11 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import Database from "better-sqlite3";
 import { queries } from "./database.mjs";
-import { moduleUrl } from "./typescript.mjs";
 
 const importer = await readFile(new URL("../../../pipeline/importer/import_federal.py", import.meta.url), "utf8");
 const schema = importer.match(/conn\.executescript\(\s*"""([\s\S]*?)"""/)[1];
-const paging = await import(moduleUrl(await readFile(new URL("../../src/lib/paging.ts", import.meta.url), "utf8")));
+const paging = await import("../../src/lib/paging.ts");
 
 function fixture(t, count = 0) {
   const reads = [];
@@ -80,7 +79,7 @@ test("vote keys use only the source ID for the member's chamber", t => {
   assert.equal(api.federalVoteKey({ ...member, chamber: "senate", lis_id: null }), null);
 });
 
-test("a new database module gets fresh results; a failed query can be retried", t => {
+test("a swapped connection gets fresh results; a failed query can be retried", t => {
   const conn = new Database(":memory:");
   t.after(() => conn.close());
   const oldSnapshot = queries(conn);
@@ -92,4 +91,6 @@ test("a new database module gets fresh results; a failed query can be retried", 
 
   const { conn: next, expected } = fixture(t, 1);
   assert.deepEqual(queries(next).federalVotesFor("S-example"), expected);
+  assert.deepEqual(oldSnapshot.federalVotesFor("S-example"), expected,
+    "results derived from the previous connection are dropped with it");
 });

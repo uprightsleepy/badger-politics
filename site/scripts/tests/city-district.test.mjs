@@ -50,7 +50,7 @@ async function setup(t, response = async () => ({ json: async () => boundaries }
     return response();
   });
   const lookup = isolatedModuleUrl(lookupSource);
-  const city = await import(isolatedModuleUrl(citySource.replace('from "./lookup"', `from ${JSON.stringify(lookup)}`)));
+  const city = await import(isolatedModuleUrl(citySource.replace('from "./lookup.ts"', `from ${JSON.stringify(lookup)}`)));
   assert.deepEqual(requests, [], "importing storage helpers must not fetch boundaries");
   assert.deepEqual(writes, [], "importing helpers must not alter saved districts");
   return { ...city, storage, values, writes, requests };

@@ -1,7 +1,7 @@
 /** The reader's saved city-council district, for addresses inside a
  * covered city (Milwaukee, West Allis). Device-only, same as the state
  * districts; this module owns the key. */
-import { cityDistrictAt } from "./lookup";
+import { cityDistrictAt } from "./lookup.ts";
 
 export type CityDistrict = { t: string; d: number };
 

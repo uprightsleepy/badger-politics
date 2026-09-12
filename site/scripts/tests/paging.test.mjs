@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { moduleUrl } from "./typescript.mjs";
-
-const source = await readFile(new URL("../../src/lib/paging.ts", import.meta.url), "utf8");
-const { yearPageStarts } = await import(moduleUrl(source));
+import { yearPageStarts } from "../../src/lib/paging.ts";
 
 test("year jumps are empty without votes", () => {
   assert.deepEqual(yearPageStarts([]), []);

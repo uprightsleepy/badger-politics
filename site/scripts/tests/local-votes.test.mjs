@@ -3,10 +3,9 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import Database from "better-sqlite3";
 import { queries } from "./database.mjs";
-import { moduleUrl } from "./typescript.mjs";
 
 const schema = await readFile(new URL("../../../pipeline/importer/schema.sql", import.meta.url), "utf8");
-const gloss = await import(moduleUrl(await readFile(new URL("../../src/lib/localGloss.ts", import.meta.url), "utf8")));
+const gloss = await import("../../src/lib/localGloss.ts");
 const vocabularies = [["old", "Aye", "No"], ["new", "Aye", "Nay"], ["civicclerk", "Yes", "No"]];
 
 function fixture(t) {

@@ -1,5 +1,5 @@
 /** Pure service-span and attendance derivations; no database access. */
-import { OPEN_END } from "./sentinels";
+import { OPEN_END } from "./sentinels.ts";
 
 export interface TermRow {
   chamber: string;
