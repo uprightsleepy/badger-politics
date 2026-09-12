@@ -267,51 +267,8 @@ def run(data_dir: Path, db_path: Path) -> int:
     import sqlite3
 
     conn = sqlite3.connect(db_path)
-    conn.executescript(
-        """
-        DROP TABLE IF EXISTS federal_vote_records;
-        DROP TABLE IF EXISTS federal_votes;
-        DROP TABLE IF EXISTS federal_members;
-        CREATE TABLE federal_members (
-            bioguide   TEXT PRIMARY KEY,
-            lis_id     TEXT,           -- senators only
-            name       TEXT NOT NULL,
-            slug       TEXT NOT NULL UNIQUE,
-            party      TEXT NOT NULL,
-            chamber    TEXT NOT NULL CHECK (chamber IN ('senate', 'house')),
-            district   INTEGER,        -- house only
-            term_start TEXT NOT NULL,
-            term_end   TEXT NOT NULL
-        );
-        CREATE TABLE federal_votes (
-            id                   TEXT PRIMARY KEY,  -- s119-2-231
-            congress             INTEGER NOT NULL,
-            session              INTEGER NOT NULL,
-            chamber              TEXT NOT NULL,
-            number               INTEGER NOT NULL,
-            date                 TEXT NOT NULL,
-            question             TEXT,
-            result               TEXT,
-            title                TEXT,
-            yeas                 INTEGER NOT NULL,
-            nays                 INTEGER NOT NULL,
-            majority_requirement TEXT,
-            document             TEXT,  -- 'S. 5271' when the vote has one
-            source_url           TEXT NOT NULL
-        );
-        CREATE TABLE federal_vote_records (
-            vote_id   TEXT NOT NULL REFERENCES federal_votes (id),
-            -- LIS id for senate rows, bioguide for house rows
-            member_id TEXT NOT NULL,
-            last_name     TEXT NOT NULL,
-            party         TEXT,
-            state         TEXT NOT NULL,
-            vote_cast     TEXT NOT NULL
-        );
-        CREATE INDEX idx_federal_records_vote ON federal_vote_records (vote_id);
-        CREATE INDEX idx_federal_records_state ON federal_vote_records (state);
-        """
-    )
+    conn.executescript("DELETE FROM federal_vote_records; DELETE FROM federal_votes;"
+                       " DELETE FROM federal_members;")
     import_roster(conn, data_dir)
     votes, records = import_votes(conn, data_dir)
     hvotes, hrecords, vacated = import_house_votes(conn, data_dir)

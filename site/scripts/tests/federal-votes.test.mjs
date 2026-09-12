@@ -4,8 +4,7 @@ import test from "node:test";
 import Database from "better-sqlite3";
 import { queries } from "./database.mjs";
 
-const importer = await readFile(new URL("../../../pipeline/importer/import_federal.py", import.meta.url), "utf8");
-const schema = importer.match(/conn\.executescript\(\s*"""([\s\S]*?)"""/)[1];
+const schema = await readFile(new URL("../../../pipeline/importer/schema.sql", import.meta.url), "utf8");
 const paging = await import("../../src/lib/paging.ts");
 
 function fixture(t, count = 0) {

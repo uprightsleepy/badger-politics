@@ -38,23 +38,8 @@ def run(cfis_dir: Path, db_path: Path) -> int:
         raise RuntimeError(f"no pac-*.json archives in {cfis_dir}")
 
     conn = sqlite3.connect(db_path)
-    # databases built before report links existed lack the two columns;
-    # add them in place rather than demanding a from-scratch rebuild
-    have = {row[1] for row in conn.execute("PRAGMA table_info(cf_transactions)")}
-    for col, kind in (("report_id", "INTEGER"), ("report_name", "TEXT")):
-        if col not in have:
-            conn.execute(f"ALTER TABLE cf_transactions ADD COLUMN {col} {kind}")
     kept = 0
     with conn:
-        conn.execute("""CREATE TABLE IF NOT EXISTS state_campaigns (
-            entity_id INTEGER PRIMARY KEY, bioguide TEXT, candidate TEXT, office TEXT,
-            cycle INTEGER, committee TEXT, source_url TEXT)""")
-        conn.execute("""CREATE TABLE IF NOT EXISTS state_campaign_coverage (
-            entity_id INTEGER, month TEXT, PRIMARY KEY(entity_id, month))""")
-        conn.execute("CREATE TABLE IF NOT EXISTS state_campaign_transactions AS"
-                     " SELECT * FROM cf_transactions WHERE 0")
-        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS state_campaign_transaction_id"
-                     " ON state_campaign_transactions(id)")
         conn.execute("DELETE FROM state_campaign_transactions")
         conn.execute("DELETE FROM state_campaign_coverage")
         conn.execute("DELETE FROM state_campaigns")

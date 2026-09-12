@@ -70,12 +70,12 @@ def test_fec_download_scope_allows_only_reviewed_summary_and_mirror():
         access.source("https://other.s3.amazonaws.com/bulk-downloads/2026/weball26.zip")
 
 
-def test_fec_failed_refresh_rolls_back_existing_data(tmp_path):
+def test_fec_failed_refresh_rolls_back_existing_data(tmp_path, make_db):
     from importer.federal_finance import fec_url
     db_path = tmp_path / "db.sqlite"
-    with sqlite3.connect(db_path) as db:
-        db.execute("CREATE TABLE federal_members (bioguide TEXT)")
-        db.execute("INSERT INTO federal_members VALUES ('T000165')")
+    with make_db(db_path) as db:
+        db.execute("INSERT INTO federal_members VALUES ('T000165', NULL, 'Example', 'example',"
+                   " 'Republican', 'house', 7, '2025-01-03', '2027-01-03')")
     row, = parse_summary(zipped(record()), {"H0WI07101": "T000165"}, 2026)
     doc = {"cycle": 2026, "source_url": fec_url(2026), "fetched_at": "2026-09-09T00:00:00Z",
            "identities": {"H0WI07101": "T000165"}, "rows": [row]}
