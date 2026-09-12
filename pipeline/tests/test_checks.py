@@ -84,6 +84,34 @@ def test_nv_all_or_none(db_path: Path, tmp_path: Path) -> None:
     assert any("v2" in f for f in failures)
 
 
+@pytest.mark.parametrize("office,district,passes", [
+    ("Supreme Court", None, True),                          # the usual shape
+    ("Circuit Court", "Marathon County Circuit Court", True),
+    (None, "State Senate, District No. 23", True),          # the race is in the district field
+    (None, None, False),                                    # no race named at all
+])
+def test_advocacy_race_may_be_named_in_either_field(
+    db_path: Path, tmp_path: Path, office, district, passes,
+) -> None:
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "INSERT INTO cf_committees (entity_id, name, committee_type)"
+        " VALUES (30614, 'Example IE Committee', 'Independent Expenditure Committee')"
+    )
+    conn.execute(
+        "INSERT INTO cf_transactions (id, filer_entity_id, filer_type, direction, date,"
+        " amount, stance, related_name, related_office, related_district)"
+        " VALUES (1, 30614, 'Independent Expenditure Committee', 'OUTGOING', '2026-09-08',"
+        " 100.0, 'FOR', 'Quinn for Senate', ?, ?)",
+        (office, district),
+    )
+    conn.commit()
+    conn.close()
+    failures = run_checks(db_path, tmp_path / "c.json")
+    named = [f for f in failures if "advocacy naming a candidate" in f]
+    assert (named == []) is passes, failures
+
+
 def test_orphan_vote_record_fails(db_path: Path, tmp_path: Path) -> None:
     conn = sqlite3.connect(db_path)
     conn.execute("DELETE FROM people WHERE id = 'p3'")

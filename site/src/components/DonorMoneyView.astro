@@ -140,8 +140,10 @@ const own = cfCommitteeFor(entityId, view.bounds);
             <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(a.date)}</span>
             <StanceChip stance={a.stance} />
             <span class="min-w-0 flex-1">{a.related_name ?? "(candidate not named in the filing)"}</span>
-            {a.related_office && (
-              <span class="shrink-0 text-xs text-navy-600">{a.related_office}{a.related_district ? ` ${a.related_district}` : ""}</span>
+            {(a.related_office || a.related_district) && (
+              <span class="shrink-0 text-xs text-navy-600">
+                {[a.related_office, a.related_district].filter(Boolean).join(" ")}
+              </span>
             )}
             <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(a.amount)}</span>
           </li>
