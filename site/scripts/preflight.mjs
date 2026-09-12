@@ -249,6 +249,27 @@ for (const p of [
 }
 if (!missingPages) pass("landing pages present");
 
+// --- pagefind attributes: Astro renders a false boolean as the string
+// "false", which Pagefind reads as "exclude entirely"; the default money
+// view once vanished from search that way ----------------------------------
+{
+  const [committee] = (await subdirs("money", "committees")) ?? [];
+  const [member] = (await subdirs("federal")) ?? [];
+  let bad = 0;
+  for (const p of [
+    "money/index.html",
+    ...(committee ? [`money/committees/${committee}/index.html`] : []),
+    ...(member ? [`federal/${member}/index.html`] : []),
+  ]) {
+    const html = await readFile(join(DIST, p), "utf-8").catch(() => "");
+    if (/data-pagefind-ignore="(?!(all|index)?")/.test(html)) {
+      fail(`${p}: data-pagefind-ignore carries a value Pagefind rejects`);
+      bad++;
+    }
+  }
+  if (!bad) pass("pagefind ignore attributes valid");
+}
+
 // --- the disclaimer is a hard rule, so assert it shipped -------------------
 const home = await readFile(join(DIST, "index.html"), "utf-8").catch(() => "");
 if (!/not affiliated with the State of Wisconsin/i.test(home)) {

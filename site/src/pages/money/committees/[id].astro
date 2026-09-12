@@ -49,7 +49,7 @@ const kind = cfTypeOf(committee.entityId);
   <MoneyFilters />
   <div data-money-views>
     {moneyViews().map((view) => (
-      <div data-money-period={view.period.key} data-money-scope={view.scope} hidden={!view.isDefault} data-pagefind-ignore={!view.isDefault}>
+      <div data-money-period={view.period.key} data-money-scope={view.scope} hidden={!view.isDefault} data-pagefind-ignore={view.isDefault ? undefined : "all"}>
         <DonorMoneyView entityId={committee.entityId} name={committee.name} view={view} />
       </div>
     ))}
