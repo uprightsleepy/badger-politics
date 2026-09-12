@@ -17,7 +17,16 @@ export function getStaticPaths() {
 }
 const { personId, view } = Astro.props;
 ---
-<meta name="robots" content="noindex" />
-<div data-money-period={view.period.key} data-money-scope={view.scope} data-pagefind-ignore>
-  <ProfileMoneyView personId={personId} view={view} />
-</div>
+{/* A document, not a bare fragment: Pagefind skips pages without a
+    data-pagefind-body element but warns on files with no <html>. */}
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+  </head>
+  <body>
+    <div data-money-period={view.period.key} data-money-scope={view.scope} data-pagefind-ignore>
+      <ProfileMoneyView personId={personId} view={view} />
+    </div>
+  </body>
+</html>
