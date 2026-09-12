@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import Database from "better-sqlite3";
 import { queries } from "./database.mjs";
+import * as council from "../../src/lib/council.ts";
 
 const schema = await readFile(new URL("../../../pipeline/importer/schema.sql", import.meta.url), "utf8");
 const gloss = await import("../../src/lib/localGloss.ts");
@@ -36,7 +37,8 @@ function fixture(t) {
       }
     }
   }
-  return { conn, api: queries(conn) };
+  // the member-scoped queries live in council.ts; the body-level ones in db.ts
+  return { conn, api: { ...queries(conn), ...council } };
 }
 
 test("council vocabularies yield identical totals without changing records or mixing cities", t => {

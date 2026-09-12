@@ -4,7 +4,8 @@ import Base from "../../../../../layouts/Base.astro";
 import Pager from "../../../../../components/Pager.astro";
 import LocalVoteRow from "../../../../../components/LocalVoteRow.astro";
 import LocalCoverageNotice from "../../../../../components/LocalCoverageNotice.astro";
-import { localBodies, localMembers, localMemberVotes, localMemberVoteYears } from "../../../../../lib/db";
+import { localBodies, localMembers } from "../../../../../lib/db";
+import { localMemberVotes, localMemberVoteYears } from "../../../../../lib/council";
 import { PER_PAGE, pageBounds, pageCount, yearPageStarts } from "../../../../../lib/paging";
 
 export function getStaticPaths() {

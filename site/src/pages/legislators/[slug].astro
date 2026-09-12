@@ -13,18 +13,13 @@ import {
   people,
   personVotes,
   personVoteCount,
-  personSponsorships,
-  electionFor,
-  chamberVoteDays,
-  personVoteDays,
-  termsFor,
-  partyAgreement,
   electionHistoryFor,
   personIdByName,
   partyBreaks,
   keyVotesFor,
   committeesFor,
 } from "../../lib/db";
+import { legislatorProfile } from "../../lib/legislator";
 import {
   COMPENSATION,
   personSlug,
@@ -38,7 +33,6 @@ import {
   STATUS_LABELS,
   STATUS_STYLES,
 } from "../../lib/format";
-import { mergeServiceSpans, buildHeatDays, attendanceTotals } from "../../lib/service";
 
 export function getStaticPaths() {
   return people().map((p) => ({
@@ -53,68 +47,16 @@ const { person } = Astro.props;
 const PREVIEW = 50;
 const votes = personVotes(person.id, 200);
 const voteTotal = personVoteCount(person.id);
-const sponsorships = personSponsorships(person.id);
 const recordBase = `/legislators/${personSlug(person.id)}`;
-const election = electionFor(person.id);
-const sitting = person.current_role === "Representative" || person.current_role === "Senator";
-const opponents = election?.opponents.filter((o) => o.ballot_status !== "Deny") ?? [];
-
-// Attendance heatmap: a chamber's voting day counts only when it falls
-// inside one of this person's recorded service terms for that chamber.
-// Recalls and resignations end terms mid-biennium; out-of-office gaps
-// (e.g. between a recall and a comeback) never show as missed votes.
-const terms = termsFor(person.id);
-const serviceSpans = mergeServiceSpans(terms);
-
-const mine = personVoteDays(person.id);
-const heatDays = buildHeatDays(terms, mine, chamberVoteDays());
-const heatYears = [...new Set(heatDays.map((d) => Number(d.date.slice(0, 4))))].sort(
-  (a, b) => b - a,
-);
-// header stats count only days in office; out-of-office days are never missed
-const servedHeatDays = heatDays.filter((d) => d.served !== false);
-const { total: votesTotal, missed: missedTotal } = attendanceTotals(heatDays);
-
-// years with any in-office voting day get a tile strip; runs of fully
-// out-of-office years collapse into one row that names the event that
-// opened the gap (a recall, a resignation) with its reference
-const servedYears = new Set(servedHeatDays.map((d) => Number(d.date.slice(0, 4))));
-type AttendanceBlock =
-  | { kind: "year"; year: number }
-  | { kind: "gap"; from: number; to: number; label: string | null; url: string | null };
-const attendanceBlocks: AttendanceBlock[] = [];
-for (const year of heatYears) {
-  if (servedYears.has(year)) {
-    attendanceBlocks.push({ kind: "year", year });
-    continue;
-  }
-  const prev = attendanceBlocks[attendanceBlocks.length - 1];
-  if (prev?.kind === "gap" && prev.from === year + 1) {
-    prev.from = year; // heatYears descends, so the run extends downward
-    continue;
-  }
-  const cause = [...serviceSpans]
-    .filter((s) => s.end && s.end <= `${year + 1}-01-01`)
-    .sort((a, b) => (a.end! < b.end! ? 1 : -1))[0];
-  attendanceBlocks.push({
-    kind: "gap", from: year, to: year,
-    label: cause?.end_label ?? null, url: cause?.end_url ?? null,
-  });
-}
-const openYears = new Set(
-  attendanceBlocks.filter((b) => b.kind === "year").slice(0, 2).map((b) => b.year),
-);
-
-// Running tally of their sponsored bills by stage; counts recompute from
-// live statuses every nightly rebuild, so they track bills through stages.
-const agreement = partyAgreement(person.id, person.party);
+const {
+  sitting, serviceSpans, heatDays, attendance, agreement, loyalty, authorship, election,
+  opponents, ballot,
+} = legislatorProfile(person);
+const { total: votesTotal, missed: missedTotal, blocks: attendanceBlocks, openYears } = attendance;
+const { led: primarySponsored, coauthored, cosponsored, tally } = authorship;
 const breaks = partyBreaks(person.id, person.party);
 const keyVotes = keyVotesFor(person.id);
 const committees = committeesFor(person.id);
-// agreement is per session, newest first, and a special session can hold a
-// single vote: taking [0] blindly reported "0%" off one roll call. Use the
-// newest session with a real sample, and say which one it is.
-const loyalty = agreement.find((a) => a.n >= 20) ?? null;
 // Only link to sections this member actually has. Money renders for
 // sitting members, key votes and attendance only where there are any, and
 // linking to a heading that was never rendered leaves a dead fragment.
@@ -122,7 +64,7 @@ const jumpLinks: [string, string][] = [
   ["#bills-led", "Bills they led"],
   ...(keyVotes.length > 0 ? [["#key-votes", "Key votes"] as [string, string]] : []),
   ...(sitting ? [["#money", "Campaign money"] as [string, string]] : []),
-  ...(heatYears.length > 0 ? [["#attendance", "Attendance"] as [string, string]] : []),
+  ...(attendanceBlocks.length > 0 ? [["#attendance", "Attendance"] as [string, string]] : []),
   ["#vote-history", "Vote history"],
 ];
 const KEY_VOTE_STYLES: Record<string, string> = {
@@ -130,35 +72,15 @@ const KEY_VOTE_STYLES: Record<string, string> = {
   "close vote": "bg-gold-100 text-navy-900",
   "veto override": "bg-badger-50 text-badger-700",
 };
-// composition legend: CFIS source types, exactly as committees report them
 const partyPlural = person.party === "Democratic" ? "Democrats" : "Republicans";
 const history = sitting ? electionHistoryFor(person.chamber, person.district) : [];
 const surname = person.name.split(" ").pop()!.toLowerCase();
-// Wisconsin's three roles: the first name on a bill is its lead author,
-// same-house signers are coauthors, other-house signers are cosponsors
-const primarySponsored = sponsorships.filter((s) => s.role === "lead");
-const coauthored = sponsorships.filter((s) => s.role === "coauthor");
-const cosponsored = sponsorships.filter((s) => s.role === "cosponsor");
 const signedOn: [string, typeof coauthored, string][] = [
   ["Coauthored", coauthored,
    `Bills led by another member of the ${chamberName(person.chamber)} that ${person.name} signed onto.`],
   ["Cosponsored", cosponsored,
    `Bills from the other house that ${person.name} signed onto.`],
 ];
-const TALLY_ORDER = [
-  "enacted",
-  "adopted",
-  "vetoed",
-  "passed",
-  "passed_chamber",
-  "in_committee",
-  "introduced",
-  "failed_sjr1",
-];
-const tally = TALLY_ORDER.map((status) => ({
-  status,
-  bills: primarySponsored.filter((s) => s.status === status),
-})).filter((t) => t.bills.length > 0);
 ---
 
 <Base
@@ -220,7 +142,7 @@ const tally = TALLY_ORDER.map((status) => ({
         <dd class="mt-0.5 text-xl font-bold tabular-nums">
           {primarySponsored.length.toLocaleString()}
           <span class="text-sm font-normal text-navy-600">
-            {" "}· {tally.find((t) => t.status === "enacted")?.bills.length ?? 0} became law
+            {" "}· {authorship.enacted} became law
           </span>
         </dd>
       </div>
@@ -322,14 +244,14 @@ const tally = TALLY_ORDER.map((status) => ({
         {sitting && election && (
           <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
             <h2 class="font-bold">Up for reelection: Nov {election.cycle_year}</h2>
-            {election.on_ballot === 1 && <p class="mt-1">On the ballot ✓</p>}
-            {election.on_ballot === 0 && (
+            {ballot.kind === "on-ballot" && <p class="mt-1">On the ballot ✓</p>}
+            {ballot.kind === "not-running" && (
               <p class="mt-1 font-semibold text-badger-700">Not running (retiring)</p>
             )}
-            {election.on_ballot == null && <p class="mt-1">Candidate list pending</p>}
+            {ballot.kind === "pending" && <p class="mt-1">Candidate list pending</p>}
             {opponents.length > 0 && (
               <p class="mt-1">
-                {election.on_ballot === 0 ? "Candidates" : "Challengers"}:{" "}
+                {ballot.kind === "on-ballot" ? "Challengers" : "Candidates"}:{" "}
                 {opponents.map((o, i) => {
                   const pid = personIdByName(o.name);
                   return (
@@ -346,7 +268,7 @@ const tally = TALLY_ORDER.map((status) => ({
                 })}
               </p>
             )}
-            {election.on_ballot === 1 && opponents.length === 0 && (
+            {ballot.kind === "on-ballot" && opponents.length === 0 && (
               <p class="mt-1">No opponents have qualified so far.</p>
             )}
             <p class="mt-1 text-xs text-navy-600">
@@ -437,9 +359,9 @@ const tally = TALLY_ORDER.map((status) => ({
         {primarySponsored.length > 0 && (
           <p class="mt-1 text-sm text-navy-600">
             Of the {primarySponsored.length} bills they led:
-            {" "}{primarySponsored.filter((s) => s.status === "enacted").length} became law,
-            {" "}{primarySponsored.filter((s) => s.status === "vetoed").length} were vetoed,
-            {" "}{primarySponsored.filter((s) => s.died_without_hearing === 1).length} died
+            {" "}{authorship.enacted} became law,
+            {" "}{authorship.vetoed} were vetoed,
+            {" "}{authorship.noHearing} died
             without a public hearing. Statuses come from each bill's official history.
           </p>
         )}
@@ -622,13 +544,13 @@ const tally = TALLY_ORDER.map((status) => ({
         </section>
       )}
 
-      {heatYears.length > 0 && (
+      {attendanceBlocks.length > 0 && (
         <section class="mt-6">
           <h2 id="attendance" class="scroll-mt-4 text-xl font-bold">Floor attendance</h2>
           <p class="mt-1 text-sm text-navy-600">
             Only days the chamber held recorded floor votes are shown, on
             every tile below, they either voted or missed:
-            {votesTotal.toLocaleString()} votes across {servedHeatDays.length} voting days,
+            {votesTotal.toLocaleString()} votes across {attendance.days} voting days,
             {missedTotal > 0 ? `${missedTotal} missed` : "none missed"}.
           </p>
           <div class="mt-1 flex flex-wrap items-center gap-3 text-xs text-navy-600">

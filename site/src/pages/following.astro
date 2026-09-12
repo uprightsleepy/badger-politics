@@ -116,7 +116,7 @@ import Base from "../layouts/Base.astro";
         : [];
       return row(false,
         `<a href="/elections/2026/${esc(id)}/" class="min-w-0 flex-1 truncate py-1 font-semibold underline">${esc(seatName(id))}</a>
-         ${r && !r.incumbentRunning ? `<span class="shrink-0 rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">open seat</span>` : ""}
+         ${r?.incumbentStatus === "not-running" ? `<span class="shrink-0 rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">open seat</span>` : ""}
          ${names.length ? `<span class="min-w-0 flex-1 truncate text-xs text-navy-600">${esc(names.join(", "))}</span>` : ""}
          ${unfollow("races", id)}`);
     }

@@ -20,6 +20,7 @@ import Portrait from "../../../components/Portrait.astro";
 import DistrictMap from "../../../components/DistrictMap.astro";
 import { sittingPeople, electionFor, electionHistoryFor, lastMarginFor, personIdByName } from "../../../lib/db";
 import { chamberName, personSlug } from "../../../lib/format";
+import { ballotStatus } from "../../../lib/ballot";
 
 export function getStaticPaths() {
   return sittingPeople()
@@ -41,8 +42,11 @@ const margin = lastMarginFor(person.chamber, person.district);
 
 const approved = election.opponents.filter((o) => o.ballot_status === "Approve");
 const pending = election.opponents.length - approved.length;
-const running = election.on_ballot === 1;
-const open = !running;
+const ballot = ballotStatus(election);
+const running = ballot.kind === "on-ballot";
+const open = ballot.kind === "not-running";
+// no status posted yet: neither a matchup nor an open seat
+const statusPending = ballot.kind === "pending";
 
 // certified 2026 rows appear here after the canvass; until then the
 // section simply doesn't exist
@@ -55,7 +59,9 @@ const pct = (votes: number, total: number | null) =>
 const candidateCount = (running ? 1 : 0) + approved.length;
 const description =
   `${seatName} in Wisconsin's November 3, 2026 election: ` +
-  (open ? `open seat (${person.name} is not running)` : `${person.name} runs for reelection`) +
+  (open ? `open seat (${person.name} is not running)`
+    : running ? `${person.name} runs for reelection`
+    : `${person.name}'s ballot status not yet posted`) +
   `, ${candidateCount} approved candidate${candidateCount === 1 ? "" : "s"}, and official past results.`;
 ---
 
@@ -115,13 +121,18 @@ const description =
 
   <div class="mt-4 grid gap-4 lg:grid-cols-[1fr_240px]">
     <section>
-      <h2 class="text-xl font-bold">{open ? "Candidates" : "The matchup"}</h2>
+      <h2 class="text-xl font-bold">{running ? "The matchup" : "Candidates"}</h2>
       {open && (
         <p class="mt-1 text-sm text-navy-700">
           {person.name} is not running, so this seat changes hands.
           <a href={`/legislators/${personSlug(person.id)}/`} class="ml-1 underline">
             {person.name}'s record &rarr;
           </a>
+        </p>
+      )}
+      {statusPending && (
+        <p class="mt-1 text-sm text-navy-700">
+          The Elections Commission has not yet posted whether {person.name} is running.
         </p>
       )}
       <ul class="mt-3 grid gap-3 sm:grid-cols-2">
