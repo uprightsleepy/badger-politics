@@ -6,9 +6,10 @@ from datetime import date
 
 import pytest
 
+from importer.federal_finance import STATE_CAMPAIGNS
 from importer.import_cf_committees import run as import_committees
 from importer.import_cfis import run as import_receipts
-from nightly.finance import merge_months, months_for
+from nightly.finance import coverage_gaps, merge_months, months_for
 from scraper import cfis_api
 from scraper import fetch_cf_committees as collector
 
@@ -174,3 +175,20 @@ def test_receipt_refresh_and_audit_use_frozen_date(tmp_path, monkeypatch):
     audited.clear()
     fetch_cfis.audit_archives(3, date(2025, 2, 28))
     assert audited == expected and len(audited) == 3
+
+
+def test_campaign_coverage_gaps_always_join_the_plan(tmp_path):
+    months = [f"2025-{m:02}" for m in range(1, 13)] + ["2026-01"]
+    first, second = list(STATE_CAMPAIGNS)[:2]
+    write(tmp_path / "committees.json", [
+        {"entity_id": first, "name": "Complete", "campaign_months": months},
+        {"entity_id": second, "name": "Curated late", "campaign_months": ["2025-12", "2026-01"]},
+    ])
+    as_of = date(2026, 1, 1)
+    gaps = coverage_gaps(tmp_path, as_of)
+    assert gaps == months[:11], "every month the late campaign was never scanned for"
+    plan = months_for({"finance_as_of": "2026-01-01", "finance_backfill": gaps})
+    assert set(gaps) <= set(plan) and plan[-2:] == ["2025-12", "2026-01"]
+    assert months_for({"finance_as_of": "2026-01-01", "finance_backfill": ["2031-01"]}) == \
+        months_for({"finance_as_of": "2026-01-01"}), "a month outside the window is ignored"
+    assert coverage_gaps(tmp_path / "absent", as_of) == months, "no registry: nothing verified"
