@@ -3,9 +3,9 @@
  * the printed form resolves to exactly one member of the right chamber
  * in that session (the title before the name run fixes the chamber).
  * Ambiguous or unknown names stay plain text. */
-import { sessionNameIndex } from "./db";
-import { personSlug } from "./format";
-import { esc } from "./html";
+import { sessionNameIndex } from "./db.ts";
+import { personSlug } from "./format.ts";
+import { esc } from "./html.ts";
 
 const TITLE_RE = /\b(Representative|Senator)s?\s+/g;
 // one printed name: optional initial, then one or two capitalized words

@@ -1,51 +1,8 @@
 /** Build-time SQLite access. BUILD_SESSIONS selects session IDs, defaults
  * to the current biennium, or accepts `all` for the complete history. */
-import Database from "better-sqlite3";
-import { resolve } from "node:path";
-import { OPEN_END, OPEN_START } from "./sentinels";
-import type { MoneyBounds } from "./money-periods";
-
-// Resolve from site/; the bundler may relocate this module's generated chunk.
-const DB_PATH = resolve(process.env.WI_DATABASE_PATH ?? "../data/wi.sqlite");
-const db = new Database(DB_PATH, { readonly: true, fileMustExist: true });
-
-// Reuse prepared statements throughout the build.
-const _stmts = new Map<string, Database.Statement>();
-const prep = (sql: string): Database.Statement => {
-  let s = _stmts.get(sql);
-  if (!s) {
-    s = db.prepare(sql);
-    _stmts.set(sql, s);
-  }
-  return s;
-};
-
-/** The database is immutable during a build, so pages can share derived results. */
-const once = <T>(compute: () => T): (() => T) => {
-  let value: T;
-  let done = false;
-  return () => {
-    if (!done) {
-      value = compute();
-      done = true;
-    }
-    return value;
-  };
-};
-const memoBy = <K, V>(compute: (key: K) => V): ((key: K) => V) => {
-  const cache = new Map<K, V>();
-  return (key) => {
-    if (!cache.has(key)) cache.set(key, compute(key));
-    return cache.get(key)!;
-  };
-};
-
-/** Enrichment tables are absent from older snapshots; their readers
- * degrade to "nothing" rather than failing the build. */
-const hasTable = memoBy(
-  (name: string) =>
-    !!prep("SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name=?").get(name),
-);
+import { hasTable, memoBy, once, prep } from "./connection.ts";
+import { OPEN_END, OPEN_START } from "./sentinels.ts";
+import type { MoneyBounds } from "./money-periods.ts";
 
 export interface Session {
   id: string;

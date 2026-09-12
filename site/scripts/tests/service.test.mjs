@@ -1,13 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { moduleUrl } from "./typescript.mjs";
-
-const sentinels = moduleUrl(await readFile(new URL("../../src/lib/sentinels.ts", import.meta.url), "utf8"));
-const source = await readFile(new URL("../../src/lib/service.ts", import.meta.url), "utf8");
-const { attendanceTotals, buildHeatDays } = await import(moduleUrl(
-  source.replace('from "./sentinels"', `from ${JSON.stringify(sentinels)}`),
-));
+import { attendanceTotals, buildHeatDays } from "../../src/lib/service.ts";
 
 const term = (chamber, start, end = null) => ({
   chamber, start, end, district: 1, end_label: null, end_url: null,

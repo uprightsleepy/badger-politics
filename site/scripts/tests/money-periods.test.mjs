@@ -1,13 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-import vm from "node:vm";
-import { compile } from "./typescript.mjs";
-
-const module = { exports: {} };
-const source = await readFile(new URL("../../src/lib/money-periods.ts", import.meta.url), "utf8");
-vm.runInNewContext(compile(source, { commonJS: true }), { exports: module.exports });
-const { currentMoneyCycle, moneyPeriods, moneyViews } = module.exports;
+import { currentMoneyCycle, moneyPeriods, moneyViews } from "../../src/lib/money-periods.ts";
 
 test("current reporting period changes at the Central calendar boundary, independently of source freshness", () => {
   assert.equal(currentMoneyCycle(new Date("2027-01-01T05:59:59Z")), 2026);

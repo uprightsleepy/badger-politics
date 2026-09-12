@@ -10,7 +10,7 @@
     "build:logos": "node scripts/fetch-logos.mjs",
     "build:astro": "astro build",
     "build:search": "pagefind --site dist",
-    "test:harness": "node --test scripts/tests/*.test.mjs"
+    "test:harness": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test scripts/tests/*.test.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "3.7.3",

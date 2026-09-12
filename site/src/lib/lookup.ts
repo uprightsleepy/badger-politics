@@ -10,7 +10,7 @@
  * Nothing is stored anywhere but this browser.
  */
 
-import type { District } from "./district";
+import type { District } from "./district.ts";
 export type { District };
 
 let boundaries: { features: { geometry: unknown; properties: District }[] } | null = null;
