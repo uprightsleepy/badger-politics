@@ -11,18 +11,25 @@ month; `audit` refreshes older months. Both accept --as-of YYYY-MM-DD.
 
 from __future__ import annotations
 
+import argparse
 import json
 import sqlite3
 import sys
-import time
 import unicodedata
 from datetime import date
 from pathlib import Path
 
 import requests
 
-from scraper.cfis_api import DELAY, PAGE, call, month_windows, transaction_count, transaction_pages
-from scraper.http import session
+from importer.roster import load_curation
+from scraper.cfis_api import (
+    call,
+    month_windows,
+    transaction_count,
+    transaction_pages,
+    verified,
+)
+from scraper.http import save_json, session
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "cfis"
 CURATED_PATH = (
@@ -104,21 +111,8 @@ def build_map(db_path: Path) -> None:
     conn.close()
     person_details = load_person_details()
 
-    curated = {}
-    if CURATED_PATH.exists():
-        curated = {
-            k: v
-            for k, v in json.loads(CURATED_PATH.read_text(encoding="utf-8")).items()
-            if not k.startswith("_")
-        }
-
-    retained = {}
-    if RETAINED_PATH.exists():
-        retained = {
-            k: v
-            for k, v in json.loads(RETAINED_PATH.read_text(encoding="utf-8")).items()
-            if not k.startswith("_")
-        }
+    curated = load_curation(CURATED_PATH) if CURATED_PATH.exists() else {}
+    retained = load_curation(RETAINED_PATH) if RETAINED_PATH.exists() else {}
 
     http = session()
     cache_path = DATA_DIR / "search_cache.json"
@@ -168,7 +162,6 @@ def build_map(db_path: Path) -> None:
                 )
                 cache[query] = {"fetched": today.isoformat(),
                                 "hits": hits if isinstance(hits, list) else hits.get("results", [])}
-                time.sleep(DELAY)
             for h in cache[query]["hits"]:
                 if h["id"] not in seen_ids:
                     seen_ids.add(h["id"])
@@ -199,8 +192,8 @@ def build_map(db_path: Path) -> None:
         owners[entity_id] = entry["person_id"]
     mapped = list({(m["person_id"], m["entity_id"]): m for m in mapped}.values())
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(json.dumps(cache), encoding="utf-8")
-    MAP_PATH.write_text(json.dumps(mapped, indent=1), encoding="utf-8")
+    save_json(cache_path, cache)
+    save_json(MAP_PATH, mapped)
     print(f"mapped {len(mapped)} committees -> {MAP_PATH}")
     # coverage gap, not misattribution risk: warn and continue
     for u in unresolved:
@@ -252,27 +245,11 @@ def fetch_window(
     return rows, skip, expected, seen_ids
 
 
-def _fetch_with_retries(
-    http: requests.Session, committee_ids: dict, first: str, last: str,
-    label: str, attempts: int,
-) -> tuple[list[dict], int, int, set, bool]:
-    """Retake incomplete windows; smaller pages recover inconsistent small listings."""
-    page_size = PAGE
-    for attempt in range(attempts):
-        rows, skip, expected, seen_ids = fetch_window(
-            http, committee_ids, first, last, page_size=page_size,
-        )
-        if skip == expected == len(seen_ids):
-            if attempt:
-                expected = transaction_count(http, first, last)
-            if skip == expected:
-                return rows, skip, expected, seen_ids, True
-        if attempt < attempts - 1:
-            print(f"{label}: incomplete listing ({skip} rows, {len(seen_ids)} unique,"
-                  f" expected {expected}), retaking")
-            page_size = min(PAGE, 100) if expected <= PAGE else PAGE
-            time.sleep(5)
-    return rows, skip, expected, seen_ids, False
+def verified_window(http, committee_ids: dict, first: str, last: str, label: str):
+    """Receipts for one window once the listing is verified complete."""
+    return verified(http, first, last,
+                    lambda size: fetch_window(http, committee_ids, first, last, page_size=size),
+                    label)
 
 
 def fetch_transactions(since: str, as_of: date | None = None) -> None:
@@ -286,17 +263,9 @@ def fetch_transactions(since: str, as_of: date | None = None) -> None:
         out = DATA_DIR / f"tx-{label}.json"
         if out.exists() and label not in refresh:
             continue
-        rows, skip, expected, seen_ids, matched = _fetch_with_retries(
-            http, committee_ids, first, last, label, attempts=3,
-        )
-        if not matched:
-            raise RuntimeError(
-                f"CFIS drift: {label} paged {skip} rows"
-                f" ({len(seen_ids)} unique) but count said {expected}"
-            )
-        out.write_text(json.dumps(rows, indent=0), encoding="utf-8")
+        rows, skip = verified_window(http, committee_ids, first, last, label)
+        save_json(out, rows)
         print(f"{label}: {skip} scanned, {len(rows)} receipts kept -> {out.name}")
-        time.sleep(DELAY)
 
 
 def audit_archives(sample: int, as_of: date | None = None) -> None:
@@ -316,14 +285,7 @@ def audit_archives(sample: int, as_of: date | None = None) -> None:
     picks = [archived[(offset + i) % len(archived)] for i in range(min(sample, len(archived)))]
     drifted = 0
     for label, first, last in picks:
-        rows, skip, expected, seen_ids, matched = _fetch_with_retries(
-            http, committee_ids, first, last, f"audit {label}", attempts=3,
-        )
-        if not matched:
-            raise RuntimeError(
-                f"CFIS drift: audit {label} paged {skip} rows"
-                f" ({len(seen_ids)} unique) but count said {expected}"
-            )
+        rows, _ = verified_window(http, committee_ids, first, last, f"audit {label}")
         out = DATA_DIR / f"tx-{label}.json"
         old = json.loads(out.read_text(encoding="utf-8"))
         if old == rows:
@@ -337,29 +299,28 @@ def audit_archives(sample: int, as_of: date | None = None) -> None:
             f"+{len(new_ids - old_ids)} added, -{len(old_ids - new_ids)} removed); "
             "archive refreshed"
         )
-        out.write_text(json.dumps(rows, indent=0), encoding="utf-8")
-        time.sleep(DELAY)
+        save_json(out, rows)
     print(f"audit: {len(picks)} months sampled, {drifted} refreshed")
 
 
 def main(argv: list[str]) -> int:
-    if not argv:
-        print(__doc__, file=sys.stderr)
-        return 2
-    as_of = date.fromisoformat(argv[argv.index("--as-of") + 1]) if "--as-of" in argv else None
-    if argv[0] == "map":
-        build_map(Path(argv[1]))
-        return 0
-    if argv[0] == "transactions":
-        since = argv[argv.index("--since") + 1] if "--since" in argv else "2025-01"
-        fetch_transactions(since, as_of)
-        return 0
-    if argv[0] == "audit":
-        sample = int(argv[argv.index("--sample") + 1]) if "--sample" in argv else 3
-        audit_archives(sample, as_of)
-        return 0
-    print(f"unknown command {argv[0]!r}", file=sys.stderr)
-    return 2
+    ap = argparse.ArgumentParser(description=__doc__)
+    sub = ap.add_subparsers(dest="command", required=True)
+    sub.add_parser("map").add_argument("db", type=Path)
+    transactions = sub.add_parser("transactions")
+    transactions.add_argument("--since", default="2025-01")
+    audit = sub.add_parser("audit")
+    audit.add_argument("--sample", type=int, default=3)
+    for parser in (transactions, audit):
+        parser.add_argument("--as-of", type=date.fromisoformat)
+    ns = ap.parse_args(argv)
+    if ns.command == "map":
+        build_map(ns.db)
+    elif ns.command == "transactions":
+        fetch_transactions(ns.since, ns.as_of)
+    else:
+        audit_archives(ns.sample, ns.as_of)
+    return 0
 
 
 if __name__ == "__main__":

@@ -67,14 +67,6 @@ def scrape_sources(scrape_dirs: list[Path]) -> dict[tuple[str, str], str]:
 
 def enrich(db_path: Path, scrape_dirs: list[Path], limit: int | None, delay: float) -> int:
     conn = sqlite3.connect(db_path)
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS bill_companions (
-             bill_id           TEXT NOT NULL REFERENCES bills (id),
-             companion_bill_id TEXT NOT NULL REFERENCES bills (id),
-             source_url        TEXT NOT NULL,  -- the page that declared the edge
-             UNIQUE (bill_id, companion_bill_id)
-           )"""
-    )
     conn.execute("DELETE FROM bill_companions")
 
     urls = scrape_sources(scrape_dirs)

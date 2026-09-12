@@ -12,6 +12,8 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from importer.roster import OPEN_END
+
 TOLERANCE_FRACTION = 0.02  # allow a 2% dip (e.g. scraper-side dedupe changes)
 
 
@@ -189,7 +191,7 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             " JOIN vote_events e ON e.id = r.vote_event_id"
             " WHERE e.date IS NOT NULL AND NOT EXISTS ("
             "   SELECT 1 FROM person_terms t WHERE t.person_id = r.person_id"
-            "   AND e.date >= t.start AND e.date <= COALESCE(t.end, '9999'))"  # roster.OPEN_END
+            f"   AND e.date >= t.start AND e.date <= COALESCE(t.end, '{OPEN_END}'))"
         ),
         "person_terms -> people": (
             "SELECT COUNT(*) FROM person_terms t"
@@ -238,13 +240,11 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
 
 
 def check_federal(conn: sqlite3.Connection) -> list[str]:
-    """Federal tables are an enrichment; when present they must hold the
-    same invariants the importer enforced: stated tallies equal counted
-    positions, and every Senate vote carries exactly two WI senators."""
-    has = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='federal_votes'"
-    ).fetchone()
-    if not has:
+    """Federal tables must hold the invariants the importer enforced: stated
+    tallies equal counted positions, and every Senate vote carries exactly
+    two WI senators."""
+    # nothing imported yet (an older snapshot): nothing to hold to account
+    if not conn.execute("SELECT 1 FROM federal_members").fetchone():
         return []
     failures = []
     # senate rows hold the full chamber, so tallies can be recounted; house
@@ -275,14 +275,11 @@ def check_federal(conn: sqlite3.Connection) -> list[str]:
 
 
 def check_local(conn: sqlite3.Connection) -> list[str]:
-    """Local council votes are an enrichment; when the tables are present
-    they must hold what the importer promised: every vote traces to the
-    tenant's own member id and vocabulary, every record links its public
-    page, and every sitting alderperson has a seat."""
-    has = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='local_bodies'"
-    ).fetchone()
-    if not has or not conn.execute("SELECT 1 FROM local_bodies").fetchone():
+    """Local council votes, when any body is loaded, must hold what the
+    importer promised: every vote traces to the tenant's own member id and
+    vocabulary, every record links its public page, and every sitting
+    alderperson has a seat."""
+    if not conn.execute("SELECT 1 FROM local_bodies").fetchone():
         return []
     queries = {
         "local votes -> actions": (
@@ -362,24 +359,22 @@ def check_local(conn: sqlite3.Connection) -> list[str]:
 def check_campaign_finance(conn: sqlite3.Connection) -> list[str]:
     from importer.federal_finance import AMOUNTS
 
-    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    queries = {}
-    if "federal_finance" in tables:
-        queries["FEC summaries without verified candidate coverage"] = (
+    queries = {
+        "FEC summaries without verified candidate coverage": (
             "SELECT COUNT(*) FROM federal_finance f LEFT JOIN federal_finance_coverage c"
             " ON c.bioguide=f.bioguide AND c.candidate_id=f.candidate_id AND c.cycle=f.cycle"
-            " WHERE c.bioguide IS NULL")
-        queries["FEC amounts not stored as integer cents"] = (
+            " WHERE c.bioguide IS NULL"),
+        "FEC amounts not stored as integer cents": (
             "SELECT COUNT(*) FROM federal_finance WHERE "
-            + " OR ".join(f"typeof({key}) NOT IN ('integer', 'null')" for key in AMOUNTS))
-    if "state_campaign_transactions" in tables:
-        queries["state campaign transactions without a verified committee"] = (
+            + " OR ".join(f"typeof({key}) NOT IN ('integer', 'null')" for key in AMOUNTS)),
+        "state campaign transactions without a verified committee": (
             "SELECT COUNT(*) FROM state_campaign_transactions t"
             " LEFT JOIN state_campaigns c ON c.entity_id=t.filer_entity_id"
             " LEFT JOIN cf_committees r ON r.entity_id=t.filer_entity_id"
             " WHERE c.entity_id IS NULL OR r.entity_id IS NULL"
             " OR t.filer_type != 'State Candidate' OR t.direction NOT IN ('INCOMING', 'OUTGOING')"
-            " OR t.amount IS NULL")
+            " OR t.amount IS NULL"),
+    }
     return [f"{label}: {bad} rows" for label, query in queries.items()
             if (bad := conn.execute(query).fetchone()[0])]
 

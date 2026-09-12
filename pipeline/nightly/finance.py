@@ -10,6 +10,7 @@ from datetime import date
 from pathlib import Path
 
 from scraper.cfis_api import month_windows
+from scraper.http import save_json
 
 # The newest months are still being amended; older ones are re-read on a
 # deterministic rotation (as fetch_cfis audits legislator receipts), so the
@@ -112,11 +113,8 @@ def merge_months(archive: Path, inputs: Path, months: list[str]):
         pending = target.with_suffix(".pending")
         shutil.copyfile(inputs / month / "cfis" / target.name, pending)
         pending.replace(target)
-    target = archive / "committees.json"
-    pending = target.with_suffix(".pending")
-    pending.write_text(json.dumps(sorted(registry.values(), key=lambda row: row["entity_id"]),
-                                  indent=0), encoding="utf-8")
-    pending.replace(target)
+    save_json(archive / "committees.json",
+              sorted(registry.values(), key=lambda row: row["entity_id"]))
 
 
 def main():

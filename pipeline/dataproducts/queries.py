@@ -245,16 +245,8 @@ def hearings(conn: sqlite3.Connection) -> list[dict]:
     return rows
 
 
-def _has_table(conn: sqlite3.Connection, name: str) -> bool:
-    return bool(conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
-    ).fetchone())
-
-
 def local_bodies(conn: sqlite3.Connection) -> list[dict]:
-    """Covered city councils; empty when the enrichment tables are absent."""
-    if not _has_table(conn, "local_bodies"):
-        return []
+    """Covered city councils."""
     return _rows(conn, "SELECT * FROM local_bodies ORDER BY city")
 
 

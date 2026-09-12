@@ -205,7 +205,6 @@ def test_search_hits_cached_a_week_while_the_map_is_rederived_nightly(
 
     monkeypatch.setattr(fetch_cfis, "call", search)
     monkeypatch.setattr(fetch_cfis, "date", Day)
-    monkeypatch.setattr(fetch_cfis.time, "sleep", lambda _: None)
     monkeypatch.setattr(fetch_cfis, "MAP_PATH", tmp_path / "committee_map.json")
     monkeypatch.setattr(fetch_cfis, "CURATED_PATH", tmp_path / "curated.json")
     monkeypatch.setattr(fetch_cfis, "RETAINED_PATH", tmp_path / "retained.json")

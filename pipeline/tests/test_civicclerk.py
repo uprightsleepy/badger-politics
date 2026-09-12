@@ -66,7 +66,7 @@ def test_roster_rejects_misattributed_archived_portrait(portrait):
 
 
 def test_official_roster_portraits_reach_shared_import(source, tmp_path, make_db, monkeypatch):
-    fetch.fetch_tenant(source.http, SPEC, [-1], 0, source.root)
+    fetch.fetch_tenant(source.http, SPEC, [-1], source.root)
     snapshot = roster()
     snapshot["members"] = parse_roster(
         ROSTER_HTML + '<img src="/ImageRepository/Document?documentID=1" alt="Pat Example">',
@@ -198,7 +198,6 @@ def source(tmp_path, monkeypatch):
     save_json(curation, {"greenbaywi": CURATED})
     monkeypatch.setattr(fetch, "SEATS_PATH", curation)
     monkeypatch.setattr(import_local, "SEATS_PATH", curation)
-    monkeypatch.setattr(fetch.time, "sleep", lambda _: None)
     records = [archive(n) for n in (13, 12, 11)]
     calls = []
 
@@ -219,33 +218,33 @@ def source(tmp_path, monkeypatch):
 
 def test_collection_pages_caps_backfills_and_reuses_cached_meetings(source, monkeypatch):
     monkeypatch.setattr(fetch, "PAGE", 2)
-    assert fetch.fetch_tenant(source.http, SPEC, [-1], 0, source.root) == (2, 0)
+    assert fetch.fetch_tenant(source.http, SPEC, [-1], source.root) == (2, 0)
     coverage = json.loads((source.out / "coverage.json").read_text())
     assert (coverage["listed_meetings"], coverage["pending_meetings"]) == (3, 1)
     assert coverage["start_date"] == "2026-07-01"
     assert len(list(source.out.glob("event_*.json"))) == 2
-    assert fetch.fetch_tenant(source.http, SPEC, [-1], 0, source.root) == (1, 2)
-    assert fetch.fetch_tenant(source.http, SPEC, [-1], 0, source.root) == (0, 3)
+    assert fetch.fetch_tenant(source.http, SPEC, [-1], source.root) == (1, 2)
+    assert fetch.fetch_tenant(source.http, SPEC, [-1], source.root) == (0, 3)
     assert len([url for url, _ in source.calls if "/Meetings/" in url]) == 3
 
 
 def test_shared_budget_applies_to_civicclerk(source):
     budget = [1]
-    assert fetch.fetch_tenant(source.http, SPEC, budget, 0, source.root) == (1, 0)
+    assert fetch.fetch_tenant(source.http, SPEC, budget, source.root) == (1, 0)
     assert budget == [0]
 
 
 def test_changed_event_metadata_refreshes_and_preserves_original_revision(source):
-    fetch.fetch_tenant(source.http, SPEC, [-1], 0, source.root)
+    fetch.fetch_tenant(source.http, SPEC, [-1], source.root)
     source.records[0]["event"]["publishedFiles"][0]["fileId"] = 501
-    assert fetch.fetch_tenant(source.http, SPEC, [-1], 0, source.root) == (2, 1)
+    assert fetch.fetch_tenant(source.http, SPEC, [-1], source.root) == (2, 1)
     files = list((source.out / "revisions/event_13").glob("*.json"))
     assert {json.loads(p.read_text())["event"]["publishedFiles"][0]["fileId"]
             for p in files} == {500, 501}
 
 
 def test_denial_keeps_existing_meeting_bytes(source, monkeypatch):
-    fetch.fetch_tenant(source.http, SPEC, [-1], 0, source.root)
+    fetch.fetch_tenant(source.http, SPEC, [-1], source.root)
     before = {p: p.read_bytes() for p in source.out.glob("event_*.json")}
 
     def denied(*args, **kwargs):
@@ -253,18 +252,18 @@ def test_denial_keeps_existing_meeting_bytes(source, monkeypatch):
 
     monkeypatch.setattr(source.http, "get", denied)
     with pytest.raises(SourceAccessError, match="Rate limit"):
-        fetch.fetch_tenant(source.http, SPEC, [-1], 0, source.root)
+        fetch.fetch_tenant(source.http, SPEC, [-1], source.root)
     assert {p: p.read_bytes() for p in before} == before
 
 
 def test_bootstrap_is_required_on_first_collection(source):
     with pytest.raises(ValueError, match="bootstrap"):
-        fetch.fetch_tenant(source.http, {**SPEC, "bootstrap_event_id": 999}, [-1], 0, source.root)
+        fetch.fetch_tenant(source.http, {**SPEC, "bootstrap_event_id": 999}, [-1], source.root)
     assert not list(source.out.glob("event_*.json"))
 
 
 def test_refresh_cannot_remove_votes_and_keeps_candidate_for_review(source):
-    fetch.fetch_tenant(source.http, SPEC, [-1], 0, source.root)
+    fetch.fetch_tenant(source.http, SPEC, [-1], source.root)
     dest = source.out / "event_13.json"
     held = json.loads(dest.read_text())
     held["checked_at"] = "2000-01-01T00:00:00+00:00"
@@ -272,7 +271,7 @@ def test_refresh_cannot_remove_votes_and_keeps_candidate_for_review(source):
     before = dest.read_bytes()
     source.records[0]["meeting"]["items"][0]["childItems"][0]["minutesItemVotes"] = []
     with pytest.raises(ValueError, match="removed recorded data"):
-        fetch.fetch_tenant(source.http, SPEC, [-1], 0, source.root)
+        fetch.fetch_tenant(source.http, SPEC, [-1], source.root)
     assert dest.read_bytes() == before
     assert len(list((source.out / "revisions/event_13").glob("*.json"))) == 2
 
@@ -280,7 +279,7 @@ def test_refresh_cannot_remove_votes_and_keeps_candidate_for_review(source):
 def test_shared_import_preserves_positions_without_inventing_terms_or_attendance(
     source, tmp_path, make_db, monkeypatch,
 ):
-    fetch.fetch_tenant(source.http, SPEC, [-1], 0, source.root)
+    fetch.fetch_tenant(source.http, SPEC, [-1], source.root)
     db = tmp_path / "wi.sqlite"
     conn = make_db(db)
     monkeypatch.setattr(import_local, "TENANTS", [SPEC])

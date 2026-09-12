@@ -43,7 +43,7 @@ class FakeResponse:
 
 def test_every_page_is_read_through_the_forms_own_postback() -> None:
     http = FakeHttp()
-    rows = fetch_departments(http, "https://x.legistar.com", 0)
+    rows = fetch_departments(http, "https://x.legistar.com")
     assert [r["name"] for r in rows] == ["ARTS BOARD", "Ethics & Rules", "ZONING COMMITTEE"]
     assert rows[0]["url"] == "https://x.legistar.com/DepartmentDetail.aspx?ID=10&GUID=A10"
     # page 2 was requested exactly once, carrying page 1's form state and its own link target
@@ -63,7 +63,7 @@ def test_meeting_item_links_come_from_every_page_of_the_grid() -> None:
                 + leg(2, "081002") + leg(3, "081002") + page_link(1) + page_link(2))
     http = FakeHttp()
     event = {"EventInSiteURL": "https://x.legistar.com/MeetingDetail.aspx?LEGID=1&GID=5&G=Z"}
-    links = fetch_links(http, event, "https://x.legistar.com", 0)
+    links = fetch_links(http, event, "https://x.legistar.com")
     # one file across pages links; the file shown with two pages links nowhere
     assert links == {"081001": "https://x.legistar.com/LegislationDetail.aspx?ID=1&GUID=AB1"}
     assert http.posts == [{"__VIEWSTATE": "m1", "__EVENTTARGET": "grid$page2",

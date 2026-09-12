@@ -89,14 +89,6 @@ def import_summaries(directory: Path, db_path: Path) -> None:
         raise ValueError("Missing FEC finance archive")
     with sqlite3.connect(db_path) as conn:
         known = {row[0] for row in conn.execute("SELECT bioguide FROM federal_members")}
-        columns = ", ".join(f"{name} INTEGER" for name in AMOUNTS)
-        conn.execute(f"""CREATE TABLE IF NOT EXISTS federal_finance (
-            candidate_id TEXT, bioguide TEXT, cycle INTEGER, reported_name TEXT,
-            coverage_end TEXT, {columns}, source_url TEXT, fetched_at TEXT,
-            PRIMARY KEY(candidate_id, cycle))""")
-        conn.execute("""CREATE TABLE IF NOT EXISTS federal_finance_coverage (
-            bioguide TEXT, candidate_id TEXT, cycle INTEGER, fetched_at TEXT,
-            PRIMARY KEY(bioguide, cycle))""")
         conn.execute("DELETE FROM federal_finance")
         conn.execute("DELETE FROM federal_finance_coverage")
         for path in files:

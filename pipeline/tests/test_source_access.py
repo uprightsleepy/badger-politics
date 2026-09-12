@@ -283,9 +283,9 @@ def test_profile_policy_failure_preserves_archive(tmp_path, monkeypatch, failed_
         return {"photos": [], "entries": []}
 
     monkeypatch.setattr(fetch_local_profiles, "milwaukee_district",
-                        lambda http, n, delay: district("milwaukee", n))
+                        lambda http, n: district("milwaukee", n))
     monkeypatch.setattr(fetch_local_profiles, "west_allis_district",
-                        lambda http, n, delay: district("westalliswi", n))
+                        lambda http, n: district("westalliswi", n))
     with pytest.raises(SourceAccessError):
         fetch_local_profiles.main([])
     assert archive.read_bytes() == original

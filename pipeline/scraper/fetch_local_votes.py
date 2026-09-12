@@ -1,6 +1,6 @@
 """Council votes from reviewed public APIs, tenant by tenant.
 
-Usage: python -m scraper.fetch_local_votes [--max-new N] [--delay S]
+Usage: python -m scraper.fetch_local_votes [--max-new N]
 
 Legistar records include items, named votes, attendance and official links.
 CivicClerk uses its native reader with the same CLI and request budget.
@@ -14,7 +14,6 @@ import html
 import json
 import re
 import sys
-import time
 from datetime import UTC, date, datetime
 from pathlib import Path
 from urllib.parse import quote, urlencode
@@ -29,21 +28,20 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "local"
 PAGE = 1000
 
 
-def call(http: requests.Session, tenant: str, path: str, delay: float, **params):
+def call(http: requests.Session, tenant: str, path: str, **params):
     qs = urlencode(params, quote_via=quote)
     url = f"{BASE}/{tenant}/{path}" + ("?" + qs if qs else "")
     response = http.get(url, timeout=90)
     response.raise_for_status()
-    time.sleep(delay)
     return response.json()
 
 
-def fetch_events(http, tenant: str, body: str, since: int, delay: float) -> list[dict]:
+def fetch_events(http, tenant: str, body: str, since: int) -> list[dict]:
     """Every council meeting since Jan 1 of `since`, newest first."""
     events, skip = [], 0
     while True:
         page = call(
-            http, tenant, "Events", delay,
+            http, tenant, "Events",
             **{
                 "$top": PAGE, "$skip": skip, "$orderby": "EventDate desc",
                 "$filter": f"EventBodyName eq '{body}'"
@@ -66,13 +64,12 @@ LEG_LINK = re.compile(
 )
 
 
-def grid_pages(http, url: str, delay: float):
+def grid_pages(http, url: str):
     """Every page of an InSite grid. The grid shows a fixed number of rows
     a page; later pages come through the plain form postback each page
     link carries for browsers without JS."""
     response = http.get(url, timeout=90)
     response.raise_for_status()
-    time.sleep(delay)
     page = 1
     while True:
         text = response.text
@@ -85,17 +82,16 @@ def grid_pages(http, url: str, delay: float):
         form.update({"__EVENTTARGET": target, "__EVENTARGUMENT": ""})
         response = http.post(url, data=form, timeout=90)
         response.raise_for_status()
-        time.sleep(delay)
 
 
-def fetch_departments(http, insite: str, delay: float) -> list[dict]:
+def fetch_departments(http, insite: str) -> list[dict]:
     """InSite's public listing of every body, name and page url. Its page
     ids and GUIDs differ from the API's, so this is the only way to link a
     body."""
     return [
         {"name": html.unescape(re.sub(r"<[^>]+>", "", label)).strip(),
          "url": f"{insite}/DepartmentDetail.aspx?ID={dept_id}&GUID={guid}"}
-        for text in grid_pages(http, f"{insite}/Departments.aspx", delay)
+        for text in grid_pages(http, f"{insite}/Departments.aspx")
         for dept_id, guid, label in DEPT_ROW.findall(text)
     ]
 
@@ -115,7 +111,7 @@ def parse_links(page: str, insite: str, found: dict | None = None) -> dict[str, 
     return {name: next(iter(urls)) for name, urls in found.items() if len(urls) == 1}
 
 
-def fetch_links(http, event: dict, insite: str, delay: float) -> dict[str, str]:
+def fetch_links(http, event: dict, insite: str) -> dict[str, str]:
     """Item links from every page of the meeting's item grid (200 rows a
     page on Milwaukee's long agendas)."""
     url = event.get("EventInSiteURL")
@@ -123,36 +119,36 @@ def fetch_links(http, event: dict, insite: str, delay: float) -> dict[str, str]:
         return {}
     found: dict[str, set[str]] = {}
     links: dict[str, str] = {}
-    for text in grid_pages(http, url, delay):
+    for text in grid_pages(http, url):
         links = parse_links(text, insite, found)
     return links
 
 
-def fetch_rollcalls(http, tenant: str, items: list[dict], delay: float) -> dict[str, list]:
+def fetch_rollcalls(http, tenant: str, items: list[dict]) -> dict[str, list]:
     """Per-member attendance for each roll-call item of a meeting."""
     return {
         str(i["EventItemId"]): call(
-            http, tenant, f"EventItems/{i['EventItemId']}/RollCalls", delay
+            http, tenant, f"EventItems/{i['EventItemId']}/RollCalls"
         )
         for i in items if i.get("EventItemRollCallFlag")
     }
 
 
 def fetch_tenant(
-    http, spec: dict, budget: list[int], delay: float, data_dir: Path | None = None,
+    http, spec: dict, budget: list[int], data_dir: Path | None = None,
 ) -> tuple[int, int]:
     if spec.get("provider") == "civicclerk":
         from scraper.fetch_civicclerk import fetch_tenant as fetch_civicclerk
 
-        return fetch_civicclerk(http, spec, budget, delay, data_dir or DATA_DIR)
+        return fetch_civicclerk(http, spec, budget, data_dir or DATA_DIR)
     tenant = spec["tenant"]
     out = (data_dir if data_dir is not None else DATA_DIR) / tenant
     out.mkdir(parents=True, exist_ok=True)
 
-    vote_types = call(http, tenant, "VoteTypes", delay)
+    vote_types = call(http, tenant, "VoteTypes")
     save_json(out / "votetypes.json", vote_types)
     office = call(
-        http, tenant, "OfficeRecords", delay,
+        http, tenant, "OfficeRecords",
         **{"$top": PAGE, "$filter": f"OfficeRecordBodyName eq '{spec['body_name']}'"},
     )
     if len(office) >= PAGE:
@@ -162,7 +158,7 @@ def fetch_tenant(
     today = date.today().isoformat()
     # for sitting members: their person record (contacts where the tenant
     # fills them in) and every body they sit on, for committee lists
-    bodies = call(http, tenant, "Bodies", delay, **{"$top": PAGE})
+    bodies = call(http, tenant, "Bodies", **{"$top": PAGE})
     if len(bodies) >= PAGE:
         raise RuntimeError(f"{tenant}: bodies hit the page cap; add paging")
     save_json(out / "bodies.json", bodies)
@@ -173,11 +169,11 @@ def fetch_tenant(
     # every member's person record: the full name where the office record
     # abbreviates it, and contacts for sitting members
     people = sorted({r["OfficeRecordPersonId"] for r in office})
-    persons = {str(pid): call(http, tenant, f"Persons/{pid}", delay) for pid in people}
+    persons = {str(pid): call(http, tenant, f"Persons/{pid}") for pid in people}
     save_json(out / "persons.json", persons)
     memberships = {
         str(pid): call(
-            http, tenant, "OfficeRecords", delay,
+            http, tenant, "OfficeRecords",
             **{"$top": PAGE, "$filter": f"OfficeRecordPersonId eq {pid}"},
         )
         for pid in sitting
@@ -185,13 +181,13 @@ def fetch_tenant(
     if any(len(rows) >= PAGE for rows in memberships.values()):
         raise RuntimeError(f"{tenant}: memberships hit the page cap; add paging")
     save_json(out / "memberships.json", memberships)
-    departments = fetch_departments(http, spec["insite"], delay)
+    departments = fetch_departments(http, spec["insite"])
     save_json(out / "departments.json", departments)
     fetched = cached = pending_count = past_count = newly_fetched = 0
     limit = spec.get("max_new_per_run")
     final_minutes = spec.get("final_minutes", ("Final",))
     upcoming = []
-    events = fetch_events(http, tenant, spec["body_name"], spec["since"], delay)
+    events = fetch_events(http, tenant, spec["body_name"], spec["since"])
     anchor = spec.get("bootstrap_event_id")
     if anchor is not None and not (out / f"event_{anchor}.json").exists():
         if not any(e["EventId"] == anchor for e in events):
@@ -211,10 +207,10 @@ def fetch_tenant(
                 # cached before item links or attendance were kept: filled once
                 changed = False
                 if "links" not in held:
-                    held["links"] = fetch_links(http, held["event"], spec["insite"], delay)
+                    held["links"] = fetch_links(http, held["event"], spec["insite"])
                     changed = True
                 if "rollcalls" not in held:
-                    held["rollcalls"] = fetch_rollcalls(http, tenant, held["items"], delay)
+                    held["rollcalls"] = fetch_rollcalls(http, tenant, held["items"])
                     changed = True
                 if changed:
                     save_json(dest, held)
@@ -224,17 +220,17 @@ def fetch_tenant(
             pending_count += 1
             continue  # --max-new exhausted; the rest stays for the next run
         budget[0] -= 1
-        items = call(http, tenant, f"Events/{event['EventId']}/EventItems", delay)
+        items = call(http, tenant, f"Events/{event['EventId']}/EventItems")
         if len(items) >= PAGE:
             raise RuntimeError(f"{tenant}: meeting items hit the page cap; add paging")
         votes: dict[str, list] = {}
         for item in items:
             if item.get("EventItemActionName"):
                 votes[str(item["EventItemId"])] = call(
-                    http, tenant, f"EventItems/{item['EventItemId']}/Votes", delay
+                    http, tenant, f"EventItems/{item['EventItemId']}/Votes"
                 )
-        links = fetch_links(http, event, spec["insite"], delay)
-        rollcalls = fetch_rollcalls(http, tenant, items, delay)
+        links = fetch_links(http, event, spec["insite"])
+        rollcalls = fetch_rollcalls(http, tenant, items)
         save_json(dest, {"event": event, "items": items, "votes": votes, "links": links,
                          "rollcalls": rollcalls})
         fetched += 1
@@ -254,7 +250,6 @@ def fetch_tenant(
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--max-new", type=int, help="fetch at most N meetings per run")
-    parser.add_argument("--delay", type=float, default=0.3)
     parser.add_argument("--tenant", action="append", choices=[s["tenant"] for s in TENANTS],
                         help="collect only these tenants (repeatable); default: all")
     parser.add_argument("--data-dir", type=Path, default=DATA_DIR,
@@ -266,7 +261,7 @@ def main(argv: list[str]) -> int:
     for spec in TENANTS:
         if ns.tenant and spec["tenant"] not in ns.tenant:
             continue
-        fetched, cached = fetch_tenant(http, spec, budget, ns.delay, ns.data_dir)
+        fetched, cached = fetch_tenant(http, spec, budget, ns.data_dir)
         print(f"{spec['tenant']}: {fetched} meetings fetched, {cached} already final")
     return 0
 

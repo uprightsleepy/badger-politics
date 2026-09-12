@@ -2,7 +2,7 @@
 city's own web pages. Paused Milwaukee retrieval retains the complete archive
 and records its freshness separately from the council's voting records.
 
-Usage: python -m scraper.fetch_local_profiles [--delay S]
+Usage: python -m scraper.fetch_local_profiles
 
 West Allis district pages and the Appleton/Waukesha council rosters refresh
 normally. Retained Milwaukee profiles remain tied to archived member identities.
@@ -15,7 +15,6 @@ import html
 import json
 import re
 import sys
-import time
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urljoin
@@ -26,6 +25,7 @@ from lxml import html as lxml_html
 from importer.civicclerk import name_key, portrait_url
 from importer.import_local import milwaukee_profile_owners
 from importer.local_registry import TENANTS
+from scraper.http import save_json
 from scraper.http import session as http_session
 from scraper.source_access import ACCESS
 
@@ -86,13 +86,12 @@ def roster_profiles(page: str, spec: dict) -> dict:
     return {"page": spec["profile_url"], "members": members}
 
 
-def milwaukee_district(http: requests.Session, n: int, delay: float) -> dict | None:
+def milwaukee_district(http: requests.Session, n: int) -> dict | None:
     """What the city's page for district n shows: headshots with their alt
     text, and every mailto/tel link. Attribution happens in the importer."""
     for pattern in MKE_PATHS:
         url = MKE_BASE + pattern.format(n=n)
         response = http.get(url, timeout=60)
-        time.sleep(delay)
         if response.status_code == 404:
             continue
         response.raise_for_status()
@@ -120,12 +119,11 @@ def milwaukee_district(http: requests.Session, n: int, delay: float) -> dict | N
     return None
 
 
-def west_allis_district(http: requests.Session, n: int, delay: float) -> dict:
+def west_allis_district(http: requests.Session, n: int) -> dict:
     """The page's content nodes in order: each name heading, then the image
     and text that follow it until the next heading."""
     url = WA_PAGES[n]
     response = http.get(url, timeout=60)
-    time.sleep(delay)
     response.raise_for_status()
     s = response.text.replace("\\/", "/").replace('\\"', '"')
     parts = re.split(r'"type":"(CONTENT_NODE_[A-Z_]+)"', s)
@@ -173,8 +171,7 @@ def retained_milwaukee(profiles: dict) -> dict:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--delay", type=float, default=0.5)
-    ns = parser.parse_args(argv)
+    parser.parse_args(argv)
     profiles = json.loads(OUT.read_text(encoding="utf-8")) if OUT.exists() else {}
     if not isinstance(profiles, dict) or not isinstance(profiles.get("_refresh", {}), dict):
         raise RuntimeError("Invalid local profile archive")
@@ -193,7 +190,7 @@ def main(argv: list[str]) -> int:
     else:
         profiles["milwaukee"] = {"seats": {}}
         for n in MKE_DISTRICTS:
-            found = milwaukee_district(http, n, ns.delay)
+            found = milwaukee_district(http, n)
             if found is None:
                 print(f"milwaukee district {n}: no page at either path", file=sys.stderr)
                 continue
@@ -203,7 +200,7 @@ def main(argv: list[str]) -> int:
         }
     profiles["westalliswi"] = {"districts": {}}
     for n in WA_PAGES:
-        profiles["westalliswi"]["districts"][str(n)] = west_allis_district(http, n, ns.delay)
+        profiles["westalliswi"]["districts"][str(n)] = west_allis_district(http, n)
     refresh["westalliswi"] = {
         "state": "refreshed", "last_success_at": datetime.now(UTC).isoformat(),
     }
@@ -215,9 +212,7 @@ def main(argv: list[str]) -> int:
             "state": "refreshed", "last_success_at": datetime.now(UTC).isoformat(),
         }
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    pending = OUT.with_suffix(".json.tmp")
-    pending.write_text(json.dumps(profiles, indent=1), encoding="utf-8")
-    pending.replace(OUT)
+    save_json(OUT, profiles)
     mke = sum(len(s["photos"]) for s in profiles["milwaukee"]["seats"].values())
     wa = sum(1 for d in profiles["westalliswi"]["districts"].values()
              for e in d["entries"] if e["image"])

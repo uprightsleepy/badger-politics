@@ -77,7 +77,6 @@ def test_split_and_unsplit_archives_and_database_are_identical(tmp_path, monkeyp
     monkeypatch.setattr(cfis_api, "PAGE", 2)
     monkeypatch.setattr(collector, "PAGE", 2)
     monkeypatch.setattr(collector, "session", lambda: object())
-    monkeypatch.setattr(collector.time, "sleep", lambda _: None)
     unsplit, split, inputs = tmp_path / "unsplit", tmp_path / "split", tmp_path / "months"
     baseline(unsplit)
     baseline(split)
@@ -153,24 +152,23 @@ def test_receipt_refresh_and_audit_use_frozen_date(tmp_path, monkeypatch):
     monkeypatch.setattr(fetch_cfis, "load_committee_ids", lambda: {})
     monkeypatch.setattr(fetch_cfis, "session", lambda: object())
     monkeypatch.setattr(fetch_cfis, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(fetch_cfis.time, "sleep", lambda _: None)
 
-    def fetch(http, ids, first, last, label, attempts):
+    def fetch(http, first, last, page, label, attempts=3):
         windows.append((first, last))
-        return [], 0, 0, set(), True
+        return [], 0
 
-    monkeypatch.setattr(fetch_cfis, "_fetch_with_retries", fetch)
+    monkeypatch.setattr(fetch_cfis, "verified", fetch)
     fetch_cfis.fetch_transactions("2025-01", date(2025, 2, 28))
     assert windows == [("2025-01-01", "2025-01-31T23:59:59"),
                        ("2025-02-01", "2025-02-28T23:59:59")]
     for month in range(1, 13):
         write(tmp_path / f"tx-2024-{month:02}.json", [])
 
-    def audit(http, ids, first, last, label, attempts):
+    def audit(http, first, last, page, label, attempts=3):
         audited.append(first)
-        return [], 0, 0, set(), True
+        return [], 0
 
-    monkeypatch.setattr(fetch_cfis, "_fetch_with_retries", audit)
+    monkeypatch.setattr(fetch_cfis, "verified", audit)
     fetch_cfis.audit_archives(3, date(2025, 2, 28))
     expected = audited.copy()
     audited.clear()

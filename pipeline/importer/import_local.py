@@ -26,7 +26,7 @@ from importer.civicclerk import (
 )
 from importer.local_registry import TENANTS
 from importer.person_slugs import slugify
-from importer.roster import load_curation
+from importer.roster import OPEN_END, load_curation
 
 SEATS_PATH = Path(__file__).resolve().parent / "local_seats.json"
 MERGES_PATH = Path(__file__).resolve().parent / "local_person_merges.json"
@@ -176,9 +176,7 @@ def is_placeholder(record_name: str | None) -> bool:
 def load_merges(tenant: str) -> dict[int, int]:
     """Curated from-id -> into-id for one person the clerk carries under
     two ids; every entry states its basis in local_person_merges.json."""
-    if not MERGES_PATH.exists():
-        return {}
-    entries = json.loads(MERGES_PATH.read_text(encoding="utf-8")).get(tenant, [])
+    entries = load_curation(MERGES_PATH).get(tenant, []) if MERGES_PATH.exists() else []
     return {int(e["from"]): int(e["into"]) for e in entries}
 
 
@@ -554,13 +552,13 @@ def import_tenant(conn: sqlite3.Connection, spec: dict, local_dir: Path) -> dict
     # Report votes outside office-record dates without rejecting them:
     # historical office records are incomplete; vote IDs remain authoritative.
     outside = conn.execute(
-        """SELECT COUNT(*) FROM local_votes v
+        f"""SELECT COUNT(*) FROM local_votes v
            JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
            JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
            WHERE v.tenant = ? AND NOT EXISTS (
              SELECT 1 FROM local_member_terms t WHERE t.tenant = v.tenant
              AND t.person_id = v.person_id AND e.date >= t.start
-             AND e.date <= COALESCE(t.end, '9999'))""",
+             AND e.date <= COALESCE(t.end, '{OPEN_END}'))""",
         (tenant,),
     ).fetchone()[0]
     return {

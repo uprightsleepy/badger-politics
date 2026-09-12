@@ -12,14 +12,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import time
 from pathlib import Path
 
 import requests
 
 from importer.federal_finance import STATE_CAMPAIGNS
-from scraper.cfis_api import DELAY, PAGE, month_windows, transaction_count, transaction_pages
-from scraper.http import session
+from scraper.cfis_api import PAGE, month_windows, transaction_count, transaction_pages, verified
+from scraper.http import save_json, session
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "cfis"
 
@@ -111,22 +110,11 @@ def _fetch_month(http: requests.Session, first: str, last: str, page_size: int |
 
 
 def fetch_month(http: requests.Session, first: str, last: str):
-    """Return transactions and registry only after full, unique coverage is verified."""
-    page_size = PAGE
-    for attempt in range(3):
+    """Transactions and registry, once full unique coverage is verified."""
+    def fetch(page_size):
         rows, registry, scanned, expected, seen_ids = _fetch_month(http, first, last, page_size)
-        if scanned == expected == len(seen_ids):
-            if attempt:
-                expected = transaction_count(http, first, last)
-            if scanned == expected:
-                return rows, registry
-        if attempt < 2:
-            print(f"{first[:7]}: incomplete listing ({scanned} rows, {len(seen_ids)} unique,"
-                  f" expected {expected}), retaking")
-            page_size = min(PAGE, 100) if expected <= PAGE else PAGE
-            time.sleep(5)
-    raise RuntimeError(f"CFIS drift: {first[:7]} paged {scanned} rows"
-                       f" ({len(seen_ids)} unique) but count said {expected}")
+        return (rows, registry), scanned, expected, seen_ids
+    return verified(http, first, last, fetch, first[:7])[0]
 
 
 def main(argv: list[str]) -> int:
@@ -155,10 +143,9 @@ def main(argv: list[str]) -> int:
             entry["campaign_months"] = sorted(set(
                 registry.get(entity_id, {}).get("campaign_months", []) + [label]))
         registry.update(month_registry)
-        out.write_text(json.dumps(rows, indent=0), encoding="utf-8")
+        save_json(out, rows)
         total += len(rows)
         print(f"{label}: {len(rows)} kept, {len(month_registry)} committees seen")
-        time.sleep(DELAY)
 
     reg_path = DATA_DIR / "committees.json"
     if reg_path.exists():
@@ -169,10 +156,7 @@ def main(argv: list[str]) -> int:
                     + existing.get(entity_id, {}).get("campaign_months", [])))
         existing.update(registry)
         registry = existing
-    reg_path.write_text(
-        json.dumps(sorted(registry.values(), key=lambda c: c["entity_id"]), indent=0),
-        encoding="utf-8",
-    )
+    save_json(reg_path, sorted(registry.values(), key=lambda c: c["entity_id"]))
     print(f"total {total} transactions; {len(registry)} committees -> {reg_path.name}")
     return 0
 

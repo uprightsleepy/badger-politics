@@ -423,6 +423,132 @@ CREATE TABLE local_vote_types (
     PRIMARY KEY (tenant, value)
 );
 
+-- Curated state campaigns of federal members (importer/state_campaigns.json)
+-- and their CFIS filings, kept apart from cf_transactions with the same
+-- columns; coverage lists the months a complete scan verified
+CREATE TABLE state_campaigns (
+    entity_id  INTEGER PRIMARY KEY,
+    bioguide   TEXT,
+    candidate  TEXT,
+    office     TEXT,
+    cycle      INTEGER,
+    committee  TEXT,
+    source_url TEXT
+);
+CREATE TABLE state_campaign_coverage (
+    entity_id INTEGER,
+    month     TEXT,
+    PRIMARY KEY (entity_id, month)
+);
+CREATE TABLE state_campaign_transactions (
+    id                   INTEGER PRIMARY KEY,  -- CFIS transaction id
+    filer_entity_id      INTEGER NOT NULL,
+    filer_type           TEXT,
+    direction            TEXT CHECK (direction IN ('INCOMING', 'OUTGOING')),
+    date                 TEXT,
+    amount               REAL NOT NULL,
+    other_entity_id      INTEGER,  -- counterparty: donor in, payee out
+    other_name           TEXT,
+    other_type           TEXT,
+    -- express advocacy: FOR/AGAINST a named candidate in a named race
+    stance               TEXT CHECK (stance IN ('FOR', 'AGAINST') OR stance IS NULL),
+    related_name         TEXT,
+    related_office       TEXT,
+    related_district     TEXT,
+    -- conduits pass earmarked money through: the true recipient
+    final_recipient_id   INTEGER,
+    final_recipient_name TEXT,
+    purpose              TEXT,
+    report_id            INTEGER,  -- the Commission's report this row was filed on
+    report_name          TEXT
+);
+
+-- Federal delegation: the roster and every floor roll call from the
+-- Senate's and House Clerk's own XML; positions keyed by each chamber's
+-- member id (LIS id for senate rows, bioguide for house rows)
+CREATE TABLE federal_members (
+    bioguide   TEXT PRIMARY KEY,
+    lis_id     TEXT,           -- senators only
+    name       TEXT NOT NULL,
+    slug       TEXT NOT NULL UNIQUE,
+    party      TEXT NOT NULL,
+    chamber    TEXT NOT NULL CHECK (chamber IN ('senate', 'house')),
+    district   INTEGER,        -- house only
+    term_start TEXT NOT NULL,
+    term_end   TEXT NOT NULL
+);
+CREATE TABLE federal_votes (
+    id                   TEXT PRIMARY KEY,  -- s119-2-231
+    congress             INTEGER NOT NULL,
+    session              INTEGER NOT NULL,
+    chamber              TEXT NOT NULL,
+    number               INTEGER NOT NULL,
+    date                 TEXT NOT NULL,
+    question             TEXT,
+    result               TEXT,
+    title                TEXT,
+    yeas                 INTEGER NOT NULL,
+    nays                 INTEGER NOT NULL,
+    majority_requirement TEXT,
+    document             TEXT,  -- 'S. 5271' when the vote has one
+    source_url           TEXT NOT NULL
+);
+CREATE TABLE federal_vote_records (
+    vote_id   TEXT NOT NULL REFERENCES federal_votes (id),
+    member_id TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    party     TEXT,
+    state     TEXT NOT NULL,
+    vote_cast TEXT NOT NULL
+);
+CREATE INDEX idx_federal_records_vote  ON federal_vote_records (vote_id);
+CREATE INDEX idx_federal_records_state ON federal_vote_records (state);
+
+-- FEC candidate summaries for the delegation, integer cents, and the
+-- candidate ids each cycle's archive verified against the roster
+CREATE TABLE federal_finance (
+    candidate_id              TEXT,
+    bioguide                  TEXT,
+    cycle                     INTEGER,
+    reported_name             TEXT,
+    coverage_end              TEXT,
+    receipts                  INTEGER,
+    transfers_in              INTEGER,
+    disbursements             INTEGER,
+    transfers_out             INTEGER,
+    cash_start                INTEGER,
+    cash_end                  INTEGER,
+    candidate_contributions   INTEGER,
+    candidate_loans           INTEGER,
+    other_loans               INTEGER,
+    candidate_loan_repayments INTEGER,
+    other_loan_repayments     INTEGER,
+    debts                     INTEGER,
+    individual_contributions  INTEGER,
+    committee_contributions   INTEGER,
+    party_contributions       INTEGER,
+    individual_refunds        INTEGER,
+    committee_refunds         INTEGER,
+    source_url                TEXT,
+    fetched_at                TEXT,
+    PRIMARY KEY (candidate_id, cycle)
+);
+CREATE TABLE federal_finance_coverage (
+    bioguide     TEXT,
+    candidate_id TEXT,
+    cycle        INTEGER,
+    fetched_at   TEXT,
+    PRIMARY KEY (bioguide, cycle)
+);
+
+-- companion bills, only from each bill page's own See Also links
+CREATE TABLE bill_companions (
+    bill_id           TEXT NOT NULL REFERENCES bills (id),
+    companion_bill_id TEXT NOT NULL REFERENCES bills (id),
+    source_url        TEXT NOT NULL,  -- the page that declared the edge
+    UNIQUE (bill_id, companion_bill_id)
+);
+
 -- Build metadata, e.g. key='data_through' for the site footer freshness badge.
 CREATE TABLE meta (
     key   TEXT PRIMARY KEY,

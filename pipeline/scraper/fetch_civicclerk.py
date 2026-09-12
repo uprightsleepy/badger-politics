@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import time
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -23,10 +22,9 @@ PAGE = 100
 REFRESH_AFTER = timedelta(days=7)
 
 
-def call(http, url: str, delay: float, **params):
+def call(http, url: str, **params):
     response = http.get(url, params=params, timeout=90)
     response.raise_for_status()
-    time.sleep(delay)
     return response
 
 
@@ -41,10 +39,10 @@ def retain_revision(path: Path, value) -> None:
         save_json(destination, value)
 
 
-def fetch_events(http, spec: dict, delay: float) -> list[dict]:
+def fetch_events(http, spec: dict) -> list[dict]:
     events, seen, skip = [], set(), 0
     while True:
-        page = call(http, f"{spec['api_base']}/Events", delay, **{
+        page = call(http, f"{spec['api_base']}/Events", **{
             "$top": PAGE, "$skip": skip, "$orderby": "eventDate desc,id desc",
             "$filter": f"eventCategoryId eq {spec['category_id']}"
                        f" and eventDate ge {spec['start_date']}T00:00:00Z",
@@ -70,18 +68,18 @@ def fetch_events(http, spec: dict, delay: float) -> list[dict]:
         skip += len(rows)
 
 
-def fetch_tenant(http, spec: dict, budget: list[int], delay: float, data_dir: Path):
+def fetch_tenant(http, spec: dict, budget: list[int], data_dir: Path):
     out = data_dir / spec["tenant"]
     out.mkdir(parents=True, exist_ok=True)
     curated = load_curation(SEATS_PATH)[spec["tenant"]]
     now = datetime.now(UTC)
     roster = {"source_url": spec["roster_url"], "checked_at": now.isoformat(),
-              "members": parse_roster(call(http, spec["roster_url"], delay).text,
+              "members": parse_roster(call(http, spec["roster_url"]).text,
                                       spec["roster_url"])}
     retain_revision(out / "roster.json", roster)
     roster_members(roster, spec, curated)
     save_json(out / "roster.json", roster)
-    events = fetch_events(http, spec, delay)
+    events = fetch_events(http, spec)
     save_json(out / "events.json", events)
     today = date.today().isoformat()
     upcoming = [e for e in events if e["eventDate"][:10] >= today]
@@ -111,7 +109,7 @@ def fetch_tenant(http, spec: dict, budget: list[int], delay: float, data_dir: Pa
                 or not event.get("hasAgenda") or not event.get("agendaId")):
             pending += 1
             continue
-        meeting = call(http, f"{spec['api_base']}/Meetings/{event['agendaId']}", delay).json()
+        meeting = call(http, f"{spec['api_base']}/Meetings/{event['agendaId']}").json()
         data = {"provider": "civicclerk", "version": 1, "checked_at": now.isoformat(),
                 "event": event, "meeting": meeting}
         retain_revision(dest, data)

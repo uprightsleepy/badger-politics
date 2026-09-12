@@ -6,6 +6,8 @@ import re
 import sqlite3
 import sys
 
+from importer.roster import OPEN_END
+
 db = sqlite3.connect(sys.argv[1] if len(sys.argv) > 1 else "../data/wi.sqlite")
 db.row_factory = sqlite3.Row
 # sessions with complete roll-call coverage (2009's documents are partial)
@@ -40,12 +42,12 @@ def check(title, rows, show=10):
 total = 0
 
 # 1. chamber-blind gate gap: a vote in chamber C with no C-chamber term
-total += check("votes whose chamber has no covering term (gate checks dates only)", db.execute("""
+total += check("votes whose chamber has no covering term (gate checks dates only)", db.execute(f"""
   SELECT p.name, pv.chamber, MIN(pv.d) first, MAX(pv.d) last, COUNT(*) days
   FROM pv JOIN people p ON p.id = pv.person_id
   WHERE NOT EXISTS (
     SELECT 1 FROM person_terms t WHERE t.person_id = pv.person_id AND t.chamber = pv.chamber
-    AND pv.d >= t.start AND pv.d <= COALESCE(t.end,'9999'))
+    AND pv.d >= t.start AND pv.d <= COALESCE(t.end,'{OPEN_END}'))
   GROUP BY pv.person_id, pv.chamber ORDER BY days DESC"""))
 
 # 2. same person voting in both chambers on one day (definite misattribution)
@@ -72,21 +74,21 @@ total += check("vote events with records but no roll-call document", db.execute(
   AND EXISTS (SELECT 1 FROM vote_records r WHERE r.vote_event_id = e.id)"""))
 
 # 4. overlapping terms for one person+chamber (double coverage)
-total += check("overlapping same-chamber terms", db.execute("""
+total += check("overlapping same-chamber terms", db.execute(f"""
   SELECT p.name, a.chamber, a.start s1, a.end e1, b.start s2, b.end e2
   FROM person_terms a JOIN person_terms b
     ON a.person_id = b.person_id AND a.chamber = b.chamber
     AND (a.start < b.start OR (a.start = b.start AND a.rowid < b.rowid))
   JOIN people p ON p.id = a.person_id
-  WHERE b.start < COALESCE(a.end,'9999')"""))
+  WHERE b.start < COALESCE(a.end,'{OPEN_END}')"""))
 
 # 5. simultaneous service in both chambers (beyond a 7-day transition)
-total += check("concurrent cross-chamber service > 7 days", db.execute("""
+total += check("concurrent cross-chamber service > 7 days", db.execute(f"""
   SELECT p.name, a.start s_lower, a.end e_lower, b.start s_upper, b.end e_upper
   FROM person_terms a JOIN person_terms b ON a.person_id = b.person_id
     AND a.chamber = 'lower' AND b.chamber = 'upper'
   JOIN people p ON p.id = a.person_id
-  WHERE julianday(MIN(COALESCE(a.end,'9999-01-01'), COALESCE(b.end,'9999-01-01')))
+  WHERE julianday(MIN(COALESCE(a.end,'{OPEN_END}-01-01'), COALESCE(b.end,'{OPEN_END}-01-01')))
       - julianday(MAX(a.start, b.start)) > 7"""))
 
 # 6. former members with open-ended terms (phantom "still serving")
@@ -97,21 +99,21 @@ total += check("non-sitting people with open-ended terms", db.execute("""
 
 # 7. phantom coverage: a full-corpus biennium slice of a term with zero votes
 #    cast while that chamber held >20 vote days inside the slice (Billings class)
-total += check("covered biennium slice with zero votes despite 20+ chamber days", db.execute("""
+total += check("covered biennium slice with zero votes despite 20+ chamber days", db.execute(f"""
   WITH biennia(by, s, e) AS (VALUES
     ('2011','2011-01-01','2013-01-01'),('2013','2013-01-01','2015-01-01'),
     ('2015','2015-01-01','2017-01-01'),('2017','2017-01-01','2019-01-01'),
     ('2019','2019-01-01','2021-01-01'),('2021','2021-01-01','2023-01-01'),
     ('2023','2023-01-01','2025-01-01'))
   SELECT p.name, t.chamber, b.by,
-    MAX(t.start, b.s) slice_start, MIN(COALESCE(t.end,'9999'), b.e) slice_end
+    MAX(t.start, b.s) slice_start, MIN(COALESCE(t.end,'{OPEN_END}'), b.e) slice_end
   FROM person_terms t JOIN people p ON p.id = t.person_id
-  JOIN biennia b ON t.start < b.e AND b.s < COALESCE(t.end,'9999')
+  JOIN biennia b ON t.start < b.e AND b.s < COALESCE(t.end,'{OPEN_END}')
   WHERE NOT EXISTS (
     SELECT 1 FROM pv WHERE pv.person_id = t.person_id AND pv.chamber = t.chamber
-    AND pv.d >= MAX(t.start, b.s) AND pv.d < MIN(COALESCE(t.end,'9999'), b.e))
+    AND pv.d >= MAX(t.start, b.s) AND pv.d < MIN(COALESCE(t.end,'{OPEN_END}'), b.e))
   AND (SELECT COUNT(*) FROM cd WHERE cd.chamber = t.chamber
-       AND cd.d >= MAX(t.start, b.s) AND cd.d < MIN(COALESCE(t.end,'9999'), b.e)) > 20
+       AND cd.d >= MAX(t.start, b.s) AND cd.d < MIN(COALESCE(t.end,'{OPEN_END}'), b.e)) > 20
   GROUP BY t.person_id, t.chamber, b.by"""))
 
 # 8. long silent tails: a final term in a chamber ends >120 days after the
@@ -131,12 +133,12 @@ total += check("terms extending far past last vote while chamber voted on", db.e
        AND cd.d > lv.last_vote AND cd.d < t.end) > 20"""))
 
 # 9. money: recipients whose receipts are 100% outside their terms
-total += check("contribution recipients with zero in-term receipts", db.execute("""
+total += check("contribution recipients with zero in-term receipts", db.execute(f"""
   SELECT p.name, COUNT(*) n, MIN(c.date) first, MAX(c.date) last
   FROM contributions c JOIN people p ON p.id = c.person_id
   GROUP BY c.person_id
   HAVING SUM(EXISTS (SELECT 1 FROM person_terms t WHERE t.person_id = c.person_id
-    AND c.date >= t.start AND c.date <= COALESCE(t.end,'9999'))) = 0"""))
+    AND c.date >= t.start AND c.date <= COALESCE(t.end,'{OPEN_END}'))) = 0"""))
 
 # 10. stale CFIS committee map: mapped people who are not sitting
 total += check("cfis committee map entries for non-sitting people", db.execute("""
@@ -191,10 +193,10 @@ for year, chamber, district, candidate in db.execute("""
     SELECT year, chamber, district, candidate,
            RANK() OVER (PARTITION BY year, chamber, district ORDER BY votes DESC) rk
     FROM election_history) WHERE rk = 1"""):
-    seated = [r[0] for r in db.execute("""
+    seated = [r[0] for r in db.execute(f"""
       SELECT p.name FROM person_terms t JOIN people p ON p.id = t.person_id
       WHERE t.chamber = ? AND t.district = ?
-      AND t.start <= ? AND COALESCE(t.end, '9999') >= ?""",
+      AND t.start <= ? AND COALESCE(t.end, '{OPEN_END}') >= ?""",
       (chamber, district, f"{year + 1}-02-01", f"{year + 1}-02-01"))]
     cand_squash = "".join(ch for ch in candidate.lower() if ch.isalpha())
     if not any(
