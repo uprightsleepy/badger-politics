@@ -29,6 +29,8 @@ CURATED_PATH = (
     Path(__file__).resolve().parents[1] / "importer" / "candidate_committees.json"
 )
 MAP_PATH = DATA_DIR / "committee_map.json"
+# earlier filers kept alongside a curated one; committed and re-validated each run
+RETAINED_PATH = Path(__file__).resolve().parents[1] / "importer" / "retained_committees.json"
 
 
 def _normalize(text: str) -> str:
@@ -109,7 +111,13 @@ def build_map(db_path: Path) -> None:
             if not k.startswith("_")
         }
 
-    previous = json.loads(MAP_PATH.read_text(encoding="utf-8")) if MAP_PATH.exists() else []
+    retained = {}
+    if RETAINED_PATH.exists():
+        retained = {
+            k: v
+            for k, v in json.loads(RETAINED_PATH.read_text(encoding="utf-8")).items()
+            if not k.startswith("_")
+        }
 
     http = session()
     mapped, unresolved = [], []
@@ -118,10 +126,22 @@ def build_map(db_path: Path) -> None:
         if override:
             if override.get("skip"):
                 continue
-            if override.get("retain_existing"):
-                mapped.extend(m for m in previous
-                              if m["person_id"] == person_id
-                              and m["entity_id"] != override["entity_id"])
+            family_name, aliases = person_details.get(person_id, (name.split()[-1], []))
+            variants = name_variants(name, family_name, aliases)
+            for kept in retained.get(person_id, []):
+                if kept["entity_id"] == override["entity_id"]:
+                    continue
+                hit = {"id": kept["entity_id"], "name": kept["committee"]}
+                if not any(match_committees(v, [hit]) for v in variants):
+                    raise ValueError(
+                        f"retained committee {kept['entity_id']} ({kept['committee']}) no"
+                        f" longer passes the name rules for {name}; revisit"
+                        " retained_committees.json"
+                    )
+                mapped.append(
+                    {"person_id": person_id, "person": name, "entity_id": kept["entity_id"],
+                     "committee": kept["committee"], "matched": "retained"}
+                )
             mapped.append(
                 {"person_id": person_id, "person": name,
                  "entity_id": override["entity_id"],
