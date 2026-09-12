@@ -58,6 +58,25 @@
             "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://gc.zgo.at https://geocoding.geo.census.gov; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://badgerpolitics.goatcounter.com https://places.googleapis.com; manifest-src 'self'"
           }
         ]
+      },
+      {
+        "comment": "Money period fragments are fetched by their page, never a destination; keep them out of search engines.",
+        "source": "**/money/views/**",
+        "headers": [
+          {
+            "key": "X-Robots-Tag",
+            "value": "noindex"
+          }
+        ]
+      },
+      {
+        "source": "/legislators/*/money/**",
+        "headers": [
+          {
+            "key": "X-Robots-Tag",
+            "value": "noindex"
+          }
+        ]
       }
     ],
     "redirects": [

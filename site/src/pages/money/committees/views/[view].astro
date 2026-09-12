@@ -1,0 +1,18 @@
+---
+/** One non-default period view of the contributing-committee list,
+ * fetched on demand by MoneyFilters so the index carries only the
+ * current view. */
+import CommitteeList from "../../../../components/CommitteeList.astro";
+import { moneyViews } from "../../../../lib/money-periods";
+
+export function getStaticPaths() {
+  return moneyViews()
+    .filter((view) => !view.isDefault)
+    .map((view) => ({ params: { view: `${view.period.key}-${view.scope}` }, props: { view } }));
+}
+const { view } = Astro.props;
+---
+<meta name="robots" content="noindex" />
+<div data-money-period={view.period.key} data-money-scope={view.scope} data-pagefind-ignore>
+  <CommitteeList view={view} unknownType="Type unknown" />
+</div>

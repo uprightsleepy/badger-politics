@@ -20,7 +20,7 @@ and served as a fully static site.
 | Hearing None | The graveyard: bills that were referred, never heard, and failed at session's end |
 | Calendar | Hearings and election days, with iCal feeds and WisconsinEye recordings where they exist; readers who saved an address in a covered city also see their own council's upcoming meetings, on that device only |
 | New Laws, Governor's Desk, Veto Tracker, Partial Veto | Acts by biennium with passage tallies; bills awaiting signature; every veto, partial veto and override attempt; how the partial veto works |
-| Campaign Money | Receipts to sitting legislators windowed to their time in office, contributing committees, and outside spending filing by filing with the Ethics Commission's transaction IDs and report links |
+| Campaign Money | Receipts to sitting legislators by two-year reporting period (the current period by default, all available history on request, an optional filter to receipts during recorded service), contributing committees, and outside spending filing by filing with the Ethics Commission's transaction IDs and report links |
 | Federal Delegation | Both U.S. senators and all eight House members, with every floor roll call from the Senate's and House Clerk's own XML (Senate from the 112th Congress, House from 2005) |
 | City Councils | Milwaukee, Madison, Appleton, Waukesha and West Allis recorded votes, member profiles, attendance, source links, feeds and JSON. Partial history is labeled. Verified district maps and address lookup currently cover Milwaukee and West Allis. |
 | 2026 Ballot | Statewide offices and every legislative seat, with a personal "what is on my ballot" view from the saved district |
@@ -73,6 +73,7 @@ require a seeded archive and `NIGHTLY_PARSER_ENABLED=true`; see the
 | Council votes and attendance | Legistar Web API (`milwaukee`, `madison`, `cityofappleton`, `waukesha`, `westalliswi`); each meeting's InSite page for item links | one shared collector/importer; meetings cached once minutes are settled (`Approved` for Madison, `Final` otherwise); votes retain each tenant's person IDs and original labels |
 | Aldermanic district boundaries | Milwaukee open data portal (CC BY shapefile); West Allis city GIS server | one-time generator (`importer/local_shapes.py`), committed GeoJSON; the robots-disallowed city map host is not used |
 | Curated council seats | official West Allis, Appleton and Waukesha rosters | shared table (`importer/local_seats.json`), keyed by tenant and person ID with a basis URL for each verified district |
+| Legislator filer ids kept alongside a curated one | `pipeline/importer/retained_committees.json`, each row with how it was matched and when first seen | re-validated against the same name rules on every run; a row that stops passing fails the run rather than lingering |
 | Council members carried under two ids | `importer/local_person_merges.json`, each entry with its basis (identical record name, complementary service, no item voted under both) | folded into one member; the importer refuses a merge the votes contradict |
 | Council member names, portraits, contacts, committees | Legistar person/office IDs and public department listings; reviewed city district pages for Milwaukee and West Allis | exact identity and source attribution; Milwaukee profile retrieval is currently paused with its complete archive retained; Madison districts use the same person ID's official council URL, without portrait downloads |
 | Cross-check only | FollowTheMoney API (CC BY-NC-SA) | verification input, never imported or republished |
@@ -112,8 +113,9 @@ These are hard rules. A change that violates one is wrong even if it works.
    to Wisconsin candidates; PAC money is the PAC's, not a corporate
    payment; occupations are donor-reported; a contribution is not an
    endorsement of a vote. Donations are never displayed next to votes.
-   Individual donors appear only in aggregate. Totals are windowed to
-   each member's time in office. Outside spending is shown one filing at
+   Individual donors appear only in aggregate. Totals follow the selected
+   two-year reporting period, with an optional filter to receipts during
+   recorded legislative service. Outside spending is shown one filing at
    a time, as filed, with the Commission's transaction ID and the report
    it appeared on; nothing is summed by stance.
 6. **Provenance filtering.** Rows with `source='legiscan'`, if ever

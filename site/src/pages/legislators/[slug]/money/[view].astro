@@ -1,0 +1,23 @@
+---
+/** One non-default period view of a legislator's campaign money, fetched
+ * on demand by MoneyFilters so the profile carries only the current view. */
+import ProfileMoneyView from "../../../../components/ProfileMoneyView.astro";
+import { sittingPeople } from "../../../../lib/db";
+import { personSlug } from "../../../../lib/format";
+import { moneyViews } from "../../../../lib/money-periods";
+
+export function getStaticPaths() {
+  const views = moneyViews().filter((view) => !view.isDefault);
+  return sittingPeople().flatMap((person) =>
+    views.map((view) => ({
+      params: { slug: personSlug(person.id), view: `${view.period.key}-${view.scope}` },
+      props: { personId: person.id, view },
+    })),
+  );
+}
+const { personId, view } = Astro.props;
+---
+<meta name="robots" content="noindex" />
+<div data-money-period={view.period.key} data-money-scope={view.scope} data-pagefind-ignore>
+  <ProfileMoneyView personId={personId} view={view} />
+</div>

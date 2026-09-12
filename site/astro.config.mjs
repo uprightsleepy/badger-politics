@@ -45,7 +45,10 @@ export default defineConfig({
         // has been told not to index
         !/\/votes\//.test(page) &&
         !/\/legislators\/[^/]+\/(votes|bills)\//.test(page) &&
-        !/\/local\/[^/]+\/[^/]+\/votes\//.test(page),
+        !/\/local\/[^/]+\/[^/]+\/votes\//.test(page) &&
+        // money period fragments are fetched by the page, never visited
+        !/\/legislators\/[^/]+\/money\/[^/]+\/$/.test(page) &&
+        !/\/money\/(?:committees\/)?views\/[^/]+\/$/.test(page),
       serialize(item) {
         // bills and members change as the session moves; reference pages
         // rarely do. Priority is relative within our own site only.

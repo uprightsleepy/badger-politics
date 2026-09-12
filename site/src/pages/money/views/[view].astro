@@ -1,0 +1,18 @@
+---
+/** One non-default period view of the money overview, fetched on demand
+ * by MoneyFilters so the page itself carries only the current view. */
+import MoneyView from "../../../components/MoneyView.astro";
+import { moneyOverview } from "../../../lib/db";
+import { moneyViews } from "../../../lib/money-periods";
+
+export function getStaticPaths() {
+  return moneyViews()
+    .filter((view) => !view.isDefault)
+    .map((view) => ({ params: { view: `${view.period.key}-${view.scope}` }, props: { view } }));
+}
+const { view } = Astro.props;
+---
+<meta name="robots" content="noindex" />
+<div data-money-period={view.period.key} data-money-scope={view.scope} data-pagefind-ignore>
+  <MoneyView m={moneyOverview(view.bounds)} view={view} />
+</div>
