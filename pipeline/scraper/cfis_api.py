@@ -17,7 +17,6 @@ import requests
 
 BASE = "https://campaignfinance.wi.gov/api/trpc/"
 PAGE = 1000
-DELAY = 0.4
 
 
 def call(http: requests.Session, proc: str, payload: dict, timeout: int = 60):
@@ -50,7 +49,28 @@ def transaction_pages(
         if len(results) < size:
             return
         skip += len(results) if offset_step is None else offset_step
-        time.sleep(DELAY)
+
+
+def verified(http, first, last, fetch, label, attempts=3):
+    """Run `fetch(page_size)`, which returns (result, scanned, expected,
+    seen_ids), until the listing is complete and unique: paged rows equal
+    the source's count. Smaller pages recover inconsistent small listings;
+    a window that never settles stops the run. Returns (result, scanned)."""
+    page_size = PAGE
+    for attempt in range(attempts):
+        result, scanned, expected, seen_ids = fetch(page_size)
+        if scanned == expected == len(seen_ids):
+            if attempt:
+                expected = transaction_count(http, first, last)
+            if scanned == expected:
+                return result, scanned
+        if attempt < attempts - 1:
+            print(f"{label}: incomplete listing ({scanned} rows, {len(seen_ids)} unique,"
+                  f" expected {expected}), retaking")
+            page_size = min(PAGE, 100) if expected <= PAGE else PAGE
+            time.sleep(5)
+    raise RuntimeError(f"CFIS drift: {label} paged {scanned} rows"
+                       f" ({len(seen_ids)} unique) but count said {expected}")
 
 
 def transaction_count(http: requests.Session, first: str, last: str) -> int:

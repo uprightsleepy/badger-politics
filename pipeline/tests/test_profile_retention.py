@@ -46,7 +46,7 @@ def archive(tmp_path, monkeypatch):
     monkeypatch.setattr(collector, "PROFILE_SOURCES", [])
     monkeypatch.setattr(collector, "milwaukee_district",
                         lambda *args: pytest.fail("paused request"))
-    monkeypatch.setattr(collector, "west_allis_district", lambda http, n, delay: {
+    monkeypatch.setattr(collector, "west_allis_district", lambda http, n: {
         "page": collector.WA_PAGES[n], "entries": [{"heading": f"Example {n}", "image": None,
                                                   "emails": [], "phones": []}],
     })
@@ -123,7 +123,7 @@ def test_reviewed_reactivation_restores_collection_and_clears_retained_status(ar
     collector.main([])
     collector.ACCESS.policies["city.milwaukee.gov"].pop("paused")
     seen = []
-    def fetch(http, n, delay):
+    def fetch(http, n):
         seen.append(n)
         return copy.deepcopy(archived_profiles()["milwaukee"]["seats"][str(n)])
     monkeypatch.setattr(collector, "milwaukee_district", fetch)

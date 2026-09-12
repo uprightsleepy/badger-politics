@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import re
 import sys
-import time
 from pathlib import Path
 
 import yaml
@@ -20,7 +19,6 @@ from scraper.http import session
 
 PEOPLE_DIR = Path(__file__).resolve().parents[1] / "_data" / "people" / "wi"
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "contacts"
-DELAY = 0.4
 
 EMAIL_RE = re.compile(r"\b(?:Rep|Sen)\.[\w.]+@legis\.wisconsin\.gov\b", re.I)
 PHONE_RE = re.compile(r"\(608\)\s*\d{3}-\d{4}")
@@ -74,7 +72,6 @@ def main(argv: list[str]) -> int:
             response = http.get(url, timeout=60)
             response.raise_for_status()
             cache.write_text(response.text, encoding="utf-8")
-            time.sleep(DELAY)
         parsed = parse_page(cache.read_text(encoding="utf-8"))
 
         # Check the official page's chamber; roster contacts can be stale.

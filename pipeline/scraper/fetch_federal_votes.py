@@ -10,14 +10,13 @@ cached forever.
 The roster (unitedstates/congress-legislators, public domain) maps ids
 to people and districts for the whole Wisconsin delegation.
 
-Usage: python -m scraper.fetch_federal_votes [--delay S]
+Usage: python -m scraper.fetch_federal_votes
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
-import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -58,9 +57,7 @@ def fetch(http: requests.Session, url: str) -> bytes:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--delay", type=float, default=0.3)
-    ns = ap.parse_args(argv)
+    argparse.ArgumentParser().parse_args(argv)
 
     http = http_session()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -87,7 +84,6 @@ def main(argv: list[str]) -> int:
                 fetch(http, VOTE_URL.format(c=congress, s=session, n=n))
             )
             fetched += 1
-            time.sleep(ns.delay)
 
     house = DATA_DIR / "house"
     house.mkdir(exist_ok=True)
@@ -108,7 +104,6 @@ def main(argv: list[str]) -> int:
             response.raise_for_status()
             dest.write_bytes(response.content)
             fetched += 1
-            time.sleep(ns.delay)
         cached += len(have)
 
     print(f"federal votes: {fetched} fetched, {cached} already cached")

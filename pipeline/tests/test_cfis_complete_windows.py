@@ -21,13 +21,11 @@ def no_sleep(monkeypatch):
 
 def collect(kind, http):
     if kind == "receipts":
-        rows, scanned, expected, seen, matched = receipts._fetch_with_retries(
-            http, {20: "p1"}, FIRST, LAST, "2025-01", attempts=3,
+        rows, _ = api.verified(
+            http, FIRST, LAST,
+            lambda size: receipts.fetch_window(http, {20: "p1"}, FIRST, LAST, page_size=size),
+            "2025-01",
         )
-        if not matched:
-            raise RuntimeError(
-                f"CFIS drift: {scanned} rows, {len(seen)} unique, {expected} expected"
-            )
         return rows, None
     return committees.fetch_month(http, FIRST, LAST)
 

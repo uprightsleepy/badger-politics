@@ -14,14 +14,19 @@ from __future__ import annotations
 import json
 import sqlite3
 import sys
-import time
 import unicodedata
 from datetime import date
 from pathlib import Path
 
 import requests
 
-from scraper.cfis_api import DELAY, PAGE, call, month_windows, transaction_count, transaction_pages
+from scraper.cfis_api import (
+    call,
+    month_windows,
+    transaction_count,
+    transaction_pages,
+    verified,
+)
 from scraper.http import session
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "cfis"
@@ -168,7 +173,6 @@ def build_map(db_path: Path) -> None:
                 )
                 cache[query] = {"fetched": today.isoformat(),
                                 "hits": hits if isinstance(hits, list) else hits.get("results", [])}
-                time.sleep(DELAY)
             for h in cache[query]["hits"]:
                 if h["id"] not in seen_ids:
                     seen_ids.add(h["id"])
@@ -252,27 +256,11 @@ def fetch_window(
     return rows, skip, expected, seen_ids
 
 
-def _fetch_with_retries(
-    http: requests.Session, committee_ids: dict, first: str, last: str,
-    label: str, attempts: int,
-) -> tuple[list[dict], int, int, set, bool]:
-    """Retake incomplete windows; smaller pages recover inconsistent small listings."""
-    page_size = PAGE
-    for attempt in range(attempts):
-        rows, skip, expected, seen_ids = fetch_window(
-            http, committee_ids, first, last, page_size=page_size,
-        )
-        if skip == expected == len(seen_ids):
-            if attempt:
-                expected = transaction_count(http, first, last)
-            if skip == expected:
-                return rows, skip, expected, seen_ids, True
-        if attempt < attempts - 1:
-            print(f"{label}: incomplete listing ({skip} rows, {len(seen_ids)} unique,"
-                  f" expected {expected}), retaking")
-            page_size = min(PAGE, 100) if expected <= PAGE else PAGE
-            time.sleep(5)
-    return rows, skip, expected, seen_ids, False
+def verified_window(http, committee_ids: dict, first: str, last: str, label: str):
+    """Receipts for one window once the listing is verified complete."""
+    return verified(http, first, last,
+                    lambda size: fetch_window(http, committee_ids, first, last, page_size=size),
+                    label)
 
 
 def fetch_transactions(since: str, as_of: date | None = None) -> None:
@@ -286,17 +274,9 @@ def fetch_transactions(since: str, as_of: date | None = None) -> None:
         out = DATA_DIR / f"tx-{label}.json"
         if out.exists() and label not in refresh:
             continue
-        rows, skip, expected, seen_ids, matched = _fetch_with_retries(
-            http, committee_ids, first, last, label, attempts=3,
-        )
-        if not matched:
-            raise RuntimeError(
-                f"CFIS drift: {label} paged {skip} rows"
-                f" ({len(seen_ids)} unique) but count said {expected}"
-            )
+        rows, skip = verified_window(http, committee_ids, first, last, label)
         out.write_text(json.dumps(rows, indent=0), encoding="utf-8")
         print(f"{label}: {skip} scanned, {len(rows)} receipts kept -> {out.name}")
-        time.sleep(DELAY)
 
 
 def audit_archives(sample: int, as_of: date | None = None) -> None:
@@ -316,14 +296,7 @@ def audit_archives(sample: int, as_of: date | None = None) -> None:
     picks = [archived[(offset + i) % len(archived)] for i in range(min(sample, len(archived)))]
     drifted = 0
     for label, first, last in picks:
-        rows, skip, expected, seen_ids, matched = _fetch_with_retries(
-            http, committee_ids, first, last, f"audit {label}", attempts=3,
-        )
-        if not matched:
-            raise RuntimeError(
-                f"CFIS drift: audit {label} paged {skip} rows"
-                f" ({len(seen_ids)} unique) but count said {expected}"
-            )
+        rows, _ = verified_window(http, committee_ids, first, last, f"audit {label}")
         out = DATA_DIR / f"tx-{label}.json"
         old = json.loads(out.read_text(encoding="utf-8"))
         if old == rows:
@@ -338,7 +311,6 @@ def audit_archives(sample: int, as_of: date | None = None) -> None:
             "archive refreshed"
         )
         out.write_text(json.dumps(rows, indent=0), encoding="utf-8")
-        time.sleep(DELAY)
     print(f"audit: {len(picks)} months sampled, {drifted} refreshed")
 
 

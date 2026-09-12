@@ -115,7 +115,6 @@ class FakeHttp:
 @pytest.fixture
 def configure(monkeypatch):
     monkeypatch.setattr(api, "PAGE", 2)
-    monkeypatch.setattr(receipts, "PAGE", 2)
     monkeypatch.setattr(committees, "PAGE", 2)
 
     def configured(pages, counts=(0,)):
@@ -157,7 +156,7 @@ def test_complete_rows_requests_and_sleeps(kind, timeout, scenario, row_count, c
     expected.insert(0, ("publicFrontendApi.getTransactionsTotalCount",
                         {"dateFrom": FIRST, "dateTo": LAST}, 60))
     assert http.requests() == expected
-    assert [e for e in http.events if e[0] == "sleep"] == [("sleep", 0.4)] * (len(skips) - 1)
+    assert not [e for e in http.events if e[0] == "sleep"], "pacing belongs to the adapter"
     assert not http.pages
 
 
@@ -175,7 +174,7 @@ def test_window_bounds_pass_through_unchanged(kind, first, last, configure):
 
 @pytest.mark.parametrize("kind", ["receipts", "committees"])
 @pytest.mark.parametrize("scenario,error,requests_made,sleeps", [
-    ("timeout", requests.Timeout, 2, [("sleep", 0.4)]),
+    ("timeout", requests.Timeout, 2, []),
     ("denied", SourceAccessError, 1, []),
     ("http-error", requests.HTTPError, 1, []),
     ("malformed-page", RuntimeError, 1, []),
@@ -195,10 +194,12 @@ def test_errors_propagate_without_advancing(
 def test_receipt_count_mismatch_retake_keeps_both_waits(configure):
     second = {**RAW, "id": 2}
     http = configure([page(RAW), page(RAW, second), page()], counts=(2, 2, 2))
-    assert receipts._fetch_with_retries(http, {20: "p1"}, FIRST, LAST, "fixture", 2) == (
-        [RECEIPT, {**RECEIPT, "id": 2}], 2, 2, {1, 2}, True,
-    )
-    assert [e for e in http.events if e[0] == "sleep"] == [("sleep", 5), ("sleep", 0.4)]
+    assert api.verified(
+        http, FIRST, LAST,
+        lambda size: receipts.fetch_window(http, {20: "p1"}, FIRST, LAST, page_size=size),
+        "fixture", 2,
+    ) == ([RECEIPT, {**RECEIPT, "id": 2}], 2)
+    assert [e for e in http.events if e[0] == "sleep"] == [("sleep", 5)]
     assert [proc for proc, _, _ in http.requests()] == [
         "publicFrontendApi.getTransactionsTotalCount", "publicFrontendApi.getTransactions",
         "publicFrontendApi.getTransactionsTotalCount", "publicFrontendApi.getTransactions",

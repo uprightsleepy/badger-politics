@@ -116,7 +116,6 @@ def test_state_campaign_reuses_scan_without_changing_existing_money(
     monkeypatch.setattr(collector, "transaction_pages",
                         lambda *_, **kw: iter([[source, pac, unrelated]]))
     monkeypatch.setattr(collector, "session", lambda: object())
-    monkeypatch.setattr(collector.time, "sleep", lambda _: None)
     monkeypatch.setattr(collector, "DATA_DIR", tmp_path)
     collector.main(["--since", "2026-01", "--until", "2026-01"])
     db_path = tmp_path / "db.sqlite"

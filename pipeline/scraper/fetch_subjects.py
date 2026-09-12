@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 import re
 import sys
-import time
 from datetime import date
 from pathlib import Path
 
@@ -25,7 +24,6 @@ from scraper.http import session
 
 BASE = "https://docs.legis.wisconsin.gov"
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "subjects"
-DELAY = 0.5
 MAX_PAGES = 800  # safety valve far above any real index size
 
 SUBJECT_RE = re.compile(
@@ -83,7 +81,6 @@ def fetch_year(http: requests.Session, year: int) -> dict:
         if not m:
             break
         url = BASE + m.group(1)
-        time.sleep(DELAY)
     else:
         raise RuntimeError(f"subject index {year}: exceeded {MAX_PAGES} pages")
     if skipped:
