@@ -24,8 +24,9 @@ DEPLOY_TRIGGER = (
 DEPLOY_TARGET = "${{ inputs.target || 'badgerpolitics-dev' }}"
 
 
-POLICY_CRON = "0 19 * * *"
-PARSER_CRON = "0 20 * * *"
+# UTC, the only clock Actions schedules know: 7pm and 8pm Central in summer
+POLICY_CRON = "0 0 * * *"
+PARSER_CRON = "0 1 * * *"
 
 def validate(workflow: dict, name: str) -> list[str]:
     errors = []
@@ -92,8 +93,8 @@ def validate(workflow: dict, name: str) -> list[str]:
             errors.append("nightly parser requires a fixed, non-cancelling concurrency group")
         schedules = events.get("schedule", []) if isinstance(events, dict) else []
         if schedules != [
-            {"cron": POLICY_CRON, "timezone": "America/Chicago"},
-            {"cron": PARSER_CRON, "timezone": "America/Chicago"},
+            {"cron": POLICY_CRON},
+            {"cron": PARSER_CRON},
         ]:
             errors.append("nightly parser requires separate daily policy and parser schedules")
         policies = workflow.get("jobs", {}).get("policies", {})
