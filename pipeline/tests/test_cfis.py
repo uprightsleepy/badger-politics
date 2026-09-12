@@ -172,3 +172,65 @@ def test_curated_conflicting_owner_leaves_previous_map_intact(tmp_path, make_db,
     with pytest.raises(ValueError, match="multiple legislators"):
         fetch_cfis.build_map(db)
     assert mapping.read_text() == "[]"
+
+
+def test_search_hits_cached_a_week_while_the_map_is_rederived_nightly(
+        tmp_path, make_db, monkeypatch):
+    from datetime import date as real_date
+
+    from scraper import fetch_cfis
+
+    db = tmp_path / "wi.sqlite"
+    conn = make_db(db)
+    conn.executemany("INSERT INTO people (id, name, current_role)"
+                     " VALUES (?, ?, 'Representative')",
+                     [("p1", "Alex Example"), ("p2", "Blake Sample")])
+    conn.commit()
+    conn.close()
+    # surname queries are normalized to lowercase before the search
+    hits = {"Alex Example": [{"id": 10, "name": "Friends of Alex Example"}], "example": [],
+            "Blake Sample": [], "sample": [{"id": 11, "name": "Blake Sample for Assembly"}]}
+    calls = []
+
+    def search(http, proc, payload):
+        calls.append(payload["searchQuery"])
+        return hits[payload["searchQuery"]]
+
+    class Day(real_date):
+        current = real_date(2026, 9, 14)
+
+        @classmethod
+        def today(cls):
+            return cls.current
+
+    monkeypatch.setattr(fetch_cfis, "call", search)
+    monkeypatch.setattr(fetch_cfis, "date", Day)
+    monkeypatch.setattr(fetch_cfis.time, "sleep", lambda _: None)
+    monkeypatch.setattr(fetch_cfis, "MAP_PATH", tmp_path / "committee_map.json")
+    monkeypatch.setattr(fetch_cfis, "CURATED_PATH", tmp_path / "curated.json")
+    monkeypatch.setattr(fetch_cfis, "RETAINED_PATH", tmp_path / "retained.json")
+    monkeypatch.setattr(fetch_cfis, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(fetch_cfis, "load_person_details", lambda: {})
+    monkeypatch.setattr(fetch_cfis, "session", lambda: None)
+
+    def mapped():
+        return [(r["person_id"], r["entity_id"]) for r in
+                json.loads((tmp_path / "committee_map.json").read_text())]
+
+    fetch_cfis.build_map(db)
+    assert len(calls) == 4 and mapped() == [("p1", 10), ("p2", 11)]
+    # the next nights read the cached hits; one member's queries are due each week
+    refetched = []
+    for offset in range(1, 8):
+        Day.current = real_date(2026, 9, 14 + offset)
+        calls.clear()
+        fetch_cfis.build_map(db)
+        refetched.extend(calls)
+    assert sorted(refetched) == sorted(hits), "every query is re-read exactly once a week"
+    # a cached hit that stops matching leaves the map on the next derivation
+    cache = json.loads((tmp_path / "search_cache.json").read_text())
+    cache["sample"]["hits"] = [{"id": 11, "name": "Someone Else for Assembly"}]
+    (tmp_path / "search_cache.json").write_text(json.dumps(cache))
+    Day.current = real_date(2026, 9, 22)
+    fetch_cfis.build_map(db)
+    assert mapped() == [("p1", 10)]

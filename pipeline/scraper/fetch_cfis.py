@@ -31,6 +31,7 @@ CURATED_PATH = (
 MAP_PATH = DATA_DIR / "committee_map.json"
 # earlier filers kept alongside a curated one; committed and re-validated each run
 RETAINED_PATH = Path(__file__).resolve().parents[1] / "importer" / "retained_committees.json"
+SEARCH_TTL_DAYS = 7
 
 
 def _normalize(text: str) -> str:
@@ -120,8 +121,11 @@ def build_map(db_path: Path) -> None:
         }
 
     http = session()
+    cache_path = DATA_DIR / "search_cache.json"
+    cache = json.loads(cache_path.read_text(encoding="utf-8")) if cache_path.exists() else {}
+    today = date.today()
     mapped, unresolved = [], []
-    for person_id, name in people:
+    for index, (person_id, name) in enumerate(people):
         override = curated.get(person_id)
         if override:
             if override.get("skip"):
@@ -152,16 +156,23 @@ def build_map(db_path: Path) -> None:
         hit_list: list[dict] = []
         seen_ids: set[int] = set()
         for query in (name, surname):
-            hits = call(
-                http, "entity.searchEntities",
-                {"searchQuery": query, "limit": 20, "entityTypeOf": ["COMMITTEE"],
-                 "alwaysRespectPiiRedaction": True},
-            )
-            for h in hits if isinstance(hits, list) else hits.get("results", []):
+            # The search index changes slowly and each request costs the source
+            # policy's interval: a query's hits are re-read once a week, on a
+            # fixed night, and the name rules run on every night's hits.
+            due = query not in cache or (today.toordinal() + index) % SEARCH_TTL_DAYS == 0
+            if due:
+                hits = call(
+                    http, "entity.searchEntities",
+                    {"searchQuery": query, "limit": 20, "entityTypeOf": ["COMMITTEE"],
+                     "alwaysRespectPiiRedaction": True},
+                )
+                cache[query] = {"fetched": today.isoformat(),
+                                "hits": hits if isinstance(hits, list) else hits.get("results", [])}
+                time.sleep(DELAY)
+            for h in cache[query]["hits"]:
                 if h["id"] not in seen_ids:
                     seen_ids.add(h["id"])
                     hit_list.append(h)
-            time.sleep(DELAY)
         family_name, aliases = person_details.get(person_id, (name.split()[-1], []))
         matches: list[dict] = []
         matched_ids: set[int] = set()
@@ -188,6 +199,7 @@ def build_map(db_path: Path) -> None:
         owners[entity_id] = entry["person_id"]
     mapped = list({(m["person_id"], m["entity_id"]): m for m in mapped}.values())
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps(cache), encoding="utf-8")
     MAP_PATH.write_text(json.dumps(mapped, indent=1), encoding="utf-8")
     print(f"mapped {len(mapped)} committees -> {MAP_PATH}")
     # coverage gap, not misattribution risk: warn and continue
