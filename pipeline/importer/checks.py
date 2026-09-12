@@ -150,15 +150,20 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
         ),
         # For third-party stanced spending, candidate and race must appear together.
         # Referendum/vendor rows may have neither; candidate-committee spending is excluded.
+        # The Commission names the race in either field: usually related_office
+        # ("Supreme Court"), sometimes only related_district ("State Senate,
+        # District No. 23", first seen on four 2026-09-08 filings by entity
+        # 30614). Either identifies the race; neither does not.
         "advocacy naming a race but not the candidate": (
             "SELECT COUNT(*) FROM cf_transactions WHERE stance IS NOT NULL"
-            " AND related_office IS NOT NULL"
+            " AND (related_office IS NOT NULL OR related_district IS NOT NULL)"
             " AND (related_name IS NULL OR related_name = '')"
             " AND COALESCE(filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')"
         ),
         "advocacy naming a candidate but not the race": (
             "SELECT COUNT(*) FROM cf_transactions WHERE stance IS NOT NULL"
-            " AND related_name IS NOT NULL AND related_office IS NULL"
+            " AND related_name IS NOT NULL"
+            " AND related_office IS NULL AND related_district IS NULL"
             " AND COALESCE(filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')"
         ),
         # a conduit pass-through whose final recipient is missing would be
