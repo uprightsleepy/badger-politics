@@ -534,10 +534,14 @@ const tally = TALLY_ORDER.map((status) => ({
       {sitting && (
         <section class="mt-6">
           <h2 id="money" class="scroll-mt-4 text-xl font-bold">Campaign money</h2>
-          <MoneyFilters />
-          {moneyViews().map((view) => <div data-money-period={view.period.key} data-money-scope={view.scope} hidden={!view.isDefault}>
-            <ProfileMoneyView personId={person.id} view={view} />
-          </div>)}
+          <MoneyFilters fragmentBase={`/legislators/${personSlug(person.id)}/money/`} />
+          <div data-money-views>
+            {moneyViews().filter((view) => view.isDefault).map((view) => (
+              <div data-money-period={view.period.key} data-money-scope={view.scope}>
+                <ProfileMoneyView personId={person.id} view={view} />
+              </div>
+            ))}
+          </div>
         </section>
       )}
 

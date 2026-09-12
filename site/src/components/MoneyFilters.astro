@@ -1,10 +1,20 @@
 ---
+/** Period and service-scope selection for the money views. The page
+ * carries the default view; with `fragmentBase`, other views are static
+ * fragments fetched on demand (one file per period and scope), so the
+ * HTML stays the size of one view and the search index sees one copy.
+ * Without it, every view is inline and hidden (small pages). */
 import { currentMoneyCycle, moneyPeriods } from "../lib/money-periods";
-interface Props { office?: boolean; }
-const { office = true } = Astro.props;
+interface Props { office?: boolean; fragmentBase?: string }
+const { office = true, fragmentBase } = Astro.props;
 const periods = moneyPeriods();
 ---
-<div data-money-filters data-current-period={currentMoneyCycle()} class="mt-4 flex flex-wrap items-end gap-4 rounded-xl border border-navy-100 bg-white p-4">
+<div
+  data-money-filters
+  data-current-period={currentMoneyCycle()}
+  data-fragment-base={fragmentBase}
+  class="mt-4 flex flex-wrap items-end gap-4 rounded-xl border border-navy-100 bg-white p-4"
+>
   <label class="flex min-w-0 flex-col gap-1 text-sm font-semibold">
     Reporting period
     <select data-money-period-select class="min-h-11 max-w-full rounded-lg border border-navy-600 bg-white px-3 py-2">
@@ -26,39 +36,85 @@ const periods = moneyPeriods();
     const status = filters.querySelector<HTMLElement>("[data-money-status]")!;
     const options = new Set([...period.options].map((o) => o.value));
     const current = filters.dataset.currentPeriod!;
-    const update = (push = false) => {
-      const scope = office
+    const base = filters.dataset.fragmentBase;
+    const container = document.querySelector<HTMLElement>("[data-money-views]");
+    const LINK = /^\/(money\/(?:committees\/(?:\d+\/)?)?|legislators\/[^/]+\/|federal\/[^/]+\/)$/;
+    let seq = 0;
+
+    const scopeNow = () =>
+      office
         ? (office.checked ? "office" : "all")
         : (new URLSearchParams(location.search).get("scope") === "office" ? "office" : "all");
-      document.querySelectorAll<HTMLElement>("[data-money-period]").forEach((view) => {
-        view.hidden = view.dataset.moneyPeriod !== period.value
-          || (view.dataset.moneyScope !== undefined && view.dataset.moneyScope !== scope);
-      });
-      document.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((link) => {
+
+    const viewFor = (key: string, scope: string) =>
+      document.querySelector<HTMLElement>(
+        `[data-money-period="${key}"]${office ? `[data-money-scope="${scope}"]` : ""}`,
+      );
+
+    // one file per view; a fetched fragment is kept for the page's lifetime
+    const ensureView = async (key: string, scope: string): Promise<boolean> => {
+      if (viewFor(key, scope) || !base || !container) return true;
+      status.textContent = "Loading…";
+      try {
+        const r = await fetch(`${base}${key}-${scope}/`);
+        if (!r.ok) return false;
+        const doc = new DOMParser().parseFromString(await r.text(), "text/html");
+        const view = doc.querySelector<HTMLElement>("[data-money-period]");
+        if (!view) return false;
+        view.hidden = true;
+        container.appendChild(document.adoptNode(view));
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const carryState = (key: string, scope: string) => {
+      // links inside the money views, and any link marked to carry the selection
+      const anchors = document.querySelectorAll<HTMLAnchorElement>(
+        "[data-money-views] a[href], [data-money-link]",
+      );
+      anchors.forEach((link) => {
         const url = new URL(link.href, location.href);
-        if (url.origin !== location.origin || !/^\/(money\/(?:committees\/(?:\d+\/)?)?|legislators\/[^/]+\/|federal\/[^/]+\/)$/.test(url.pathname)) return;
-        url.searchParams.set("period", period.value);
+        if (url.origin !== location.origin || !LINK.test(url.pathname)) return;
+        url.searchParams.set("period", key);
         url.searchParams.set("scope", scope);
         link.href = url.pathname + url.search + url.hash;
       });
+    };
+
+    const update = async (push = false) => {
+      const key = period.value;
+      const scope = scopeNow();
+      const mine = ++seq;
+      const loaded = await ensureView(key, scope);
+      if (mine !== seq) return; // a newer selection superseded this one
+      document.querySelectorAll<HTMLElement>("[data-money-period]").forEach((view) => {
+        view.hidden = view.dataset.moneyPeriod !== key
+          || (view.dataset.moneyScope !== undefined && view.dataset.moneyScope !== scope);
+      });
+      carryState(key, scope);
       if (push) {
         const url = new URL(location.href);
-        url.searchParams.set("period", period.value);
+        url.searchParams.set("period", key);
         url.searchParams.set("scope", scope);
         history.pushState(null, "", url);
       }
-      status.textContent = `Showing ${period.selectedOptions[0].textContent}${office?.checked ? ", while in legislative office" : ""}`;
+      status.textContent = loaded
+        ? `Showing ${period.selectedOptions[0].textContent}${office?.checked ? ", while in legislative office" : ""}`
+        : "That period could not be loaded. Reload the page to try again.";
       document.dispatchEvent(new Event("money-period-change"));
     };
+
     const restore = () => {
       const params = new URLSearchParams(location.search);
       const requested = params.get("period") ?? current;
       period.value = options.has(requested) ? requested : current;
       if (office) office.checked = params.get("scope") === "office";
-      update();
+      void update();
     };
-    period.addEventListener("change", () => update(true));
-    office?.addEventListener("change", () => update(true));
+    period.addEventListener("change", () => void update(true));
+    office?.addEventListener("change", () => void update(true));
     window.addEventListener("popstate", restore);
     restore();
   }

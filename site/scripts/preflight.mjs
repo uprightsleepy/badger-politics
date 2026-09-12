@@ -108,6 +108,23 @@ for (const c of counts) {
   }
 }
 
+// --- money period fragments: one per sitting legislator per non-default view --
+{
+  const sitting = db
+    .prepare("SELECT COUNT(*) AS n FROM people WHERE current_role IN ('Representative', 'Senator')")
+    .get().n;
+  let fragments = 0;
+  for (const slugDir of (await subdirs("legislators")) ?? []) {
+    fragments += ((await subdirs("legislators", slugDir, "money")) ?? []).length;
+  }
+  const perPerson = fragments / Math.max(sitting, 1);
+  if (fragments === 0 || perPerson < 19) {
+    fail(`money fragments: ${fragments} built for ${sitting} sitting legislators (expected at least 19 each)`);
+  } else {
+    pass(`money fragments: ${fragments} for ${sitting} sitting legislators`);
+  }
+}
+
 // --- council member pages mirror the local tables, when present ------------
 const hasLocal = db
   .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='local_members'")

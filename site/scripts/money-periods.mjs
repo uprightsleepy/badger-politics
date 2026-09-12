@@ -31,6 +31,7 @@ const choose = async (period, scope = "all") => {
     const box = document.querySelector("[data-money-office]");
     if (box && box.checked !== checked) { box.checked = checked; box.dispatchEvent(new Event("change", {bubbles:true})); }
   }, scope === "office");
+  await page.waitForSelector(visible(scope), { timeout: 30000 }); // fragments load on demand
 };
 const assertLayout = async () => {
   assert.ok(await page.evaluate(() => Math.max(document.documentElement.scrollWidth,document.body.scrollWidth)<=innerWidth+1), "Horizontal overflow");
