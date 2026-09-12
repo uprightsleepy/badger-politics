@@ -7,11 +7,11 @@ import json
 import re
 import shutil
 import sqlite3
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from nightly.archive import MAX_EXPANDED, pack, unpack
-from nightly.finance import months_for, require_complete
+from nightly.finance import coverage_gaps, months_for, require_complete
 from nightly.stages import READS, SOURCES, STAGES, WRITES
 from nightly.storage import Conflict
 
@@ -169,7 +169,8 @@ class Runner:
                 raise ValueError("Checkpoint stages must execute in order")
         else:
             doc = copy.deepcopy(latest)
-            for key in ("snapshot", "completed_at", "finance_completed_months"):
+            for key in ("snapshot", "completed_at", "finance_completed_months",
+                        "finance_backfill"):
                 doc.pop(key, None)
             now = datetime.now(UTC)
             doc.update(run_id=self.run_id, revision=self.revision, base_generation=generation,
@@ -231,6 +232,10 @@ class Runner:
 
     def checkpoint(self, stage: str):
         doc = self.checkpoint_context(stage)
+        if stage == "finance-audit":
+            # The archive is on disk here: freeze the coverage gaps into the plan.
+            doc["finance_backfill"] = coverage_gaps(
+                self.root / "_data/cfis", date.fromisoformat(doc["finance_as_of"]))
         if stage == "finance-committees":
             marker = self.scratch / "finance-complete.json"
             merged = json.loads(marker.read_text(encoding="utf-8"))

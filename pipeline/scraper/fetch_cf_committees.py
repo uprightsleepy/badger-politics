@@ -128,11 +128,17 @@ def main(argv: list[str]) -> int:
     registry: dict[int, dict] = {}
     total = 0
     windows = month_windows(ns.since, ns.until)
+    reg_path = DATA_DIR / "committees.json"
+    archived = ({c["entity_id"]: c for c in json.loads(reg_path.read_text(encoding="utf-8"))}
+                if reg_path.exists() else {})
     # Refresh the newest two months; the nightly rotation re-reads older ones.
+    # A month some curated campaign was never scanned for is always read.
     refresh = {w[0] for w in windows[-2:]}
     for label, first, last in windows:
         out = DATA_DIR / f"pac-{label}.json"
-        if out.exists() and label not in refresh:
+        covered = all(label in archived.get(entity_id, {}).get("campaign_months", [])
+                      for entity_id in STATE_CAMPAIGNS)
+        if out.exists() and label not in refresh and covered:
             continue
         rows, month_registry = fetch_month(http, first, last)
         for entity_id, campaign in STATE_CAMPAIGNS.items():
@@ -147,7 +153,6 @@ def main(argv: list[str]) -> int:
         total += len(rows)
         print(f"{label}: {len(rows)} kept, {len(month_registry)} committees seen")
 
-    reg_path = DATA_DIR / "committees.json"
     if reg_path.exists():
         existing = {c["entity_id"]: c for c in json.loads(reg_path.read_text(encoding="utf-8"))}
         for entity_id, entry in registry.items():

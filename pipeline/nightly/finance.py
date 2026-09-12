@@ -9,6 +9,7 @@ import shutil
 from datetime import date
 from pathlib import Path
 
+from importer.federal_finance import STATE_CAMPAIGNS
 from scraper.cfis_api import month_windows
 from scraper.http import save_json
 
@@ -19,14 +20,29 @@ REFRESH = 2
 AUDIT_SAMPLE = 3
 
 
+def all_months(as_of: date) -> list[str]:
+    return [label for label, _, _ in month_windows("2025-01", as_of.strftime("%Y-%m"))]
+
+
+def coverage_gaps(archive: Path, as_of: date) -> list[str]:
+    """Months some curated state campaign has no verified scan for. A campaign
+    curated after a month was collected has none of its rows from that month,
+    so the rotation alone would leave its totals unavailable for weeks."""
+    path = archive / "committees.json"
+    registry = read_registry(path) if path.exists() else {}
+    return sorted({month for entity_id in STATE_CAMPAIGNS for month in all_months(as_of)
+                   if month not in registry.get(entity_id, {}).get("campaign_months", [])})
+
+
 def months_for(doc: dict) -> list[str]:
     """The months this run re-reads; the archive keeps every other month."""
     as_of = date.fromisoformat(doc["finance_as_of"])
-    months = [label for label, _, _ in month_windows("2025-01", as_of.strftime("%Y-%m"))]
+    months = all_months(as_of)
     recent, older = months[-REFRESH:], months[:-REFRESH]
     offset = as_of.toordinal() * AUDIT_SAMPLE
     picks = {older[(offset + i) % len(older)] for i in range(min(AUDIT_SAMPLE, len(older)))}
-    plan = sorted(picks | set(recent))
+    backfill = set(doc.get("finance_backfill", [])) & set(months)
+    plan = sorted(picks | set(recent) | backfill)
     # Fail explicitly before exceeding GitHub's matrix limit; never truncate coverage.
     if not 1 <= len(plan) <= 256:
         raise ValueError("Finance month plan exceeds the supported job count")
