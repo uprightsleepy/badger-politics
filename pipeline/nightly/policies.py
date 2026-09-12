@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import sys
@@ -13,6 +12,7 @@ from pathlib import Path
 
 from nightly.runner import Runner
 from nightly.storage import GCS
+from scraper.http import save_json
 from scraper.source_access import (
     SourceAccess,
     SourceAccessError,
@@ -70,9 +70,7 @@ def restore(store, target: Path, policies: dict) -> None:
         if not policy.get("paused"):
             require_approval(report, host, now)
     target.parent.mkdir(parents=True, exist_ok=True)
-    pending = target.with_suffix(".tmp")
-    pending.write_text(json.dumps(report), encoding="utf-8")
-    pending.replace(target)
+    save_json(target, report)
 
 
 def main() -> int:

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import requests
 
-from scraper.http import session
+from scraper.http import save_json, session
 from scraper.source_access import SourceAccessError
 
 API = "https://wiseye.org/wp-json/wp/v2/posts"
@@ -74,7 +74,7 @@ def collect(argv: list[str]) -> int:
     for v in fresh:
         existing[v["url"]] = v
     merged = sorted(existing.values(), key=lambda v: v["date"], reverse=True)
-    DATA_PATH.write_text(json.dumps(merged, indent=0), encoding="utf-8")
+    save_json(DATA_PATH, merged)
     print(f"wiseye: {len(fresh)} fetched, {len(merged)} archived -> {DATA_PATH.name}")
     return 0
 

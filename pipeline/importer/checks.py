@@ -12,6 +12,8 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from importer.roster import OPEN_END
+
 TOLERANCE_FRACTION = 0.02  # allow a 2% dip (e.g. scraper-side dedupe changes)
 
 
@@ -189,7 +191,7 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             " JOIN vote_events e ON e.id = r.vote_event_id"
             " WHERE e.date IS NOT NULL AND NOT EXISTS ("
             "   SELECT 1 FROM person_terms t WHERE t.person_id = r.person_id"
-            "   AND e.date >= t.start AND e.date <= COALESCE(t.end, '9999'))"  # roster.OPEN_END
+            f"   AND e.date >= t.start AND e.date <= COALESCE(t.end, '{OPEN_END}'))"
         ),
         "person_terms -> people": (
             "SELECT COUNT(*) FROM person_terms t"

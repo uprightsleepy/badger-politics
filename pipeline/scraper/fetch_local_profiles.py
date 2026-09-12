@@ -25,6 +25,7 @@ from lxml import html as lxml_html
 from importer.civicclerk import name_key, portrait_url
 from importer.import_local import milwaukee_profile_owners
 from importer.local_registry import TENANTS
+from scraper.http import save_json
 from scraper.http import session as http_session
 from scraper.source_access import ACCESS
 
@@ -211,9 +212,7 @@ def main(argv: list[str]) -> int:
             "state": "refreshed", "last_success_at": datetime.now(UTC).isoformat(),
         }
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    pending = OUT.with_suffix(".json.tmp")
-    pending.write_text(json.dumps(profiles, indent=1), encoding="utf-8")
-    pending.replace(OUT)
+    save_json(OUT, profiles)
     mke = sum(len(s["photos"]) for s in profiles["milwaukee"]["seats"].values())
     wa = sum(1 for d in profiles["westalliswi"]["districts"].values()
              for e in d["entries"] if e["image"])

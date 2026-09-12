@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from importer.federal_finance import candidate_ids, fec_url, parse_summary
-from scraper.http import session
+from scraper.http import save_json, session
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data/federal"
 
@@ -27,12 +27,9 @@ def main():
     pending_raw = raw.with_suffix(".pending")
     pending_raw.write_bytes(response.content)
     pending_raw.replace(raw)
-    output = DATA_DIR / f"finance-{cycle}.json"
-    pending = output.with_suffix(".pending")
-    pending.write_text(json.dumps({"cycle": cycle, "source_url": url,
-        "fetched_at": datetime.now(UTC).isoformat(), "identities": identities,
-        "rows": rows}, indent=2), encoding="utf-8")
-    pending.replace(output)
+    save_json(DATA_DIR / f"finance-{cycle}.json", {
+        "cycle": cycle, "source_url": url, "fetched_at": datetime.now(UTC).isoformat(),
+        "identities": identities, "rows": rows})
     print(f"FEC {cycle}: {len(rows)} of {len(identities)} candidate summaries")
 
 

@@ -18,7 +18,7 @@ import requests
 
 from importer.federal_finance import STATE_CAMPAIGNS
 from scraper.cfis_api import PAGE, month_windows, transaction_count, transaction_pages, verified
-from scraper.http import session
+from scraper.http import save_json, session
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "cfis"
 
@@ -143,7 +143,7 @@ def main(argv: list[str]) -> int:
             entry["campaign_months"] = sorted(set(
                 registry.get(entity_id, {}).get("campaign_months", []) + [label]))
         registry.update(month_registry)
-        out.write_text(json.dumps(rows, indent=0), encoding="utf-8")
+        save_json(out, rows)
         total += len(rows)
         print(f"{label}: {len(rows)} kept, {len(month_registry)} committees seen")
 
@@ -156,10 +156,7 @@ def main(argv: list[str]) -> int:
                     + existing.get(entity_id, {}).get("campaign_months", [])))
         existing.update(registry)
         registry = existing
-    reg_path.write_text(
-        json.dumps(sorted(registry.values(), key=lambda c: c["entity_id"]), indent=0),
-        encoding="utf-8",
-    )
+    save_json(reg_path, sorted(registry.values(), key=lambda c: c["entity_id"]))
     print(f"total {total} transactions; {len(registry)} committees -> {reg_path.name}")
     return 0
 

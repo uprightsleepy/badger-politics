@@ -8,14 +8,13 @@ Cache official office contacts from member-page URLs in the people files;
 
 from __future__ import annotations
 
-import json
 import re
 import sys
 from pathlib import Path
 
 import yaml
 
-from scraper.http import session
+from scraper.http import save_json, session
 
 PEOPLE_DIR = Path(__file__).resolve().parents[1] / "_data" / "people" / "wi"
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "contacts"
@@ -97,7 +96,7 @@ def main(argv: list[str]) -> int:
             print(f"CONTACT FAILURE: {f}", file=sys.stderr)
         return 1
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    (DATA_DIR / "contacts.json").write_text(json.dumps(out, indent=0), encoding="utf-8")
+    save_json(DATA_DIR / "contacts.json", out)
     print(f"{len(out)} member contacts -> {DATA_DIR / 'contacts.json'}")
     return 0
 
