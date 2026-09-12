@@ -139,8 +139,13 @@ def main(argv: list[str]) -> int:
     http = session()
     registry: dict[int, dict] = {}
     total = 0
-    for label, first, last in month_windows(ns.since, ns.until):
+    windows = month_windows(ns.since, ns.until)
+    # Refresh the newest two months; the nightly rotation re-reads older ones.
+    refresh = {w[0] for w in windows[-2:]}
+    for label, first, last in windows:
         out = DATA_DIR / f"pac-{label}.json"
+        if out.exists() and label not in refresh:
+            continue
         rows, month_registry = fetch_month(http, first, last)
         for entity_id, campaign in STATE_CAMPAIGNS.items():
             entry = month_registry.setdefault(entity_id, {

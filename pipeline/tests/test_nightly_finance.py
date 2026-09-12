@@ -133,12 +133,16 @@ def test_invalid_batch_leaves_archive_untouched(tmp_path, problem):
     assert {p.name: p.read_bytes() for p in archive.iterdir()} == before
 
 
-def test_plan_covers_year_boundary_and_refuses_truncation():
-    assert months_for({"finance_as_of": "2026-01-01"}) == [
-        *(f"2025-{month:02}" for month in range(1, 13)), "2026-01",
-    ]
-    with pytest.raises(ValueError, match="job count"):
-        months_for({"finance_as_of": "2050-01-01"})
+def test_plan_refreshes_newest_months_and_rotates_through_the_rest():
+    plan = months_for({"finance_as_of": "2026-01-01"})
+    assert plan[-2:] == ["2025-12", "2026-01"] and len(plan) == 5 and plan == sorted(plan)
+    assert plan == months_for({"finance_as_of": "2026-01-01"}), "the plan is a pure function"
+    older = {f"2025-{month:02}" for month in range(1, 12)}
+    nights = [set(months_for({"finance_as_of": f"2026-01-{day:02}"})) for day in range(1, 8)]
+    assert older <= set().union(*nights), "a week of rotation re-reads every older month"
+    assert months_for({"finance_as_of": "2025-03-31"}) == ["2025-01", "2025-02", "2025-03"]
+    with pytest.raises(ValueError):
+        months_for({"finance_as_of": "2024-12-01"})
 
 
 def test_receipt_refresh_and_audit_use_frozen_date(tmp_path, monkeypatch):
