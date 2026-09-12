@@ -20,7 +20,7 @@ const dollars = (cents: number | null) => cents === null ? "Not reported" : fmtM
   {moneyPeriods().map((period) => {
     const selectedFederal = federal.filter((f) => period.key === "all" || String(f.cycle) === period.key);
     const selectedState = state.filter((c) => period.key === "all" || String(c.cycle) === period.key);
-    return <div data-money-period={period.key} hidden={period.key !== String(currentMoneyCycle())} data-pagefind-ignore={period.key !== String(currentMoneyCycle())}>
+    return <div data-money-period={period.key} hidden={period.key !== String(currentMoneyCycle())} data-pagefind-ignore={period.key !== String(currentMoneyCycle()) ? "all" : undefined}>
   {selectedFederal.length === 0 && selectedState.length === 0 && <p class="mt-2 text-sm text-navy-700">
     Campaign finance has not been collected for this reporting period. Missing data does not mean zero fundraising.
   </p>}
