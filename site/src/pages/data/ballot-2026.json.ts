@@ -13,6 +13,7 @@
 import type { APIRoute } from "astro";
 import { sittingPeople, electionFor, statewideRaces } from "../../lib/db";
 import { personSlug } from "../../lib/format";
+import { ballotStatus } from "../../lib/ballot";
 import type { Ballot, Race } from "../../lib/wire";
 
 export const GET: APIRoute = () => {
@@ -22,11 +23,14 @@ export const GET: APIRoute = () => {
   for (const p of sittingPeople()) {
     const e = electionFor(p.id);
     if (!e || e.cycle_year !== 2026 || p.district == null) continue;
+    const { kind } = ballotStatus(e);
+    if (kind === "none" || kind === "future") continue; // excluded above; narrows the type
     const race: Race = {
       district: p.district,
-      onBallot: e.on_ballot === 1,
+      onBallot: true, // every race listed is on this cycle's ballot
       incumbent: { name: p.name, party: p.party, slug: personSlug(p.id) },
-      incumbentRunning: e.on_ballot === 1,
+      incumbentRunning: kind === "on-ballot",
+      incumbentStatus: kind,
       candidates: (e.opponents ?? [])
         .filter((o) => o.ballot_status !== "Deny")
         .map((o) => ({ name: o.name, party: o.party })),

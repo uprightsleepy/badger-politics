@@ -4,14 +4,12 @@ import PartyChip from "../../components/PartyChip.astro";
 import Portrait from "../../components/Portrait.astro";
 import { sittingPeople, electionFor } from "../../lib/db";
 import { personSlug } from "../../lib/format";
+import { ballotStatus } from "../../lib/ballot";
 const members = sittingPeople();
 // filtering happens in the browser over rows that are all present, so a
 // filtered view never hides anyone from search engines or from no-JS
 const onBallot = new Map(
-  members.map((m) => {
-    const e = electionFor(m.id);
-    return [m.id, e?.cycle_year === 2026 && e.on_ballot === 1];
-  }),
+  members.map((m) => [m.id, ballotStatus(electionFor(m.id)).kind === "on-ballot"]),
 );
 const senate = members.filter((m) => m.chamber === "upper");
 const assembly = members.filter((m) => m.chamber === "lower");

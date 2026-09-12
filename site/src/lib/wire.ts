@@ -47,6 +47,8 @@ export type Race = {
   onBallot: boolean;
   incumbent: { name: string; party: string | null; slug: string } | null;
   incumbentRunning: boolean;
+  /** As posted by the Elections Commission; "pending" is a gap, not a retirement. */
+  incumbentStatus: "on-ballot" | "not-running" | "pending";
   candidates: { name: string; party: string | null }[];
 };
 export type Ballot = {

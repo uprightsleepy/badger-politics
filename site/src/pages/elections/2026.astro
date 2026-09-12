@@ -7,6 +7,7 @@ import {
   lastMarginFor, statewideCountiesFor,
 } from "../../lib/db";
 import { partyLetter, personSlug } from "../../lib/format";
+import { ballotStatus } from "../../lib/ballot";
 const seats = sittingPeople()
   .map((p) => ({
     person: p,
@@ -242,6 +243,7 @@ const statewide = OFFICES.map(([key, label]) => {
       <ul class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
         {chamber.rows.map(({ person, election, margin }) => {
           const opponents = election!.opponents.filter((o) => o.ballot_status !== "Deny");
+          const ballot = ballotStatus(election);
           return (
             <li class="flex flex-wrap items-baseline gap-x-3 px-4 py-2">
               <a
@@ -257,15 +259,18 @@ const statewide = OFFICES.map(([key, label]) => {
                   +{margin.margin.toFixed(1)} in {margin.year}
                 </span>
               )}
-              {election!.on_ballot === 0 && (
+              {ballot.kind === "not-running" && (
                 <span class="rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">retiring</span>
               )}
-              {election!.on_ballot === 1 && opponents.length === 0 && (
+              {ballot.kind === "on-ballot" && opponents.length === 0 && (
                 <span class="text-xs text-navy-600">unopposed so far</span>
+              )}
+              {ballot.kind === "pending" && (
+                <span class="text-xs text-navy-600">incumbent's status not yet posted</span>
               )}
               {opponents.length > 0 && (
                 <span class="min-w-0 flex-1 truncate text-navy-700">
-                  {election!.on_ballot === 0 ? "Candidates: " : "Challengers: "}
+                  {ballot.kind === "on-ballot" ? "Challengers: " : "Candidates: "}
                   {opponents.map((o, i) => {
                     const pid = personIdByName(o.name);
                     return (
@@ -328,11 +333,12 @@ const statewide = OFFICES.map(([key, label]) => {
               : []),
             ...r.candidates.map((c) => ({ ...c, incumbent: false })),
           ];
-          const open = !r.incumbentRunning;
+          const open = r.incumbentStatus === "not-running";
           return (
             `<div class="rounded-lg border border-navy-100 bg-paper p-3">` +
             `<p class="text-xs font-semibold uppercase tracking-wide text-navy-600">${esc(label)}` +
-            (open ? ` <span class="text-badger-700">· open seat</span>` : "") +
+            (open ? ` <span class="text-badger-700">· open seat</span>`
+              : r.incumbentStatus === "pending" ? ` <span class="text-navy-600">· incumbent's status pending</span>` : "") +
             `</p>` +
             (names.length
               ? `<ul class="mt-1.5 space-y-1 text-sm">` +

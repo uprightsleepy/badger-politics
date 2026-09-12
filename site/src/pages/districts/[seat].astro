@@ -9,6 +9,7 @@ import {
 import { partyLetter, partyStyle, personSlug, monthYear, chamberName } from "../../lib/format";
 import { safeHref } from "../../lib/html";
 import { mergeServiceSpans } from "../../lib/service";
+import { ballotStatus } from "../../lib/ballot";
 
 export function getStaticPaths() {
   const seats = [
@@ -28,6 +29,7 @@ const seatName = `${chamberName(chamber)} District ${district}`;
 const holder = sittingPeople().find((p) => p.chamber === chamber && p.district === district);
 const election = holder ? electionFor(holder.id) : undefined;
 const opponents = election?.opponents.filter((o) => o.ballot_status !== "Deny") ?? [];
+const ballot = ballotStatus(election);
 const history = electionHistoryFor(chamber, district);
 const lastMargin = lastMarginFor(chamber, district);
 
@@ -91,16 +93,16 @@ const lineage = [...byPerson.entries()]
         <a href={`/legislators/${personSlug(holder.id)}/`} class="underline">{holder.name}</a>
         <span class={`rounded px-1.5 text-sm ${partyStyle(holder.party)}`}>{holder.party ?? "?"}</span>
       </p>
-      {election && (
+      {ballot.kind !== "none" && (
         <p class="mt-1 text-sm text-navy-700">
-          {election.cycle_year === 2026
-            ? election.on_ballot === 1
-              ? `On the November 2026 ballot${opponents.length ? `, challenged by ${opponents.map((o) => `${o.name} (${partyLetter(o.party)})`).join(", ")}` : ", unopposed so far"}`
-              : election.on_ballot === 0
-                ? "Not running in November 2026"
-                : `Seat next on the ballot in November ${election.cycle_year}`
-            : `Seat next on the ballot in November ${election.cycle_year}`}
-          {election.cycle_year === 2026 && (
+          {ballot.kind === "on-ballot"
+            ? `On the November ${ballot.year} ballot${opponents.length ? `, challenged by ${opponents.map((o) => `${o.name} (${partyLetter(o.party)})`).join(", ")}` : ", unopposed so far"}`
+            : ballot.kind === "not-running"
+              ? `Not running in November ${ballot.year}`
+              : ballot.kind === "pending"
+                ? `November ${ballot.year} ballot status not yet posted by the Elections Commission`
+                : `Seat next on the ballot in November ${ballot.year}`}
+          {ballot.kind !== "future" && (
             <a href={`/elections/2026/${seatKey}/`} class="ml-2 underline">2026 race &rarr;</a>
           )}
         </p>

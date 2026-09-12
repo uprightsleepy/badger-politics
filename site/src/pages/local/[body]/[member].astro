@@ -10,14 +10,11 @@ import LocalProfileNotice from "../../../components/LocalProfileNotice.astro";
 import LocalCoverageNotice from "../../../components/LocalCoverageNotice.astro";
 import FollowButton from "../../../components/FollowButton.astro";
 import JsonLd from "../../../components/JsonLd.astro";
-import { localBodies, localMembers, localMemberVotes, localMemberVoteStats, localMemberVotesWithDissent, localMemberTerms, localMemberships, localMemberOutcomes, localMemberMotions, localMemberMotionCount, localMemberAttendance, localMemberVoteYears, localMemberTieBreaks } from "../../../lib/db";
+import { localBodies, localMembers } from "../../../lib/db";
+import { RECENT, councilMemberProfile } from "../../../lib/council";
 import YearChips from "../../../components/YearChips.astro";
 import LocalVoteRow from "../../../components/LocalVoteRow.astro";
-import { yearPageStarts } from "../../../lib/paging";
 import { fmtDate } from "../../../lib/format";
-import { glossaryFor, isNoVote, isYesVote } from "../../../lib/localGloss";
-
-const RECENT = 300;
 
 export function getStaticPaths() {
   return localBodies().flatMap((body) =>
@@ -27,40 +24,12 @@ export function getStaticPaths() {
   );
 }
 const { body, member } = Astro.props;
-const stats = localMemberVoteStats(body.tenant, member.person_id);
-const votes = localMemberVotes(body.tenant, member.person_id, RECENT);
-const dissentVotes = localMemberVotesWithDissent(body.tenant, member.person_id);
-const terms = localMemberTerms(body.tenant, member.person_id);
-const committees = member.is_current ? localMemberships(body.tenant, member.person_id) : [];
-const outcomes = localMemberOutcomes(body.tenant, member.person_id);
-const soleNoes = dissentVotes.filter((v) => isNoVote(v.value) && v.noes === 1);
-const motionCount = localMemberMotionCount(body.tenant, member.person_id);
-const motions = motionCount > 0 ? localMemberMotions(body.tenant, member.person_id, RECENT) : [];
-const attendance = localMemberAttendance(body.tenant, member.person_id);
-// the seat is filled at the April spring election of the year the term ends
-const termEnd = member.is_current
-  ? terms.map((t) => t.end).filter((e): e is string => !!e).sort().at(-1) ?? null
-  : null;
-const springYear = termEnd && termEnd.slice(5, 7) === "04" ? termEnd.slice(0, 4) : null;
+const {
+  stats, votes, dissentVotes, soleNoes, terms, committees, outcomes, motionCount, motions,
+  attendance, termEnd, springYear, yearPages, presiding, rated, tieBreaks, joinedAyes,
+  glossary, years,
+} = councilMemberProfile(body.tenant, member);
 const pct = (n: number, d: number) => (d > 0 ? `${Math.round((n / d) * 100)}%` : "");
-const yearsOf = (rows: { date: string }[]) => {
-  const by = new Map<string, number>();
-  for (const r of rows) by.set(r.date.slice(0, 4), (by.get(r.date.slice(0, 4)) ?? 0) + 1);
-  return [...by.entries()].map(([year, n]) => ({ year, n }))
-    .sort((a, b) => b.year.localeCompare(a.year));
-};
-const yearPages = yearPageStarts(localMemberVoteYears(body.tenant, member.person_id));
-// Mayors preside; council presidents still vote as alderpersons.
-const presiding = terms.some((t) => t.title === "Mayor");
-const rated = !presiding;
-const tieBreaks = rated ? [] : localMemberTieBreaks(body.tenant, member.person_id);
-const tieAyes = tieBreaks.filter((v) => isYesVote(v.value)).length;
-// the chair's remaining Ayes joined an already unanimous council
-const joinedAyes = stats.total - stats.noes - stats.other - tieAyes;
-const glossary = glossaryFor(
-  [...tieBreaks, ...soleNoes, ...dissentVotes, ...votes, ...motions].map((r) => r.action),
-  [...new Set([...votes, ...dissentVotes].map((v) => v.value)), ...attendance.values.map((a) => a.value)],
-);
 const followId = `${body.slug}/${member.slug}`;
 const role = member.seat != null
   ? `${body.city} Common Council, District ${member.seat}`
@@ -304,7 +273,7 @@ const termLabel = (t: string | null) =>
         voted on, which may be a referral or postponement rather than final passage,
         and links to the clerk's record.
       </p>
-      <YearChips target="sole-no-list" label={`Filter the sole No votes by year`} years={yearsOf(soleNoes)} />
+      <YearChips target="sole-no-list" label={`Filter the sole No votes by year`} years={years.soleNoes} />
       <ScrollPanel label={`${member.name}'s sole No votes`} max="max-h-[24rem]" count={soleNoes.length}>
         <ul id="sole-no-list" class="divide-y divide-navy-100 p-0 text-sm">
           {soleNoes.map((v) => (
@@ -327,7 +296,7 @@ const termLabel = (t: string | null) =>
         and the council's tally. Each row names the action voted on, which may
         be a referral or postponement rather than final passage, and links to the clerk's record.
       </p>
-      <YearChips target="dissent-list" label={`Filter the votes with dissent by year`} years={yearsOf(dissentVotes)} />
+      <YearChips target="dissent-list" label={`Filter the votes with dissent by year`} years={years.dissent} />
       <ScrollPanel label={`${member.name} on votes with dissent`} max="max-h-[28rem]" count={dissentVotes.length}>
         <ul id="dissent-list" class="divide-y divide-navy-100 p-0 text-sm">
           {dissentVotes.map((v) => (

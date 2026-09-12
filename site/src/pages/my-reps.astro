@@ -77,6 +77,7 @@ import { PLACES_KEY } from "../lib/placesKey";
     import { forgetCityDistrict, resolveCity, savedCityDistrict } from "../lib/cityDistrict";
     import { attachSuggest } from "../scripts/addressSuggest";
     import { esc } from "../lib/html";
+    import { ballotStatus } from "../lib/ballot";
     import { fmtDate, partyChipHtml, shortTitle } from "../lib/format";
     import { districtAt, districtForAddress } from "../lib/lookup";
     import { forgetPollingPlace, savePollingPlace, savedPollingPlace } from "../lib/pollingPlace";
@@ -153,17 +154,14 @@ import { PLACES_KEY } from "../lib/placesKey";
         `<div class="rounded-lg border border-navy-100 p-4">${head}${body}</div>`;
       if (!full) return shell("");
 
+      const status = ballotStatus(full.election);
       const ballotText =
-        full.election?.cycle_year === 2026
-          ? full.election.on_ballot === 1
-            ? "On the November 2026 ballot"
-            : full.election.on_ballot === 0
-              ? "Not running in November 2026"
-              : ""
-          : full.election
-            ? `Seat next on the ballot in ${full.election.cycle_year}`
-            : "";
-      const onBallot = full.election?.cycle_year === 2026 && full.election.on_ballot === 1;
+        status.kind === "on-ballot" ? `On the November ${status.year} ballot`
+        : status.kind === "not-running" ? `Not running in November ${status.year}`
+        : status.kind === "pending" ? `November ${status.year} ballot status not yet posted`
+        : status.kind === "future" ? `Seat next on the ballot in ${status.year}`
+        : "";
+      const onBallot = status.kind === "on-ballot";
       const ballot = ballotText
         ? `<p class="mt-2"><span class="inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${
             onBallot ? "bg-gold-100 text-navy-900" : "bg-navy-50 text-navy-700"
