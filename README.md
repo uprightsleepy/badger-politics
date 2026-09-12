@@ -67,7 +67,7 @@ require a seeded archive and `NIGHTLY_PARSER_ENABLED=true`; see the
 | Hearing recordings | WisconsinEye | metadata matched by exact date and committee title; links out, never hosted |
 | Candidates and election results | Wisconsin Elections Commission | ballot access report PDF to CSV; certified ward-by-ward canvasses |
 | District boundaries | LTSB 2024 official files | bundled GeoJSON; the Census geocoder is used for address-to-point only |
-| Campaign finance | CFIS tRPC API (campaignfinance.wi.gov) | legislator receipts in monthly windows since 2008-01 through a verified committee map; every other filer's money since 2025-01, including independent expenditures with their report IDs |
+| Campaign finance | CFIS tRPC API (campaignfinance.wi.gov) | legislator receipts in monthly windows since 2008-01 through a verified committee map; every other filer's money since 2025-01, including independent expenditures with their report IDs; the newest two months are re-read nightly and older months on a rotating audit |
 | Lobbying registrations | Withheld | Collection removed; archived data is excluded from public pages and exports pending an approved source |
 | Federal roll calls | senate.gov LIS XML, clerk.house.gov EVS XML, unitedstates/congress-legislators roster | per-vote files mirrored once and cached forever; positions keyed by each chamber's own member id |
 | Council votes and attendance | Legistar Web API (`milwaukee`, `madison`, `cityofappleton`, `waukesha`, `westalliswi`); each meeting's InSite page for item links | one shared collector/importer; meetings cached once minutes are settled (`Approved` for Madison, `Final` otherwise); votes retain each tenant's person IDs and original labels |

@@ -1,4 +1,5 @@
-"""Frozen finance coverage and a complete, chronological merge of monthly outputs."""
+"""Frozen finance coverage and a chronological merge of the months re-read tonight
+into the cumulative archive."""
 
 from __future__ import annotations
 
@@ -10,14 +11,25 @@ from pathlib import Path
 
 from scraper.cfis_api import month_windows
 
+# The newest months are still being amended; older ones are re-read on a
+# deterministic rotation (as fetch_cfis audits legislator receipts), so the
+# whole archive is re-verified over successive nights instead of every night.
+REFRESH = 2
+AUDIT_SAMPLE = 3
+
 
 def months_for(doc: dict) -> list[str]:
+    """The months this run re-reads; the archive keeps every other month."""
     as_of = date.fromisoformat(doc["finance_as_of"])
     months = [label for label, _, _ in month_windows("2025-01", as_of.strftime("%Y-%m"))]
+    recent, older = months[-REFRESH:], months[:-REFRESH]
+    offset = as_of.toordinal() * AUDIT_SAMPLE
+    picks = {older[(offset + i) % len(older)] for i in range(min(AUDIT_SAMPLE, len(older)))}
+    plan = sorted(picks | set(recent))
     # Fail explicitly before exceeding GitHub's matrix limit; never truncate coverage.
-    if not 1 <= len(months) <= 256:
+    if not 1 <= len(plan) <= 256:
         raise ValueError("Finance month plan exceeds the supported job count")
-    return months
+    return plan
 
 
 def require_complete(doc: dict):

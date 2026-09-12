@@ -291,8 +291,10 @@ The run freezes `finance_as_of` at its UTC start date. Receipt refresh and
 the rotating audit use that date even if a retry crosses midnight, and the
 committee plan includes **every month from January 2025 through that
 date's month**, exactly the previous collection range. This freezes window
-selection, not the upstream records themselves. Historical committee
-months are still refreshed on every run, preserving amendment coverage.
+selection, not the upstream records themselves. The newest two committee
+months are refreshed on every run; older months are re-read three a night
+on a deterministic rotation, so the whole archive is re-verified about
+weekly, the same policy the legislator receipts already follow.
 
 The `finance-months` matrix has `max-parallel: 1` and fails fast. Its jobs
 may finish in any order; each uses the existing collector with matching
