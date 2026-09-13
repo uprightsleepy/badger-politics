@@ -3,16 +3,13 @@ import MoneyFilters from "./MoneyFilters.astro";
 import { moneyPeriods, currentMoneyCycle } from "../lib/money-periods";
 import StateCampaignMoney from "./StateCampaignMoney.astro";
 import { federalMoneyFor, stateCampaignsFor } from "../lib/db";
-import { fmtDate } from "../lib/format";
+import { fmtCents, fmtDate } from "../lib/format";
 
 interface Props { bioguide: string; }
 const { bioguide } = Astro.props;
 const federal = federalMoneyFor(bioguide);
 const state = stateCampaignsFor(bioguide);
-const fmtMoney = (value: number) => value.toLocaleString("en-US", {
-  style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2,
-});
-const dollars = (cents: number | null) => cents === null ? "Not reported" : fmtMoney(cents / 100);
+const dollars = (cents: number | null) => cents === null ? "Not reported" : fmtCents(cents / 100);
 ---
 <section class="mt-8 max-w-3xl" aria-labelledby="money">
   <h2 id="money" class="scroll-mt-4 text-xl font-bold">Campaign money</h2>

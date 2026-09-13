@@ -112,6 +112,23 @@ export const districtForAddress = async (
   return { district, lng: match.coordinates.x, lat: match.coordinates.y };
 };
 
+/** The browser's location -> district, in the same shape as an address. */
+export const districtForBrowser = (): Promise<
+  { district: District; lng: number; lat: number } | { error: string }
+> =>
+  new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords: { longitude: lng, latitude: lat } }) => {
+        const district = await districtAt(lng, lat);
+        resolve(district
+          ? { district, lng, lat }
+          : { error: "That location doesn't fall inside a Wisconsin legislative district." });
+      },
+      () => resolve({ error: "Location unavailable or denied." }),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  });
+
 export type CityDistrictHit = { tenant: string; slug: string; city: string; district: number };
 
 let localBoundaries: { features: { geometry: unknown; properties: CityDistrictHit }[] } | null =

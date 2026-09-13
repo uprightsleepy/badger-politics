@@ -79,7 +79,7 @@ import { PLACES_KEY } from "../lib/placesKey";
     import { esc } from "../lib/html";
     import { ballotStatus } from "../lib/ballot";
     import { fmtDate, partyChipHtml, shortTitle } from "../lib/format";
-    import { districtAt, districtForAddress } from "../lib/lookup";
+    import { districtForAddress, districtForBrowser } from "../lib/lookup";
     import { forgetPollingPlace, savePollingPlace, savedPollingPlace } from "../lib/pollingPlace";
     import type { LocalReps, RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
 
@@ -318,17 +318,6 @@ import { PLACES_KEY } from "../lib/placesKey";
       }
     }
 
-    async function resolvePoint(lng: number, lat: number) {
-      const [props] = await Promise.all([districtAt(lng, lat), loadData()]);
-      if (props) {
-        await resolveCity(lng, lat);
-        show(props, true);
-      } else {
-        statusEl.textContent =
-          "That point doesn't fall inside a Wisconsin legislative district.";
-      }
-    }
-
     document.getElementById("addr-form")!.addEventListener("submit", async (e) => {
       e.preventDefault();
       const addr = (document.getElementById("addr") as HTMLInputElement).value;
@@ -345,25 +334,26 @@ import { PLACES_KEY } from "../lib/placesKey";
     attachSuggest(document.getElementById("addr") as HTMLInputElement, () =>
       (document.getElementById("addr-form") as HTMLFormElement).requestSubmit());
 
-    document.getElementById("geo-btn")!.addEventListener("click", () => {
+    document.getElementById("geo-btn")!.addEventListener("click", async () => {
       statusEl.textContent = "Asking your browser for your location…";
-      navigator.geolocation.getCurrentPosition(
-        (pos) =>
-          resolvePoint(pos.coords.longitude, pos.coords.latitude)
-            .then(() => {
-              // browser locations can be off by blocks; say so instead of
-              // silently saving no council district
-              if (!savedCityDistrict()) {
-                statusEl.textContent += " No covered city at your browser's location;"
-                  + " a street address is more precise.";
-              }
-            })
-            .catch(
-              () => (statusEl.textContent = "Couldn't load district data. Try again in a minute."),
-            ),
-        () => (statusEl.textContent = "Location unavailable or denied."),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-      );
+      try {
+        const result = await districtForBrowser();
+        if ("error" in result) {
+          statusEl.textContent = result.error;
+          return;
+        }
+        await loadData();
+        await resolveCity(result.lng, result.lat);
+        show(result.district, true);
+        // browser locations can be off by blocks; say so instead of
+        // silently saving no council district
+        if (!savedCityDistrict()) {
+          statusEl.textContent += " No covered city at your browser's location;"
+            + " a street address is more precise.";
+        }
+      } catch {
+        statusEl.textContent = "Couldn't load district data. Try again in a minute.";
+      }
     });
 
     document.getElementById("forget")!.addEventListener("click", () => {

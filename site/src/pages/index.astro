@@ -463,7 +463,7 @@ const sessionName = current.name ?? current.id;
 <script>
   import { savedDistrict, saveDistrict, forgetDistrict } from "../lib/district";
   import { forgetCityDistrict, resolveCity, savedCityDistrict } from "../lib/cityDistrict";
-  import { districtAt, districtForAddress } from "../lib/lookup";
+  import { districtForAddress, districtForBrowser } from "../lib/lookup";
   import { esc } from "../lib/html";
   import { attachSuggest } from "../scripts/addressSuggest";
   import { partyChipHtml } from "../lib/format";
@@ -530,30 +530,22 @@ const sessionName = current.name ?? current.id;
     settle(result.district);
   });
 
-  geoBtn?.addEventListener("click", () => {
+  geoBtn?.addEventListener("click", async () => {
     if (addrStatus) addrStatus.textContent = "Asking your browser for your location…";
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const d = await districtAt(pos.coords.longitude, pos.coords.latitude);
-        if (!d) {
-          if (addrStatus) addrStatus.textContent = "That location isn't inside a Wisconsin district.";
-          return;
-        }
-        await resolveCity(pos.coords.longitude, pos.coords.latitude);
-        settle(d);
-        // browser locations can be off by blocks; say so instead of
-        // silently saving no council district
-        if (addrStatus && !savedCityDistrict()) {
-          addrStatus.textContent =
-            "No covered city at your browser's location. If you live in Milwaukee or "
-            + "West Allis, enter your street address instead; it is more precise.";
-        }
-      },
-      () => {
-        if (addrStatus) addrStatus.textContent = "Location unavailable or denied.";
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
+    const result = await districtForBrowser();
+    if ("error" in result) {
+      if (addrStatus) addrStatus.textContent = result.error;
+      return;
+    }
+    await resolveCity(result.lng, result.lat);
+    settle(result.district);
+    // browser locations can be off by blocks; say so instead of
+    // silently saving no council district
+    if (addrStatus && !savedCityDistrict()) {
+      addrStatus.textContent =
+        "No covered city at your browser's location. If you live in Milwaukee or "
+        + "West Allis, enter your street address instead; it is more precise.";
+    }
   });
 
   const saved = savedDistrict();
