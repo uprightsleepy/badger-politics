@@ -4,6 +4,10 @@
  * candidacy. Client scripts import this too, so it reads no database. */
 export const ELECTION_CYCLE = 2026;
 
+/** The Commission's office name for a legislative seat, as its records spell it. */
+export const seatOffice = (chamber: string | null, district: number | null): string =>
+  `${chamber === "upper" ? "STATE SENATOR" : "REPRESENTATIVE TO THE ASSEMBLY"} DISTRICT ${district}`;
+
 export type BallotStatus =
   | { kind: "on-ballot" | "not-running" | "pending" | "future"; year: number }
   | { kind: "none" };

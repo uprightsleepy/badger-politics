@@ -65,7 +65,7 @@ require a seeded archive and `NIGHTLY_PARSER_ENABLED=true`; see the
 | Capitol office contacts | docs.legis member pages | refreshed each run; sitting members only |
 | Subject index | docs.legis subject index | matched by exact session and identifier |
 | Hearing recordings | WisconsinEye | metadata matched by exact date and committee title; links out, never hosted |
-| Candidates and election results | Wisconsin Elections Commission | ballot access report PDF to CSV; certified ward-by-ward canvasses |
+| Candidates and election results | Wisconsin Elections Commission | before the primary, the ballot-access report; after it, each party's nominee from the certified primary canvass under Wis. Stat. 8.16 plus the independents the Commission approved, with anything the records cannot settle shown as open (rulings with an official basis in `importer/wec_rulings.json`); certified ward-by-ward canvasses for results |
 | District boundaries | LTSB 2024 official files | bundled GeoJSON; the Census geocoder is used for address-to-point only |
 | Campaign finance | CFIS tRPC API (campaignfinance.wi.gov) | legislator receipts in monthly windows since 2008-01 through a verified committee map; every other filer's money since 2025-01, including independent expenditures with their report IDs; the newest two months are re-read nightly and older months on a rotating audit |
 | Lobbying registrations | Withheld | Collection removed; archived data is excluded from public pages and exports pending an approved source |

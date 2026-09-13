@@ -18,8 +18,11 @@ import {
   partyBreaks,
   keyVotesFor,
   committeesFor,
+  ballotPhase,
+  writeInPending,
 } from "../../lib/db";
 import { legislatorProfile } from "../../lib/legislator";
+import { seatOffice } from "../../lib/ballot";
 import {
   COMPENSATION,
   personSlug,
@@ -52,6 +55,9 @@ const {
   sitting, serviceSpans, heatDays, attendance, agreement, loyalty, authorship, election,
   opponents, ballot,
 } = legislatorProfile(person);
+const openPrimaries = sitting
+  ? writeInPending(seatOffice(person.chamber, person.district)).map((p) => p.party)
+  : [];
 const { total: votesTotal, missed: missedTotal, blocks: attendanceBlocks, openYears } = attendance;
 const { led: primarySponsored, coauthored, cosponsored, tally } = authorship;
 const breaks = partyBreaks(person.id, person.party);
@@ -243,10 +249,10 @@ const signedOn: [string, typeof coauthored, string][] = [
         )}
         {sitting && election && (
           <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
-            <h2 class="font-bold">Up for reelection: Nov {election.cycle_year}</h2>
+            <h2 class="font-bold">Seat up for election: Nov {election.cycle_year}</h2>
             {ballot.kind === "on-ballot" && <p class="mt-1">On the ballot ✓</p>}
             {ballot.kind === "not-running" && (
-              <p class="mt-1 font-semibold text-badger-700">Not running (retiring)</p>
+              <p class="mt-1 font-semibold text-badger-700">Not on the November ballot</p>
             )}
             {ballot.kind === "pending" && <p class="mt-1">Candidate list pending</p>}
             {opponents.length > 0 && (
@@ -268,12 +274,16 @@ const signedOn: [string, typeof coauthored, string][] = [
                 })}
               </p>
             )}
-            {ballot.kind === "on-ballot" && opponents.length === 0 && (
-              <p class="mt-1">No opponents have qualified so far.</p>
+            {openPrimaries.length > 0 && (
+              <p class="mt-1">{openPrimaries.join(" and ")} primary: a write-in nominee may have qualified; the certified results do not name one.</p>
+            )}
+            {ballot.kind === "on-ballot" && opponents.length === 0 && openPrimaries.length === 0 && (
+              <p class="mt-1">{ballotPhase() === "general" ? "No other candidate is on the November ballot." : "No opponents have qualified so far."}</p>
             )}
             <p class="mt-1 text-xs text-navy-600">
-              Status comes from the Wisconsin Elections Commission's ballot access
-              report. The final ballot is certified after the August primary.
+              {ballotPhase() === "general"
+                ? "Candidates are each party's certified primary winner and approved independents, from the Wisconsin Elections Commission's records."
+                : "Status comes from the Wisconsin Elections Commission's ballot access report. The final ballot is certified after the August primary."}
             </p>
           </div>
         )}

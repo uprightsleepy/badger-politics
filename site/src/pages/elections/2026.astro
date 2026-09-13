@@ -4,10 +4,10 @@ import SourceStrip from "../../components/SourceStrip.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import {
   sittingPeople, electionFor, personIdByName, statewideRaces, statewideHistory,
-  lastMarginFor, statewideCountiesFor,
+  lastMarginFor, statewideCountiesFor, ballotPhase, writeInPending,
 } from "../../lib/db";
 import { partyLetter, personSlug } from "../../lib/format";
-import { ballotStatus } from "../../lib/ballot";
+import { ballotStatus, seatOffice } from "../../lib/ballot";
 const seats = sittingPeople()
   .map((p) => ({
     person: p,
@@ -29,6 +29,7 @@ const closeSeats = seats.filter(
   (s) => s.margin?.margin != null && s.margin.margin < 5,
 ).length;
 
+const general = ballotPhase() === "general";
 const OFFICES: [string, string][] = [
   ["GOVERNOR", "Governor"],
   ["LIEUTENANT GOVERNOR", "Lieutenant Governor"],
@@ -85,7 +86,9 @@ const statewide = OFFICES.map(([key, label]) => {
   return {
     key, label,
     incumbent: rows[0]?.incumbent ?? null,
-    retiring: rows[0]?.incumbent_noncandidacy === 1,
+    // after the primary the question is the November ballot, not a filing
+    retiring: general ? rows[0]?.incumbent_on_ballot === 0 : rows[0]?.incumbent_noncandidacy === 1,
+    pending: writeInPending(key).map((p) => p.party),
     approved: rows.filter((r) => r.ballot_status === "Approve"),
     otherFilings: rows.filter((r) => r.ballot_status !== "Approve").length,
     last,
@@ -129,9 +132,10 @@ const statewide = OFFICES.map(([key, label]) => {
   <p class="mt-2 max-w-3xl text-navy-700">
     All five statewide constitutional offices, all 99 Assembly seats, and the
     17 odd-numbered Senate seats are on the ballot. Every legislative seat
-    has its own race page: candidates, the district, and how it has voted. Candidate status comes
-    from the Wisconsin Elections Commission's ballot access report. The final
-    ballot is certified after the August 11 primary.
+    has its own race page: candidates, the district, and how it has voted.
+    {general
+      ? "Each party's candidate is the winner of the certified August 11 primary; independent candidates are those the Wisconsin Elections Commission approved."
+      : "Candidate status comes from the Wisconsin Elections Commission's ballot access report. The final ballot is certified after the August 11 primary."}
   </p>
   <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
     <a href="https://myvote.wi.gov/en-us/Find-My-Polling-Place" class="py-1 font-semibold underline">Find where you vote ↗</a>
@@ -141,17 +145,18 @@ const statewide = OFFICES.map(([key, label]) => {
 
   <p class="mt-3 max-w-3xl rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm text-navy-700">
     The legislative cycle at a glance: <strong>{openSeats}</strong> open seats
-    (incumbent not running) · <strong>{closeSeats}</strong> seats decided by
+    (incumbent not on the ballot) · <strong>{closeSeats}</strong> seats decided by
     under 5 points last time · <strong>{singleCandidate}</strong> seats with
-    only one approved candidate so far.
+    {general ? "one candidate on the November ballot" : "only one approved candidate so far"}.
   </p>
 
   <section class="mt-6">
     <h2 class="text-xl font-bold">Statewide offices</h2>
     <p class="mt-1 max-w-3xl text-sm text-navy-700">
-      All five constitutional offices are on the ballot. Candidates and
-      ballot status come from the WEC ballot-access report; past results are
-      the WEC's certified canvasses.
+      All five constitutional offices are on the ballot.
+      {general
+        ? "Candidates are each party's certified primary winner and approved independents; past results are the WEC's certified canvasses."
+        : "Candidates and ballot status come from the WEC ballot-access report; past results are the WEC's certified canvasses."}
     </p>
     <div class="mt-3 grid gap-3 lg:grid-cols-2">
       {statewide.map((o) => (
@@ -164,15 +169,21 @@ const statewide = OFFICES.map(([key, label]) => {
           </h3>
           {o.incumbent && (
             <p class="mt-1 text-navy-700">
-              Incumbent: {o.incumbent}{o.retiring && ", not seeking reelection"}
+              Incumbent: {o.incumbent}{o.retiring && (general ? ", not on the November ballot" : ", not seeking reelection")}
             </p>
           )}
           <p class="mt-2 font-semibold">
-            {o.approved.length} candidate{o.approved.length === 1 ? "" : "s"} approved for the ballot
+            {o.approved.length} candidate{o.approved.length === 1 ? "" : "s"} {general ? "on the November ballot" : "approved for the ballot"}
             {o.otherFilings > 0 && (
               <span class="font-normal text-navy-600"> ({o.otherFilings} more filings not approved)</span>
             )}
           </p>
+          {o.pending.length > 0 && (
+            <p class="mt-1 text-xs text-navy-700">
+              {o.pending.join(" and ")} primary: write-in votes may have produced a nominee the
+              certified results do not name.
+            </p>
+          )}
           <ul class="mt-1 space-y-0.5">
             {o.approved.map((c) => (
               <li class="flex flex-wrap items-baseline gap-x-2">
@@ -244,6 +255,7 @@ const statewide = OFFICES.map(([key, label]) => {
         {chamber.rows.map(({ person, election, margin }) => {
           const opponents = election!.opponents.filter((o) => o.ballot_status !== "Deny");
           const ballot = ballotStatus(election);
+          const openPrimaries = writeInPending(seatOffice(person.chamber, person.district));
           return (
             <li class="flex flex-wrap items-baseline gap-x-3 px-4 py-2">
               <a
@@ -260,10 +272,13 @@ const statewide = OFFICES.map(([key, label]) => {
                 </span>
               )}
               {ballot.kind === "not-running" && (
-                <span class="rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">retiring</span>
+                <span class="rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">open seat</span>
               )}
-              {ballot.kind === "on-ballot" && opponents.length === 0 && (
-                <span class="text-xs text-navy-600">unopposed so far</span>
+              {ballot.kind === "on-ballot" && opponents.length === 0 && openPrimaries.length === 0 && (
+                <span class="text-xs text-navy-600">{general ? "unopposed" : "unopposed so far"}</span>
+              )}
+              {openPrimaries.length > 0 && (
+                <span class="text-xs text-navy-700">{openPrimaries.map((p) => p.party).join(" and ")} write-in line open</span>
               )}
               {ballot.kind === "pending" && (
                 <span class="text-xs text-navy-600">incumbent's status not yet posted</span>
@@ -383,7 +398,9 @@ const statewide = OFFICES.map(([key, label]) => {
             ? `<p class="mt-4 text-xs font-semibold uppercase tracking-wide text-navy-600">Statewide, for every voter</p>` +
               `<div class="mt-1.5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">${statewide}</div>`
             : "") +
-          `<p class="mt-3 text-xs text-navy-600">Candidates are those the Wisconsin Elections Commission has approved for the ballot. Filings can still change before the deadline.</p>`;
+          `<p class="mt-3 text-xs text-navy-600">${data.phase === "general"
+            ? "Candidates are each party's certified primary winner and the independents the Wisconsin Elections Commission approved. Check your own sample ballot at MyVote."
+            : "Candidates are those the Wisconsin Elections Commission has approved for the ballot. Filings can still change before the deadline."}</p>`;
         empty.classList.add("hidden");
         body.classList.remove("hidden");
       })

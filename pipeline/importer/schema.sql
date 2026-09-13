@@ -184,10 +184,23 @@ CREATE INDEX idx_election_history_seat ON election_history (chamber, district, y
 
 -- Statewide constitutional offices on the current ballot, straight from
 -- the WEC ballot-access report (candidates, incumbents, non-candidacy).
+-- Primaries whose November nominee the certified results cannot settle
+-- (for example a write-in who may have qualified under s. 8.16(2)); shown
+-- as open on the race pages until a ruling in importer/wec_rulings.json
+CREATE TABLE write_in_pending (
+    cycle_year INTEGER NOT NULL,
+    office     TEXT NOT NULL,
+    party      TEXT NOT NULL,
+    reason     TEXT NOT NULL,
+    PRIMARY KEY (cycle_year, office, party)
+);
 CREATE TABLE statewide_races (
     office                 TEXT NOT NULL,
     incumbent              TEXT,
     incumbent_noncandidacy INTEGER NOT NULL CHECK (incumbent_noncandidacy IN (0, 1)),
+    -- after the primary: whether the incumbent is a November candidate for
+    -- this office; NULL before it (the noncandidacy filing is all there is)
+    incumbent_on_ballot    INTEGER CHECK (incumbent_on_ballot IN (0, 1)),
     candidate              TEXT NOT NULL,
     party                  TEXT,
     ballot_status          TEXT,

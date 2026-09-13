@@ -1,6 +1,14 @@
-"""Overlay the wec_pdf CSV onto elections: on_ballot + opponents per seat.
+"""Overlay the Commission's candidate records onto elections: on_ballot and
+opponents per seat, plus the statewide races.
+
+Before the primary is certified the candidates are every approved filing in
+the ballot-access report. From September 1 of the cycle year the certified
+primary is required, and the candidates are each party's nominee under
+Wis. Stat. 8.16 plus the independents the report approved: a primary loser
+is never shown as a November candidate.
 
 Usage: python -m importer.import_wec <candidates.csv> <sqlite_path> --cycle 2026
+       [--primary primary-2026.xlsx]
 """
 
 from __future__ import annotations
@@ -12,7 +20,13 @@ import re
 import sqlite3
 import sys
 import unicodedata
+from collections import defaultdict
+from datetime import date
 from pathlib import Path
+
+from importer.roster import load_curation
+from importer.wec_primary import nominee
+from importer.wec_primary import parse as parse_primary
 
 EXPECTED_COLUMNS = [
     "office",
@@ -35,6 +49,7 @@ STATEWIDE_OFFICES = {
     "STATE TREASURER",
 }
 FEDERAL_RE = re.compile(r"^(REPRESENTATIVE IN CONGRESS|UNITED STATES SENATOR)")
+RULINGS_PATH = Path(__file__).with_name("wec_rulings.json")
 
 
 SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
@@ -128,11 +143,92 @@ def load_candidates(csv_path: Path) -> dict[tuple[str, int], list[dict]]:
     return _seats(_read_rows(csv_path))
 
 
-def overlay(csv_path: Path, db_path: Path, cycle: int) -> int:
+def _in_scope(office: str) -> bool:
+    return bool(OFFICE_RE.match(office)) or office in STATEWIDE_OFFICES
+
+
+def _rulings(cycle: int) -> tuple[dict, dict]:
+    cycle_rulings = load_curation(RULINGS_PATH).get(str(cycle), {})
+    for entry in cycle_rulings.get("candidates", []) + cycle_rulings.get("contests", []):
+        if not str(entry.get("basis", "")).startswith("https://"):
+            raise RuntimeError(f"WEC ruling without an official basis: {entry}")
+    return ({(r["office"], r["candidate"]): r for r in cycle_rulings.get("candidates", [])},
+            {(r["office"], r["party"]): r for r in cycle_rulings.get("contests", [])})
+
+
+def november(csv_rows: list[dict], contests: list[dict], cycle: int
+             ) -> tuple[dict[str, list[dict]], dict[str, list[tuple[str, str]]]]:
+    """office -> November candidates, office -> [(party, reason)] still open."""
+    by_office: dict[str, dict[str, dict]] = defaultdict(dict)
+    for c in contests:
+        if _in_scope(c["office"]):
+            by_office[c["office"]][c["party"]] = c
+    parties = {party for races in by_office.values() for party in races}
+    report_offices = {r["office"] for r in csv_rows if _in_scope(r["office"])}
+    if report_offices != set(by_office) or any(set(r) != parties for r in by_office.values()):
+        raise RuntimeError(
+            "WEC primary does not cover the ballot-access offices and parties:"
+            f" {sorted(report_offices ^ set(by_office))[:5]}")
+    candidate_rulings, contest_rulings = _rulings(cycle)
+    ballot: dict[str, list[dict]] = defaultdict(list)
+    pending: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    for office, races in by_office.items():
+        for party, contest in races.items():
+            kind, value = nominee(contest)
+            ruling = contest_rulings.pop((office, party), None)
+            if ruling and kind != "unresolved":
+                raise RuntimeError(f"WEC ruling for a settled primary: {office} - {party}")
+            if ruling:
+                named = [n for n, _ in contest["candidates"]]
+                if ruling["nominee"] is not None and ruling["nominee"] not in named:
+                    raise RuntimeError(f"WEC ruling names no one in {office} - {party}")
+                kind, value = (("nominee", ruling["nominee"]) if ruling["nominee"]
+                               else ("none", None))
+            if kind == "nominee":
+                ballot[office].append({"candidate": value, "party": party})
+            elif kind == "unresolved":
+                pending[office].append((party, value))
+    for row in csv_rows:
+        office = row["office"]
+        if not _in_scope(office) or row["ballot_status"] == "Deny":
+            continue
+        entrants = [n for c in by_office[office].values() for n, _ in c["candidates"]]
+        if any(same_person(row["candidate"], n) for n in entrants):
+            continue
+        label = row["party"].strip().rstrip(",")
+        if label in parties:
+            continue  # a party filing missing from its own primary was not on the ballot
+        if any(" " in p and p.split()[0] == label for p in parties):
+            raise RuntimeError(f"WEC: truncated party label {label!r} for {row['candidate']}")
+        ruling = candidate_rulings.pop((office, row["candidate"]), None)
+        if row["ballot_status"] == "Challenged" and ruling is None:
+            raise RuntimeError(f"WEC: challenge outcome needs a ruling: {row['candidate']}")
+        if ruling and row["ballot_status"] != "Challenged":
+            raise RuntimeError(f"WEC ruling for an unchallenged filing: {row['candidate']}")
+        if ruling is None or ruling["on_ballot"]:
+            ballot[office].append({"candidate": row["candidate"], "party": "Independent"})
+    if candidate_rulings or contest_rulings:
+        raise RuntimeError(
+            f"WEC rulings the data no longer needs: {candidate_rulings or contest_rulings}")
+    for office, entries in ballot.items():
+        named = [e["party"] for e in entries if e["party"] != "Independent"]
+        if len(named) != len(set(named)):
+            raise RuntimeError(f"WEC: two candidates of one party for {office}")
+    return ballot, pending
+
+
+def overlay(csv_path: Path, db_path: Path, cycle: int, primary: Path | None = None,
+            today: date | None = None) -> int:
     csv_rows = _read_rows(csv_path)
     seats = _seats(csv_rows)
     if not seats:
         raise RuntimeError("WEC drift: no legislative seats in CSV")
+    if primary is None and (today or date.today()) >= date(cycle, 9, 1):
+        raise RuntimeError(
+            f"The {cycle} primary is certified by now: pass --primary, or pre-primary"
+            " filings would be shown as November candidates")
+    ballot, pending = november(csv_rows, parse_primary(primary, cycle), cycle) \
+        if primary else ({}, {})
 
     conn = sqlite3.connect(db_path)
     warnings = 0
@@ -165,7 +261,10 @@ def overlay(csv_path: Path, db_path: Path, cycle: int) -> int:
                     file=sys.stderr,
                 )
                 warnings += 1
-            viable = [r for r in rows if r["ballot_status"] in ("Approve", "Challenged")]
+            office = rows[0]["office"]
+            viable = ([{**e, "ballot_status": "Approve"} for e in ballot.get(office, [])]
+                      if primary else
+                      [r for r in rows if r["ballot_status"] in ("Approve", "Challenged")])
             incumbent_rows = match_candidate(person_name, viable)
             on_ballot = int(bool(incumbent_rows) and not noncandidacy)
             opponents = [
@@ -184,22 +283,38 @@ def overlay(csv_path: Path, db_path: Path, cycle: int) -> int:
             )
             updated += 1
         statewide = [r for r in csv_rows if r["office"] in STATEWIDE_OFFICES]
+        if primary:
+            incumbents = {r["office"]: r for r in statewide}
+            statewide = [
+                {**incumbents[office], **e, "ballot_status": "Approve",
+                 "on_ballot": int(bool(incumbents[office]["incumbent"]) and any(
+                     same_person(incumbents[office]["incumbent"], x["candidate"])
+                     for x in ballot.get(office, [])))}
+                for office in sorted(incumbents) for e in ballot.get(office, [])]
+        conn.execute("DELETE FROM write_in_pending WHERE cycle_year = ?", (cycle,))
+        conn.executemany(
+            "INSERT INTO write_in_pending (cycle_year, office, party, reason) VALUES (?, ?, ?, ?)",
+            [(cycle, office, party, reason)
+             for office, open_ in sorted(pending.items()) for party, reason in open_])
+        conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('wec_ballot_phase', ?)",
+                     ("general" if primary else "primary",))
         conn.execute("DELETE FROM statewide_races")
         conn.executemany(
             "INSERT INTO statewide_races (office, incumbent, incumbent_noncandidacy,"
-            " candidate, party, ballot_status, source)"
-            " VALUES (?, ?, ?, ?, ?, ?, 'wec')",
+            " incumbent_on_ballot, candidate, party, ballot_status, source)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, 'wec')",
             [
                 (r["office"], r["incumbent"] or None,
-                 int(r["incumbent_noncandidacy"] == "1"), r["candidate"],
+                 int(r["incumbent_noncandidacy"] == "1"), r.get("on_ballot"), r["candidate"],
                  r["party"] or None, r["ballot_status"] or None)
                 for r in statewide
             ],
         )
     conn.close()
     races = len({r["office"] for r in statewide})
-    print(f"wec overlay: {updated} seats updated, {warnings} warnings;"
-          f" {len(statewide)} statewide candidates across {races} offices")
+    print(f"wec overlay ({'November ballot' if primary else 'pre-primary filings'}):"
+          f" {updated} seats updated, {warnings} warnings; {len(statewide)} statewide"
+          f" candidates across {races} offices; {sum(map(len, pending.values()))} open primaries")
     return 0
 
 
@@ -208,8 +323,9 @@ def main(argv: list[str]) -> int:
     parser.add_argument("csv_path", type=Path)
     parser.add_argument("db_path", type=Path)
     parser.add_argument("--cycle", type=int, required=True)
+    parser.add_argument("--primary", type=Path, help="certified primary ward-by-ward workbook")
     ns = parser.parse_args(argv)
-    return overlay(ns.csv_path, ns.db_path, ns.cycle)
+    return overlay(ns.csv_path, ns.db_path, ns.cycle, ns.primary)
 
 
 if __name__ == "__main__":

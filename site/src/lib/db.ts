@@ -690,8 +690,22 @@ export const sessionNameIndex = memoBy((sessionId: string) => {
 export const statewideRaces = () =>
   prep("SELECT * FROM statewide_races ORDER BY office, candidate").all() as {
     office: string; incumbent: string | null; incumbent_noncandidacy: number;
+    incumbent_on_ballot: number | null;
     candidate: string; party: string | null; ballot_status: string | null;
   }[];
+
+/** "general" once the certified primary names the November candidates;
+ * before it the candidates are the approved ballot-access filings. */
+export const ballotPhase = (): "general" | "primary" =>
+  meta().wec_ballot_phase === "general" ? "general" : "primary";
+
+/** Party primaries whose nominee the certified results cannot settle. */
+export const writeInPending = memoBy((office: string) =>
+  hasTable("write_in_pending")
+    ? (prep("SELECT party, reason FROM write_in_pending WHERE office = ? ORDER BY party")
+        .all(office) as { party: string; reason: string }[])
+    : [],
+);
 
 /** Certified statewide general-election results (WEC canvasses). */
 export const statewideHistory = () =>

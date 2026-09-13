@@ -306,7 +306,7 @@ def test_policy_refresh_blocks_mid_run_change(network):
     "https://lobbying.wi.gov/What/BillInformation/2025REG/Information/25090",
     "https://wiseye.org/wp-json/wp/v2/posts",
     "https://api.followthemoney.org/",
-    "https://elections.wi.gov/sites/default/files/documents/report.pdf",
+    "https://elections.wi.gov/search/node?keys=candidates",
     "https://services1.arcgis.com/example/query",
     "https://milwaukeemaps.milwaukee.gov/arcgis/rest/services/",
     "https://unreviewed.example/records",
@@ -466,7 +466,10 @@ def test_nightly_job_keeps_archives_and_omits_paused_fetchers():
                 if line.startswith("python -m ")]
     assert "python -m importer.import_lobbying _data/lobbying ../data/wi.sqlite" in commands
     assert not any("scraper.fetch_" + name in line for line in commands
-                   for name in ("lobbying", "wiseye", "wec"))
+                   for name in ("lobbying", "wiseye"))
     policies = json.loads(source_access.MANIFEST.read_text())
     assert all(policies["sources"][host].get("paused")
-               for host in ("lobbying.wi.gov", "wiseye.org", "elections.wi.gov"))
+               for host in ("lobbying.wi.gov", "wiseye.org"))
+    # the Commission review (2026-09-13) reopened its pinned report files only
+    assert policies["sources"]["elections.wi.gov"]["paths"] == {
+        "GET": [r"/sites/default/files/documents/[^/]+\.(?:pdf|xlsx)"]}
