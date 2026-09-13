@@ -1,6 +1,7 @@
 ---
 /** One non-default period view of the money overview, fetched on demand
  * by MoneyFilters so the page itself carries only the current view. */
+import MoneyFragment from "../../../components/MoneyFragment.astro";
 import MoneyView from "../../../components/MoneyView.astro";
 import { moneyOverview } from "../../../lib/db";
 import { moneyViews } from "../../../lib/money-periods";
@@ -12,16 +13,6 @@ export function getStaticPaths() {
 }
 const { view } = Astro.props;
 ---
-{/* A document, not a bare fragment: Pagefind skips pages without a
-    data-pagefind-body element but warns on files with no <html>. */}
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="robots" content="noindex" />
-  </head>
-  <body>
-    <div data-money-period={view.period.key} data-money-scope={view.scope} data-pagefind-ignore>
-      <MoneyView m={moneyOverview(view.bounds)} view={view} />
-    </div>
-  </body>
-</html>
+<MoneyFragment view={view}>
+  <MoneyView m={moneyOverview(view.bounds)} view={view} />
+</MoneyFragment>

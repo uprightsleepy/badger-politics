@@ -1,15 +1,12 @@
 ---
 import type { stateCampaignMoney } from "../lib/db";
-import { fmtDate } from "../lib/format";
+import { fmtCents, fmtDate } from "../lib/format";
 
 interface Props {
   campaign: ReturnType<typeof stateCampaignMoney>;
   title?: string;
 }
 const { campaign: c, title = `${c.office} campaign · ${c.cycle}` } = Astro.props;
-const fmtMoney = (value: number) => value.toLocaleString("en-US", {
-  style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2,
-});
 ---
 <article class="min-w-0 rounded-xl border border-navy-100 bg-white p-4 sm:p-5">
   <h3 class="text-lg font-bold">{title}</h3>
@@ -20,9 +17,9 @@ const fmtMoney = (value: number) => value.toLocaleString("en-US", {
   </p> : <>
     <dl data-campaign-totals class="mt-4 flex flex-wrap gap-4">
       <div class="flex-auto"><dt class="text-sm text-navy-600">Reported spending</dt>
-        <dd class="mt-1 whitespace-nowrap text-xl font-bold tabular-nums sm:text-2xl">{fmtMoney(c.totals.spending ?? 0)}</dd></div>
+        <dd class="mt-1 whitespace-nowrap text-xl font-bold tabular-nums sm:text-2xl">{fmtCents(c.totals.spending ?? 0)}</dd></div>
       <div class="flex-auto"><dt class="text-sm text-navy-600">Reported receipts</dt>
-        <dd class="mt-1 whitespace-nowrap text-xl font-bold tabular-nums sm:text-2xl">{fmtMoney(c.totals.receipts ?? 0)}</dd></div>
+        <dd class="mt-1 whitespace-nowrap text-xl font-bold tabular-nums sm:text-2xl">{fmtCents(c.totals.receipts ?? 0)}</dd></div>
     </dl>
     <p class="mt-3 text-sm text-navy-600">
       {c.totals.count.toLocaleString()} transactions collected for the {c.cycle - 1}–{c.cycle} reporting period.
@@ -34,7 +31,7 @@ const fmtMoney = (value: number) => value.toLocaleString("en-US", {
     {c.donors.length > 0 && <details class="mt-3 text-sm">
       <summary class="cursor-pointer py-1 font-semibold">Largest reported sources of receipts</summary>
       <dl class="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2">
-        {c.donors.map((d) => <><dt class="break-words">{d.name}</dt><dd class="tabular-nums">{fmtMoney(d.total)}</dd></>)}
+        {c.donors.map((d) => <><dt class="break-words">{d.name}</dt><dd class="tabular-nums">{fmtCents(d.total)}</dd></>)}
       </dl>
     </details>}
   </>}

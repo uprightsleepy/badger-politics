@@ -77,17 +77,17 @@ export const launchBrowser = async () => {
 };
 
 /** First href matching `pattern` on a built index page, or null. */
-export const firstHref = async (indexDir, pattern) => {
+const firstHref = async (indexDir, pattern) => {
   const html = await readFile(join(DIST, indexDir, "index.html"), "utf-8").catch(() => "");
   return html.match(pattern)?.[1] ?? null;
 };
 
 /** First legislator profile linked from the index, or null. */
-export const firstLegislatorHref = () =>
+const firstLegislatorHref = () =>
   firstHref("legislators", /href="(\/legislators\/[^"]+\/)"/);
 
 /** First legislator whose money card carries the quarterly chart, or null. */
-export const moneyLegislatorHref = async () => {
+const moneyLegislatorHref = async () => {
   for (const dir of await readdir(join(DIST, "legislators")).catch(() => [])) {
     const html = await readFile(join(DIST, "legislators", dir, "index.html"), "utf-8")
       .catch(() => "");

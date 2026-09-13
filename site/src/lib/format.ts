@@ -139,6 +139,10 @@ export const fmtTime = (t: string | null): string => {
 export const fmtMoney = (v: number): string =>
   "$" + Math.round(v).toLocaleString("en-US");
 
+/** Dollars to the cent, for figures reported to the cent. */
+export const fmtCents = (v: number): string =>
+  v.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
+
 // the state's index terms encode em dashes as " _ "; restore for display
 export const subjectDisplay = (subject: string): string =>
   subject

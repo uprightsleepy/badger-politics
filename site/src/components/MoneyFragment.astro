@@ -1,0 +1,18 @@
+---
+/** One non-default money period view as its own document, fetched on demand
+ * by MoneyFilters. A document, not a bare fragment: Pagefind skips pages
+ * without a data-pagefind-body element but warns on files with no <html>. */
+interface Props { view: { period: { key: string }; scope: string } }
+const { view } = Astro.props;
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+  </head>
+  <body>
+    <div data-money-period={view.period.key} data-money-scope={view.scope} data-pagefind-ignore>
+      <slot />
+    </div>
+  </body>
+</html>
