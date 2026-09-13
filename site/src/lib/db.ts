@@ -730,6 +730,30 @@ export const ballotMeasures = memoBy((year: number): BallotMeasure[] =>
     : [],
 );
 
+/** U.S. House races by district. The serving member is linked by district:
+ * checks.check_congress holds the Commission's incumbent to that member. */
+export const houseRaces = once(() => {
+  if (!hasTable("congressional_races")) return [];
+  const rows = prep("SELECT * FROM congressional_races ORDER BY district, party, candidate").all() as {
+    district: number; incumbent_noncandidacy: number; incumbent_on_ballot: number | null;
+    candidate: string; party: string | null; ballot_status: string | null;
+  }[];
+  const general = ballotPhase() === "general";
+  const members = new Map(federalMembers().filter((m) => m.chamber === "house").map((m) => [m.district, m]));
+  return [...new Set(rows.map((r) => r.district))].map((district) => {
+    const race = rows.filter((r) => r.district === district);
+    return {
+      district,
+      member: members.get(district) ?? null,
+      // after the primary the question is the November ballot, not a filing
+      retiring: general ? race[0].incumbent_on_ballot === 0 : race[0].incumbent_noncandidacy === 1,
+      candidates: race.filter((r) => r.ballot_status === "Approve"),
+      otherFilings: race.filter((r) => r.ballot_status !== "Approve").length,
+      pending: writeInPending(`REPRESENTATIVE IN CONGRESS DISTRICT ${district}`).map((p) => p.party),
+    };
+  });
+});
+
 /** Certified statewide general-election results (WEC canvasses). */
 export const statewideHistory = () =>
   prep(

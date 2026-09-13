@@ -224,6 +224,19 @@ CREATE TABLE statewide_races (
     source                 TEXT NOT NULL
 );
 
+-- U.S. House races, same shape and rules as statewide_races (import_wec);
+-- the incumbent is the Commission's record, checked against federal_members
+CREATE TABLE congressional_races (
+    district               INTEGER NOT NULL,
+    incumbent              TEXT,
+    incumbent_noncandidacy INTEGER NOT NULL CHECK (incumbent_noncandidacy IN (0, 1)),
+    incumbent_on_ballot    INTEGER CHECK (incumbent_on_ballot IN (0, 1)),
+    candidate              TEXT NOT NULL,
+    party                  TEXT,
+    ballot_status          TEXT,
+    source                 TEXT NOT NULL
+);
+
 -- Official WEC general-election results for statewide contests, summed
 -- from ward-by-ward canvass spreadsheets. Display data (no FKs).
 CREATE TABLE statewide_history (

@@ -4,7 +4,7 @@ import SourceStrip from "../../components/SourceStrip.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import {
   sittingPeople, electionFor, personIdByName, statewideRaces, statewideHistory,
-  lastMarginFor, statewideCountiesFor, ballotPhase, writeInPending, ballotMeasures,
+  lastMarginFor, statewideCountiesFor, ballotPhase, writeInPending, ballotMeasures, houseRaces,
 } from "../../lib/db";
 import { partyLetter, personSlug } from "../../lib/format";
 import { ballotStatus, seatOffice } from "../../lib/ballot";
@@ -31,6 +31,7 @@ const closeSeats = seats.filter(
 
 const general = ballotPhase() === "general";
 const measures = ballotMeasures(2026);
+const house = houseRaces();
 const OFFICES: [string, string][] = [
   ["GOVERNOR", "Governor"],
   ["LIEUTENANT GOVERNOR", "Lieutenant Governor"],
@@ -98,10 +99,10 @@ const statewide = OFFICES.map(([key, label]) => {
 });
 ---
 
-<Base title="2026 elections" description="Everything on Wisconsin's November 2026 ballot: all five statewide constitutional offices and every legislative seat, with incumbents, retirements, and qualified candidates.">
+<Base title="2026 elections" description="Everything on Wisconsin's November 2026 ballot: all five statewide constitutional offices, every U.S. House and legislative seat, with incumbents, retirements, and qualified candidates.">
   <h1 class="text-2xl font-bold">On the Ballot: November 3, 2026</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Everything on Wisconsin's November 2026 ballot: the statewide offices, every legislative seat up this year, and who has qualified to run.
+    Everything on Wisconsin's November 2026 ballot: the statewide offices, the U.S. House, every legislative seat up this year, who has qualified to run{measures.length > 0 && ", and the constitutional amendment questions"}.
   </p>
   <SourceStrip
     sources={[{ label: "Wisconsin Elections Commission", href: "https://elections.wi.gov" }]}
@@ -246,6 +247,55 @@ const statewide = OFFICES.map(([key, label]) => {
       ))}
     </div>
   </section>
+  {house.length > 0 && (
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">U.S. House</h2>
+      <p class="mt-1 max-w-3xl text-sm text-navy-700">
+        Every Wisconsin seat in the U.S. House is on the ballot.
+        {general
+          ? "Candidates are each party's certified primary winner and approved independents."
+          : "Candidates and ballot status come from the WEC ballot-access report."}
+      </p>
+      <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {house.map((h) => (
+          <div class="rounded-lg border border-navy-100 bg-white p-4 text-sm">
+            <h3 class="flex flex-wrap items-baseline gap-x-2 text-lg font-bold">
+              District {h.district}
+              {h.retiring && (
+                <span class="rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">open seat</span>
+              )}
+            </h3>
+            {h.member && (
+              <p class="mt-1 text-navy-700">
+                Incumbent: <a href={`/federal/${h.member.slug}/`} class="underline">{h.member.name}</a>
+                {h.retiring && (general ? ", not on the November ballot" : ", not seeking reelection")}
+              </p>
+            )}
+            <p class="mt-2 font-semibold">
+              {h.candidates.length} candidate{h.candidates.length === 1 ? "" : "s"} {general ? "on the November ballot" : "approved for the ballot"}
+              {h.otherFilings > 0 && (
+                <span class="font-normal text-navy-600"> ({h.otherFilings} more filings not approved)</span>
+              )}
+            </p>
+            {h.pending.length > 0 && (
+              <p class="mt-1 text-xs text-navy-700">
+                {h.pending.join(" and ")} primary: write-in votes may have produced a nominee the
+                certified results do not name.
+              </p>
+            )}
+            <ul class="mt-1 space-y-0.5">
+              {h.candidates.map((c) => (
+                <li class="flex flex-wrap items-baseline gap-x-2">
+                  <PartyChip party={c.party} />
+                  <span>{c.candidate}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+  )}
   {measures.length > 0 && (
     <section class="mt-6">
       <h2 class="text-xl font-bold">Constitutional amendments</h2>

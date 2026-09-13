@@ -19,6 +19,8 @@ LEGISLATIVE_RE = re.compile(
     r"^(STATE SENATOR DISTRICT|REPRESENTATIVE TO THE ASSEMBLY DISTRICT) (\d+)$"
 )
 
+CONGRESS_RE = re.compile(r"^REPRESENTATIVE IN CONGRESS DISTRICT (\d+)$")
+
 
 def _lines(page: pymupdf.Page) -> list[list[tuple[float, str]]]:
     """Words grouped into visual rows: list of (x, text), sorted by x."""
@@ -33,6 +35,8 @@ def parse_tracking(pdf_path: Path) -> list[dict[str, str]]:
     doc = pymupdf.open(pdf_path)
     records: list[dict[str, str]] = []
     office = incumbent = ""
+    office_x = 0.0
+    subtotaled: set[str] = set()
     noncandidacy = False
     party_x = status_x = campaign_x = None
     in_tracking = False
@@ -71,6 +75,10 @@ def parse_tracking(pdf_path: Path) -> list[dict[str, str]]:
                                   "Receipt #", TRACKING_TITLE, "2026 General")):
                 continue
             if "Office Subtotal" in joined:
+                parsed = sum(r["office"] == office for r in records)
+                if office and str(parsed) != texts[-1]:
+                    raise RuntimeError(f"WEC drift: {office} subtotal {texts[-1]}, parsed {parsed}")
+                subtotaled.add(office)
                 office, incumbent, noncandidacy = "", "", False
                 continue
             if texts[0] == "Office" and ":" in texts[1]:
@@ -81,6 +89,7 @@ def parse_tracking(pdf_path: Path) -> list[dict[str, str]]:
                 )
                 name_words = texts[2:inc_idx] if inc_idx else texts[2:]
                 office = " ".join(name_words)
+                office_x = row[2][0]
                 if inc_idx is not None:
                     incumbent = " ".join(texts[inc_idx + 1:])
                     # the marker can wrap mid-phrase, so match its prefix
@@ -88,42 +97,45 @@ def parse_tracking(pdf_path: Path) -> list[dict[str, str]]:
                         noncandidacy = True
                         incumbent = incumbent.split("(Filed")[0].strip()
                 continue
-            # continuation rows for wrapped office/incumbent names
-            if office and not any(x >= status_x for x, _ in row) and all(
-                x < party_x for x, _ in row
-            ) and not joined[:1].isdigit():
-                candidate_words = [t for x, t in row if x < party_x]
-                maybe = " ".join(candidate_words)
-                if maybe.isupper() or maybe.isdigit():  # office names are ALL CAPS
-                    office = f"{office} {maybe}".strip()
-                    continue
             if "(Filed Notification" in joined or joined == "Noncandidacy)":
                 noncandidacy = True
                 continue
-            if office:
-                status_words = [t for x, t in row if x >= status_x - 2]
-                name_words = [
-                    t for x, t in row
-                    if x < party_x and not re.fullmatch(r"\d+", t)
-                ]
-                party_words = [
-                    t for x, t in row if party_x - 2 <= x < campaign_x - 2
-                ]
-                if status_words and status_words[0] in STATUSES and name_words:
-                    records.append(
-                        {
-                            "office": office,
-                            "incumbent": incumbent,
-                            "incumbent_noncandidacy": str(int(noncandidacy)),
-                            "candidate": " ".join(name_words),
-                            "party": " ".join(party_words),
-                            "ballot_status": status_words[0],
-                        }
-                    )
+            if not office:
+                continue
+            status_words = [t for x, t in row if x >= status_x - 2]
+            name_words = [t for x, t in row if x < party_x and not re.fullmatch(r"\d+", t)]
+            if not (status_words and status_words[0] in STATUSES and name_words):
+                # a wrapped office name continues in the office column, where a
+                # receipt number never sits ("REPRESENTATIVE IN CONGRESS DISTRICT" / "1")
+                if all(office_x - 2 <= x < party_x for x, _ in row) and (
+                        joined.isupper() or joined.isdigit()):
+                    office = f"{office} {joined}"
+                    continue
+                # a wrapped party label continues the row above ("Wisconsin" / "Green")
+                if records and records[-1]["office"] == office and all(
+                        party_x - 2 <= x < campaign_x - 2 for x, _ in row):
+                    records[-1]["party"] = f"{records[-1]['party']} {joined}"
+                    continue
+                raise RuntimeError(f"WEC drift: unparsed tracking row under {office}: {joined!r}")
+            party_words = [t for x, t in row if party_x - 2 <= x < campaign_x - 2]
+            records.append({
+                "office": office,
+                "incumbent": incumbent,
+                "incumbent_noncandidacy": str(int(noncandidacy)),
+                "candidate": " ".join(name_words),
+                "party": " ".join(party_words),
+                "ballot_status": status_words[0],
+            })
     doc.close()
 
     if not records:
         raise RuntimeError("WEC drift: no candidate rows parsed")
+    unchecked = {r["office"] for r in records} - subtotaled
+    if unchecked:
+        raise RuntimeError(f"WEC drift: no office subtotal to check for {sorted(unchecked)}")
+    congress = {r["office"] for r in records if "IN CONGRESS" in r["office"]}
+    if any(not CONGRESS_RE.match(o) for o in congress):
+        raise RuntimeError(f"WEC drift: House office without a district: {sorted(congress)}")
     legislative = {r["office"] for r in records if LEGISLATIVE_RE.match(r["office"])}
     if len(legislative) < 100:
         raise RuntimeError(

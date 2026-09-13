@@ -8,6 +8,20 @@
         "on_ballot": true,
         "basis": "https://elections.wi.gov/sites/default/files/documents/June%209%2C%202026%2C%20Open%20Session%20Minutes%20APPROVED.pdf",
         "note": "EL 26-34 Trevor Ford v. Nathan Tataje: 211 valid signatures; the Commission added him to the approved list (motion carried 6-0)."
+      },
+      {
+        "office": "REPRESENTATIVE IN CONGRESS DISTRICT 3",
+        "candidate": "Rustin Provance",
+        "on_ballot": true,
+        "basis": "https://elections.wi.gov/sites/default/files/documents/June%209%2C%202026%2C%20Open%20Session%20Minutes%20APPROVED.pdf",
+        "note": "EL 26-36 Stephen Mueller v. Rustin Provance: 1,369 valid signatures; the Commission added him to the approved list (motion carried 6-0)."
+      },
+      {
+        "office": "REPRESENTATIVE IN CONGRESS DISTRICT 6",
+        "candidate": "Elizabeth Anne Fitzgibbon",
+        "on_ballot": true,
+        "basis": "https://elections.wi.gov/sites/default/files/documents/June%209%2C%202026%2C%20Open%20Session%20Minutes%20APPROVED.pdf",
+        "note": "EL 26-37 Brian Norby v. Elizabeth Anne Fitzgibbon: 1,278 valid signatures; the Commission added her to the approved list (motion carried 6-0)."
       }
     ],
     "contests": []

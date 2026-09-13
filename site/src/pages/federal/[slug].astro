@@ -5,7 +5,9 @@ import SourceStrip from "../../components/SourceStrip.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import FederalMoney from "../../components/FederalMoney.astro";
 import FederalVoteRow from "../../components/FederalVoteRow.astro";
-import { federalMembers, federalVoteKey, federalVotesFor, federalCongressStats } from "../../lib/db";
+import {
+  federalMembers, federalVoteKey, federalVotesFor, federalCongressStats, houseRaces, ballotPhase,
+} from "../../lib/db";
 import { congressLabel } from "../../lib/federal";
 
 export function getStaticPaths() {
@@ -20,6 +22,8 @@ const missed = byCongress.reduce((s, c) => s + c.missed, 0);
 const latest = votes[0]?.date ?? null;
 const sinceYear = byCongress.at(-1)?.first.slice(0, 4);
 const recent = votes.slice(0, 25);
+const race = member.chamber === "house" ? houseRaces().find((h) => h.district === member.district) : undefined;
+const general = ballotPhase() === "general";
 ---
 
 <Base
@@ -67,6 +71,27 @@ const recent = votes.slice(0, 25);
       </dd>
     </div>
   </dl>
+
+  {race && (
+    <div class="mt-3 max-w-md rounded bg-navy-50 p-3 text-sm">
+      <h2 class="font-bold">Seat up for election: Nov 2026</h2>
+      {race.retiring ? (
+        <p class="mt-1 font-semibold text-badger-700">
+          {general ? "Not on the November ballot for this seat" : "Not seeking reelection"}
+        </p>
+      ) : general && <p class="mt-1">On the ballot ✓</p>}
+      {race.candidates.length > 0 && (
+        <p class="mt-1">
+          {general ? "Candidates on the November ballot" : "Candidates approved so far"}:{" "}
+          {race.candidates.map((c) => `${c.candidate} (${c.party?.[0] ?? "?"})`).join(", ")}
+        </p>
+      )}
+      {race.pending.length > 0 && (
+        <p class="mt-1">{race.pending.join(" and ")} primary: a write-in nominee may have qualified; the certified results do not name one.</p>
+      )}
+      <p class="mt-1"><a href="/elections/2026/" class="underline">Everything on the 2026 ballot</a></p>
+    </div>
+  )}
 
   <FederalMoney bioguide={member.bioguide} />
 
