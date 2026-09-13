@@ -1,0 +1,15 @@
+{
+  "_comment": "Human-verified rulings for November ballot questions the Commission's certified primary results and ballot-access report cannot settle on their own. 'candidates': a ballot-access challenge the report still shows as Challenged, decided at a Commission meeting. 'contests': a primary the certified totals leave unresolved (for example a write-in who may have qualified under s. 8.16(2)); nominee is a name in that contest, or null for no nominee. Every entry needs an official basis URL. An entry the data does not need fails the import.",
+  "2026": {
+    "candidates": [
+      {
+        "office": "REPRESENTATIVE TO THE ASSEMBLY DISTRICT 51",
+        "candidate": "Nathan Tataje",
+        "on_ballot": true,
+        "basis": "https://elections.wi.gov/sites/default/files/documents/June%209%2C%202026%2C%20Open%20Session%20Minutes%20APPROVED.pdf",
+        "note": "EL 26-34 Trevor Ford v. Nathan Tataje: 211 valid signatures; the Commission added him to the approved list (motion carried 6-0)."
+      }
+    ],
+    "contests": []
+  }
+}

@@ -384,6 +384,34 @@ def check_campaign_finance(conn: sqlite3.Connection) -> list[str]:
             if (bad := conn.execute(query).fetchone()[0])]
 
 
+def check_ballot(conn: sqlite3.Connection) -> list[str]:
+    """After the primary, a November race has at most one candidate per party
+    and every seat on the cycle carries the Commission's overlay: a primary
+    loser or a stale pre-primary list can never reach a race page."""
+    phase = conn.execute("SELECT value FROM meta WHERE key = 'wec_ballot_phase'").fetchone()
+    if not phase or phase[0] != "general":
+        return []
+    failures = []
+    doubled = conn.execute(
+        "SELECT office, party FROM statewide_races WHERE party != 'Independent'"
+        " GROUP BY office, party HAVING COUNT(*) > 1").fetchall()
+    failures += [f"statewide {o}: two {p} candidates on the November ballot" for o, p in doubled]
+    cycle = conn.execute("SELECT MIN(cycle_year) FROM elections").fetchone()[0]
+    for person, party, on_ballot, opponents, source in conn.execute(
+        "SELECT p.name, p.party, e.on_ballot, e.opponents_json, e.source FROM elections e"
+        " JOIN people p ON p.id = e.person_id WHERE e.cycle_year = ?", (cycle,),
+    ):
+        if source != "wec" or opponents is None:
+            failures.append(f"{person}: seat on the {cycle} ballot has no Commission overlay")
+            continue
+        parties = [o["party"] for o in json.loads(opponents) if o["party"] != "Independent"]
+        if on_ballot:
+            parties.append(party)
+        if len(parties) != len(set(parties)):
+            failures.append(f"{person}'s seat: two candidates of one party in November")
+    return failures
+
+
 def run_checks(db_path: Path, counts_file: Path) -> list[str]:
     conn = sqlite3.connect(db_path)
     try:
@@ -393,6 +421,7 @@ def run_checks(db_path: Path, counts_file: Path) -> list[str]:
         failures += check_federal(conn)
         failures += check_local(conn)
         failures += check_campaign_finance(conn)
+        failures += check_ballot(conn)
     finally:
         conn.close()
     return failures

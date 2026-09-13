@@ -4,12 +4,13 @@ import SourceStrip from "../../components/SourceStrip.astro";
 import FollowButton from "../../components/FollowButton.astro";
 import DistrictMap from "../../components/DistrictMap.astro";
 import {
-  seatTerms, sittingPeople, electionFor, electionHistoryFor, lastMarginFor,
+  seatTerms, sittingPeople, electionFor, electionHistoryFor, lastMarginFor, ballotPhase,
+  writeInPending,
 } from "../../lib/db";
 import { partyLetter, partyStyle, personSlug, monthYear, chamberName } from "../../lib/format";
 import { safeHref } from "../../lib/html";
 import { mergeServiceSpans } from "../../lib/service";
-import { ballotStatus } from "../../lib/ballot";
+import { ballotStatus, seatOffice } from "../../lib/ballot";
 
 export function getStaticPaths() {
   const seats = [
@@ -30,6 +31,10 @@ const holder = sittingPeople().find((p) => p.chamber === chamber && p.district =
 const election = holder ? electionFor(holder.id) : undefined;
 const opponents = election?.opponents.filter((o) => o.ballot_status !== "Deny") ?? [];
 const ballot = ballotStatus(election);
+const openPrimaries = writeInPending(seatOffice(chamber, district)).map((p) => p.party);
+const alone = openPrimaries.length
+  ? `; the ${openPrimaries.join(" and ")} write-in line is still open`
+  : ballotPhase() === "general" ? ", unopposed" : ", unopposed so far";
 const history = electionHistoryFor(chamber, district);
 const lastMargin = lastMarginFor(chamber, district);
 
@@ -96,9 +101,9 @@ const lineage = [...byPerson.entries()]
       {ballot.kind !== "none" && (
         <p class="mt-1 text-sm text-navy-700">
           {ballot.kind === "on-ballot"
-            ? `On the November ${ballot.year} ballot${opponents.length ? `, challenged by ${opponents.map((o) => `${o.name} (${partyLetter(o.party)})`).join(", ")}` : ", unopposed so far"}`
+            ? `On the November ${ballot.year} ballot${opponents.length ? `, challenged by ${opponents.map((o) => `${o.name} (${partyLetter(o.party)})`).join(", ")}` : alone}`
             : ballot.kind === "not-running"
-              ? `Not running in November ${ballot.year}`
+              ? `Not on the November ${ballot.year} ballot`
               : ballot.kind === "pending"
                 ? `November ${ballot.year} ballot status not yet posted by the Elections Commission`
                 : `Seat next on the ballot in November ${ballot.year}`}

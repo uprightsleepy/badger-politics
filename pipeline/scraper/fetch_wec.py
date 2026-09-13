@@ -1,49 +1,54 @@
-"""Download the WEC ballot-access report (candidate tracking) for a cycle.
+"""Download the Commission's pinned candidate records for an election cycle.
 
-Usage: python -m scraper.fetch_wec [--url URL] [dest_pdf]
+Usage: python -m scraper.fetch_wec [--cycle 2026]
 
-Downloads are paused by source_policies.json as of 2026-09-07 because the
-terms review could not be completed (homepage returned 403). Existing reports
-remain available offline; restore only after completing the source review.
+Two files per cycle, both immutable once posted, so a present file is never
+fetched again:
+- the ballot-access report whose "Candidate Tracking by Office" appendix
+  lists every filing and its status (independents come only from here);
+- the certified partisan primary ward-by-ward workbook, which names each
+  party's nominee for November.
 
-The Wisconsin Elections Commission publishes candidate ballot access as a
-commission-meeting memo whose Appendix B is the "Candidate Tracking by
-Office" table. The URL changes each cycle (and gets superseded when the
-general-election ballot is certified) — update DEFAULT_URL per cycle; the
-parser's drift alarms catch format changes.
+Reviewed 2026-09-13 (scraper/README.md): robots.txt permits the documents
+path and the site publishes no separate terms. Add each cycle's URLs after
+its ballot-access meeting and its primary certification.
 """
 
+import argparse
 import sys
 from pathlib import Path
 
 from scraper.http import session
 
-DEFAULT_URL = (
-    "https://elections.wi.gov/sites/default/files/documents/"
-    "D.%20Ballot%20Access%20Report%206.9.2026.pdf"
-)
-DEFAULT_DEST = Path(__file__).resolve().parents[1] / "_data" / "wec" / "ballot-access.pdf"
-
-
-def fetch(url: str, dest: Path) -> None:
-    response = session().get(url, timeout=120)
-    response.raise_for_status()
-    if not response.content.startswith(b"%PDF"):
-        raise RuntimeError(f"{url} did not return a PDF (WEC page moved?)")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(response.content)
-    print(f"fetched {len(response.content):,} bytes -> {dest}")
+DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "wec"
+BASE = "https://elections.wi.gov/sites/default/files/documents/"
+CYCLES = {
+    2026: {
+        "ballot-access.pdf": BASE + "D.%20Ballot%20Access%20Report%206.9.2026.pdf",
+        "primary-2026.xlsx": (BASE + "Ward%20by%20Ward%20Report_Partisan%20Primary%202026"
+                              "_All%20State%20Contests.xlsx"),
+    },
+}
+MAGIC = {".pdf": b"%PDF", ".xlsx": b"PK"}
 
 
 def main(argv: list[str]) -> int:
-    args = list(argv)
-    url = DEFAULT_URL
-    if "--url" in args:
-        i = args.index("--url")
-        url = args[i + 1]
-        del args[i : i + 2]
-    dest = Path(args[0]) if args else DEFAULT_DEST
-    fetch(url, dest)
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--cycle", type=int, default=2026)
+    ns = ap.parse_args(argv)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    http = session()
+    for name, url in CYCLES[ns.cycle].items():
+        target = DATA_DIR / name
+        if target.exists():
+            print(f"{name}: already present")
+            continue
+        response = http.get(url, timeout=120)
+        response.raise_for_status()
+        if not response.content.startswith(MAGIC[target.suffix]):
+            raise RuntimeError(f"{url} did not return a {target.suffix} file (page moved?)")
+        target.write_bytes(response.content)
+        print(f"{name}: {len(response.content):,} bytes")
     return 0
 
 

@@ -1,5 +1,5 @@
 {
-  "reviewed_on": "2026-09-09",
+  "reviewed_on": "2026-09-13",
   "documentation": "README.md#shared-daily-checks-2026-09-08",
   "sources": {
     "cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com": {
@@ -88,7 +88,13 @@
       }
     },
     "elections.wi.gov": {
-      "paused": "Report paths are robots-permitted, but the terms recheck was blocked by HTTP 403. Retain local reports until access/reuse review is complete."
+      "paths": { "GET": ["/sites/default/files/documents/[^/]+\\.(?:pdf|xlsx)"] },
+      "delay_seconds": 10,
+      "robots": {
+        "status": 200,
+        "url": "https://elections.wi.gov/robots.txt",
+        "sha256": "c1494865f063cf5c1c027282558ea4c67197f8bdbc11ff93c5bb8f72635d5544"
+      }
     },
     "api.github.com": {
       "paths": {

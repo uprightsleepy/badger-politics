@@ -44,10 +44,11 @@ python -m importer.import_openstates _data/wi _data/sessions/*/ ../data/wi.sqlit
 
 # --- Phase 2: derived features + elections (CYCLE = active election year) ---
 CYCLE="${CYCLE:-2026}"
-# WEC downloads paused 2026-09-07: terms recheck returned 403; use local reports.
+# the cycle's ballot-access report and certified primary, fetched once (pinned)
+python -m scraper.fetch_wec --cycle "$CYCLE"
 python -m importer.wec_pdf _data/wec/ballot-access.pdf _data/wec/candidates-${CYCLE}.csv
 python -m importer.elections ../data/wi.sqlite --cycle "$CYCLE"
-python -m importer.import_wec _data/wec/candidates-${CYCLE}.csv ../data/wi.sqlite --cycle "$CYCLE"
+python -m importer.import_wec _data/wec/candidates-${CYCLE}.csv ../data/wi.sqlite   --cycle "$CYCLE" --primary "_data/wec/primary-${CYCLE}.xlsx"
 
 # Existing pinned canvass files remain available offline.
 python -m importer.import_wec_results _data/wec-results ../data/wi.sqlite

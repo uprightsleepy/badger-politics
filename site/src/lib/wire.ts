@@ -52,6 +52,8 @@ export type Race = {
   candidates: { name: string; party: string | null }[];
 };
 export type Ballot = {
+  /** "general" once the certified primary names the November candidates. */
+  phase: "general" | "primary";
   assembly: Record<string, Race>;
   senate: Record<string, Race>;
   statewide: Record<string, { name: string; party: string | null }[]>;

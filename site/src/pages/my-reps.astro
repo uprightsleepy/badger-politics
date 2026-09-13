@@ -157,7 +157,7 @@ import { PLACES_KEY } from "../lib/placesKey";
       const status = ballotStatus(full.election);
       const ballotText =
         status.kind === "on-ballot" ? `On the November ${status.year} ballot`
-        : status.kind === "not-running" ? `Not running in November ${status.year}`
+        : status.kind === "not-running" ? `Not on the November ${status.year} ballot`
         : status.kind === "pending" ? `November ${status.year} ballot status not yet posted`
         : status.kind === "future" ? `Seat next on the ballot in ${status.year}`
         : "";

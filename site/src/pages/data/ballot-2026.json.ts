@@ -11,7 +11,7 @@
  * showing it as though it were would be wrong.
  */
 import type { APIRoute } from "astro";
-import { sittingPeople, electionFor, statewideRaces } from "../../lib/db";
+import { sittingPeople, electionFor, statewideRaces, ballotPhase } from "../../lib/db";
 import { personSlug } from "../../lib/format";
 import { ballotStatus } from "../../lib/ballot";
 import type { Ballot, Race } from "../../lib/wire";
@@ -46,7 +46,7 @@ export const GET: APIRoute = () => {
       return acc;
     }, {});
 
-  const ballot: Ballot = { assembly, senate, statewide };
+  const ballot: Ballot = { phase: ballotPhase(), assembly, senate, statewide };
   return new Response(JSON.stringify(ballot), {
     headers: { "Content-Type": "application/json" },
   });
