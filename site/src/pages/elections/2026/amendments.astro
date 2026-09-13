@@ -1,0 +1,152 @@
+---
+import Base from "../../../layouts/Base.astro";
+import SourceStrip from "../../../components/SourceStrip.astro";
+import { ballotMeasures, votesFor } from "../../../lib/db";
+import { billSlug, chamberName, fmtDate } from "../../../lib/format";
+import { safeHref } from "../../../lib/html";
+
+const measures = ballotMeasures(2026);
+const enrolledUrl = (sessionId: string, identifier: string) =>
+  `https://docs.legis.wisconsin.gov/${sessionId}/related/enrolled/${billSlug(identifier)}`;
+// journal-sourced records are committee reports; everything else is a floor vote
+const floorVotes = (billId: string) =>
+  votesFor(billId).filter((v) => !(v.source_url ?? "").includes("/journals/"));
+const passages = (m: (typeof measures)[number]) => [
+  { label: "First approval", sessionId: m.first_session_id, identifier: m.first_identifier, billId: m.first_bill_id },
+  { label: "Second approval", sessionId: m.session_id, identifier: m.identifier, billId: m.bill_id },
+];
+// a created section carries no marks: the treatment line says it is all new
+const marked = (m: (typeof measures)[number]) =>
+  m.changes.some((c) => c.text.some((runs) => runs.some(([kind]) => kind !== "same")));
+const count =["no", "one", "two", "three", "four", "five", "six"][measures.length] ?? String(measures.length);
+---
+
+<Base
+  title="Constitutional amendments, November 2026"
+  description={`The ${count} Wisconsin constitutional amendment questions on the November 3, 2026 ballot: the exact wording, what each would change, and how every legislator voted to put it there.`}
+  breadcrumbs={[{ name: "Elections", url: "/elections/2026/" }, { name: "2026", url: "/elections/2026/" }]}
+  filters={{ type: "Race", session: "2026 election" }}
+>
+  <p class="text-sm text-navy-600">
+    <a href="/elections/2026/" class="underline">&larr; Everything on the 2026 ballot</a>
+  </p>
+  <h1 class="mt-2 text-2xl font-bold">Constitutional Amendments: November 3, 2026</h1>
+  {measures.length === 0 ? (
+    <p class="mt-2 max-w-3xl text-navy-700">
+      The statewide ballot questions for this election are not verified in our records yet.
+      The <a href="https://elections.wi.gov" class="underline">Wisconsin Elections Commission</a>
+      publishes them in its referendum notice.
+    </p>
+  ) : (
+    <>
+      <p class="mt-2 max-w-3xl text-navy-700">
+        Every Wisconsin voter will be asked {count} questions about changing the state
+        constitution. An amendment reaches the ballot only after two consecutive
+        Legislatures approve the same text; the governor has no role. A <strong>yes</strong> vote
+        adopts the change and a <strong>no</strong> vote leaves the constitution as it is. Each
+        question passes or fails on a simple majority of the votes cast on it.
+      </p>
+      <SourceStrip
+        sources={[
+          { label: "Wisconsin Elections Commission referendum notice", href: measures[0].notice_url },
+          { label: "Wisconsin Legislature", href: "https://docs.legis.wisconsin.gov" },
+        ]}
+        through={null}
+      />
+      <nav aria-label="Questions on the ballot" class="mt-4">
+        <ol class="grid gap-2 sm:grid-cols-3">
+          {measures.map((m) => (
+            <li>
+              <a href={`#question-${m.number}`} class="block h-full rounded-lg border border-navy-100 bg-white px-3 py-2 hover:bg-navy-50">
+                <span class="block text-xs font-bold uppercase tracking-wide text-navy-600">Question {m.number}</span>
+                <span class="font-semibold">{m.title}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      {measures.map((m) => (
+        <section id={`question-${m.number}`} class="mt-8 max-w-3xl scroll-mt-4">
+          <p class="text-xs font-bold uppercase tracking-wide text-navy-600">Question {m.number}</p>
+          <h2 class="text-xl font-bold">{m.title}</h2>
+
+          <figure class="mt-3 rounded-lg border-l-4 border-navy-600 bg-white p-4">
+            <blockquote class="text-lg leading-relaxed">“{m.question}”</blockquote>
+            <figcaption class="mt-2 text-sm text-navy-600">
+              The wording on the ballot, from the Commission's{" "}
+              <a href={safeHref(m.notice_url)} class="underline">referendum notice</a>.
+            </figcaption>
+          </figure>
+
+          <h3 class="mt-5 font-bold">What it would change</h3>
+          <p class="mt-1 text-sm text-navy-700">
+            The constitution's text as the Legislature approved it.
+            {marked(m) && (
+              <>
+                {" "}<del class="text-badger-700">Struck text</del> would be removed and{" "}
+                <ins class="font-semibold text-moss-600 decoration-2">underlined text</ins> would be added.
+              </>
+            )}
+          </p>
+          {m.changes.map((change) => (
+            <div class="mt-3 rounded-lg border border-navy-100 bg-white p-4">
+              <p class="text-sm font-semibold text-navy-700">{change.treatment}</p>
+              {/is created to read/.test(change.treatment) && (
+                <p class="mt-1 text-sm text-navy-700">
+                  This would be a new section of the constitution: all of the text below would be added.
+                </p>
+              )}
+              {change.text.map((paragraph) => (
+                <p class="mt-2 leading-relaxed">
+                  {paragraph.map(([kind, words]) =>
+                    kind === "del" ? <del class="text-badger-700"><span class="sr-only">[removed: </span>{words}<span class="sr-only">]</span></del>
+                    : kind === "ins" ? <ins class="font-semibold text-moss-600 decoration-2"><span class="sr-only">[added: </span>{words}<span class="sr-only">]</span></ins>
+                    : words,
+                  )}
+                </p>
+              ))}
+            </div>
+          ))}
+          <p class="mt-2 text-sm">
+            <a href={enrolledUrl(m.session_id, m.identifier)} class="underline">Official enrolled text</a>
+          </p>
+
+          <h3 class="mt-5 font-bold">How it reached the ballot</h3>
+          <div class="mt-2 grid gap-3 sm:grid-cols-2">
+            {passages(m).map((p) => (
+              <div class="rounded-lg border border-navy-100 bg-white p-4">
+                <h4 class="text-xs font-bold uppercase tracking-wide text-navy-600">
+                  {p.label}: {p.sessionId}–{Number(p.sessionId) + 1} Legislature
+                </h4>
+                <p class="mt-1 font-semibold">
+                  <a href={`/bills/${p.sessionId}/${billSlug(p.identifier)}/`} class="underline">
+                    {p.sessionId} {p.identifier}
+                  </a>
+                </p>
+                <ul class="mt-2 divide-y divide-navy-100 text-sm">
+                  {floorVotes(p.billId).map((v) => (
+                    <li class="py-1.5">
+                      <span class="font-semibold">{chamberName(v.chamber)}</span>{" "}
+                      <span class="text-navy-600">{fmtDate(v.date)}</span>
+                      <span class="block">
+                        {v.motion ?? "Vote"}:{" "}
+                        <span class={`font-bold ${v.result === "pass" ? "text-moss-600" : "text-badger-700"}`}>
+                          {v.result === "pass" ? "Passed" : "Failed"}
+                          {v.yes_count != null && ` ${v.yes_count}–${v.no_count ?? 0}`}
+                        </span>{" "}
+                        <a href={`/votes/${v.id}/`} class="underline">
+                          {(v.source_url ?? "").includes("/votes/") ? "how each member voted" : "vote record"}
+                        </a>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </>
+  )}
+</Base>

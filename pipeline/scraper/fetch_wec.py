@@ -2,12 +2,13 @@
 
 Usage: python -m scraper.fetch_wec [--cycle 2026]
 
-Two files per cycle, both immutable once posted, so a present file is never
-fetched again:
+Pinned files per cycle, each immutable once posted, so a present file is
+never fetched again:
 - the ballot-access report whose "Candidate Tracking by Office" appendix
   lists every filing and its status (independents come only from here);
 - the certified partisan primary ward-by-ward workbook, which names each
-  party's nominee for November.
+  party's nominee for November;
+- the Type A referendum notice, the statewide ballot questions as printed.
 
 Reviewed 2026-09-13 (scraper/README.md): robots.txt permits the documents
 path and the site publishes no separate terms. Add each cycle's URLs after
@@ -27,6 +28,8 @@ CYCLES = {
         "ballot-access.pdf": BASE + "D.%20Ballot%20Access%20Report%206.9.2026.pdf",
         "primary-2026.xlsx": (BASE + "Ward%20by%20Ward%20Report_Partisan%20Primary%202026"
                               "_All%20State%20Contests.xlsx"),
+        "referendum-2026.pdf": (BASE + "Type%20A%20Notice%20of%20Referendum_November%202026"
+                                "%20General%20Election.pdf"),
     },
 }
 MAGIC = {".pdf": b"%PDF", ".xlsx": b"PK"}

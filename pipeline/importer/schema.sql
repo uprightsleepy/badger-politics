@@ -184,6 +184,23 @@ CREATE INDEX idx_election_history_seat ON election_history (chamber, district, y
 
 -- Statewide constitutional offices on the current ballot, straight from
 -- the WEC ballot-access report (candidates, incumbents, non-candidacy).
+-- Statewide constitutional amendment questions from the Commission's
+-- referendum notice, each proved against its enrolled resolution and the
+-- first consideration it names (importer/import_amendments.py).
+-- changes_json: [{"treatment", "text": [[[kind, words], ...], ...]}] with
+-- kind same | del (struck) | ins (inserted), as the enrolled text marks it
+CREATE TABLE ballot_measures (
+    election_date TEXT NOT NULL,
+    number        INTEGER NOT NULL,
+    title         TEXT NOT NULL,
+    question      TEXT NOT NULL,
+    bill_id       TEXT NOT NULL REFERENCES bills(id),
+    first_bill_id TEXT NOT NULL REFERENCES bills(id),
+    changes_json  TEXT NOT NULL,
+    notice_url    TEXT NOT NULL,
+    PRIMARY KEY (election_date, number)
+);
+
 -- Primaries whose November nominee the certified results cannot settle
 -- (for example a write-in who may have qualified under s. 8.16(2)); shown
 -- as open on the race pages until a ruling in importer/wec_rulings.json

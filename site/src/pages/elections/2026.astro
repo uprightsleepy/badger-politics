@@ -4,7 +4,7 @@ import SourceStrip from "../../components/SourceStrip.astro";
 import PartyChip from "../../components/PartyChip.astro";
 import {
   sittingPeople, electionFor, personIdByName, statewideRaces, statewideHistory,
-  lastMarginFor, statewideCountiesFor, ballotPhase, writeInPending,
+  lastMarginFor, statewideCountiesFor, ballotPhase, writeInPending, ballotMeasures,
 } from "../../lib/db";
 import { partyLetter, personSlug } from "../../lib/format";
 import { ballotStatus, seatOffice } from "../../lib/ballot";
@@ -30,6 +30,7 @@ const closeSeats = seats.filter(
 ).length;
 
 const general = ballotPhase() === "general";
+const measures = ballotMeasures(2026);
 const OFFICES: [string, string][] = [
   ["GOVERNOR", "Governor"],
   ["LIEUTENANT GOVERNOR", "Lieutenant Governor"],
@@ -245,6 +246,25 @@ const statewide = OFFICES.map(([key, label]) => {
       ))}
     </div>
   </section>
+  {measures.length > 0 && (
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">Constitutional amendments</h2>
+      <p class="mt-1 max-w-3xl text-sm text-navy-700">
+        Every ballot in the state carries these questions. See the exact wording, what each
+        would change, and how legislators voted to put it there.
+      </p>
+      <ul class="mt-2 grid gap-2 sm:grid-cols-3">
+        {measures.map((m) => (
+          <li>
+            <a href={`/elections/2026/amendments/#question-${m.number}`} class="block h-full rounded-lg border border-navy-100 bg-white px-3 py-2 hover:bg-navy-50">
+              <span class="block text-xs font-bold uppercase tracking-wide text-navy-600">Question {m.number}</span>
+              <span class="font-semibold">{m.title}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
   {[
     { label: "Senate (odd districts)", rows: senate },
     { label: "Assembly (all districts)", rows: assembly },

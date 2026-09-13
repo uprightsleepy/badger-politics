@@ -20,7 +20,7 @@ READS = {
     "federal": ("federal",),
     "import": tuple(s for s in SOURCES
                     if s not in ("lrb_cache", "companions_cache", "scraper_cache")),
-    "enrich": ("database", "wi", "sessions", "lrb_cache", "companions_cache"),
+    "enrich": ("database", "wi", "sessions", "wec", "lrb_cache", "companions_cache"),
 }
 WRITES = {
     "legislature": ("wi", "people", "scraper_cache"),
@@ -78,6 +78,8 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
                    ["importer.federal_finance", "_data/federal", db],
                    ["importer.import_local", "_data/local", db]],
         "enrich": [["importer.enrich_lrb", db], ["importer.enrich_companions", db],
+                   # enrolled resolution pages share the LRB page cache
+                   ["importer.import_amendments", db, "--cycle", cycle],
                    ["importer.checks", db]],
     }
     return stages[stage]
