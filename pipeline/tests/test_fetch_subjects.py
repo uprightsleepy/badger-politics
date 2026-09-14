@@ -12,10 +12,9 @@ from scraper.fetch_subjects import blocks, build
 P = "/2025/related/subject_index/index"
 
 
-def heading(slug, key, text, cls="qsSubject  level2"):
-    return (f'<div class="{cls}" data-path="{P}/p/{slug}"'
-            f'   data-cites=\'["subjectindex/2025/{key}"]\'>'
-            f'<a class="reference" href="/document/subjectindex/2025/{key}">{key}</a>{text}</div>')
+def heading(slug, text, cls="qsSubject  level2"):
+    return (f'<div class="{cls}" data-path="{P}/p/{slug}"   data-cites=\'[]\'>'
+            f'<a class="reference" href="/document/subjectindex/{slug}">{slug}</a>{text}</div>')
 
 
 def entry(slug, n, bill, cls="qsAbstract"):
@@ -32,18 +31,18 @@ def index(*pages):
 
 
 def test_entries_repeated_across_overlapping_pages_keep_their_own_heading():
-    page1 = [heading("police", "police", "Police, see also Sheriff; Traffic officer"),
+    page1 = [heading("police", "Police, see also Sheriff; Traffic officer"),
              entry("police", 1, "AB1"), entry("police", 2, "SB2"),
-             heading("port", "port", "Port"), entry("port", 1, "AB9")]
+             heading("port", "Port"), entry("port", 1, "AB9")]
     # the next page starts back inside Police, before the Port heading
     page2 = [entry("police", 2, "SB2"),
-             heading("port", "port", "Port"), entry("port", 1, "AB9"),
-             heading("zoning", "zoning", "Zoning, see Municipality &#8212; Planning")]
+             heading("port", "Port"), entry("port", 1, "AB9"),
+             heading("zoning", "Zoning, see Municipality &#8212; Planning")]
     assert build(index(page1, page2), 2025) == {"Police": ["AB 1", "SB 2"], "Port": ["AB 9"]}
 
 
 def test_printed_heading_replaces_the_url_key_in_every_markup_era():
-    old = [heading("banking", "banking division of",
+    old = [heading("banking",
                    '<span class="qs_subjecthead_">Banking, Division of</span>',
                    "qs_subject_ level2"),
            entry("banking", 1, "ab224", "qs_entry_")]

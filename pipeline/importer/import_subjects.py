@@ -44,7 +44,7 @@ def run(archives_dir: Path, db_path: Path) -> int:
             if archive.get("format") != FORMAT and year != newest:
                 stale.append(year)
                 continue
-            if archive.get("format") != FORMAT or not archive["subjects"]:
+            if archive.get("format") != FORMAT:
                 raise RuntimeError(
                     f"{path.name}: not a current subject archive; run scraper.fetch_subjects")
             batch = []

@@ -1224,15 +1224,16 @@ export const committeeFor = (committeeId: string) => {
  * as the newest session prints it, with each bill counted once. */
 export const subjectIndex = once(() => {
   const rows = prep(
-      `SELECT s.subject, s.bill_id, b.session_id FROM bill_subjects s
-       JOIN bills b ON b.id = s.bill_id WHERE b.source != 'legiscan'`,
+      `SELECT s.subject, s.bill_id FROM bill_subjects s
+       JOIN bills b ON b.id = s.bill_id WHERE b.source != 'legiscan'
+       ORDER BY b.session_id`,
     )
-    .all() as { subject: string; bill_id: string; session_id: string }[];
-  const bySlug = new Map<string, { heading: string; newest: string; subjects: Set<string>; bills: Set<string> }>();
+    .all() as { subject: string; bill_id: string }[];
+  const bySlug = new Map<string, { heading: string; subjects: Set<string>; bills: Set<string> }>();
   for (const r of rows) {
     const slug = subjectSlug(r.subject);
-    const entry = bySlug.get(slug) ?? { heading: r.subject, newest: r.session_id, subjects: new Set(), bills: new Set() };
-    if (r.session_id > entry.newest) Object.assign(entry, { heading: r.subject, newest: r.session_id });
+    const entry = bySlug.get(slug) ?? { heading: r.subject, subjects: new Set(), bills: new Set() };
+    entry.heading = r.subject; // oldest session first, so the newest heading wins
     entry.subjects.add(r.subject);
     entry.bills.add(r.bill_id);
     bySlug.set(slug, entry);

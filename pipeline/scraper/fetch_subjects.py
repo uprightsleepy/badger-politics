@@ -38,7 +38,7 @@ FORMAT = 2  # archives before this keyed subjects by URL slug and misattributed
 # heading and entry markup differs by era (qsSubject / qs_subject_), the path does not
 BLOCK_RE = re.compile(
     r'<div class="[^"]*"\s+data-path="(/\d{4}/related/subject_index/index/[^"]+)"\s+'
-    r"data-cites='([^']*)'>(.*?)</div>", re.S)
+    r"data-cites='[^']*'>(.*?)</div>", re.S)
 HEADING_RE = re.compile(r"/index/[^/]+/[^/]+$")
 ENTRY_RE = re.compile(r"/index/[^/]+/[^/]+/_\d+$")
 REFERENCE_RE = re.compile(r'<a class="reference"[^>]*>.*?</a>', re.S)
@@ -47,23 +47,23 @@ BILL_RE = re.compile(r'href="/document/session/(\d+)/([A-Za-z0-9]+)/([A-Za-z]+)(
 DOWN_RE = re.compile(r"<a href='(/\d{4}/related/subject_index/[^']+\?down=1)'>\s*Down")
 
 
-def blocks(page: str) -> dict[str, tuple[str, str]]:
-    """data-path -> (cites, inner html) for every index block on one page."""
-    return {m.group(1): (m.group(2), m.group(3)) for m in BLOCK_RE.finditer(page)}
+def blocks(page: str) -> dict[str, str]:
+    """data-path -> inner html for every index block on one page."""
+    return dict(BLOCK_RE.findall(page))
 
 
 def heading_text(inner: str) -> str:
     """The heading as printed, without its cross-references: "Police, see
     also Milwaukee — Police" is the subject "Police"."""
     text = html_lib.unescape(re.sub(r"<[^>]+>", "", REFERENCE_RE.sub("", inner, count=1)))
-    return re.split(r",\s+see\b", re.sub(r"\s+", " ", text).strip())[0].strip()
+    return re.split(r",\s+see\b", re.sub(r"\s+", " ", text))[0].strip()
 
 
-def build(index: dict[str, tuple[str, str]], year: int) -> dict[str, list[str]]:
-    headings = {path: heading_text(inner) for path, (_, inner) in index.items()
+def build(index: dict[str, str], year: int) -> dict[str, list[str]]:
+    headings = {path: heading_text(inner) for path, inner in index.items()
                 if HEADING_RE.search(path)}
     subjects: dict[str, list[str]] = {}
-    for path, (_, inner) in index.items():
+    for path, inner in index.items():
         if not ENTRY_RE.search(path):
             continue
         heading = headings.get(path.rsplit("/", 1)[0])
@@ -80,7 +80,7 @@ def build(index: dict[str, tuple[str, str]], year: int) -> dict[str, list[str]]:
 
 
 def fetch_year(http: requests.Session, year: int) -> dict[str, list[str]]:
-    index: dict[str, tuple[str, str]] = {}
+    index: dict[str, str] = {}
     url: str | None = f"{BASE}/{year}/related/subject_index/index"
     seen = set()
     for _ in range(MAX_PAGES):
