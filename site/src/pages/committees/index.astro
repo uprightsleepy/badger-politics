@@ -81,7 +81,7 @@ const facets = [
               href={`/committees/${committeeSlug(c.id)}/`}
               class="inline-block shrink-0 py-1.5 text-xs tabular-nums text-badger-700 underline"
             >
-              {c.died_here.toLocaleString()} died here
+              {c.died_here.toLocaleString()} {c.died_here === 1 ? "bill" : "bills"} died without a hearing
             </a>
           )
         )}
