@@ -89,6 +89,7 @@ python -m importer.import_local _data/local ../data/wi.sqlite
 
 python -m importer.enrich_lrb ../data/wi.sqlite
 python -m importer.enrich_companions ../data/wi.sqlite
+python -m importer.import_amendments ../data/wi.sqlite --cycle "$CYCLE"  # ballot questions, proved against enrolled text
 python -m importer.checks ../data/wi.sqlite   # hard gate: abort deploy on failure
 
 # --- Phase 3: static JSON API, feeds, calendars, bulk exports ---

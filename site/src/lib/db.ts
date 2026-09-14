@@ -707,6 +707,29 @@ export const writeInPending = memoBy((office: string) =>
     : [],
 );
 
+export interface BallotMeasure {
+  election_date: string; number: number; title: string; question: string; notice_url: string;
+  bill_id: string; identifier: string; session_id: string;
+  first_bill_id: string; first_identifier: string; first_session_id: string;
+  /** Each amended section of the constitution, as the enrolled text marks it. */
+  changes: { treatment: string; text: ["same" | "del" | "ins", string][][] }[];
+}
+
+/** Statewide constitutional amendment questions for one election year, each
+ * proved against both enrolled resolutions by importer/import_amendments. */
+export const ballotMeasures = memoBy((year: number): BallotMeasure[] =>
+  hasTable("ballot_measures")
+    ? (prep(
+        `SELECT m.*, b.identifier, b.session_id,
+                f.identifier AS first_identifier, f.session_id AS first_session_id
+         FROM ballot_measures m
+         JOIN bills b ON b.id = m.bill_id JOIN bills f ON f.id = m.first_bill_id
+         WHERE m.election_date LIKE ? ORDER BY m.election_date, m.number`,
+      ).all(`${year}-%`) as (Omit<BallotMeasure, "changes"> & { changes_json: string })[])
+        .map(({ changes_json, ...m }) => ({ ...m, changes: JSON.parse(changes_json) }))
+    : [],
+);
+
 /** Certified statewide general-election results (WEC canvasses). */
 export const statewideHistory = () =>
   prep(
