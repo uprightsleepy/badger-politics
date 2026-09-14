@@ -12,6 +12,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from importer.import_wec import family_key, same_person
 from importer.roster import OPEN_END
 
 TOLERANCE_FRACTION = 0.02  # allow a 2% dip (e.g. scraper-side dedupe changes)
@@ -396,6 +397,11 @@ def check_ballot(conn: sqlite3.Connection) -> list[str]:
         "SELECT office, party FROM statewide_races WHERE party != 'Independent'"
         " GROUP BY office, party HAVING COUNT(*) > 1").fetchall()
     failures += [f"statewide {o}: two {p} candidates on the November ballot" for o, p in doubled]
+    doubled = conn.execute(
+        "SELECT district, party FROM congressional_races WHERE party != 'Independent'"
+        " GROUP BY district, party HAVING COUNT(*) > 1").fetchall()
+    failures += [f"House district {d}: two {p} candidates on the November ballot"
+                 for d, p in doubled]
     cycle = conn.execute("SELECT MIN(cycle_year) FROM elections").fetchone()[0]
     for person, party, on_ballot, opponents, source in conn.execute(
         "SELECT p.name, p.party, e.on_ballot, e.opponents_json, e.source FROM elections e"
@@ -412,6 +418,28 @@ def check_ballot(conn: sqlite3.Connection) -> list[str]:
     return failures
 
 
+def check_congress(conn: sqlite3.Connection) -> list[str]:
+    """The Commission's House incumbents are the members serving on election
+    day, district for district: a misread report can never put a race under
+    the wrong member."""
+    cycle = conn.execute("SELECT MIN(cycle_year) FROM elections").fetchone()[0]
+    races = dict(conn.execute("SELECT DISTINCT district, incumbent FROM congressional_races"))
+    if not races or cycle is None:
+        return []
+    election = f"{cycle}-11-03"
+    members = dict(conn.execute(
+        "SELECT district, name FROM federal_members WHERE chamber = 'house'"
+        " AND term_start <= ? AND ? < term_end", (election, election)))
+    if not members:
+        return []  # federal roster not imported: nothing to hold to account
+    if set(races) != set(members):
+        return [f"House districts {sorted(races)} differ from serving members {sorted(members)}"]
+    return [f"House district {d}: Commission incumbent {races[d]!r} is not {members[d]!r}"
+            for d in sorted(races)
+            if not (races[d] and (same_person(races[d], members[d])
+                                  or family_key(races[d]) == family_key(members[d])))]
+
+
 def run_checks(db_path: Path, counts_file: Path) -> list[str]:
     conn = sqlite3.connect(db_path)
     try:
@@ -422,6 +450,7 @@ def run_checks(db_path: Path, counts_file: Path) -> list[str]:
         failures += check_local(conn)
         failures += check_campaign_finance(conn)
         failures += check_ballot(conn)
+        failures += check_congress(conn)
     finally:
         conn.close()
     return failures

@@ -7,7 +7,7 @@ import pytest
 from openpyxl import Workbook
 
 from importer import import_wec
-from importer.checks import check_ballot
+from importer.checks import check_ballot, check_congress
 from importer.wec_primary import nominee, parse
 
 OFFICE = "REPRESENTATIVE TO THE ASSEMBLY DISTRICT 7"
@@ -179,4 +179,29 @@ def test_ballot_gate_rejects_two_candidates_of_one_party(make_db, tmp_path):
     assert len(check_ballot(conn)) == 2
     conn.execute("UPDATE meta SET value = 'primary'")
     assert check_ballot(conn) == [], "before the primary several filings per party are normal"
+    conn.close()
+
+
+def test_house_gates_hold_party_lines_and_the_serving_member(make_db, tmp_path):
+    conn = make_db(tmp_path / "wi.sqlite")
+    conn.execute("INSERT INTO people (id, name, party) VALUES ('p', 'Pat Seat', 'Democratic')")
+    conn.execute("INSERT INTO meta VALUES ('wec_ballot_phase', 'general')")
+    conn.execute("INSERT INTO elections (person_id, cycle_year, on_ballot, opponents_json, source)"
+                 " VALUES ('p', 2026, 1, '[]', 'wec')")
+    conn.execute("INSERT INTO federal_members (bioguide, name, slug, party, chamber, district,"
+                 " term_start, term_end) VALUES ('S001213', 'Bryan Steil', 'bryan-steil',"
+                 " 'Republican', 'house', 1, '2025-01-03', '2027-01-03')")
+    conn.executemany(
+        "INSERT INTO congressional_races (district, incumbent, incumbent_noncandidacy, candidate,"
+        " party, source) VALUES (1, ?, 0, ?, ?, 'wec')",
+        [("Bryan Steil", "Bryan Steil", "Republican"), ("Bryan Steil", "Ann Lee", "Democratic")])
+    assert check_ballot(conn) == [] and check_congress(conn) == []
+    conn.execute("INSERT INTO congressional_races (district, incumbent, incumbent_noncandidacy,"
+                 " candidate, party, source) VALUES (1, 'Bryan Steil', 0, 'Bo Ray', 'Democratic',"
+                 " 'wec')")
+    assert check_ballot(conn) == [
+        "House district 1: two Democratic candidates on the November ballot"]
+    conn.execute("UPDATE congressional_races SET incumbent = 'Mark Pocan'")
+    assert check_congress(conn) == [
+        "House district 1: Commission incumbent 'Mark Pocan' is not 'Bryan Steil'"]
     conn.close()

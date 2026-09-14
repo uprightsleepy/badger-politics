@@ -39,8 +39,8 @@ EXPECTED_COLUMNS = [
 OFFICE_RE = re.compile(
     r"^(STATE SENATOR|REPRESENTATIVE TO THE ASSEMBLY) DISTRICT (\d+)$"
 )
-# statewide constitutional offices tracked; federal contests are known and
-# skipped; anything else in the report is drift and fails loudly
+# statewide constitutional offices and House seats tracked; a U.S. Senate
+# contest is known and skipped; anything else in the report is drift
 STATEWIDE_OFFICES = {
     "GOVERNOR",
     "LIEUTENANT GOVERNOR",
@@ -49,6 +49,7 @@ STATEWIDE_OFFICES = {
     "STATE TREASURER",
 }
 FEDERAL_RE = re.compile(r"^(REPRESENTATIVE IN CONGRESS|UNITED STATES SENATOR)")
+CONGRESS_RE = re.compile(r"^REPRESENTATIVE IN CONGRESS DISTRICT (\d+)$")
 RULINGS_PATH = Path(__file__).with_name("wec_rulings.json")
 
 
@@ -144,7 +145,7 @@ def load_candidates(csv_path: Path) -> dict[tuple[str, int], list[dict]]:
 
 
 def _in_scope(office: str) -> bool:
-    return bool(OFFICE_RE.match(office)) or office in STATEWIDE_OFFICES
+    return bool(OFFICE_RE.match(office) or CONGRESS_RE.match(office)) or office in STATEWIDE_OFFICES
 
 
 def _rulings(cycle: int) -> tuple[dict, dict]:
@@ -217,6 +218,22 @@ def november(csv_rows: list[dict], contests: list[dict], cycle: int
     return ballot, pending
 
 
+def _races(csv_rows: list[dict], keep, ballot: dict, primary: bool) -> list[dict]:
+    """Rows for offices outside the legislature: every filing before the
+    primary; after it, the November candidates with the report's incumbent
+    and whether that incumbent is one of them."""
+    rows = [r for r in csv_rows if keep(r["office"])]
+    if not primary:
+        return rows
+    incumbents = {r["office"]: r for r in rows}
+    return [
+        {**incumbents[office], **e, "ballot_status": "Approve",
+         "on_ballot": int(bool(incumbents[office]["incumbent"]) and any(
+             same_person(incumbents[office]["incumbent"], x["candidate"])
+             for x in ballot.get(office, [])))}
+        for office in sorted(incumbents) for e in ballot.get(office, [])]
+
+
 def overlay(csv_path: Path, db_path: Path, cycle: int, primary: Path | None = None,
             today: date | None = None) -> int:
     csv_rows = _read_rows(csv_path)
@@ -282,15 +299,10 @@ def overlay(csv_path: Path, db_path: Path, cycle: int, primary: Path | None = No
                 (on_ballot, json.dumps(opponents), person_id, cycle),
             )
             updated += 1
-        statewide = [r for r in csv_rows if r["office"] in STATEWIDE_OFFICES]
-        if primary:
-            incumbents = {r["office"]: r for r in statewide}
-            statewide = [
-                {**incumbents[office], **e, "ballot_status": "Approve",
-                 "on_ballot": int(bool(incumbents[office]["incumbent"]) and any(
-                     same_person(incumbents[office]["incumbent"], x["candidate"])
-                     for x in ballot.get(office, [])))}
-                for office in sorted(incumbents) for e in ballot.get(office, [])]
+        statewide = _races(csv_rows, STATEWIDE_OFFICES.__contains__, ballot, bool(primary))
+        congress = _races(csv_rows, CONGRESS_RE.match, ballot, bool(primary))
+        if not congress:
+            raise RuntimeError("WEC drift: no congressional races in the report")
         conn.execute("DELETE FROM write_in_pending WHERE cycle_year = ?", (cycle,))
         conn.executemany(
             "INSERT INTO write_in_pending (cycle_year, office, party, reason) VALUES (?, ?, ?, ?)",
@@ -310,11 +322,21 @@ def overlay(csv_path: Path, db_path: Path, cycle: int, primary: Path | None = No
                 for r in statewide
             ],
         )
+        conn.execute("DELETE FROM congressional_races")
+        conn.executemany(
+            "INSERT INTO congressional_races (district, incumbent, incumbent_noncandidacy,"
+            " incumbent_on_ballot, candidate, party, ballot_status, source)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, 'wec')",
+            [(int(CONGRESS_RE.match(r["office"]).group(1)), r["incumbent"] or None,
+              int(r["incumbent_noncandidacy"] == "1"), r.get("on_ballot"), r["candidate"],
+              r["party"] or None, r["ballot_status"] or None) for r in congress],
+        )
     conn.close()
     races = len({r["office"] for r in statewide})
     print(f"wec overlay ({'November ballot' if primary else 'pre-primary filings'}):"
           f" {updated} seats updated, {warnings} warnings; {len(statewide)} statewide"
-          f" candidates across {races} offices; {sum(map(len, pending.values()))} open primaries")
+          f" candidates across {races} offices; {len(congress)} House candidates;"
+          f" {sum(map(len, pending.values()))} open primaries")
     return 0
 
 
