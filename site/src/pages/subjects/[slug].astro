@@ -1,26 +1,19 @@
 ---
 import Base from "../../layouts/Base.astro";
 import StatusBadge from "../../components/StatusBadge.astro";
-import { allSubjects, billsForSubject } from "../../lib/db";
-import { billSlug, fmtDate, shortTitle, subjectDisplay, subjectSlug } from "../../lib/format";
+import { subjectIndex, billsForSubject } from "../../lib/db";
+import { billSlug, fmtDate, shortTitle } from "../../lib/format";
 
 export function getStaticPaths() {
-  // distinct index terms can slug identically; one page carries them all
-  const bySlug = new Map<string, string[]>();
-  for (const s of allSubjects()) {
-    const slug = subjectSlug(s.subject);
-    bySlug.set(slug, [...(bySlug.get(slug) ?? []), s.subject]);
-  }
-  return [...bySlug.entries()].map(([slug, subjects]) => ({
+  return subjectIndex().map(({ slug, subjects, title }) => ({
     params: { slug },
-    props: { subjects },
+    props: { subjects, title },
   }));
 }
-const { subjects } = Astro.props;
+const { subjects, title } = Astro.props;
 const bills = subjects.flatMap((s) => billsForSubject(s));
 const seen = new Set<string>();
 const unique = bills.filter((b) => !seen.has(b.id) && seen.add(b.id));
-const title = subjectDisplay(subjects[0]);
 const sessions = [...new Set(unique.map((b) => b.session_id))].sort().reverse();
 
 // What happened to bills on this subject, counted from their statuses.

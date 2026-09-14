@@ -3,7 +3,10 @@
 Usage: python -m importer.import_subjects <archives_dir> <sqlite_path>
 
 Rows are written only for exact session + identifier matches; anything
-unmatched is counted and reported, never guessed across sessions.
+unmatched is counted and reported, never guessed across sessions. Subjects
+are the headings as the index prints them (scraper.fetch_subjects). An
+older-format archive misfiled entries and is left out, never imported,
+until the fetcher replaces it; the current biennium must be current.
 """
 
 from __future__ import annotations
@@ -15,6 +18,8 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from scraper.fetch_subjects import FORMAT
+
 YEAR_RE = re.compile(r"subjects-(\d{4})\.json$")
 
 
@@ -23,7 +28,8 @@ def run(archives_dir: Path, db_path: Path) -> int:
     if not files:
         raise RuntimeError(f"no subject archives in {archives_dir}; run scraper.fetch_subjects")
     conn = sqlite3.connect(db_path)
-    total, unmatched = 0, 0
+    total, unmatched, stale = 0, 0, []
+    newest = max(YEAR_RE.search(p.name).group(1) for p in files)
     with conn:
         conn.execute("DELETE FROM bill_subjects")
         for path in files:
@@ -34,8 +40,15 @@ def run(archives_dir: Path, db_path: Path) -> int:
                     "SELECT id, identifier FROM bills WHERE session_id = ?", (year,)
                 )
             }
+            archive = json.loads(path.read_text(encoding="utf-8"))
+            if archive.get("format") != FORMAT and year != newest:
+                stale.append(year)
+                continue
+            if archive.get("format") != FORMAT:
+                raise RuntimeError(
+                    f"{path.name}: not a current subject archive; run scraper.fetch_subjects")
             batch = []
-            for subject, identifiers in json.loads(path.read_text(encoding="utf-8")).items():
+            for subject, identifiers in archive["subjects"].items():
                 for identifier in identifiers:
                     bill_id = known.get(identifier)
                     if bill_id is None:
@@ -51,6 +64,7 @@ def run(archives_dir: Path, db_path: Path) -> int:
     print(
         f"bill_subjects: {total} rows across {subjects} subjects"
         + (f" ({unmatched} references skipped: bill not in db)" if unmatched else "")
+        + (f"; left out until refetched: {', '.join(stale)}" if stale else "")
     )
     return 0
 

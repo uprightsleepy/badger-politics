@@ -3,6 +3,7 @@
 import { hasTable, memoBy, once, prep } from "./connection.ts";
 import { OPEN_END, OPEN_START } from "./sentinels.ts";
 import type { MoneyBounds } from "./money-periods.ts";
+import { subjectDisplay, subjectSlug } from "./subjects.ts";
 
 export interface Session {
   id: string;
@@ -1217,12 +1218,30 @@ export const committeeFor = (committeeId: string) => {
 };
 
 /** The state's subject index, aggregated. */
-export const allSubjects = () =>
-  prep(
-      `SELECT subject, COUNT(*) AS n FROM bill_subjects
-       GROUP BY subject ORDER BY subject`,
+/** One entry per subject page. The index reprints a heading from session to
+ * session with small differences ("Corrections, Department of" was once
+ * keyed "corrections department of"); those share a slug and one page, titled
+ * as the newest session prints it, with each bill counted once. */
+export const subjectIndex = once(() => {
+  const rows = prep(
+      `SELECT s.subject, s.bill_id FROM bill_subjects s
+       JOIN bills b ON b.id = s.bill_id WHERE b.source != 'legiscan'
+       ORDER BY b.session_id`,
     )
-    .all() as { subject: string; n: number }[];
+    .all() as { subject: string; bill_id: string }[];
+  const bySlug = new Map<string, { heading: string; subjects: Set<string>; bills: Set<string> }>();
+  for (const r of rows) {
+    const slug = subjectSlug(r.subject);
+    const entry = bySlug.get(slug) ?? { heading: r.subject, subjects: new Set(), bills: new Set() };
+    entry.heading = r.subject; // oldest session first, so the newest heading wins
+    entry.subjects.add(r.subject);
+    entry.bills.add(r.bill_id);
+    bySlug.set(slug, entry);
+  }
+  return [...bySlug.entries()]
+    .map(([slug, e]) => ({ slug, title: subjectDisplay(e.heading), subjects: [...e.subjects], n: e.bills.size }))
+    .sort((a, b) => a.title.localeCompare(b.title));
+});
 
 export const billsForSubject = (subject: string) =>
   prep(

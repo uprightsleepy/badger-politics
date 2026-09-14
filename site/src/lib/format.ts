@@ -143,15 +143,7 @@ export const fmtMoney = (v: number): string =>
 export const fmtCents = (v: number): string =>
   v.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
 
-// the state's index terms encode em dashes as " _ "; restore for display
-export const subjectDisplay = (subject: string): string =>
-  subject
-    .split(" _ ")
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-    .join(" — ");
-
-export const subjectSlug = (subject: string): string =>
-  subject.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+export { subjectDisplay, subjectSlug } from "./subjects.ts";
 
 export const monthYear = (iso: string): string =>
   new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", {

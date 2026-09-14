@@ -1,9 +1,10 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { allSubjects } from "../../lib/db";
-import { subjectDisplay, subjectSlug } from "../../lib/format";
+import { subjectIndex } from "../../lib/db";
 
-const subjects = allSubjects();
+const subjects = subjectIndex();
+// grouped by first letter, as the Legislature's own index is
+const groups = Map.groupBy(subjects, (s) => (/[a-z]/i.test(s.title[0]) ? s.title[0].toUpperCase() : "#"));
 ---
 
 <Base
@@ -12,8 +13,9 @@ const subjects = allSubjects();
 >
   <h1 class="text-2xl font-bold">Browse Bills by Subject</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    The Legislature's own subject index, covering every session since 2009.
-    Terms are the state's, verbatim.
+    The Legislature's own subject index, covering every session since 2009,
+    with each term as the index prints it. {subjects.length.toLocaleString()} subjects,
+    grouped by letter.
   </p>
   <div class="mt-4">
     <label class="mb-1 block text-sm font-semibold" for="subject-filter">Filter subjects</label>
@@ -25,27 +27,58 @@ const subjects = allSubjects();
     />
     <p id="subject-filter-status" role="status" class="mt-2 text-sm text-navy-600"></p>
   </div>
-  <ul class="mt-4 columns-1 gap-6 sm:columns-2 lg:columns-3">
-    {subjects.map((s) => (
-      <li
-        class="break-inside-avoid"
-        data-subject-row
-        data-text={subjectDisplay(s.subject).toLowerCase()}
-      >
-        <a
-          href={`/subjects/${subjectSlug(s.subject)}/`}
-          class="flex items-baseline gap-2 rounded px-1 py-1 text-sm hover:bg-navy-50"
+  <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+    {[...groups.entries()].map(([letter, group]) => (
+      <details class="self-start rounded-lg border border-navy-100 bg-white" data-subject-group>
+        <summary class="flex cursor-pointer items-baseline gap-2 px-3 py-2">
+          <span class="text-lg font-bold">{letter}</span>
+          <span class="text-sm text-navy-600" data-group-count>
+            {group.length} subject{group.length === 1 ? "" : "s"}
+          </span>
+        </summary>
+        <div
+          class="max-h-96 overflow-y-auto border-t border-navy-100 scroll-body scroll-on-paper"
+          role="region"
+          tabindex="0"
+          aria-label={`Subjects starting with ${letter}`}
         >
-          <span class="min-w-0 flex-1 underline">{subjectDisplay(s.subject)}</span>
-          <span class="shrink-0 text-xs text-navy-600">{s.n}</span>
-        </a>
-      </li>
+          <ul class="p-2">
+            {group.map((s) => (
+              <li data-subject-row data-text={s.title.toLowerCase()}>
+                <a
+                  href={`/subjects/${s.slug}/`}
+                  class="flex items-baseline gap-2 rounded px-1 py-1 text-sm hover:bg-navy-50"
+                >
+                  <span class="min-w-0 flex-1 underline">{s.title}</span>
+                  <span class="shrink-0 text-xs text-navy-600">{s.n}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </details>
     ))}
-  </ul>
+  </div>
   <p id="subject-no-match" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600"></p>
 
   <script>
     import { initRowFilter } from "../../scripts/rowFilter";
+    const input = document.getElementById("subject-filter") as HTMLInputElement;
+    const groups = [...document.querySelectorAll<HTMLDetailsElement>("[data-subject-group]")];
+    // while filtering, open the letters with matches and hide the rest;
+    // clearing the filter returns every letter to closed
+    const regroup = () => {
+      const filtering = input.value.trim() !== "";
+      for (const group of groups) {
+        const rows = group.querySelectorAll("[data-subject-row]");
+        const shown = group.querySelectorAll("[data-subject-row]:not(.sorted-hidden)").length;
+        const count = group.querySelector<HTMLElement>("[data-group-count]")!;
+        count.dataset.all ??= count.textContent!;
+        group.hidden = filtering && shown === 0;
+        group.open = filtering && shown > 0;
+        count.textContent = filtering ? `${shown} of ${rows.length}` : count.dataset.all;
+      }
+    };
     initRowFilter({
       input: "subject-filter",
       rows: "[data-subject-row]",
@@ -53,5 +86,7 @@ const subjects = allSubjects();
       noMatch: "subject-no-match",
       noun: "subjects",
     });
+    input.addEventListener("input", regroup);
+    window.addEventListener("pageshow", regroup);
   </script>
 </Base>
