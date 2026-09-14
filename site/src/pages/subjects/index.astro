@@ -1,9 +1,8 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { allSubjects } from "../../lib/db";
-import { subjectDisplay, subjectSlug } from "../../lib/format";
+import { subjectIndex } from "../../lib/db";
 
-const subjects = allSubjects();
+const subjects = subjectIndex();
 ---
 
 <Base
@@ -12,8 +11,8 @@ const subjects = allSubjects();
 >
   <h1 class="text-2xl font-bold">Browse Bills by Subject</h1>
   <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    The Legislature's own subject index, covering every session since 2009.
-    Terms are the state's, verbatim.
+    The Legislature's own subject index, covering every session since 2009,
+    with each term as the index prints it.
   </p>
   <div class="mt-4">
     <label class="mb-1 block text-sm font-semibold" for="subject-filter">Filter subjects</label>
@@ -30,13 +29,13 @@ const subjects = allSubjects();
       <li
         class="break-inside-avoid"
         data-subject-row
-        data-text={subjectDisplay(s.subject).toLowerCase()}
+        data-text={s.title.toLowerCase()}
       >
         <a
-          href={`/subjects/${subjectSlug(s.subject)}/`}
+          href={`/subjects/${s.slug}/`}
           class="flex items-baseline gap-2 rounded px-1 py-1 text-sm hover:bg-navy-50"
         >
-          <span class="min-w-0 flex-1 underline">{subjectDisplay(s.subject)}</span>
+          <span class="min-w-0 flex-1 underline">{s.title}</span>
           <span class="shrink-0 text-xs text-navy-600">{s.n}</span>
         </a>
       </li>
