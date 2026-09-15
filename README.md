@@ -1,12 +1,27 @@
 # Badger Politics
 
-Free, independent tracking of the Wisconsin Legislature at
-[badgerpolitics.org](https://badgerpolitics.org): every bill, roll call,
-hearing, veto and campaign dollar, plus
-how Wisconsin's members of Congress vote, rebuilt from official records
-and served as a fully static site.
+**Explore Wisconsin politics through official public records.**
+
+[Badger Politics](https://badgerpolitics.org) is a free, independent,
+open-source resource for residents, journalists, researchers, and civic
+developers. Follow bills, votes, campaign finance, and elections across
+Wisconsin state government, its members of Congress, and covered city councils.
+
+Records link back to official sources so you can check the evidence yourself.
+See [coverage](#coverage) for available history and gaps.
 
 > **Badger Politics is an independent project, not affiliated with the State of Wisconsin.**
+
+## Start exploring
+
+- [Find your representatives](https://badgerpolitics.org/my-reps/) and explore their records.
+- [Browse bills and votes](https://badgerpolitics.org/bills/) to see what was proposed and how legislators voted.
+- [Explore campaign finance](https://badgerpolitics.org/money/) by reporting period, with links to official records.
+- Follow [Wisconsin's members of Congress](https://badgerpolitics.org/federal/) or [city council records](https://badgerpolitics.org/local/).
+- [Use the data](https://badgerpolitics.org/data/): JSON API, feeds, and calendars without an API key.
+
+Working on the code? Start with [local development](#local-development),
+[architecture](#architecture), and [data sources](#data-sources).
 
 ## What is on the site
 
