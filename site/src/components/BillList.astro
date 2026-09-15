@@ -10,10 +10,10 @@ const { bills, sessionId } = Astro.props;
 <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white">
   {bills.map((b) => (
     <li class="text-sm" data-bill-row data-status={b.status} data-text={`${b.identifier} ${b.title ?? ""}`.toLowerCase()}>
-      <a href={`/bills/${sessionId}/${billSlug(b.identifier)}/`} class="flex items-center gap-3 px-4 py-2.5 hover:bg-navy-50">
+      <a href={`/bills/${sessionId}/${billSlug(b.identifier)}/`} class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-navy-50 sm:flex-nowrap sm:py-2.5">
         <span class="w-20 shrink-0 font-bold underline">{b.identifier}</span>
-        <span class="min-w-0 flex-1 truncate">{shortTitle(b.title)}</span>
-        <StatusBadge status={b.status} short />
+        <span class="order-last basis-full leading-snug sm:order-none sm:min-w-0 sm:flex-1 sm:truncate">{shortTitle(b.title)}</span>
+        <span class="ml-auto shrink-0 sm:ml-0"><StatusBadge status={b.status} short /></span>
         <span class="hidden w-24 shrink-0 text-right text-xs text-navy-600 sm:block">
           {fmtDate(b.latest_action_date)}
         </span>

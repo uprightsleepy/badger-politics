@@ -91,8 +91,10 @@ const NAV_GROUPS: { label: string; items: [string, string][] }[] = [
   },
 ];
 const NAV_DIRECT: [string, string][] = [
+  ["/#search", "Search"],
   ["/calendar/", "Calendar"],
   ["/elections/2026/", "2026 Ballot"],
+  ["/following/", "Following"],
 ];
 ---
 
@@ -138,12 +140,12 @@ const NAV_DIRECT: [string, string][] = [
     <header class="border-b border-navy-100 bg-navy-900 text-white">
       <nav class="mx-auto max-w-5xl px-4 py-3 text-sm">
         <div class="flex items-center justify-between gap-4">
-          <a href="/" class="flex items-center gap-2 text-base font-bold tracking-tight">
+          <a href="/" class="flex shrink-0 items-center gap-2 whitespace-nowrap text-base font-bold tracking-tight">
             <img src="/wisconsin.svg" alt="" width="22" height="22" />
             Badger Politics
           </a>
           <!-- phones and small tablets get a native disclosure menu -->
-          <details data-nav-menu class="relative md:hidden">
+          <details data-nav-menu class="relative lg:hidden">
             <summary class="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-navy-600 px-3 py-2 font-semibold [&::-webkit-details-marker]:hidden">
               <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
                 <path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M2 4h12M2 8h12M2 12h12" />
@@ -153,7 +155,7 @@ const NAV_DIRECT: [string, string][] = [
             <div class="absolute right-0 top-full z-50 mt-2 max-h-[80vh] w-72 overflow-y-auto rounded-lg border border-navy-700 bg-navy-900 p-2 shadow-lg">
               <!-- the site's primary action leads; it was previously last,
                    below the fold on a phone -->
-              <form action="/" method="get" class="px-1 pb-2">
+              <form action="/#search" method="get" class="px-1 pb-2">
                 <label class="sr-only" for="nav-search">Search the site</label>
                 <input
                   id="nav-search"
@@ -170,10 +172,6 @@ const NAV_DIRECT: [string, string][] = [
               >
                 Find My Legislators
               </a>
-              <a href="/following/" class="mt-1 block rounded-lg border border-navy-600 px-3 py-2 text-center font-semibold hover:bg-navy-800">
-                Following
-              </a>
-
               <!-- categories collapse so every one is visible at once
                    instead of a fifteen-item scroll -->
               {NAV_GROUPS.map((g) => (
@@ -195,7 +193,7 @@ const NAV_DIRECT: [string, string][] = [
               ))}
 
               <ul class="mt-1 border-t border-navy-700 pt-1">
-                {NAV_DIRECT.map(([href, label]) => (
+                {NAV_DIRECT.filter(([href]) => href !== "/#search").map(([href, label]) => (
                   <li>
                     <a href={href} class="block rounded px-3 py-2 hover:bg-navy-800">{label}</a>
                   </li>
@@ -203,7 +201,7 @@ const NAV_DIRECT: [string, string][] = [
               </ul>
             </div>
           </details>
-          <div class="hidden flex-wrap items-center gap-x-6 gap-y-2 md:flex">
+          <div class="hidden flex-wrap items-center gap-x-5 gap-y-2 lg:flex">
             {NAV_GROUPS.map((g) => (
               <details data-nav-menu class="group relative">
                 <summary class="flex cursor-pointer list-none items-center gap-1 py-1 hover:text-gold-500 [&::-webkit-details-marker]:hidden">
