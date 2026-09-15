@@ -56,6 +56,14 @@ try {
     await gotoLayoutReady(page, origin + path);
     assert.ok(await page.$eval(selector, el => el.getBoundingClientRect().width) >= 250, `${path} address has typing room`);
   }
+  await page.setViewport({ width: 320, height: 900 });
+  await page.evaluate(() => { document.documentElement.style.fontSize = "125%"; });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "enlarged header fits at 320px");
+  await page.click("header [data-nav-menu] > summary");
+  assert.ok(await page.$eval("header [data-nav-menu] > div", el => {
+    const rect = el.getBoundingClientRect();
+    return rect.left >= 0 && rect.right <= innerWidth;
+  }), "expanded menu stays inside the narrow viewport");
   assert.deepEqual(errors, [], "no browser script errors");
   console.log("UX checks passed: search pagination, shareable filters, empty state, narrow forms and reflow.");
 } catch (error) {

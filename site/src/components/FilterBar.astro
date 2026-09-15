@@ -12,7 +12,7 @@ interface Props {
 const { id, statusId, label, placeholder, facetAttr, facetLabel, facets } = Astro.props;
 const chips = facets?.filter((f) => f.count > 0) ?? [];
 const total = chips.reduce((sum, f) => sum + f.count, 0);
-const CHIP = "min-h-11 shrink-0 rounded-full border px-3 py-2 text-sm font-semibold";
+const CHIP = "min-h-11 max-w-full rounded-full border px-3 py-2 text-sm font-semibold";
 ---
 <div
   class="sticky top-0 z-20 -mx-4 border-b border-navy-100 bg-paper/95 px-4 py-3 backdrop-blur"
