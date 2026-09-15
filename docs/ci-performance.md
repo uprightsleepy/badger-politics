@@ -18,11 +18,11 @@ Optimize measured work without reducing gate coverage.
 - Search's no-results assertion requires the completed state for the current
   query and rejects an empty, stuck container. Fixed sleeps around initial
   search results and saved-rep pinning are replaced by observable content.
-- Timings split logos, Astro, Pagefind, data products, links, each browser
+- Timings split Astro, Pagefind, data products, links, each browser
   harness, and release. Each records elapsed seconds, peak RSS, and exit
   status. Logs and metrics survive failed stages and are retained for 7 days.
   Downloadable diagnostics include timings and uncredentialed build/gate logs;
-  logo and release logs remain in GitHub's masked console output only.
+  release logs remain in GitHub's masked console output only.
 - The deploy job now requires the reusable CI workflow for the same revision.
   Manual deployments must use main. Only the deploy job has OIDC permission.
   Ordinary push CI remains, so main can run both standalone CI and validation

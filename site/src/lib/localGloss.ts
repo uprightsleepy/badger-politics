@@ -97,7 +97,6 @@ export const actionLabel = (action: string): string => {
     : t;
 };
 
-export const actionGloss = (action: string): string | undefined => ACTIONS[norm(action)];
 export const voteGloss = (value: string): string | undefined => VOTES[value.trim()];
 
 /** Glossary entries for the actions and vote values a page shows,

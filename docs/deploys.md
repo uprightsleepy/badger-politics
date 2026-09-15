@@ -92,8 +92,8 @@ above are what make the identity safe, not the obscurity of these values:
 - `GCP_WIF_PROVIDER` — full provider resource name
 - `GCP_DEPLOY_SA` — deployer service account email
 
-One optional secret: `LOGO_DEV_TOKEN`. Without it the build still succeeds
-and organisations fall back to monogram tiles.
+Organisation logos use existing local assets, with monogram tiles for
+missing logos. No logo API secret is required.
 
 ## Where the data comes from
 

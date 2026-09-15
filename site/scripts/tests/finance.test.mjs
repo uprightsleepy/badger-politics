@@ -123,6 +123,34 @@ test("overview, profiles, and donor recipients share period and service boundari
   assert.deepEqual(structuredClone(empty.committees), []);
 });
 
+test("overview totals retain refunds, the small-dollar boundary, unknown sources, and empty periods", (t) => {
+  const conn = new Database(":memory:");
+  t.after(() => conn.close());
+  conn.exec(schema);
+  conn.exec(`INSERT INTO people (id, name) VALUES ('member', 'Member');
+    INSERT INTO contributions (person_id, committee_entity_id, date, amount, from_type) VALUES
+    ('member', 99, '2025-01-01', 199.99, 'Individual'),
+    ('member', 99, '2025-01-01', 200, 'Individual'),
+    ('member', 99, '2025-01-01', -25, 'Individual'),
+    ('member', 99, '2025-01-01', 300, 'Registrant'),
+    ('member', 99, '2025-01-01', -50, 'Registrant'),
+    ('member', 99, '2025-01-01', 10, 'Unknown'),
+    ('member', 99, '2025-01-01', 15, NULL);`);
+  const db = queries(conn);
+  const result = db.moneyOverview({ inOffice: 0 });
+  assert.equal(result.n, 7);
+  assert.equal(result.total, 649.99);
+  assert.equal(result.individualTotal, 374.99);
+  assert.equal(result.smallDollarTotal, 174.99);
+  assert.equal(result.committeeTotal, 250);
+  const empty = db.moneyOverview({ start: "2027-01-01", inOffice: 0 });
+  for (const field of ["n", "total", "individualTotal", "smallDollarTotal", "committeeTotal"]) {
+    assert.equal(empty[field], 0);
+  }
+  assert.equal(empty.first, null);
+  assert.equal(empty.last, null);
+});
+
 test("committee filings use the selected dates without a legislator service filter", (t) => {
   const conn = new Database(":memory:");
   t.after(() => conn.close());

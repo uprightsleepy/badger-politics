@@ -1,7 +1,4 @@
-/** One council member's record: the member-scoped queries and the
- * derived facts the member page shows, shaped once. The body-level
- * readers (bodies, rosters, tenant stats) stay in db.ts. */
-import { hasTable, prep } from "./connection.ts";
+import { hasTable, memoBy, prep } from "./connection.ts";
 import type { LocalMember } from "./db.ts";
 import { glossaryFor, isNoVote, isYesVote } from "./localGloss.ts";
 import { yearPageStarts } from "./paging.ts";
@@ -9,12 +6,15 @@ import { yearPageStarts } from "./paging.ts";
 /** Recent votes and motions shown inline; the complete record is paged. */
 export const RECENT = 300;
 
-/** One member's positions on the items with dissent, newest first, each
- * with the council's tally; the test runs in SQLite so a long career
- * never loads whole. */
-export const localMemberVotesWithDissent = (tenant: string, personId: number) =>
-  prep(
-      `SELECT v.value, v.event_item_id, a.matter_file, a.matter_url, a.title,
+type DissentVote = {
+  value: string; event_item_id: number; matter_file: string | null;
+  matter_url: string | null; title: string | null; action: string; date: string; insite_url: string;
+  ayes: number; noes: number;
+};
+
+const dissentByMember = memoBy((tenant: string) => {
+  const votes = prep(
+      `SELECT v.person_id, v.value, v.event_item_id, a.matter_file, a.matter_url, a.title,
               a.action, e.date, e.insite_url, t.ayes, t.noes
        FROM local_votes v
        JOIN (SELECT tenant, event_item_id,
@@ -24,14 +24,20 @@ export const localMemberVotesWithDissent = (tenant: string, personId: number) =>
          ON t.tenant = v.tenant AND t.event_item_id = v.event_item_id
        JOIN local_actions a ON a.tenant = v.tenant AND a.event_item_id = v.event_item_id
        JOIN local_events e ON e.tenant = a.tenant AND e.event_id = a.event_id
-       WHERE v.tenant = ? AND v.person_id = ?
+       WHERE v.tenant = ?
        ORDER BY e.date DESC, a.event_item_id DESC`,
     )
-    .all(tenant, tenant, personId) as {
-    value: string; event_item_id: number; matter_file: string | null;
-    matter_url: string | null; title: string | null; action: string; date: string; insite_url: string;
-    ayes: number; noes: number;
-  }[];
+    .all(tenant, tenant) as (DissentVote & { person_id: number })[];
+  const members = new Map<number, DissentVote[]>();
+  for (const { person_id, ...vote } of votes) {
+    if (!members.has(person_id)) members.set(person_id, []);
+    members.get(person_id)!.push(vote);
+  }
+  return members;
+});
+
+export const localMemberVotesWithDissent = (tenant: string, personId: number) =>
+  dissentByMember(tenant).get(personId) ?? [];
 
 export const localMemberVotes = (
   tenant: string, personId: number, limit: number, offset = 0,
