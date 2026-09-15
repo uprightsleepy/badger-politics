@@ -46,7 +46,7 @@ function breakdown(rows: typeof members, seatCount: number) {
         type="search"
         id="member-filter"
         placeholder="Name or district number"
-        class="min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm sm:max-w-xs sm:flex-none"
+        class="min-h-11 min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm sm:max-w-xs sm:flex-none"
       />
       <div class="flex flex-wrap gap-1.5" role="group" aria-label="Filter legislators">
         {[
@@ -59,7 +59,7 @@ function breakdown(rows: typeof members, seatCount: number) {
             type="button"
             data-member-facet={key}
             aria-pressed={key === "all" ? "true" : "false"}
-            class={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${
+            class={`min-h-11 shrink-0 rounded-full border px-3 py-2 text-xs font-semibold ${
               key === "all" ? "border-navy-800 bg-navy-800 text-white" : "border-navy-100 bg-white"
             }`}
           >{label}</button>
@@ -170,5 +170,8 @@ function breakdown(rows: typeof members, seatCount: number) {
     });
   }
   document.getElementById("member-filter")!.addEventListener("input", hideEmptySections);
+  hideEmptySections();
+  window.addEventListener("pageshow", hideEmptySections);
+  window.addEventListener("popstate", hideEmptySections);
 </script>
 </Base>

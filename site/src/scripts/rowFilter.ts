@@ -14,7 +14,7 @@ export const paintChips = (
   }
 };
 
-/** Filter rows in place, sync optional facets to the URL, and debounce count
+/** Filter rows in place, sync the query and facets to the URL, and debounce count
  * announcements. Reapply on pageshow; return apply() for deep links. */
 export function initRowFilter(opts: {
   input: string;
@@ -28,6 +28,8 @@ export function initRowFilter(opts: {
   const input = document.getElementById(opts.input) as HTMLInputElement;
   const status = document.getElementById(opts.status)!;
   const noMatch = document.getElementById(opts.noMatch)!;
+  const clear = document.querySelector<HTMLButtonElement>(`[data-filter-clear="${opts.input}"]`);
+  input.value = new URLSearchParams(location.search).get("q") ?? input.value;
   const chips = opts.facetAttr
     ? [
         ...document.querySelectorAll<HTMLButtonElement>(
@@ -43,6 +45,15 @@ export function initRowFilter(opts: {
   const paint = () => paintChips(chips, (chip) => (chip.dataset.facet ?? "") === facet);
 
   const apply = () => {
+    const url = new URL(location.href);
+    if (input.value) url.searchParams.set("q", input.value);
+    else url.searchParams.delete("q");
+    if (opts.facetAttr) {
+      if (facet) url.searchParams.set(opts.facetAttr, facet);
+      else url.searchParams.delete(opts.facetAttr);
+    }
+    history.replaceState(null, "", url);
+    clear?.classList.toggle("hidden", !input.value && !facet);
     const rows = document.querySelectorAll<HTMLElement>(opts.rows);
     const q = input.value.toLowerCase();
     let shown = 0;
@@ -69,16 +80,26 @@ export function initRowFilter(opts: {
     chip.addEventListener("click", () => {
       const key = chip.dataset.facet ?? "";
       facet = key === facet ? "" : key;
-      const url = new URL(location.href);
-      if (facet) url.searchParams.set(opts.facetAttr!, facet);
-      else url.searchParams.delete(opts.facetAttr!);
-      history.replaceState(null, "", url);
       paint();
       apply();
     });
   }
 
   input.addEventListener("input", apply);
+  clear?.addEventListener("click", () => {
+    input.value = "";
+    facet = "";
+    paint();
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+  });
+  window.addEventListener("popstate", () => {
+    const params = new URLSearchParams(location.search);
+    input.value = params.get("q") ?? "";
+    facet = opts.facetAttr ? params.get(opts.facetAttr) ?? "" : "";
+    paint();
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
   window.addEventListener("pageshow", () => {
     if (input.value) apply();
   });

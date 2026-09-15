@@ -78,6 +78,13 @@ const seoDescription = [
   .join(" ");
 const passedChamberName = bill.chamber === "upper" ? "Senate" : "Assembly";
 const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
+const jumpLinks: [string, string][] = [
+  ...(bill.lrb_analysis ? [["#summary", "Summary"] as [string, string]] : []),
+  ...(fiscalEstimates.length > 0 ? [["#cost", "Cost"] as [string, string]] : []),
+  ["#sponsors", "Sponsors"],
+  ...(votes.length > 0 ? [["#votes", "Votes"] as [string, string]] : []),
+  ["#history", "Full history"],
+];
 ---
 
 <Base
@@ -165,6 +172,14 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
         ))}
       </p>
     )}
+
+    <nav class="mt-3 flex flex-wrap gap-1.5 text-xs" aria-label="Jump to a section">
+      {jumpLinks.map(([href, label]) => (
+        <a href={href} class="inline-flex min-h-11 items-center rounded-full border border-navy-100 bg-white px-3 py-1 font-semibold hover:bg-navy-50">
+          {label}
+        </a>
+      ))}
+    </nav>
 
     <div class="mt-6 rounded-lg border border-navy-100 bg-white p-4">
       <h2 class="sr-only">At a glance</h2>
@@ -282,7 +297,7 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
 
     {bill.lrb_analysis && (
       <section class="mt-6">
-        <h2 class="text-xl font-bold">What this bill does</h2>
+        <h2 id="summary" class="scroll-mt-4 text-xl font-bold">What this bill does</h2>
         <p class="text-xs text-navy-600">
           Plain-language analysis by the nonpartisan Legislative Reference Bureau
         </p>
@@ -301,7 +316,7 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
 
     {fiscalEstimates.length > 0 && (
       <section class="mt-4">
-        <h2 class="text-lg font-bold">What it would cost</h2>
+        <h2 id="cost" class="scroll-mt-4 text-lg font-bold">What it would cost</h2>
         <p class="text-xs text-navy-600">
           Fiscal estimates filed by state agencies, as official PDFs
         </p>
@@ -316,7 +331,7 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
     )}
 
     <section class="mt-6">
-      <h2 class="text-xl font-bold">Sponsors</h2>
+      <h2 id="sponsors" class="scroll-mt-4 text-xl font-bold">Sponsors</h2>
       <div class="mt-2 space-y-1 text-sm" data-pagefind-ignore>
         {primary.length > 0 && (
           <p>
@@ -339,7 +354,7 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
 
     {votes.length > 0 && (
       <section class="mt-6" data-pagefind-ignore>
-        <h2 class="text-xl font-bold">Votes</h2>
+        <h2 id="votes" class="scroll-mt-4 text-xl font-bold">Votes</h2>
         {votes.some((v) => /suspend/i.test(v.motion ?? "")) && (
           <p class="mt-1 max-w-3xl text-sm text-navy-600">
             Suspending the rules (to take a vote immediately) needs a
@@ -356,7 +371,7 @@ const otherChamberName = bill.chamber === "upper" ? "Assembly" : "Senate";
     )}
 
     <section class="mt-6" data-pagefind-ignore>
-      <h2 class="text-xl font-bold">Full history</h2>
+      <h2 id="history" class="scroll-mt-4 text-xl font-bold">Full history</h2>
       <div
         class="mt-3 max-h-96 overflow-y-auto pl-2 scroll-body scroll-on-paper"
         role="region"
