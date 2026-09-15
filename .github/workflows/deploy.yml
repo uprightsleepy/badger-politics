@@ -149,12 +149,6 @@ jobs:
           uv sync --locked
           bash ../.github/scripts/timed.sh data-products uv run python -m dataproducts.build ../data/wi.sqlite ../site/public/
 
-      - name: Fetch verified logos
-        working-directory: site
-        env:
-          LOGO_DEV_TOKEN: ${{ secrets.LOGO_DEV_TOKEN }}
-        run: bash ../.github/scripts/timed.sh logos npm run build:logos
-
       - name: Build every session
         working-directory: site
         env:

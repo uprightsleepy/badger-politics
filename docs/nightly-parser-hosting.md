@@ -36,7 +36,7 @@ rebuilds SQLite from current and archived sessions, imports offline data,
 enriches records, checks integrity, builds the whole static site, deploys,
 and uploads a snapshot. `--skip-deploy` still builds the site. The nightly
 workflow instead runs the parser-only stages in `pipeline/nightly/`.
-`pipeline/Dockerfile` is an unused placeholder; runners install the pinned
+Runners install the pinned
 scraper CLI separately from the pipeline environment using upstream's
 existing Poetry lock, exported with hashes and platform markers.
 

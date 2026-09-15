@@ -1001,23 +1001,16 @@ const coverage = once(() => ({
 export const moneyOverview = (bounds: MoneyBounds = {}) => {
   const summary = windowedGet<{
     n: number; total: number; first: string | null; last: string | null;
+    individualTotal: number; smallDollarTotal: number; committeeTotal: number;
   }>(
     `SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total,
-            MIN(c.date) AS first, MAX(c.date) AS last
+            MIN(c.date) AS first, MAX(c.date) AS last,
+            COALESCE(SUM(CASE WHEN c.from_type = 'Individual' THEN amount ELSE 0 END), 0) AS individualTotal,
+            COALESCE(SUM(CASE WHEN c.from_type = 'Individual' AND amount < 200 THEN amount ELSE 0 END), 0) AS smallDollarTotal,
+            COALESCE(SUM(CASE WHEN c.from_type = 'Registrant' THEN amount ELSE 0 END), 0) AS committeeTotal
      FROM ${WINDOWED}`,
     bounds,
   );
-  const individuals = windowedGet<{ t: number; small: number }>(
-    `SELECT COALESCE(SUM(amount), 0) AS t,
-            COALESCE(SUM(CASE WHEN amount < 200 THEN amount ELSE 0 END), 0) AS small
-     FROM ${WINDOWED} WHERE c.from_type = 'Individual'`,
-    bounds,
-  );
-  const committeeTotal = windowedGet<{ t: number }>(
-    `SELECT COALESCE(SUM(amount), 0) AS t FROM ${WINDOWED}
-     WHERE c.from_type = 'Registrant'`,
-    bounds,
-  ).t;
   const agg = committeeAggFor(bounds);
   const topCommittees = [...agg].sort((a, b) => b.total - a.total).slice(0, 20);
   const widestCommittees = [...agg]
@@ -1044,8 +1037,6 @@ export const moneyOverview = (bounds: MoneyBounds = {}) => {
   for (const o of topOccupations) o.occupation = deShout(o.occupation);
   return {
     ...summary, ...coverage(),
-    individualTotal: individuals.t, smallDollarTotal: individuals.small,
-    committeeTotal,
     topCommittees, widestCommittees, topLegislators,
     byParty: partyTotals("", bounds), topOccupations,
   };

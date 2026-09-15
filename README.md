@@ -78,7 +78,7 @@ require a seeded archive and `NIGHTLY_PARSER_ENABLED=true`; see the
 | Council members carried under two ids | `importer/local_person_merges.json`, each entry with its basis (identical record name, complementary service, no item voted under both) | folded into one member; the importer refuses a merge the votes contradict |
 | Council member names, portraits, contacts, committees | Legistar person/office IDs and public department listings; reviewed city district pages for Milwaukee and West Allis | exact identity and source attribution; Milwaukee profile retrieval is currently paused with its complete archive retained; Madison districts use the same person ID's official council URL, without portrait downloads |
 | Cross-check only | FollowTheMoney API (CC BY-NC-SA) | verification input, never imported or republished |
-| Org logos | logo.dev (`LOGO_DEV_TOKEN`) | build-time fetch for hand-verified org domains only |
+| Org logos | Local assets for hand-verified org domains | missing logos use monogram tiles; automatic retrieval is paused |
 | Address suggestions (optional) | Google Places API (New), only in builds where the `PUBLIC_PLACES_KEY` Actions variable is set | as-you-type suggestions in the address lookups, disclosed in the privacy copy; the submitted address still resolves through the Census geocoder; without the variable the feature is dormant and the site fully keyless |
 
 ## Data mandates
@@ -232,9 +232,8 @@ wraps `docker compose run --rm scrape` against
 wipes its output at run start, so never run two scrapes concurrently, and
 never build the site while the importer is rebuilding the database.
 
-Secrets live in gitignored `pipeline/.env` (`FTM_API_KEY`) and `site/.env`
-(`LOGO_DEV_TOKEN`); both are optional and the features degrade gracefully
-without them.
+The optional `FTM_API_KEY` lives in gitignored `pipeline/.env`; its
+enrichment degrades gracefully without it.
 
 ### Site
 

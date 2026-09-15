@@ -1,11 +1,5 @@
 ---
-/** Sticky filter for a long list. These pages run tens of screens on a
- * phone, so a filter that scrolls away only helps before you start
- * looking. The live count sits beside the field rather than under it, to
- * keep the bar short.
- *
- * Facet chips carry their own counts and hide rows rather than dropping
- * them, so the whole list stays in the page and in search. */
+// Hide filtered rows without removing them from the page or search index.
 interface Props {
   id: string;
   statusId: string;

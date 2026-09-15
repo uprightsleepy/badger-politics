@@ -1,10 +1,3 @@
-/** The one module that touches the locally saved districts. The key
- * name lives here and nowhere else, so every reader, writer and "forget"
- * button agrees on it.
- *
- * Values are validated as integers in range (Assembly 1-99, Senate 1-33);
- * anything malformed self-heals by clearing the key and reporting
- * nothing saved. */
 export type District = { ad: number; sd: number };
 
 const KEY = "bp-district";

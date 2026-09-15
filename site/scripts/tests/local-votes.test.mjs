@@ -9,8 +9,8 @@ const schema = await readFile(new URL("../../../pipeline/importer/schema.sql", i
 const gloss = await import("../../src/lib/localGloss.ts");
 const vocabularies = [["old", "Aye", "No"], ["new", "Aye", "Nay"], ["civicclerk", "Yes", "No"]];
 
-function fixture(t) {
-  const conn = new Database(":memory:");
+function fixture(t, verbose = () => {}) {
+  const conn = new Database(":memory:", { verbose });
   t.after(() => conn.close());
   conn.exec(schema);
   for (const [tenant, positive, negative] of vocabularies) {
@@ -37,9 +37,27 @@ function fixture(t) {
       }
     }
   }
-  // the member-scoped queries live in council.ts; the body-level ones in db.ts
   return { conn, api: { ...queries(conn), ...council } };
 }
+
+test("dissent queries are shared per city and reset with the database", t => {
+  const statements = [];
+  const { conn, api } = fixture(t, sql => statements.push(sql));
+  statements.length = 0;
+  const before = api.localMemberVotesWithDissent("old", 1);
+  assert.equal(statements.length, 1);
+  assert.equal(api.localMemberVotesWithDissent("old", 2).length, 3);
+  assert.deepEqual(api.localMemberVotesWithDissent("old", 999), []);
+  assert.equal(statements.length, 1);
+  assert.equal(api.localMemberVotesWithDissent("new", 1)[0].value, "Aye");
+  assert.equal(statements.length, 2);
+
+  const replacement = fixture(t);
+  replacement.conn.exec("UPDATE local_votes SET value = 'Aye' WHERE tenant = 'old'");
+  assert.deepEqual(replacement.api.localMemberVotesWithDissent("old", 1), []);
+  queries(conn);
+  assert.deepEqual(api.localMemberVotesWithDissent("old", 1), before);
+});
 
 test("council vocabularies yield identical totals without changing records or mixing cities", t => {
   const { api } = fixture(t);
