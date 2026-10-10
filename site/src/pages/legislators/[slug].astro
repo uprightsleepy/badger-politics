@@ -1,14 +1,15 @@
 ---
 import Base from "../../layouts/Base.astro";
-import SourceStrip from "../../components/SourceStrip.astro";
 import VoteHeatmap from "../../components/VoteHeatmap.astro";
 import MoneyFilters from "../../components/MoneyFilters.astro";
 import ProfileMoneyView from "../../components/ProfileMoneyView.astro";
 import { moneyViews } from "../../lib/money-periods";
 import FollowButton from "../../components/FollowButton.astro";
-import MaybeLink from "../../components/MaybeLink.astro";
 import VoteRow from "../../components/VoteRow.astro";
 import JsonLd from "../../components/JsonLd.astro";
+import PlainText from "../../components/PlainText.astro";
+import TermsOnPage from "../../components/TermsOnPage.astro";
+import TermPopovers from "../../components/TermPopovers.astro";
 import {
   people,
   personVotes,
@@ -17,24 +18,30 @@ import {
   personIdByName,
   partyBreaks,
   keyVotesFor,
-  committeesFor,
   ballotPhase,
   writeInPending,
+  allSessions,
+  meta,
 } from "../../lib/db";
 import { legislatorProfile } from "../../lib/legislator";
-import { seatOffice } from "../../lib/ballot";
+import { seatOffice, ELECTION_CYCLE } from "../../lib/ballot";
+import { chamberTypical, repSummary } from "../../lib/repSummary";
+import { answers } from "../../lib/repAnswers";
+import type { TermId } from "../../lib/glossary";
+import ELECTION_DAYS from "../../data/election-days.json";
 import {
   COMPENSATION,
   personSlug,
-  partyStyle,
   roleAbbr,
   chamberName,
   fmtDate,
   monthYear,
   billSlug,
   shortTitle,
-  STATUS_LABELS,
-  STATUS_STYLES,
+  partyPlural as partyPluralOf,
+  partyWord,
+  sessionPlainName,
+  STATUS_PLAIN,
 } from "../../lib/format";
 
 export function getStaticPaths() {
@@ -50,9 +57,10 @@ const { person } = Astro.props;
 const PREVIEW = 50;
 const votes = personVotes(person.id, 200);
 const voteTotal = personVoteCount(person.id);
-const recordBase = `/legislators/${personSlug(person.id)}`;
+const slug = personSlug(person.id);
+const recordBase = `/legislators/${slug}`;
 const {
-  sitting, serviceSpans, heatDays, attendance, agreement, loyalty, authorship, election,
+  sitting, serviceSpans, heatDays, attendance, agreement, authorship, election,
   opponents, ballot,
 } = legislatorProfile(person);
 const openPrimaries = sitting
@@ -62,36 +70,83 @@ const { total: votesTotal, missed: missedTotal, blocks: attendanceBlocks, openYe
 const { led: primarySponsored, coauthored, cosponsored, tally } = authorship;
 const breaks = partyBreaks(person.id, person.party);
 const keyVotes = keyVotesFor(person.id);
-const committees = committeesFor(person.id);
+const house = person.chamber === "upper" ? "senate" : "assembly";
+const chamber = chamberName(person.chamber);
+const title = person.chamber === "upper" ? "state senator" : "state representative";
+const partyPlural = person.party ? partyPluralOf(person.party) : "their party";
+const history = sitting ? electionHistoryFor(person.chamber, person.district) : [];
+const surname = person.name.split(" ").pop()!.toLowerCase();
+const sessionNames = new Map(allSessions().map((s) => [s.id, s.name ?? s.id]));
+const sessionLabel = (id: string) => sessionPlainName(id, sessionNames.get(id) ?? id);
+const pulledOn = meta().imported_at?.slice(0, 10);
+
+// the same plain questions, in the same words, as the My reps cards
+const general =
+  (ELECTION_DAYS as [string, string][]).find(
+    ([date, name]) => date.startsWith(String(ELECTION_CYCLE)) && /general/i.test(name),
+  )?.[0] ?? "";
+const glance = sitting && person.district != null
+  ? answers(repSummary(person), {
+      house, district: person.district, typical: chamberTypical()[house],
+      phase: ballotPhase(), general, mine: false,
+    })
+  : [];
+
+// who they are, in one line
+const lastSpan = serviceSpans.at(-1);
+const roleLine = sitting
+  ? null
+  : lastSpan
+    ? `Former ${lastSpan.chamber === "upper" ? "state senator" : "state representative"}. Served ${chamberName(lastSpan.chamber)}${lastSpan.district != null ? ` District ${lastSpan.district}` : ""}${lastSpan.end ? ` until ${monthYear(lastSpan.end)}` : ""}.`
+    : "Former state lawmaker.";
+
 // Only link to sections this member actually has. Money renders for
 // sitting members, key votes and attendance only where there are any, and
 // linking to a heading that was never rendered leaves a dead fragment.
 const jumpLinks: [string, string][] = [
-  ...(sitting && person.email ? [["#contact", "Contact"] as [string, string]] : []),
   ["#bills-led", "Bills they led"],
   ...(keyVotes.length > 0 ? [["#key-votes", "Key votes"] as [string, string]] : []),
   ...(sitting ? [["#money", "Campaign money"] as [string, string]] : []),
   ...(attendanceBlocks.length > 0 ? [["#attendance", "Attendance"] as [string, string]] : []),
-  ["#vote-history", "Vote history"],
+  ["#vote-history", "Every vote"],
+  ...(sitting && person.email ? [["#contact", "Contact"] as [string, string]] : []),
 ];
-const KEY_VOTE_STYLES: Record<string, string> = {
-  "became law": "bg-moss-50 text-moss-600",
-  "close vote": "bg-gold-100 text-navy-900",
-  "veto override": "bg-badger-50 text-badger-700",
+const keyVoteWords: Record<string, string> = {
+  "became law": "Became law",
+  "close vote": "Close vote",
+  "veto override": "Veto override",
 };
-const partyPlural = person.party === "Democratic" ? "Democrats" : "Republicans";
-const history = sitting ? electionHistoryFor(person.chamber, person.district) : [];
-const surname = person.name.split(" ").pop()!.toLowerCase();
+const voteWord = (option: string) => (option === "yes" ? "Yes" : option === "no" ? "No" : "Didn't vote");
 const signedOn: [string, typeof coauthored, string][] = [
   ["Coauthored", coauthored,
-   `Bills led by another member of the ${chamberName(person.chamber)} that ${person.name} signed onto.`],
+   `Bills led by another member of the ${chamber} that ${person.name} signed on to.`],
   ["Cosponsored", cosponsored,
-   `Bills from the other house that ${person.name} signed onto.`],
+   `Bills from the other chamber that ${person.name} signed on to.`],
 ];
+const terms: TermId[] = [
+  "author", "lrb",
+  ...(coauthored.length + cosponsored.length > 0 ? (["cosponsor"] as TermId[]) : []),
+  ...(agreement.length > 0 ? (["with-party"] as TermId[]) : []),
+  "roll-call",
+];
+const portraitAlt = `Portrait of ${person.name}`;
+// "$171" and "$85.50": cents only when there are some
+const dollars = (n: number) => `$${Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2)}`;
+// numbers only, so the sentence can carry figure markup safely
+const fig = (n: number) => `<span class="figure">${n.toLocaleString()}</span>`;
+const outcomes = [
+  authorship.enacted === 0 ? "None became law" : `${fig(authorship.enacted)} became law`,
+  ...(authorship.vetoed > 0 ? [`${fig(authorship.vetoed)} ${authorship.vetoed === 1 ? "was" : "were"} vetoed`] : []),
+  ...(authorship.noHearing > 0 ? [`${fig(authorship.noHearing)} never got a hearing`] : []),
+];
+const ledSentence =
+  `Our records show ${fig(primarySponsored.length)} ${primarySponsored.length === 1 ? "bill" : "bills"} they led. ` +
+  (outcomes.length > 1 ? `${outcomes.slice(0, -1).join(", ")} and ${outcomes.at(-1)}.` : `${outcomes[0]}.`);
 ---
 
 <Base
   title={`${person.name}${person.district != null ? `, ${roleAbbr(person.chamber)} ${person.district}` : ""}`}
+  layout="wide"
   filters={{
     type: "Legislator",
     ...(person.party ? { party: person.party } : {}),
@@ -115,359 +170,324 @@ const signedOn: [string, typeof coauthored, string][] = [
       },
     }}
   />
-  <div class="flex flex-wrap items-center gap-3">
-    <h1 class="text-2xl font-bold">{person.name}</h1>
-    <span class="ml-auto flex items-center gap-3">
-      <FollowButton kind="legislators" id={personSlug(person.id)} />
-      <a href={`/feeds/legislators/${personSlug(person.id)}.xml`} class="text-xs underline">Atom feed</a>
-    </span>
-  </div>
-  <p class="mt-1 text-sm">
-    <span class={`mr-1 rounded-full px-2 py-0.5 text-xs font-bold ${partyStyle(person.party)}`}>
-      {person.party ?? "—"}
-    </span>
-    {person.current_role} · {chamberName(person.chamber)}
-    {person.district != null && ` District ${person.district}`}
-  </p>
-  <SourceStrip
-    sources={[
-      { label: "Wisconsin Legislature", href: "https://docs.legis.wisconsin.gov" },
-      { label: "Wisconsin Ethics Commission", href: "https://ethics.wi.gov" },
-    ]}
-  />
-  {sitting && (
-    <dl class="mt-4 grid gap-x-6 gap-y-3 rounded-lg border border-navy-100 bg-white p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-      <div>
-        <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Floor votes missed</dt>
-        <dd class={`mt-0.5 text-xl font-bold tabular-nums ${missedTotal > 0 ? "text-badger-700" : "text-moss-600"}`}>
-          {missedTotal.toLocaleString()}
-          <span class="text-sm font-normal text-navy-600"> of {votesTotal.toLocaleString()}</span>
-        </dd>
-      </div>
-      <div>
-        <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Bills led</dt>
-        <dd class="mt-0.5 text-xl font-bold tabular-nums">
-          {primarySponsored.length.toLocaleString()}
-          <span class="text-sm font-normal text-navy-600">
-            {" "}· {authorship.enacted} became law
-          </span>
-        </dd>
-      </div>
-      <div>
-        <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Votes with their party</dt>
-        <dd class="mt-0.5 text-xl font-bold tabular-nums">
-          {loyalty ? `${Math.round(loyalty.pct)}%` : "Not enough votes"}
-          {loyalty && (
-            <span class="text-sm font-normal text-navy-600">
-              {" "}· {loyalty.n.toLocaleString()} votes, {loyalty.session}
-            </span>
+
+  <article class="profile">
+    <header class="p-head flex flex-wrap items-center gap-x-6 gap-y-4">
+      {person.image_url ? (
+        <img
+          src={person.image_url}
+          alt={portraitAlt}
+          width="112"
+          height="140"
+          loading="eager"
+          class="h-[140px] w-[112px] shrink-0 rounded-[0.75rem] bg-fog object-cover object-[50%_20%]"
+        />
+      ) : (
+        <svg width="112" height="112" viewBox="0 0 48 48" aria-hidden="true" class="shrink-0 rounded-[0.75rem]">
+          <rect width="48" height="48" fill="#E6EBE7" /><circle cx="24" cy="19" r="7.5" fill="#848E88" /><rect x="10" y="30.5" width="28" height="24" rx="12" fill="#848E88" />
+        </svg>
+      )}
+      <div class="flex min-w-0 flex-[1_1_18rem] flex-col gap-2">
+        <a href="/legislators/" class="self-start text-small underline">State lawmakers</a>
+        <h1 class="t-display">{person.name}</h1>
+        <p class="sm:text-lead">
+          {sitting ? (
+            <>
+              {title.charAt(0).toUpperCase() + title.slice(1)}
+              {person.district != null && (
+                <> for <a href={`/districts/${house}-${person.district}/`} class="underline">{chamber} District {person.district}</a></>
+              )}.
+              {person.party && ` ${partyWord(person.party)}.`}
+            </>
+          ) : (
+            <>{roleLine}{person.party && ` ${partyWord(person.party)}.`}</>
           )}
-        </dd>
-      </div>
-      <div>
-        <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Committees</dt>
-        <dd class="mt-0.5 text-xl font-bold tabular-nums">{committees.length}</dd>
-      </div>
-    </dl>
-  )}
-
-  {/* Jump links: these pages run long, and a reader arrives wanting one
-      of these answers rather than all of them. */}
-  <nav class="mt-3 flex flex-wrap gap-1.5 text-xs" aria-label="Jump to a section">
-    {jumpLinks.map(([href, label]) => (
-      <a href={href} class="rounded-full border border-navy-100 bg-white px-3 py-1 font-semibold hover:bg-navy-50">
-        {label}
-      </a>
-    ))}
-  </nav>
-
-  <div class="mt-4 flex flex-col gap-6 md:flex-row">
-    <aside class="w-full shrink-0 md:w-64" aria-label={`About ${person.name}`}>
-      <div class="rounded-lg border border-navy-100 bg-white p-4">
-        {person.image_url && (
-          <img
-            src={person.image_url}
-            alt={`Portrait of ${person.name}`}
-            width="120"
-            height="150"
-            loading="lazy"
-            class="mb-3 rounded"
-          />
+        </p>
+        {sitting && (
+          <p data-mine-person={slug} hidden class="self-start rounded-full border-2 border-prairie bg-prairie-tint px-3 py-1 text-small font-bold">
+            <span class="mr-1.5 inline-block h-2.5 w-2.5 rounded-full bg-spruce align-middle" aria-hidden="true"></span>
+            Your {person.chamber === "upper" ? "state senator" : "representative"}
+          </p>
         )}
-        {serviceSpans.length > 0 && (
-          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
-            <h2 class="font-bold">Service</h2>
+      </div>
+    </header>
+
+    <div class="p-actions flex flex-col gap-2.5" data-pagefind-ignore>
+      <FollowButton kind="legislators" id={slug} label={`Follow ${person.name}`} variant="primary" />
+      {sitting && person.email && (
+        <a href={`mailto:${person.email}`} class="btn btn-secondary w-full">Email <span class="font-sans font-normal [overflow-wrap:anywhere]">{person.email}</span></a>
+      )}
+      {sitting && person.office_phone && (
+        <a href={`tel:${person.office_phone.replace(/\D/g, "")}`} class="btn btn-secondary w-full">Call <span class="font-sans font-normal">{person.office_phone}</span></a>
+      )}
+      <p class="text-small text-granite">
+        Following saves them on this device. You can also
+        {" "}<a href={`/feeds/legislators/${slug}.xml`} class="underline">get updates in a feed reader</a>.
+      </p>
+    </div>
+
+    {glance.length > 0 && (
+      <section class="p-glance sheet flex flex-col gap-4 p-5 sm:px-8 sm:py-7" aria-labelledby="glance-heading">
+        <div class="flex flex-col gap-1">
+          <h2 id="glance-heading" class="t-section">At a glance</h2>
+          <p class="text-small text-granite">This session's record, each number next to how the rest of the {chamber} compares.</p>
+        </div>
+        {glance.map((a) => (
+          <div class="flex flex-col gap-1.5 border-t border-rule pt-4">
+            <h3 class="t-question">{a.q}</h3>
+            <Fragment set:html={a.html} />
+          </div>
+        ))}
+      </section>
+    )}
+
+    <aside class="p-details flex flex-col gap-8" aria-label={`More about ${person.name}`}>
+      {sitting && person.email && (
+        <section class="flex flex-col gap-1.5" aria-labelledby="contact">
+          <h2 id="contact" class="t-label scroll-mt-4 text-[1.1875rem]">Contact</h2>
+          <p class="[overflow-wrap:anywhere]"><a href={`mailto:${person.email}`} class="underline">{person.email}</a></p>
+          {person.office_phone && (
+            <p><a href={`tel:${person.office_phone.replace(/\D/g, "")}`} class="underline">{person.office_phone}</a></p>
+          )}
+          {person.office_address && <p class="text-small">{person.office_address}</p>}
+          <p class="text-fine text-granite">
+            Official Capitol office contacts, from
+            {" "}{person.contact_url ? <a href={person.contact_url} class="underline">their Legislature page</a> : "their Legislature page"}.
+            Not sure who represents you? Call the Legislative Hotline at
+            {" "}<a href="tel:18003629472" class="underline">1-800-362-9472</a>, or
+            {" "}<a href="/my-reps/" class="underline">find your lawmakers</a>.
+          </p>
+        </section>
+      )}
+
+      {sitting && election && ballot.kind === "future" && (
+        <section class="flex flex-col gap-1.5" aria-labelledby="ballot-heading">
+          <h2 id="ballot-heading" class="t-label text-[1.1875rem]">Next election</h2>
+          <p>This seat is next on the ballot in November {election.cycle_year}.</p>
+        </section>
+      )}
+      {sitting && election && ballot.kind !== "future" && (
+        <section class="flex flex-col gap-1.5" aria-labelledby="ballot-heading">
+          <h2 id="ballot-heading" class="t-label text-[1.1875rem]">November {election.cycle_year} ballot</h2>
+          {ballot.kind === "on-ballot" && <p>They're on the ballot.</p>}
+          {ballot.kind === "not-running" && <p>They're not on the November ballot.</p>}
+          {ballot.kind === "pending" && <p>The candidate list isn't posted yet.</p>}
+          {opponents.length > 0 && (
+            <p>
+              {ballot.kind === "on-ballot" ? "Running against them" : "Candidates"}:{" "}
+              {opponents.map((o, i) => {
+                const pid = personIdByName(o.name);
+                return <>{i > 0 && "; "}{pid ? <a href={`/legislators/${personSlug(pid)}/`} class="underline">{o.name}</a> : o.name}{o.party ? `, ${partyWord(o.party)}` : ""}</>;
+              })}.
+            </p>
+          )}
+          {openPrimaries.length > 0 && (
+            <p>The {openPrimaries.join(" and ")} primary had no printed candidate, so a write-in nominee may also be on the ballot. The certified results don't name one.</p>
+          )}
+          {ballot.kind === "on-ballot" && opponents.length === 0 && openPrimaries.length === 0 && (
+            <p>{ballotPhase() === "general" ? "No other candidate is on the November ballot." : "No one else has qualified so far."}</p>
+          )}
+          <p class="text-fine text-granite">
+            {ballotPhase() === "general"
+              ? "Candidates are each party's certified primary winner and approved independents, from the Wisconsin Elections Commission's records."
+              : "From the Wisconsin Elections Commission's ballot report. The final ballot is set after the August primary."}
+            {election.cycle_year === 2026 && person.district != null && (
+              <> <a href={`/elections/2026/${house}-${person.district}/`} class="underline">See the race</a></>
+            )}
+          </p>
+        </section>
+      )}
+
+      {serviceSpans.length > 0 && (
+        <section class="flex flex-col gap-1.5" aria-labelledby="service-heading">
+          <h2 id="service-heading" class="t-label text-[1.1875rem]">Time in office</h2>
+          <ul class="flex flex-col gap-1.5">
             {serviceSpans.map((s) => (
-              <p class="mt-1">
-                {chamberName(s.chamber)}
-                {s.district != null && ` District ${s.district}`}:{" "}
-                {monthYear(s.start)} to {s.end ? monthYear(s.end) : "present"}
+              <li>
+                {chamberName(s.chamber)}{s.district != null && ` District ${s.district}`}:{" "}
+                {monthYear(s.start)} to {s.end ? monthYear(s.end) : "now"}
                 {s.end_label && (
-                  <span class="block text-xs text-navy-600">
-                    {s.end_url ? (
-                      <a href={s.end_url} class="underline">{s.end_label}</a>
-                    ) : (
-                      s.end_label
-                    )}
+                  <span class="block text-small text-granite">
+                    {s.end_url ? <a href={s.end_url} class="underline">{s.end_label}</a> : s.end_label}
                   </span>
                 )}
-              </p>
+              </li>
             ))}
-            <p class="mt-1 text-xs text-navy-600">
-              From the Legislature's service records. Records begin 2009 for
-              the longest-serving members.
-            </p>
-          </div>
-        )}
-        {sitting && person.email && (
-          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
-            <h2 id="contact" class="scroll-mt-4 font-bold">Contact</h2>
-            <p class="mt-1 break-all">
-              <a href={`mailto:${person.email}`} class="underline">{person.email}</a>
-            </p>
-            {person.office_phone && (
-              <p class="mt-1">
-                <a href={`tel:${person.office_phone.replace(/\D/g, "")}`} class="underline">
-                  {person.office_phone}
-                </a>
-              </p>
-            )}
-            {person.office_address && (
-              <p class="mt-1 text-xs text-navy-700">{person.office_address}</p>
-            )}
-            <p class="mt-1 text-xs text-navy-600">
-              Official Capitol office contacts, from
-              {" "}{person.contact_url ? (
-                <a href={person.contact_url} class="underline">their Legislature page</a>
-              ) : (
-                "their Legislature page"
-              )}.
-              Not sure who represents you? The Legislative Hotline
-              {" "}(<a href="tel:18003629472" class="underline">1-800-362-9472</a>)
-              or <a href="/districts/" class="underline">our district finder</a> can tell you.
-            </p>
-          </div>
-        )}
-        {sitting && election && (
-          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
-            <h2 class="font-bold">Seat up for election: Nov {election.cycle_year}</h2>
-            {ballot.kind === "on-ballot" && <p class="mt-1">On the ballot ✓</p>}
-            {ballot.kind === "not-running" && (
-              <p class="mt-1 font-semibold text-badger-700">Not on the November ballot</p>
-            )}
-            {ballot.kind === "pending" && <p class="mt-1">Candidate list pending</p>}
-            {opponents.length > 0 && (
-              <p class="mt-1">
-                {ballot.kind === "on-ballot" ? "Challengers" : "Candidates"}:{" "}
-                {opponents.map((o, i) => {
-                  const pid = personIdByName(o.name);
-                  return (
-                    <>
-                      {i > 0 && ", "}
-                      {pid ? (
-                        <a href={`/legislators/${personSlug(pid)}/`} class="underline">{o.name}</a>
-                      ) : (
-                        o.name
-                      )}
-                      {` (${o.party[0] ?? "?"})`}
-                    </>
-                  );
-                })}
-              </p>
-            )}
-            {openPrimaries.length > 0 && (
-              <p class="mt-1">{openPrimaries.join(" and ")} primary: a write-in nominee may have qualified; the certified results do not name one.</p>
-            )}
-            {ballot.kind === "on-ballot" && opponents.length === 0 && openPrimaries.length === 0 && (
-              <p class="mt-1">{ballotPhase() === "general" ? "No other candidate is on the November ballot." : "No opponents have qualified so far."}</p>
-            )}
-            <p class="mt-1 text-xs text-navy-600">
-              {ballotPhase() === "general"
-                ? "Candidates are each party's certified primary winner and approved independents, from the Wisconsin Elections Commission's records."
-                : "Status comes from the Wisconsin Elections Commission's ballot access report. The final ballot is certified after the August primary."}
-            </p>
-          </div>
-        )}
-        {agreement.length > 0 && (
-          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
-            <h2 class="font-bold">Votes with party majority</h2>
+          </ul>
+          <p class="text-fine text-granite">From the Legislature's service records, which begin in 2009.</p>
+        </section>
+      )}
+
+      {agreement.length > 0 && (
+        <section class="flex flex-col gap-1.5" aria-labelledby="party-heading">
+          <h2 id="party-heading" class="t-label text-[1.1875rem]">Voting with their party, by session</h2>
+          <ul class="flex flex-col gap-1">
             {agreement.slice(0, 3).map((a) => (
-              <p class="mt-1">
-                {a.session}: <strong>{a.pct.toFixed(1)}%</strong>
-                <span class="text-xs text-navy-600"> of {a.n.toLocaleString()} floor votes</span>
-              </p>
+              <li>
+                {sessionLabel(a.session)}: <span class="figure">{a.pct.toFixed(1)}%</span>
+                <span class="text-small text-granite"> of {a.n.toLocaleString()} votes</span>
+              </li>
             ))}
-            <p class="mt-1 text-xs text-navy-600">
-              How often their aye or nay matched most of their own party.
-            </p>
-          </div>
-        )}
-        {history.length > 0 && (
-          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
-            <h2 class="font-bold">Election results for this seat</h2>
-            {history.map((h) => (
-              <div class="mt-2">
-                <p class="text-xs font-semibold text-navy-600">November {h.year}</p>
+          </ul>
+          <p class="text-fine text-granite">How often their yes or no matched most of their own party on the same roll call.</p>
+        </section>
+      )}
+
+      {history.length > 0 && (
+        <section class="flex flex-col gap-1.5" aria-labelledby="results-heading">
+          <h2 id="results-heading" class="t-label text-[1.1875rem]">Past results for this seat</h2>
+          {history.map((h) => (
+            <div class="border-t border-rule pt-2">
+              <p class="text-fine font-semibold text-granite">November {h.year}</p>
+              <ul>
                 {h.candidates.map((c) => {
                   const isThem = c.candidate.toLowerCase().includes(surname);
                   const pct = h.total ? ((c.votes / h.total) * 100).toFixed(1) : "0";
                   const pid = personIdByName(c.candidate);
                   return (
-                    <p class={isThem ? "font-bold" : ""}>
+                    <li class={isThem ? "font-bold" : ""}>
                       {pid && pid !== person.id ? (
                         <a href={`/legislators/${personSlug(pid)}/`} class="underline">{c.candidate}</a>
                       ) : (
                         c.candidate
                       )}
-                      {c.party && ` (${c.party[0]})`}: {pct}%
-                      <span class="text-xs text-navy-600"> · {c.votes.toLocaleString()}</span>
-                    </p>
+                      {c.party && `, ${partyWord(c.party)}`}: <span class="figure">{pct}%</span>
+                      <span class="text-small font-normal text-granite"> ({c.votes.toLocaleString()} votes)</span>
+                    </li>
                   );
                 })}
-              </div>
-            ))}
-            <p class="mt-1 text-xs text-navy-600">
-              Official WEC canvass results for {chamberName(person.chamber)} District
-              {" "}{person.district}. District lines changed in 2024.
-            </p>
-          </div>
-        )}
-        {sitting && (
-          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
-            <h2 class="font-bold">Compensation</h2>
-            <p class="mt-1">
-              Salary: <strong>${COMPENSATION.salary.toLocaleString()}</strong>/year
-              <span class="text-xs text-navy-600">
-                {" "}(2025&ndash;26 legislature, same for every member;
-                <a href="https://legis.wisconsin.gov/lrb/media/chth4qs4/elected-official-salaries-2025-95.pdf" class="underline">LRB</a>)
-              </span>
-            </p>
-            <p class="mt-1">
-              Per diem rate:{" "}
-              {person.chamber === "lower"
-                ? `$${COMPENSATION.assembly.overnight}/overnight or $${COMPENSATION.assembly.day}/day trip (Dane County members: day rate only)`
-                : `$${COMPENSATION.senate.overnight}/day for senators outside Dane County`}
-            </p>
-            <p class="mt-1 text-xs text-navy-600">
-              What each member actually claims varies. Per-member claim records
-              come from the chief clerks once a year.
-            </p>
-          </div>
-        )}
+              </ul>
+            </div>
+          ))}
+          <p class="text-fine text-granite">
+            Official canvass results from the Wisconsin Elections Commission for
+            {" "}{chamber} District {person.district}. District lines changed in 2024.
+          </p>
+        </section>
+      )}
+
+      {sitting && (
+        <section class="flex flex-col gap-1.5" aria-labelledby="pay-heading">
+          <h2 id="pay-heading" class="t-label text-[1.1875rem]">Pay</h2>
+          <p>
+            Salary: <span class="figure">${COMPENSATION.salary.toLocaleString()}</span> a year, the same for every member in 2025–26
+            (<a href="https://legis.wisconsin.gov/lrb/media/chth4qs4/elected-official-salaries-2025-95.pdf" class="underline">Legislative Reference Bureau</a>).
+          </p>
+          <p>
+            Daily expense pay:{" "}
+            {person.chamber === "lower"
+              ? `${dollars(COMPENSATION.assembly.overnight)} a night, or ${dollars(COMPENSATION.assembly.day)} for a day trip (Dane County members get the day rate only).`
+              : `${dollars(COMPENSATION.senate.overnight)} a day for senators outside Dane County.`}
+          </p>
+          <p class="text-fine text-granite">
+            What each member actually claims varies. The chief clerks publish
+            each member's claims once a year.
+          </p>
+        </section>
+      )}
+
+      <div class="hidden lg:block">
+        <TermsOnPage terms={terms} headingId="terms-heading-rail" />
       </div>
     </aside>
 
-    <div class="min-w-0 flex-1">
-      <section>
-        <h2 id="bills-led" class="scroll-mt-4 text-xl font-bold">Bills they led · {primarySponsored.length}</h2>
-        <p class="mt-1 max-w-3xl text-sm text-navy-600">
-          Bills where {person.name} is the lead author, the first name on the
-          bill. Sponsoring a bill means putting it forward: the text itself is
-          drafted by the nonpartisan Legislative Reference Bureau. Bills they
-          signed onto behind another member are listed below, and bills they
-          only voted on are in Vote history. <a href="/glossary/" class="underline">What these roles mean</a>
+    <div class="p-body flex flex-col gap-10">
+      {/* these pages run long, and a reader arrives wanting one answer */}
+      <nav class="flex flex-wrap items-center gap-x-4 gap-y-1 text-small" aria-label="Jump to a section">
+        <span class="font-bold">On this page:</span>
+        {jumpLinks.map(([href, label]) => (
+          <a href={href} class="inline-flex min-h-11 items-center underline">{label}</a>
+        ))}
+      </nav>
+
+      <section class="flex flex-col gap-3" aria-labelledby="bills-led">
+        <h2 id="bills-led" class="t-section scroll-mt-4">Bills they led</h2>
+        <p class="max-w-[45rem]">
+          <PlainText text={`Bills where ${person.name} is the lead [[author|author]], the first name on the bill. The text itself is drafted by the [[lrb|Legislative Reference Bureau]], the Legislature's nonpartisan drafting office.`} />
         </p>
-        {primarySponsored.length > 0 && (
-          <p class="mt-1 text-sm text-navy-600">
-            Of the {primarySponsored.length} bills they led:
-            {" "}{authorship.enacted} became law,
-            {" "}{authorship.vetoed} were vetoed,
-            {" "}{authorship.noHearing} died
-            without a public hearing. Statuses come from each bill's official history.
-          </p>
+        {primarySponsored.length > 0 ? (
+          <p class="max-w-[45rem]" set:html={ledSentence} />
+        ) : (
+          <p>No bills they led are in our records.</p>
         )}
-        <div class="mt-2 flex flex-wrap gap-2 text-sm">
-          {tally.map((t) => (
-            <a
-              href={`#status-${t.status}`}
-              aria-label={`Jump to ${t.bills.length} bills: ${STATUS_LABELS[t.status].toLowerCase()}`}
-              class={`rounded-full px-3 py-1 font-semibold hover:ring-2 hover:ring-navy-600 focus-visible:ring-2 focus-visible:ring-navy-600 ${STATUS_STYLES[t.status]}`}
-            >
-              {t.bills.length} {STATUS_LABELS[t.status].toLowerCase()}
-            </a>
-          ))}
-        </div>
-        <div class="mt-3 space-y-2">
-          {tally.map((t) => (
-            <details id={`status-${t.status}`} class="rounded-lg border border-navy-100 bg-white" open={t.status === "enacted"}>
-              <summary class="flex cursor-pointer items-center gap-2 px-3 py-2">
-                <span class="font-semibold">{STATUS_LABELS[t.status]}</span>
-                <span class="text-sm text-navy-600">{t.bills.length} bills</span>
-              </summary>
-              <div
-                class="max-h-72 overflow-y-auto border-t border-navy-100 scroll-body scroll-on-paper"
-                role="region"
-                tabindex="0"
-                aria-label={`${STATUS_LABELS[t.status]} bills`}
-              >
-              <ul class="space-y-1 p-3 text-sm">
-                {t.bills.slice(0, PREVIEW).map((s) => (
-                  <li class="flex items-center gap-2">
-                    <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-16 shrink-0 py-1 font-semibold underline">
-                      {s.identifier}
+        {tally.length > 0 && (
+          <div class="flex max-w-[47.5rem] flex-col border-b border-rule">
+            {tally.map((t) => (
+              <details id={`status-${t.status}`} class="group scroll-mt-4 border-t border-rule" open={t.status === "enacted"}>
+                <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-2 [&::-webkit-details-marker]:hidden">
+                  <span class="t-label">{STATUS_PLAIN[t.status] ?? t.status}</span>
+                  <span class="flex items-center gap-3 text-granite">
+                    <span class="figure">{t.bills.length.toLocaleString()}</span>
+                    <span aria-hidden="true" class="text-xl leading-none group-open:hidden">+</span>
+                    <span aria-hidden="true" class="hidden text-xl leading-none group-open:inline">–</span>
+                  </span>
+                </summary>
+                <ul class="flex flex-col pb-3">
+                  {t.bills.slice(0, PREVIEW).map((s) => (
+                    <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-rule/60 py-1.5 text-small">
+                      <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-[5.5rem] max-w-full shrink-0 font-bold underline">{s.identifier}</a>
+                      <span class="min-w-0 flex-[1_1_16rem] break-words">{shortTitle(s.title)}</span>
+                      <span class="ml-auto text-fine text-granite">{sessionLabel(s.session_id)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {t.bills.length > PREVIEW && (
+                  <p class="pb-3 text-small">
+                    <a href={`${recordBase}/bills/1/`} class="underline">
+                      Showing {PREVIEW} of {t.bills.length.toLocaleString()}. See every bill they led or signed on to
                     </a>
-                    <span class="min-w-0 flex-1 truncate">{shortTitle(s.title)}</span>
-                    <span class="shrink-0 text-xs text-navy-600">{s.session_id}</span>
-                  </li>
-                ))}
-              </ul>
-              {t.bills.length > PREVIEW && (
-                <p class="border-t border-navy-100 px-3 py-2 text-xs">
-                  <a href={`${recordBase}/bills/1/`} class="underline">
-                    Showing {PREVIEW} of {t.bills.length.toLocaleString()}, see the full record
-                  </a>
-                </p>
-              )}
-              </div>
-            </details>
-          ))}
-        </div>
+                  </p>
+                )}
+              </details>
+            ))}
+          </div>
+        )}
       </section>
 
-      {signedOn.map(([label, bills, blurb]) => bills.length > 0 && (
-        <section class="mt-6">
-          <h2 class="text-xl font-bold">{label} · {bills.length.toLocaleString()}</h2>
-          <p class="mt-1 max-w-3xl text-sm text-navy-600">
-            {blurb} Signing on adds their name to the bill; it is not the same
-            as leading it. From each bill's official history.
+      {coauthored.length + cosponsored.length > 0 && (
+        <section class="flex flex-col gap-3" aria-labelledby="signed-on">
+          <h2 id="signed-on" class="t-section scroll-mt-4">Bills they signed on to</h2>
+          <p class="max-w-[45rem]">
+            <PlainText text="[[cosponsor|Signing on]] adds their name in support of someone else's bill. It isn't the same as leading it." />
           </p>
-          <details class="mt-2 rounded-lg border border-navy-100 bg-white">
-            <summary class="cursor-pointer px-3 py-2 text-sm font-semibold">
-              Show all {bills.length.toLocaleString()} {label.toLowerCase()} bills
-            </summary>
-            <div
-              class="max-h-96 overflow-y-auto border-t border-navy-100 scroll-body scroll-on-paper"
-              role="region"
-              tabindex="0"
-              aria-label={`${label} bills`}
-            >
-              <ul class="space-y-1 p-3 text-sm">
-                {bills.slice(0, PREVIEW).map((s) => (
-                  <li class="flex items-center gap-2">
-                    <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-16 shrink-0 py-1 font-semibold underline">
-                      {s.identifier}
+          <div class="flex max-w-[47.5rem] flex-col border-b border-rule">
+            {signedOn.map(([label, bills, blurb]) => bills.length > 0 && (
+              <details class="group border-t border-rule">
+                <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-2 [&::-webkit-details-marker]:hidden">
+                  <span class="t-label">{label}</span>
+                  <span class="flex items-center gap-3 text-granite">
+                    <span class="figure">{bills.length.toLocaleString()}</span>
+                    <span aria-hidden="true" class="text-xl leading-none group-open:hidden">+</span>
+                    <span aria-hidden="true" class="hidden text-xl leading-none group-open:inline">–</span>
+                  </span>
+                </summary>
+                <p class="pb-2 text-small text-granite">{blurb}</p>
+                <ul class="flex flex-col pb-3">
+                  {bills.slice(0, PREVIEW).map((s) => (
+                    <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-rule/60 py-1.5 text-small">
+                      <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-[5.5rem] max-w-full shrink-0 font-bold underline">{s.identifier}</a>
+                      <span class="min-w-0 flex-[1_1_16rem] break-words">{shortTitle(s.title)}</span>
+                      <span class="ml-auto text-fine text-granite">{sessionLabel(s.session_id)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {bills.length > PREVIEW && (
+                  <p class="pb-3 text-small">
+                    <a href={`${recordBase}/bills/1/`} class="underline">
+                      Showing {PREVIEW} of {bills.length.toLocaleString()}. See every bill they led or signed on to
                     </a>
-                    <span class="min-w-0 flex-1 truncate">{shortTitle(s.title)}</span>
-                    <span class="shrink-0 text-xs text-navy-600">{s.session_id}</span>
-                  </li>
-                ))}
-              </ul>
-              {bills.length > PREVIEW && (
-                <p class="border-t border-navy-100 px-3 py-2 text-xs">
-                  <a href={`${recordBase}/bills/1/`} class="underline">
-                    Showing {PREVIEW} of {bills.length.toLocaleString()}, see the full record
-                  </a>
-                </p>
-              )}
-            </div>
-          </details>
+                  </p>
+                )}
+              </details>
+            ))}
+          </div>
         </section>
-      ))}
+      )}
 
       {sitting && (
-        <section class="mt-6">
-          <h2 id="money" class="scroll-mt-4 text-xl font-bold">Campaign money</h2>
-          <MoneyFilters fragmentBase={`/legislators/${personSlug(person.id)}/money/`} />
+        <section class="flex flex-col gap-3" aria-labelledby="money">
+          <h2 id="money" class="t-section scroll-mt-4">Campaign money</h2>
+          <MoneyFilters fragmentBase={`/legislators/${slug}/money/`} />
           <div data-money-views>
             {moneyViews().filter((view) => view.isDefault).map((view) => (
               <div data-money-period={view.period.key} data-money-scope={view.scope}>
@@ -479,75 +499,94 @@ const signedOn: [string, typeof coauthored, string][] = [
       )}
 
       {keyVotes.length > 0 && (
-        <section class="mt-6">
-          <h2 id="key-votes" class="scroll-mt-4 text-xl font-bold">Key votes · {keyVotes.length.toLocaleString()}</h2>
-          <p class="mt-1 max-w-3xl text-sm text-navy-600">
-            Selected by rule, not judgment: the final recorded passage vote of
-            every bill that became law, any floor vote decided by five or
-            fewer, and every veto-override vote. Each row links to the
-            official roll call.
+        <section class="flex flex-col gap-3" aria-labelledby="key-votes">
+          <h2 id="key-votes" class="t-section scroll-mt-4">Key votes</h2>
+          <p class="max-w-[45rem]">
+            Picked by rule, not by us: each chamber's final recorded passage
+            vote on bills that became law, every recorded floor vote decided by
+            five or fewer, and every vote to override a veto.
+            {" "}<span class="figure">{keyVotes.length.toLocaleString()}</span> of their votes fit.
           </p>
-          <div
-            class="mt-2 max-h-[32rem] overflow-y-auto rounded-lg border border-navy-100 bg-white scroll-body"
-            role="region"
-            tabindex="0"
-            aria-label="Key votes"
-          >
-            <ul class="space-y-1 p-3 text-sm">
-              {keyVotes.slice(0, 300).map((v) => (
-                <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-navy-100 pb-1 sm:flex-nowrap">
-                  <span class="w-20 shrink-0 text-xs tabular-nums text-navy-600">{v.date ? fmtDate(v.date) : ""}</span>
-                  <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="w-16 shrink-0 font-bold underline">{v.identifier}</a>
-                  <span class="min-w-0 flex-1 truncate">{v.motion ?? shortTitle(v.title)}</span>
-                  {/* A vote can carry two badges ("became law" and "close
-                      vote"). Left to size themselves they push the tally and
-                      link onto a second line, so every column past the motion
-                      is fixed-width and the badges wrap inside their own. */}
-                  <span class="flex w-[8.5rem] shrink-0 flex-wrap justify-end gap-1">
-                    {v.kinds.map((k) => (
-                      <span class={`rounded-full px-1.5 py-0.5 text-[0.625rem] font-semibold ${KEY_VOTE_STYLES[k] ?? "bg-navy-50"}`}>{k}</span>
-                    ))}
-                  </span>
-                  <span class="w-32 shrink-0 text-right text-xs text-navy-700">
-                    Voted <strong>{v.option === "yes" ? "Aye" : v.option === "no" ? "Nay" : "did not vote"}</strong>
-                    {" "}({v.yes_count}–{v.no_count})
-                  </span>
-                  <a href={`/votes/${v.vote_event_id}/`} class="w-16 shrink-0 py-1 text-right text-xs underline">roll call</a>
-                </li>
-              ))}
-            </ul>
-            {keyVotes.length > 300 && (
-              <p class="px-3 pb-3 text-xs text-navy-600">
-                Showing the 300 most recent; the full record is in Vote history below.
-              </p>
-            )}
-          </div>
+          <ul class="flex max-w-[47.5rem] flex-col border-b border-rule">
+            {keyVotes.slice(0, 10).map((v) => (
+              <li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 border-t border-rule py-3">
+                <p class="min-w-0">
+                  <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="font-bold underline">{v.identifier}</a>
+                  {" "}<span>{v.motion ?? shortTitle(v.title)}</span>
+                </p>
+                <p class="text-right text-small">
+                  <strong>{voteWord(v.option)}</strong>
+                  {v.yes_count != null && <span class="text-granite"> · {v.yes_count} to {v.no_count ?? 0}</span>}
+                </p>
+                <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-fine text-granite">
+                  <span>{v.date ? fmtDate(v.date) : ""}</span>
+                  {v.kinds.map((k) => (
+                    <span class="rounded-full bg-fog px-2 py-0.5 font-semibold text-spruce">{keyVoteWords[k] ?? k}</span>
+                  ))}
+                </p>
+                <p class="text-right text-fine"><a href={`/votes/${v.vote_event_id}/`} class="underline">Roll call</a></p>
+              </li>
+            ))}
+          </ul>
+          {keyVotes.length > 10 && (
+            <details class="group max-w-[47.5rem]">
+              <summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">
+                <span class="group-open:hidden">Show {Math.min(keyVotes.length, 300) - 10} more key votes</span>
+                <span class="hidden group-open:inline">Show fewer</span>
+              </summary>
+              <ul class="flex flex-col border-b border-rule">
+                {keyVotes.slice(10, 300).map((v) => (
+              <li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 border-t border-rule py-3">
+                <p class="min-w-0">
+                  <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="font-bold underline">{v.identifier}</a>
+                  {" "}<span>{v.motion ?? shortTitle(v.title)}</span>
+                </p>
+                <p class="text-right text-small">
+                  <strong>{voteWord(v.option)}</strong>
+                  {v.yes_count != null && <span class="text-granite"> · {v.yes_count} to {v.no_count ?? 0}</span>}
+                </p>
+                <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-fine text-granite">
+                  <span>{v.date ? fmtDate(v.date) : ""}</span>
+                  {v.kinds.map((k) => (
+                    <span class="rounded-full bg-fog px-2 py-0.5 font-semibold text-spruce">{keyVoteWords[k] ?? k}</span>
+                  ))}
+                </p>
+                <p class="text-right text-fine"><a href={`/votes/${v.vote_event_id}/`} class="underline">Roll call</a></p>
+              </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {keyVotes.length > 300 && (
+            <p class="text-small text-granite">Showing the 300 most recent. Every vote is in the full record below.</p>
+          )}
         </section>
       )}
 
       {breaks.length > 0 && (
-        <section class="mt-6">
-          <h2 class="text-xl font-bold">Votes against their party · {breaks.length}</h2>
-          <p class="mt-1 max-w-3xl text-sm text-navy-600">
-            Roll calls where {person.name} voted opposite the majority of
-            {" "}{partyPlural} casting an Aye or Nay on that roll call. Ties
-            within the party are excluded; absences never count. Each row
-            links to the official roll call.
+        <section class="flex flex-col gap-3" aria-labelledby="party-breaks">
+          <h2 id="party-breaks" class="t-section scroll-mt-4">Votes against their party</h2>
+          <p class="max-w-[45rem]">
+            <span class="figure">{breaks.length.toLocaleString()}</span> roll calls where {person.name} voted
+            the opposite way from most {partyPlural} who voted yes or no. Ties
+            within the party aren't counted, and neither are absences.
           </p>
-          <details class="mt-3 rounded-lg border border-navy-100 bg-white" open={breaks.length <= 12}>
-            <summary class="cursor-pointer px-3 py-2 text-sm font-semibold">
-              Show all {breaks.length} party-break votes
+          <details class="group max-w-[47.5rem] border-y border-rule" open={breaks.length <= 12}>
+            <summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">
+              <span class="group-open:hidden">Show all {breaks.length.toLocaleString()}</span>
+              <span class="hidden group-open:inline">Hide them</span>
             </summary>
-            <ul class="space-y-1 px-3 pb-3">
+            <ul class="flex flex-col pb-2">
               {breaks.map((v) => (
-                <li class="flex flex-wrap items-baseline gap-x-3 border-t border-navy-100 pt-1 text-sm">
-                  <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{v.date ? fmtDate(v.date) : ""}</span>
-                  <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="w-20 shrink-0 font-bold underline">{v.identifier}</a>
-                  <span class="min-w-0 flex-1 truncate">{v.motion ?? shortTitle(v.title)}</span>
-                  <span class="shrink-0 text-xs text-navy-700">
-                    Voted {v.option === "yes" ? "Aye" : "Nay"}; {partyPlural} split {v.split.yes} Aye–{v.split.no} Nay
-                  </span>
-                  <a href={`/votes/${v.vote_event_id}/`} class="shrink-0 text-xs underline">roll call</a>
+                <li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-0.5 border-t border-rule py-2.5 text-small">
+                  <p class="min-w-0">
+                    <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="font-bold underline">{v.identifier}</a>
+                    {" "}{v.motion ?? shortTitle(v.title)}
+                  </p>
+                  <p class="text-right"><a href={`/votes/${v.vote_event_id}/`} class="underline">Roll call</a></p>
+                  <p class="col-span-2 text-fine text-granite">
+                    {v.date ? `${fmtDate(v.date)}. ` : ""}Voted {voteWord(v.option).toLowerCase()}; {partyPlural} split {v.split.yes} yes, {v.split.no} no.
+                  </p>
                 </li>
               ))}
             </ul>
@@ -556,33 +595,37 @@ const signedOn: [string, typeof coauthored, string][] = [
       )}
 
       {attendanceBlocks.length > 0 && (
-        <section class="mt-6">
-          <h2 id="attendance" class="scroll-mt-4 text-xl font-bold">Floor attendance</h2>
-          <p class="mt-1 text-sm text-navy-600">
-            Only days the chamber held recorded floor votes are shown, on
-            every tile below, they either voted or missed:
-            {votesTotal.toLocaleString()} votes across {attendance.days} voting days,
-            {missedTotal > 0 ? `${missedTotal} missed` : "none missed"}.
+        <section class="flex flex-col gap-3" aria-labelledby="attendance">
+          <h2 id="attendance" class="t-section scroll-mt-4">Floor attendance</h2>
+          <p class="max-w-[45rem]">
+            One square for each day of recorded floor votes in their chamber.
+            While in office: <span class="figure">{votesTotal.toLocaleString()}</span> votes across
+            {" "}<span class="figure">{attendance.days.toLocaleString()}</span> voting days,
+            {" "}{missedTotal > 0 ? <><span class="figure">{missedTotal.toLocaleString()}</span> with no vote recorded for them at all.</> : "with a vote recorded for them every time."}
           </p>
-          <div class="mt-1 flex flex-wrap items-center gap-3 text-xs text-navy-600">
-            <span class="flex items-center gap-1"><span class="hm-cell h-3 w-3 rounded-[3px] bg-moss-600"></span> voted all</span>
-            <span class="flex items-center gap-1"><span class="hm-cell h-3 w-3 rounded-[3px] bg-gold-600"></span> present, not voting</span>
-            <span class="flex items-center gap-1"><span class="hm-cell hm-miss h-3 w-3 rounded-[3px]"></span> missed votes (striped)</span>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-fine text-granite">
+            <span class="flex items-center gap-1.5"><span class="hm-cell h-3.5 w-3.5 rounded-[3px] bg-lake"></span> Voted on every one</span>
+            <span class="flex items-center gap-1.5"><span class="hm-cell h-3.5 w-3.5 rounded-[3px] bg-edge"></span> Recorded as not voting on some</span>
+            <span class="flex items-center gap-1.5"><span class="hm-cell hm-miss h-3.5 w-3.5 rounded-[3px]"></span> No vote recorded on some (striped)</span>
             {serviceSpans.length > 1 && (
-              <span class="flex items-center gap-1"><span class="hm-cell h-3 w-3 rounded-[3px] bg-navy-100"></span> not in office</span>
+              <span class="flex items-center gap-1.5"><span class="hm-cell h-3.5 w-3.5 rounded-[3px] bg-fog ring-1 ring-inset ring-rule"></span> Not in office</span>
             )}
           </div>
-          <div class="mt-3 space-y-2">
+          <div class="flex max-w-[47.5rem] flex-col border-b border-rule">
             {attendanceBlocks.map((b) =>
               b.kind === "year" ? (
-                <details class="rounded-lg border border-navy-100 bg-white px-3 py-2" open={openYears.has(b.year)}>
-                  <summary class="cursor-pointer text-sm font-semibold">{b.year}</summary>
-                  <div class="mt-2">
+                <details class="group border-t border-rule" open={openYears.has(b.year)}>
+                  <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between py-1.5 [&::-webkit-details-marker]:hidden">
+                    <span class="t-label">{b.year}</span>
+                    <span aria-hidden="true" class="text-xl leading-none text-granite group-open:hidden">+</span>
+                    <span aria-hidden="true" class="hidden text-xl leading-none text-granite group-open:inline">–</span>
+                  </summary>
+                  <div class="pb-3">
                     <VoteHeatmap year={b.year} days={heatDays.filter((d) => d.date.startsWith(String(b.year)))} />
                     {serviceSpans
                       .filter((s) => s.end?.startsWith(String(b.year)) && s.end_label)
                       .map((s) => (
-                        <p class="mt-2 text-xs text-navy-600">
+                        <p class="mt-2 text-fine text-granite">
                           Out of office from {fmtDate(s.end!)},{" "}
                           {s.end_url ? <a href={s.end_url} class="underline">{s.end_label}</a> : s.end_label}
                         </p>
@@ -590,52 +633,104 @@ const signedOn: [string, typeof coauthored, string][] = [
                   </div>
                 </details>
               ) : (
-                <div class="rounded-lg border border-navy-100 bg-navy-50 px-3 py-2 text-sm text-navy-700">
-                  <span class="font-semibold">{b.from === b.to ? b.from : `${b.from}–${b.to}`}</span>
-                  {" · "}Not in office
+                <p class="border-t border-rule py-2.5 text-small text-granite">
+                  <span class="t-label text-spruce">{b.from === b.to ? b.from : `${b.from}–${b.to}`}</span>
+                  {" "}Not in office
                   {b.label && (
                     <>
                       {", "}
                       {b.url ? <a href={b.url} class="underline">{b.label}</a> : b.label}
                     </>
                   )}
-                </div>
+                </p>
               ),
             )}
           </div>
         </section>
       )}
 
-      <section class="mt-6">
-        <h2 id="vote-history" class="scroll-mt-4 text-xl font-bold">Vote history · {voteTotal.toLocaleString()}</h2>
-        <div
-          class="mt-2 max-h-[32rem] overflow-y-auto rounded-lg border border-navy-100 bg-white scroll-body"
+      <section class="flex flex-col gap-3" aria-labelledby="vote-history">
+        <h2 id="vote-history" class="t-section scroll-mt-4">Every vote</h2>
+        <p class="max-w-[45rem]">
+          <PlainText text={voteTotal > 0
+            ? `Their [[roll-call|roll call]] votes, newest first: ${voteTotal.toLocaleString()} in all.`
+            : "No [[roll-call|roll call]] votes are on record for them."} />
+        </p>
+        {voteTotal > 0 && <div
+          class="max-h-[32rem] max-w-[47.5rem] overflow-y-auto border-y border-rule scroll-body scroll-on-paper"
           role="region"
           tabindex="0"
           aria-label="Recent votes"
         >
-          <ul class="space-y-1 p-3 text-sm">
+          <ul class="flex flex-col py-1">
             {votes.slice(0, 200).map((v) => <VoteRow v={v} />)}
           </ul>
-        </div>
+        </div>}
         {voteTotal > votes.length && (
-          <p class="mt-2 text-sm">
-            <a href={`${recordBase}/votes/1/`} class="inline-block py-1 underline">
-              Showing the most recent {votes.length}, see all
-              {" "}{voteTotal.toLocaleString()} votes →
+          <p>
+            <a href={`${recordBase}/votes/1/`} class="inline-flex min-h-11 items-center font-bold underline">
+              See all {voteTotal.toLocaleString()} votes
             </a>
           </p>
         )}
       </section>
+
+      <div class="lg:hidden">
+        <TermsOnPage terms={terms} />
+      </div>
+
+      <p class="text-fine text-granite">
+        From the official records of the
+        {" "}<a href="https://docs.legis.wisconsin.gov" class="underline">Wisconsin Legislature</a> and the
+        {" "}<a href="https://ethics.wi.gov" class="underline">Wisconsin Ethics Commission</a>{pulledOn && `, checked ${fmtDate(pulledOn)}`}.
+      </p>
     </div>
-  </div>
+
+    <TermPopovers terms={terms} />
+  </article>
 
   <script>
-    // status pills jump to a details strip; open it so the target isn't collapsed
-    document.querySelectorAll<HTMLAnchorElement>("a[href^='#status-']").forEach((a) => {
-      a.addEventListener("click", () => {
-        document.querySelector(a.getAttribute("href")!)?.setAttribute("open", "");
-      });
-    });
+    // links to one status group open it, so the target isn't collapsed
+    const openTarget = () => {
+      const id = location.hash.slice(1);
+      if (id.startsWith("status-")) document.getElementById(id)?.setAttribute("open", "");
+    };
+    openTarget();
+    window.addEventListener("hashchange", openTarget);
   </script>
 </Base>
+
+<style>
+  /* Phones read in order: who, how to reach them, at a glance, the details,
+     then the long record. From 1024px the actions and details sit in a rail. */
+  .profile {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+  @media (min-width: 64rem) {
+    .profile {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(18.75rem, 22.5rem);
+      grid-template-rows: auto auto 1fr;
+      grid-template-areas:
+        "head actions"
+        "glance details"
+        "body details";
+      column-gap: 3rem;
+      row-gap: 2.25rem;
+    }
+    .p-head { grid-area: head; }
+    .p-actions { grid-area: actions; align-self: center; }
+    .p-glance { grid-area: glance; }
+    .p-body { grid-area: body; }
+    .p-details { grid-area: details; align-self: start; }
+    /* former members have no glance: the record moves up */
+    .profile:not(:has(.p-glance)) {
+      grid-template-areas:
+        "head actions"
+        "body details";
+      grid-template-rows: auto 1fr;
+    }
+  }
+</style>

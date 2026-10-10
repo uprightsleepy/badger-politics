@@ -12,6 +12,19 @@ export const STATUS_LABELS: Record<string, string> = {
   failed_sjr1: "Died at session end",
 };
 
+/** Status in plain words for lists of bills (docs/brand.md, "Status
+ * wording"). STATUS_LABELS stays as is: it is also a search facet value. */
+export const STATUS_PLAIN: Record<string, string> = {
+  introduced: "Introduced",
+  in_committee: "In committee",
+  passed_chamber: "Passed one chamber",
+  passed: "Passed both chambers",
+  adopted: "Adopted",
+  enacted: "Became law",
+  vetoed: "Vetoed",
+  failed_sjr1: "Stopped when the session ended",
+};
+
 export const STATUS_SHORT: Record<string, string> = {
   introduced: "Introduced",
   in_committee: "In committee",

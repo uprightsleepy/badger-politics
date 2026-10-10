@@ -37,6 +37,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   { id: "veto-override", term: "Veto override", definition: "The Legislature's power to enact a bill over the governor's veto. It takes a two-thirds vote in each chamber, see the Governor's desk page for every attempt." },
   { id: "roll-call-vote", term: "Roll call vote", definition: "A vote where each member's Aye or Nay is recorded by name. Only roll calls appear in attendance and vote records here; voice votes record no names." },
   { id: "voice-vote", term: "Voice vote", definition: "A vote by collective shout, recorded only as the outcome. No individual positions exist, so none are shown here." },
+  { id: "votes-with-party", term: "Votes with party majority", definition: "How often a member's Aye or Nay matched the position most of their own party took on the same roll call, shown on member pages here. Roll calls where their party split evenly, and votes they didn't cast, aren't counted." },
   { id: "party-line", term: "Party-line / bipartisan vote", definition: "As tagged on roll calls here: party-line means the majorities of the two parties took opposite positions; bipartisan means both parties' majorities voted the same way. Ties within a party get no tag." },
   { id: "special-session", term: "Special session", definition: "A session called by the governor, limited to subjects in the call. Special-session bills carry their own numbering." },
   { id: "extraordinary-session", term: "Extraordinary session", definition: "A session the Legislature calls itself, outside the scheduled floorperiods." },
@@ -129,6 +130,11 @@ export const TERMS = {
     short: "A state agency's estimate of what a bill would cost or save.",
     official: "Fiscal estimate",
     glossary: "fiscal-estimate",
+  },
+  "with-party": {
+    label: "Voting with their party",
+    short: "How often a lawmaker's yes or no matched what most of their own party voted on the same roll call.",
+    glossary: "votes-with-party",
   },
   "joint-resolution": {
     label: "Joint resolution",

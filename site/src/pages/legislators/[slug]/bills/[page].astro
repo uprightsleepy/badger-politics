@@ -6,13 +6,13 @@
 import Base from "../../../../layouts/Base.astro";
 import Pager from "../../../../components/Pager.astro";
 import { people, personSponsorshipCount, personSponsorships } from "../../../../lib/db";
-import { billSlug, chamberName, personSlug, roleAbbr, shortTitle } from "../../../../lib/format";
+import { billSlug, chamberName, personSlug, roleAbbr, sessionPlainName, shortTitle } from "../../../../lib/format";
 import { PER_PAGE, pageBounds, pageCount } from "../../../../lib/paging";
 
 const ROLE_LABEL: Record<string, string> = {
-  lead: "Lead author",
-  coauthor: "Coauthor",
-  cosponsor: "Cosponsor",
+  lead: "Led it",
+  coauthor: "Signed on (same chamber)",
+  cosponsor: "Signed on (other chamber)",
 };
 
 export function getStaticPaths() {
@@ -38,30 +38,32 @@ const { first, last } = pageBounds(page, total);
   description={`Bills ${first.toLocaleString()}–${last.toLocaleString()} of ${total.toLocaleString()} that ${person.name} led or signed onto in the Wisconsin ${chamberName(person.chamber)}, from each bill's official history.`}
   noindex
   searchable={false}
+  layout="wide"
   breadcrumbs={[
     { name: "Legislators", url: "/legislators/" },
     { name: person.name, url: `${base}/` },
   ]}
 >
-  <p class="text-sm text-navy-600">
-    <a href={`${base}/`} class="underline">← {person.name}</a>
-  </p>
-  <h1 class="mt-1 text-2xl font-bold">Every Bill Led or Signed</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-600">
-    {total.toLocaleString()} in total, newest first. Signing on adds a name
-    to a bill; it is not the same as leading it. Showing
-    {" "}{first.toLocaleString()}–{last.toLocaleString()}.
-  </p>
+  <div class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <a href={`${base}/`} class="self-start text-small underline">{person.name}</a>
+    <h1 class="t-display">Every bill they led or signed on to</h1>
+    <p class="sm:text-lead">
+      {total.toLocaleString()} in all, newest first. Signing on adds a name in
+      support; it isn't the same as leading a bill. Showing
+      {" "}{first.toLocaleString()} to {last.toLocaleString()}.
+    </p>
+  </div>
 
-  <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+  <ul class="mt-6 flex max-w-[47.5rem] flex-col border-b border-rule">
     {rows.map((s) => (
-      <li class="flex items-center gap-3 px-4 py-2">
-        <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-20 shrink-0 font-semibold underline">
+      <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-rule py-2.5">
+        <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-[5.5rem] max-w-full shrink-0 font-bold underline">
           {s.identifier}
         </a>
-        <span class="min-w-0 flex-1 truncate">{shortTitle(s.title)}</span>
-        <span class="shrink-0 text-xs text-navy-600">{ROLE_LABEL[s.role] ?? s.role}</span>
-        <span class="hidden shrink-0 text-xs text-navy-600 sm:inline">{s.session_id}</span>
+        <span class="min-w-0 flex-[1_1_16rem] break-words">{shortTitle(s.title)}</span>
+        <span class="ml-auto text-fine text-granite sm:text-right">
+          {ROLE_LABEL[s.role] ?? s.role}<span class="block">{sessionPlainName(s.session_id, s.session_id)}</span>
+        </span>
       </li>
     ))}
   </ul>
