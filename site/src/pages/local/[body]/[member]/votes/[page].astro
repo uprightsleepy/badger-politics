@@ -35,34 +35,34 @@ const yearPages = yearPageStarts(localMemberVoteYears(body.tenant, member.person
   noindex
   searchable={false}
   breadcrumbs={[
-    { name: "City Councils", url: "/local/" },
+    { name: "City councils", url: "/local/" },
     { name: body.name, url: `/local/${body.slug}/` },
     { name: member.name, url: `${base}/` },
   ]}
+  layout="wide"
 >
-  <p class="text-sm text-navy-600">
-    <a href={`${base}/`} class="underline">&larr; {member.name}</a>
-  </p>
-  <h1 class="mt-1 text-2xl font-bold">Recorded Votes</h1>
-  <p class="mt-1 text-sm text-navy-600">
-    {total.toLocaleString()} recorded votes, newest first. Showing
-    {" "}{first.toLocaleString()} to {last.toLocaleString()}. The vote is on the
-    action named under each row, which is not always the measure itself.
-    Each item links to the clerk's page.
-  </p>
-  <LocalCoverageNotice tenant={body.tenant} />
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <a href={`${base}/`} class="self-start text-small underline">{member.name}</a>
+    <h1 class="t-display">Recorded votes</h1>
+    <p class="sm:text-lead">
+      {total.toLocaleString()} recorded votes, newest first. This page has {first.toLocaleString()} to {last.toLocaleString()}.
+    </p>
+    <p class="text-small text-granite">
+      The vote is on the action named with each item, which isn't always the measure itself. Each item links
+      to the clerk's page.
+    </p>
+    <LocalCoverageNotice tenant={body.tenant} />
+  </header>
   {yearPages.length > 1 && (
-    <p class="mt-1 text-sm text-navy-600" data-pagefind-ignore>
-      Jump to a year:
+    <p class="mt-4 flex flex-wrap items-center gap-2 text-small" data-pagefind-ignore>
+      <span class="text-granite">Start at a year:</span>
       {yearPages.map((y) => (
-        y.page === page
-          ? <span class="ml-2 font-semibold tabular-nums">{y.year}</span>
-          : <a href={`${base}/votes/${y.page}/`} class="ml-2 underline tabular-nums">{y.year}</a>
+        <a href={`${base}/votes/${y.page}/`} class="chip tabular-nums" aria-current={y.page === page ? "page" : undefined}>{y.year}</a>
       ))}
     </p>
   )}
 
-  <ul class="mt-4 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+  <ul class="mt-6 max-w-[60rem] border-b border-rule" role="list">
     {rows.map((v) => (
       <LocalVoteRow v={v} />
     ))}

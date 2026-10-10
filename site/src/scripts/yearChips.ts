@@ -15,5 +15,7 @@ for (const bar of document.querySelectorAll<HTMLElement>("[data-yearchips]")) {
     for (const row of list.querySelectorAll<HTMLElement>("[data-y]")) {
       row.classList.toggle("sorted-hidden", year !== "" && row.dataset.y !== year);
     }
+    // a year's rows may sit behind "Show more"; choosing a year shows them all
+    if (year) for (const more of list.querySelectorAll("details")) more.open = true;
   });
 }

@@ -76,17 +76,8 @@ const VOTES: Record<string, string> = {
   "Recused": "did not participate in the decision because of a conflict of interest",
 };
 
-const CAST_STYLE: Record<string, string> = {
-  Aye: "bg-moss-50 text-moss-600",
-  Yes: "bg-moss-50 text-moss-600",
-  No: "bg-badger-50 text-badger-700",
-  Nay: "bg-badger-50 text-badger-700",
-};
 export const isNoVote = (value: string): boolean => value === "No" || value === "Nay";
 export const isYesVote = (value: string): boolean => value === "Aye" || value === "Yes";
-export const castStyle = (value: string): string =>
-  CAST_STYLE[value] ?? "bg-navy-50 text-navy-600";
-
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
 /** A recorded action, readable: all-caps records come down to sentence case. */

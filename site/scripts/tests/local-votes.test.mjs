@@ -78,10 +78,12 @@ test("council vocabularies yield identical totals without changing records or mi
   }
 });
 
-test("negative vote labels share a display style without classifying other positions as no", () => {
-  assert.equal(gloss.castStyle("Nay"), gloss.castStyle("No"));
+// Rows show the clerk's word as recorded, with no color per position (docs/brand.md:
+// words carry status); the glosses and classifiers still read Nay as no and Yes as yes.
+test("negative vote labels read the same without classifying other positions as no", () => {
+  assert.equal(gloss.voteGloss("Nay"), gloss.voteGloss("No"));
   assert.equal(gloss.voteGloss("Nay"), "voted no");
-  assert.equal(gloss.castStyle("Yes"), gloss.castStyle("Aye"));
+  assert.equal(gloss.voteGloss("Yes"), gloss.voteGloss("Aye"));
   assert.equal(gloss.voteGloss("Yes"), "voted yes");
   for (const value of ["Yes", "Aye"]) assert.equal(gloss.isYesVote(value), true);
   for (const value of ["Nay", "No"]) assert.equal(gloss.isNoVote(value), true);
