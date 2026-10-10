@@ -1,58 +1,144 @@
 ---
+/** What the site publishes for reuse (JSON API, feeds, calendars), what
+ * it leaves out, and how the records are collected and checked. The paths
+ * match pipeline/dataproducts (api.py, feeds.py, ical.py). */
 import Base from "../layouts/Base.astro";
-import { meta } from "../lib/db";
+import { meta, usesLegiscan } from "../lib/db";
+import { fmtDate } from "../lib/format";
 const m = meta();
+const pulledOn = m.imported_at?.slice(0, 10);
+
+const api: [string, string][] = [
+  ["/api/v1/meta.json", "When the records were last checked, and the newest recorded action."],
+  ["/api/v1/sessions.json", "Every session on record."],
+  ["/api/v1/bills/2025/index.json", "Every bill in one session, briefly. Swap 2025 for any session."],
+  ["/api/v1/bills/2025/ab656.json", "One bill with its sponsors, every action and its roll calls. The name matches the bill page's address."],
+  ["/api/v1/votes/{id}.json", "One roll call with every member's vote. The id matches the roll call page's address."],
+  ["/api/v1/legislators/index.json", "Every state lawmaker on record."],
+  ["/api/v1/legislators/{name}.json", "One lawmaker: their profile, election, bills and votes. The name matches their page's address."],
+  ["/api/v1/elections/statewide.json", "Statewide races on the 2026 ballot, and past statewide results."],
+  ["/api/v1/local/{city}/index.json", "One city council's members."],
+  ["/api/v1/local/{city}/{member}.json", "One council member and their latest votes."],
+];
+const feeds: [string, string][] = [
+  ["/feeds/bills/{id}.xml", "Each step in one bill's history. Linked from the bill's page."],
+  ["/feeds/legislators/{name}.xml", "A state lawmaker's roll-call votes."],
+  ["/feeds/committees/{id}.xml", "A committee's hearings."],
+  ["/feeds/local/{city}/{member}.xml", "A city council member's votes."],
+];
 ---
 
-<Base title="Data & API" description="Free JSON API, Atom feeds, calendars, and bulk downloads of Wisconsin legislative data.">
-  <h1 class="text-2xl font-bold">Data &amp; API</h1>
-  <p class="mt-2 max-w-3xl text-navy-700">
-    All of the data behind this site is free to use. No key required. It is
-    collected from docs.legis.wisconsin.gov, last pulled {m.imported_at?.slice(0, 10)},
-    with the Legislature's most recent recorded action from {m.data_through}.
-    Every exported row comes from public records.
-  </p>
-  <section class="mt-6 max-w-3xl space-y-4 text-sm leading-relaxed">
-    <div class="rounded-lg border border-navy-100 bg-white p-4">
-      <h2 class="font-bold">Static JSON API</h2>
-      <p class="mt-1">CDN-served JSON, one file per resource:</p>
-      <ul class="mt-1 list-inside list-disc font-mono text-xs">
-        <li>/api/v1/sessions.json · /api/v1/meta.json</li>
-        <li>/api/v1/bills/2025/index.json · /api/v1/bills/2025/ab656.json</li>
-        <li>/api/v1/votes/&lbrace;vote_id&rbrace;.json</li>
-        <li>/api/v1/legislators/index.json · /api/v1/legislators/&lbrace;id&rbrace;.json</li>
+<Base
+  title="Data and API"
+  description="Free JSON API, Atom feeds and calendars of Wisconsin legislative records, with what's left out and how the records are checked."
+  layout="wide"
+>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">Data and API</h1>
+    <p class="sm:text-lead">
+      Everything behind this site is free to reuse, with no key or sign-up. It's collected from official
+      public records{pulledOn && <>, last checked <strong>{fmtDate(pulledOn)}</strong></>}.
+      {m.data_through && <> The Legislature's newest recorded action is from <strong>{fmtDate(m.data_through)}</strong>.</>}
+    </p>
+  </header>
+
+  <div class="mt-10 flex max-w-[47.5rem] flex-col gap-12">
+    <section aria-labelledby="api-heading">
+      <h2 id="api-heading" class="t-section">JSON API</h2>
+      <p class="mt-2">Static JSON files, one for each record, rebuilt with every update of the site.</p>
+      <dl class="paths mt-3">
+        {api.map(([path, what]) => (
+          <div>
+            <dt><code>{path}</code></dt>
+            <dd>{what}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+
+    <section aria-labelledby="feeds-heading">
+      <h2 id="feeds-heading" class="t-section">Feeds</h2>
+      <p class="mt-2">
+        Atom feeds for any feed reader. Each page that has one links to it next to its Follow button. For a
+        summary of the whole Legislature, there's <a href="/feeds/weekly.xml" class="underline">this week in the
+        Legislature</a>.
+      </p>
+      <dl class="paths mt-3">
+        {feeds.map(([path, what]) => (
+          <div>
+            <dt><code>{path}</code></dt>
+            <dd>{what}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+
+    <section aria-labelledby="calendars-heading">
+      <h2 id="calendars-heading" class="t-section">Calendars</h2>
+      <p class="mt-2">Calendar files (iCal) that any calendar app can subscribe to or import.</p>
+      <ul class="mt-2 flex flex-col" role="list">
+        <li><a href="/calendar/hearings.ics" class="inline-flex min-h-11 items-center underline">Committee hearings</a></li>
+        <li><a href="/calendar/election-days.ics" class="inline-flex min-h-11 items-center underline">2026 election days</a></li>
       </ul>
-    </div>
-    <div class="rounded-lg border border-navy-100 bg-white p-4">
-      <h2 class="font-bold">Feeds &amp; calendars</h2>
-      <p class="mt-1">
-        Atom feeds per bill (<span class="font-mono text-xs">/feeds/bills/&lbrace;id&rbrace;.xml</span>),
-        per legislator, per committee, plus the
-        <a href="/feeds/weekly.xml" class="underline">weekly digest</a>. iCal:
-        <a href="/calendar/hearings.ics" class="underline">hearings</a> and
-        <a href="/calendar/election-days.ics" class="underline">2026 election days</a>.
+      <p class="mt-1 text-small text-granite">Each hearing on the <a href="/calendar/#hearings" class="underline">calendar</a> also has its own file.</p>
+    </section>
+
+    <section aria-labelledby="bulk-heading">
+      <h2 id="bulk-heading" class="t-section">Bulk downloads</h2>
+      <p class="mt-2">
+        Not published yet. Each update of the site already writes CSV files for every session (bills,
+        their actions, sponsors, roll calls and each member's vote) and a filtered copy of the database,
+        and they're planned for GitHub, beside the
+        {" "}<a href="https://github.com/uprightsleepy/badger-politics" class="underline">source code</a>.
+        Until then, the JSON API above has the bills, roll calls and lawmakers.
       </p>
-    </div>
-    <div class="rounded-lg border border-navy-100 bg-white p-4">
-      <h2 class="font-bold">Bulk downloads</h2>
-      <p class="mt-1">
-        Per-session CSVs and a filtered SQLite snapshot are published with each
-        release on <a href="https://github.com/uprightsleepy/badger-politics/releases" class="underline">GitHub Releases</a>.
-        Records from LegiScan (if any) appear on the site, credited under its
-        <a href="https://creativecommons.org/licenses/by/4.0/" class="underline">CC BY 4.0 license</a>,
-        but are left out of every download, feed and API response.
-        Eye on Lobbying registrations are withheld from the site and exports.
+    </section>
+
+    <section aria-labelledby="left-out-heading">
+      <h2 id="left-out-heading" class="t-section">What's left out</h2>
+      <ul class="mt-3 flex list-disc flex-col gap-2 pl-5 marker:text-granite">
+        <li>
+          {usesLegiscan()
+            ? <>Bills and roll calls that came from LegiScan appear on the site, credited and linked under its
+              {" "}<a href="https://creativecommons.org/licenses/by/4.0/" class="underline">CC BY 4.0 license</a>,
+              but they're left out of every API file, feed and download.</>
+            : <>No records on the site come from LegiScan. If any ever do, they'll be credited and linked under
+              its <a href="https://creativecommons.org/licenses/by/4.0/" class="underline">CC BY 4.0 license</a>
+              {" "}and left out of every API file, feed and download.</>}
+        </li>
+        <li>Eye on Lobbying registrations are withheld from the site and from everything published here.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="method-heading">
+      <h2 id="method-heading" class="t-section">How the records are collected</h2>
+      <p class="mt-2">
+        Every night, the Legislature's official pages are read with the open-source Open States scrapers
+        and loaded into a single database behind hard checks. Roll-call totals must match the official
+        counts, and a lawmaker's name that could mean two people stops the update rather than being
+        guessed. <a href="/about/" class="underline">Every source and check</a> is on the About page, and the
+        {" "}<a href="https://github.com/uprightsleepy/badger-politics" class="underline">code is on GitHub</a>.
       </p>
-    </div>
-    <div class="rounded-lg border border-navy-100 bg-white p-4">
-      <h2 class="font-bold">Methodology, briefly</h2>
-      <p class="mt-1">
-        Nightly scrape of official Legislature pages (via the open-source
-        openstates-scrapers), imported into SQLite behind hard integrity gates:
-        roll-call sums must reconcile with official counts, and any ambiguous
-        legislator name fails the build rather than guessing. See
-        <a href="https://github.com/uprightsleepy/badger-politics" class="underline">the source</a>.
-      </p>
-    </div>
-  </section>
+    </section>
+  </div>
 </Base>
+
+<style>
+  .paths {
+    border-bottom: 1px solid var(--color-rule);
+  }
+  .paths > div {
+    border-top: 1px solid var(--color-rule);
+    padding: 0.75rem 0;
+  }
+  .paths code {
+    font-size: var(--text-small);
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+  .paths dd {
+    margin-top: 0.125rem;
+    color: var(--color-granite);
+    font-size: var(--text-small);
+  }
+</style>

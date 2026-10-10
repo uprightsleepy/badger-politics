@@ -1,80 +1,118 @@
 ---
+/** How to take part in a committee hearing, start to finish. */
 import Base from "../../layouts/Base.astro";
 
 const steps = [
   {
     title: "Find a hearing",
-    body: "Committees announce public hearings a few days ahead. Watch the calendar here, or follow a bill to see its hearings, every hearing links to the official notice with the room, time, and agenda.",
-    links: [{ href: "/calendar/", label: "Civic calendar" }],
+    body: "Committees announce public hearings a few days ahead. Watch the calendar here, or follow a bill to see its hearings. Every hearing links to the official notice with the room, the time and the agenda.",
+    links: [{ href: "/calendar/#hearings", label: "Committee hearings" }],
   },
   {
     title: "Read the official notice",
-    body: "The notice lists every bill on the agenda in order. Committees usually take bills in agenda order, but chairs can rearrange, arriving early is the only guarantee you'll be there when your bill comes up.",
+    body: "The notice lists every bill on the agenda in order. Committees usually take bills in agenda order, but the chair can rearrange them. Arriving early is the only way to be sure you're there when your bill comes up.",
     links: [],
   },
   {
     title: "Fill out a hearing slip when you arrive",
-    body: "Outside the hearing room you'll find appearance slips. Fill one out with your name, who you represent (yourself counts), the bill number, and whether you are for, against, or providing information only. You can register your position without speaking, registrations are read into the record.",
+    body: "Outside the hearing room you'll find appearance slips. Fill one out with your name, who you represent (yourself counts), the bill number, and whether you're for it, against it or providing information only. You can register your position without speaking; registrations are read into the record.",
     links: [],
   },
   {
-    title: "Testifying",
-    body: "The chair calls speakers from the slips. Keep remarks short (chairs often set limits when rooms are full), speak to how the bill affects you, and expect questions from members, it's a conversation, not a speech. Bringing printed copies of longer testimony for the members is welcome.",
+    title: "Speak to the committee",
+    body: "The chair calls speakers from the slips. Keep your remarks short, since chairs often set limits when the room is full. Say how the bill affects you, and expect questions from members: it's a conversation, not a speech. Printed copies of longer testimony for the members are welcome.",
     links: [],
   },
   {
     title: "Can't attend? Write instead",
-    body: "Committee pages list every member; you can email your testimony to the committee chair and members before the hearing and ask that it be included in the record. And your own legislators want to hear from constituents regardless of committee membership.",
+    body: "Committee pages list every member. You can email your testimony to the committee chair and members before the hearing and ask that it be included in the record. Your own lawmakers want to hear from you whether or not they sit on the committee.",
     links: [
       { href: "/committees/", label: "Committees and their members" },
-      { href: "/my-reps/", label: "Find your legislators" },
+      { href: "/my-reps/", label: "Find your lawmakers" },
     ],
   },
   {
     title: "Afterward",
-    body: "A public hearing doesn't mean a vote. The committee may later hold an executive session to vote the bill forward, follow the bill here to see every action, or check whether it ever got a hearing at all.",
-    links: [
-      { href: "/hearing-none/", label: "Bills that died without a hearing" },
-    ],
+    body: "A public hearing doesn't mean a vote. The committee may later hold an executive session to vote the bill forward. Follow the bill here to see every step, or check whether a bill ever got a hearing at all.",
+    links: [{ href: "/hearing-none/", label: "Bills that never got a hearing" }],
   },
 ];
 ---
 
 <Base
-  title="How to Testify"
-  description="A practical guide to testifying at a Wisconsin legislative committee hearing: finding hearings, appearance slips, speaking, and written testimony."
+  title="How to testify at a hearing"
+  description="A practical guide to testifying at a Wisconsin legislative committee hearing: finding hearings, appearance slips, speaking and written testimony."
+  layout="wide"
 >
-  <h1 class="text-2xl font-bold">How to Testify at a Hearing</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Public hearings are where individual voices carry the most weight in the
-    Legislature. Committees hear from anyone who shows up, in the order they
-    signed in. Here's how it works, start to finish. For the Legislature's own
-    description of the process, see the
-    <a href="https://docs.legis.wisconsin.gov/document/help/process" class="underline">official overview</a>.
-  </p>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">How to testify at a hearing</h1>
+    <p class="sm:text-lead">
+      Public hearings are where one person's voice carries the most weight in the Legislature. Committees
+      hear from anyone who shows up, in the order they signed in. Here's how it works, start to finish.
+    </p>
+    <p class="text-small text-granite">
+      For the Legislature's own description of the process, see its
+      {" "}<a href="https://docs.legis.wisconsin.gov/document/help/process" class="underline">official overview</a>.
+    </p>
+  </header>
 
-  <ol class="mt-6 max-w-3xl space-y-4">
+  <ol class="steps mt-8 max-w-[47.5rem]" role="list">
     {steps.map((s, i) => (
-      <li class="rounded-lg border border-navy-100 bg-white p-4">
-        <h2 class="flex items-baseline gap-3 text-lg font-bold">
-          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy-900 text-sm text-white" aria-hidden="true">{i + 1}</span>
-          {s.title}
-        </h2>
-        <p class="mt-2 text-sm text-navy-700">{s.body}</p>
-        {s.links.length > 0 && (
-          <p class="mt-1 flex flex-wrap gap-x-4 text-sm">
-            {s.links.map((l) => (
-              <a href={l.href} class="py-1 underline">{l.label}</a>
-            ))}
-          </p>
-        )}
+      <li class="step">
+        <span class="step-n figure" aria-hidden="true">{i + 1}</span>
+        <div class="min-w-0 pb-8">
+          <h2 id={`step-${i + 1}`} class="t-question"><span class="sr-only">Step {i + 1}: </span>{s.title}</h2>
+          <p class="mt-1.5">{s.body}</p>
+          {s.links.length > 0 && (
+            <ul class="mt-1 flex flex-wrap gap-x-5" role="list">
+              {s.links.map((l) => (
+                <li><a href={l.href} class="inline-flex min-h-11 items-center underline">{l.label}</a></li>
+              ))}
+            </ul>
+          )}
+        </div>
       </li>
     ))}
   </ol>
 
-  <p class="mt-6 max-w-3xl text-sm text-navy-600">
-    Practical details (rooms, slips, chair discretion) reflect standing
-    practice in the Wisconsin State Capitol; the hearing notice for your
-    hearing is always the authority on time and place.
+  <p class="max-w-[47.5rem] text-small text-granite">
+    Practical details (rooms, slips, the chair's discretion) reflect standing practice at the State Capitol.
+    The notice for your hearing is always the authority on the time and place.
   </p>
 </Base>
+
+<style>
+  /* numbered steps; from 30rem the number sits in a column of its own,
+     joined to the next by a rule (narrower, it sits above the step so
+     large text keeps the full width) */
+  .step-n {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin-bottom: 0.5rem;
+    border: 2px solid var(--color-spruce);
+    border-radius: 999px;
+    background: #fff;
+    font-weight: 700;
+  }
+  @media (min-width: 30rem) {
+    .step {
+      display: grid;
+      grid-template-columns: 2.5rem minmax(0, 1fr);
+      column-gap: 1rem;
+      position: relative;
+    }
+    .step-n {
+      margin-bottom: 0;
+    }
+    .step:not(:last-child)::before {
+      content: "";
+      position: absolute;
+      left: calc(1.25rem - 1px);
+      top: 2.75rem;
+      bottom: 0.25rem;
+      border-left: 2px solid var(--color-rule);
+    }
+  }
+</style>

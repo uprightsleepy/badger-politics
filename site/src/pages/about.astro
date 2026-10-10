@@ -1,229 +1,315 @@
 ---
+/** Who runs the site, where every number comes from, the checks the data
+ * must pass, what the site won't do, and how to get a correction. The
+ * anchors #districts, #money and #contact are linked from other pages. */
 import Base from "../layouts/Base.astro";
-import { meta } from "../lib/db";
+import { localBodies, meta } from "../lib/db";
+import { PLACES_KEY } from "../lib/placesKey";
 import { fmtDate } from "../lib/format";
 const dataThrough = meta().data_through;
 const pulledOn = meta().imported_at?.slice(0, 10);
+const cities = localBodies().map((b) => b.city).sort((a, b) => a.localeCompare(b));
+const cityList = cities.length < 3 ? cities.join(" and ") : `${cities.slice(0, -1).join(", ")} and ${cities.at(-1)}`;
+const SOURCES: [string, string][] = [
+  ["bills", "Bills, votes and hearings"],
+  ["lawmakers", "State lawmakers"],
+  ["districts", "Elections and districts"],
+  ["money", "Campaign money"],
+  ["congress", "Members of Congress"],
+  ...(cities.length ? [["councils", "City councils"] as [string, string]] : []),
+  ["lobbying", "Lobbying"],
+  ["compensation", "Pay"],
+];
+const SECTIONS: [string, string][] = [
+  ["sources", "Where every number comes from"],
+  ["checks", "Checks the data must pass"],
+  ["principles", "What we won't do"],
+  ["contact", "Contact and corrections"],
+];
+const LIST = "flex list-disc flex-col gap-2 pl-5 marker:text-granite";
 ---
 
-<Base title="About" description="Every data source behind Badger Politics, the checks each one passes, and how to get corrections.">
-  <h1 class="text-2xl font-bold">About Badger Politics</h1>
-  <div class="mt-3 max-w-3xl space-y-4 leading-relaxed ">
-    <p>
-      <strong>Badger Politics is an independent project, not affiliated with the
-      State of Wisconsin.</strong> It exists so that any Wisconsinite can answer,
-      in plain language: what is my Legislature doing, how did my legislators
-      vote, and what died quietly without a hearing?
-    </p>
-    <p>
-      Everything is built from official public records
-      {pulledOn && <span>, last pulled <strong>{fmtDate(pulledOn)}</strong></span>}.
-      {dataThrough && <span>The Legislature's most recent recorded action is from
-      <strong>{fmtDate(dataThrough)}</strong>, between floorperiods those two
-      dates drift apart, because we keep checking while the Legislature rests.</span>}
-      There are no accounts, no tracking cookies, and no ads. The
-      <a href="/my-reps/" class="underline">Find my legislators</a> feature keeps
-      your district in your browser only. Your address is never stored.
-      The full pipeline and site are open source at
-      <a href="https://github.com/uprightsleepy/badger-politics" class="underline">github.com/uprightsleepy/badger-politics</a>,
-      and all data is <a href="/data/" class="underline">free to reuse</a>.
-    </p>
+<Base title="About" description="Every data source behind Badger Politics, the checks each one passes, and how to get corrections." layout="wide">
+  <div class="about">
+    <header class="a-head flex max-w-[47.5rem] flex-col gap-2.5">
+      <h1 class="t-display">About Badger Politics</h1>
+      <p class="sm:text-lead">
+        <strong>Badger Politics is an independent project, not affiliated with the State of Wisconsin.</strong>
+        It exists so that anyone in Wisconsin can answer, in plain words: what is my Legislature doing, how
+        did my lawmakers vote, and what died quietly without a hearing?
+      </p>
+      <p>
+        Everything is built from official public records{pulledOn && <>, last checked <strong>{fmtDate(pulledOn)}</strong></>}.
+        {dataThrough && <> The Legislature's newest recorded action is from <strong>{fmtDate(dataThrough)}</strong>. Between floorperiods those two dates drift apart, because we keep checking while the Legislature rests.</>}
+      </p>
+      <p>
+        There are no accounts, no tracking cookies and no ads. <a href="/my-reps/" class="underline">Find your lawmakers</a> keeps
+        your district in your browser only, and your address is never stored. The site and the code that
+        builds it are open source <a href="https://github.com/uprightsleepy/badger-politics" class="underline">on GitHub</a>,
+        and the data is <a href="/data/" class="underline">free to reuse</a>.
+      </p>
+    </header>
 
-    <h2 class="mt-8 text-xl font-bold">Where every number comes from</h2>
-    <p>
-      Each kind of data on this site has exactly one official source, and every
-      page links back to it so you can check our work.
-    </p>
+    <nav class="a-rail" aria-labelledby="toc-heading" data-pagefind-ignore>
+      <h2 id="toc-heading" class="t-label text-granite">On this page</h2>
+      <ul class="mt-1 border-b border-rule" role="list">
+        {SECTIONS.map(([id, label]) => (
+          <li class="border-t border-rule">
+            <a href={`#${id}`} class="flex min-h-11 items-center underline">{label}</a>
+            {id === "sources" && (
+              <ul class="mb-2 border-l-2 border-rule pl-3 text-small" role="list">
+                {SOURCES.map(([sid, slabel]) => (
+                  <li><a href={`#${sid}`} class="flex min-h-11 items-center underline">{slabel}</a></li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+    </nav>
 
-    <h3 class="mt-6 text-lg font-bold">Bills, votes, and hearings</h3>
-    <p>
-      Scraped nightly from the Legislature's own site,
-      <a href="https://docs.legis.wisconsin.gov" class="underline">docs.legis.wisconsin.gov</a>,
-      using the open source
-      <a href="https://github.com/openstates/openstates-scrapers" class="underline">Open States scrapers</a>
-      with our fixes contributed back. Coverage runs from the 2009 session to
-      today. A few older sessions are marked "partial data" where the
-      Legislature's records do not include individual roll calls.
-    </p>
-    <ul class="list-inside list-disc space-y-2">
-      <li>
-        Every vote is matched against a roster of who actually served that
-        session. If a name on a roll call could mean two people, the nightly
-        build fails and a human resolves it. We never guess.
-      </li>
-      <li>
-        Some official roll calls omit the list of members who did not vote and
-        give only a count. We show the count and never invent the names.
-      </li>
-      <li>
-        "Hearing: none" means what it says: the bill died at the end of a
-        session with no public hearing on record. The committee and chair
-        shown are from the bill's own history.
-      </li>
-    </ul>
+    <div class="a-body flex max-w-[47.5rem] flex-col gap-12">
+      <section id="sources" class="flex flex-col gap-4" aria-labelledby="sources-heading">
+        <h2 id="sources-heading" class="t-section">Where every number comes from</h2>
+        <p>
+          Each kind of record on this site has one official source, and every page links back to it so you
+          can check our work.
+        </p>
 
-    <h3 class="mt-6 text-lg font-bold">Legislators</h3>
-    <p>
-      Names, districts, parties, photos, and committee assignments come from
-      <a href="https://docs.legis.wisconsin.gov" class="underline">docs.legis.wisconsin.gov</a>.
-      Attendance heatmaps and "votes with party" figures are computed from the
-      roll calls above, and the page states what each number counts.
-    </p>
+        <h3 id="bills" class="t-question">Bills, votes and hearings</h3>
+        <p>
+          Read nightly from the Legislature's own site,
+          {" "}<a href="https://docs.legis.wisconsin.gov" class="underline [overflow-wrap:anywhere]">docs.legis.wisconsin.gov</a>, using the
+          open-source <a href="https://github.com/openstates/openstates-scrapers" class="underline">Open States scrapers</a>,
+          with our fixes contributed back. Coverage runs from the 2009 session to today. A few older sessions
+          are marked “partial data” where the Legislature's records don't include individual roll calls.
+        </p>
+        <ul class={LIST}>
+          <li>
+            Every vote is matched against a roster of who actually served that session. If a name on a roll
+            call could mean two people, the nightly build stops and a person resolves it. We never guess.
+          </li>
+          <li>
+            Some official roll calls give only a count of members who didn't vote, without their names. We
+            show the count and never invent the names.
+          </li>
+          <li>
+            “Never got a hearing” means what it says: the bill died at the end of a session with no public
+            hearing on record. The committee and chair shown come from the bill's own history.
+          </li>
+        </ul>
 
-    <h3 id="districts" class="mt-6 scroll-mt-4 text-lg font-bold">Elections and districts</h3>
-    <p>
-      Candidate lists come from the
-      <a href="https://elections.wi.gov" class="underline">Wisconsin Elections Commission</a>
-      ballot access report, and past results from WEC's certified canvass
-      reports. District boundaries are the Legislative Technology Services
-      Bureau's official 2024 files. When you look up your address, it goes to
-      the U.S. Census geocoder once, just to get coordinates, and is never
-      stored or sent anywhere else.
-    </p>
-    <p class="mt-2">
-      Automated election-report updates were paused on September 7, 2026.
-      Candidate information reflects our archived reports; consult WEC for
-      subsequent ballot changes.
-    </p>
+        <h3 id="lawmakers" class="t-question">State lawmakers</h3>
+        <p>
+          Names, districts, parties, photos and committee assignments come from
+          {" "}<a href="https://docs.legis.wisconsin.gov" class="underline [overflow-wrap:anywhere]">docs.legis.wisconsin.gov</a>. Attendance
+          and “votes with their party” figures are worked out from the roll calls above, and each page says
+          what its numbers count.
+        </p>
 
-    <h3 id="money" class="mt-6 text-lg font-bold">Campaign money</h3>
-    <p>
-      Reported receipts come from committees' own filings with the Wisconsin
-      Ethics Commission, via
-      <a href="https://campaignfinance.wi.gov" class="underline">campaignfinance.wi.gov</a>,
-      covering electronic records from 2008 to today. Some things to know when
-      reading them:
-    </p>
-    <ul class="list-inside list-disc space-y-2">
-      <li>
-        <strong>Corporations cannot contribute to Wisconsin candidates.</strong>
-        Money reaching a legislator's committee comes from individual people,
-        from political committees (PACs, party committees, other candidates),
-        and from conduits that pass along individual contributions.
-      </li>
-      <li>
-        <strong>"Committees that gave the most"</strong> lists political
-        committees by their own filings. A PAC's name may reference a company
-        or industry; the money is the PAC's, raised from its contributors, not
-        a corporate payment.
-      </li>
-      <li>
-        <strong>"What individual donors do for a living"</strong> adds up what
-        donors themselves reported as their occupation. It says nothing about
-        any employer directing or endorsing the contribution.
-      </li>
-      <li>
-        Totals follow the <strong>person</strong>: they cover all of a
-        legislator's candidate committees, including committees for runs at
-        other offices.
-      </li>
-      <li>
-        The <strong>current two-year reporting period</strong> is shown by default,
-        including collected receipts before taking office. Earlier periods and
-        <strong>all available history</strong> remain available. The optional
-        service filter counts only receipts within recorded legislative terms,
-        excluding gaps between terms. These dates come from service records, not floor votes.
-        Electronic records begin in July 2008; missing filings and amendments can leave gaps.
-      </li>
-      <li>
-        <strong>Receipts are broader than donations.</strong> They can include loans,
-        transfers, refunds, and in-kind support. Receipts minus spending is not cash on hand.
-        The latest transaction date describes the collected records, not proof that every filing is present.
-      </li>
-      <li>
-        Committees are linked to legislators only when the link is certain.
-        Where we haven't verified a committee yet, the page says the data
-        isn't linked. It never shows a false zero.
-      </li>
-      <li>
-        Donors are grouped by the state's own filer identifiers, not by name,
-        so two different people with the same name are never combined.
-        Individual donors appear only in aggregate, never by name.
-      </li>
-      <li>
-        Organization logos appear only for committees whose sponsoring
-        organization we have verified by hand, and the build re-verifies the
-        organization's own website before fetching each logo. A logo never
-        replaces the committee's registered name.
-      </li>
-    </ul>
+        <h3 id="districts" class="t-question">Elections and districts</h3>
+        <p>
+          Candidate lists come from the <a href="https://elections.wi.gov" class="underline">Wisconsin Elections Commission</a>'s
+          ballot access report, and past results from its certified canvass reports. District boundaries
+          are the Legislative Technology Services Bureau's official 2024 files. When you look up your
+          address, it goes to the U.S. Census geocoder once, only to get coordinates, and is never stored.
+          {PLACES_KEY
+            ? " While you type, suggestions come from Google Places, so the letters you type are sent to Google."
+            : " It isn't sent anywhere else."}
+        </p>
+        <p>
+          Automated election-report updates were paused on September 7, 2026. Candidate information reflects
+          our archived reports; check with the Elections Commission for later changes to the ballot.
+        </p>
 
-    <h3 class="mt-6 text-lg font-bold">Lobbying</h3>
-    <p>
-      Eye on Lobbying registrations are not displayed or included in downloads
-      because the source disallows automated collection. Publication may resume
-      after an approved source of this data becomes available.
-    </p>
+        <h3 id="money" class="t-question">Campaign money</h3>
+        <p>
+          Reported receipts come from committees' own filings with the Wisconsin Ethics Commission, through
+          {" "}<a href="https://campaignfinance.wi.gov" class="underline [overflow-wrap:anywhere]">campaignfinance.wi.gov</a>, covering
+          electronic records from 2008 to today. Some things to know when reading them:
+        </p>
+        <ul class={LIST}>
+          <li>
+            <strong>Corporations can't contribute to Wisconsin candidates.</strong> Money reaching a
+            lawmaker's committee comes from individual people, from political committees (PACs, party
+            committees, other candidates), and from conduits that pass along individual contributions.
+          </li>
+          <li>
+            <strong>“Committees that gave the most”</strong> lists political committees by their own
+            filings. A PAC's name may mention a company or industry, but the money is the PAC's, raised from
+            its contributors, not a corporate payment.
+          </li>
+          <li>
+            <strong>“What individual donors do for a living”</strong> adds up what donors themselves
+            reported as their occupation. It says nothing about any employer directing or endorsing the
+            contribution.
+          </li>
+          <li>
+            Totals follow the <strong>person</strong>: they cover all of a lawmaker's candidate committees,
+            including committees for runs at other offices.
+          </li>
+          <li>
+            The <strong>current two-year reporting period</strong> is shown first, including collected
+            receipts from before taking office. Earlier periods and <strong>all available history</strong>
+            stay available. The optional service filter counts only receipts within recorded terms in the
+            Legislature, leaving out gaps between terms; those dates come from service records, not floor
+            votes. Electronic records begin in July 2008, and missing filings and amendments can leave gaps.
+          </li>
+          <li>
+            <strong>Receipts are broader than donations.</strong> They can include loans, transfers, refunds
+            and in-kind support. Receipts minus spending isn't cash on hand. The latest transaction date
+            describes the collected records; it isn't proof that every filing is present.
+          </li>
+          <li>
+            Committees are linked to lawmakers only when the link is certain. Where we haven't verified a
+            committee yet, the page says the data isn't linked. It never shows a false zero.
+          </li>
+          <li>
+            Donors are grouped by the state's own filer identifiers, not by name, so two different people
+            with the same name are never combined. Individual donors appear only in totals, never by name.
+          </li>
+          <li>
+            Organization logos appear only for committees whose sponsoring organization we've verified by
+            hand, and the build checks the organization's own website again before fetching each logo. A
+            logo never replaces the committee's registered name.
+          </li>
+        </ul>
 
-    <h3 class="mt-6 text-lg font-bold">Compensation</h3>
-    <p>
-      Salaries are set by statute and identical for every member. Per diem
-      rates come from each chamber's rules. What individual members actually
-      claim is released by the chief clerks on request once a year, and is
-      noted as such where shown.
-    </p>
+        <h3 id="congress" class="t-question">Members of Congress</h3>
+        <p>
+          Roll calls come from the <a href="https://www.senate.gov/legislative/votes_new.htm" class="underline">U.S. Senate</a>
+          {" "}and the <a href="https://clerk.house.gov/Votes" class="underline">House Clerk</a>. Each vote is
+          matched to a member by the chamber's own member ID, never by name, and a vote whose yes and no
+          counts don't match the positions recorded stops the update. Federal campaign money comes from the
+          {" "}<a href="https://www.fec.gov" class="underline">Federal Election Commission</a>'s summaries, with
+          the date each was retrieved.
+        </p>
 
-    <h2 class="mt-8 text-xl font-bold">Checks the data must pass</h2>
-    <ul class="list-inside list-disc space-y-2">
-      <li>
-        <strong>Integrity checks gate every deploy.</strong> If any check
-        fails, the site simply is not updated that night. Checks are never
-        loosened to make a run pass.
-      </li>
-      <li>
-        <strong>Counts are reconciled against the source.</strong> Every month
-        of campaign finance data must match the state system's own record
-        count exactly before it is accepted.
-      </li>
-      <li>
-        <strong>History is re-audited nightly.</strong> Committees can amend
-        old filings, so a rotating sample of past months is re-fetched every
-        night and refreshed if the official record changed.
-      </li>
-      <li>
-        <strong>An independent pipeline checks our math.</strong> We compare
-        per-legislator totals against the National Institute on Money in State
-        Politics (<a href="https://www.followthemoney.org" class="underline">followthemoney.org</a>),
-        which processes the same filings separately. Their data is used only
-        for verification and is not republished here.
-      </li>
-      <li>
-        <strong>The site itself is tested.</strong> Every build runs automated
-        accessibility scans and functional checks, from search quality to
-        district lookup, before it ships.
-      </li>
-    </ul>
+        {cities.length > 0 && (
+          <>
+            <h3 id="councils" class="t-question">City councils</h3>
+            <p>
+              Votes for {cityList} come from each city's own legislative system, and each one links to the
+              city's own record of the meeting where it was cast. Members are matched by the system's own member IDs or by verified full
+              names. Only votes the clerk recorded member by member appear; a voice
+              vote names no one, so it isn't counted for anyone. Each council's page says what its records
+              cover.
+            </p>
+          </>
+        )}
 
-    <h2 class="mt-8 text-xl font-bold">What we deliberately do not do</h2>
-    <ul class="list-inside list-disc space-y-2">
-      <li>
-        We never infer. If a link between records cannot be established from
-        official identifiers, the page says so instead of guessing. Gaps are
-        labeled as gaps.
-      </li>
-      <li>
-        We do not put donations next to votes or suggest that money caused a
-        vote. Both are shown, on separate pages, and you can draw your own
-        conclusions.
-      </li>
-      <li>
-        We do not track you. Analytics is a single privacy-respecting counter
-        (<a href="https://www.goatcounter.com" class="underline">GoatCounter</a>)
-        with no cookies. Personalization lives in your browser and nowhere
-        else.
-      </li>
-    </ul>
+        <h3 id="lobbying" class="t-question">Lobbying</h3>
+        <p>
+          Eye on Lobbying registrations aren't shown or included in downloads, because the source disallows
+          automated collection. They may return once an approved source of this data is available.
+        </p>
 
-    <h2 id="contact" class="mt-8 text-xl font-bold">Contact and corrections</h2>
-    <p>
-      Accuracy is the whole point. Every vote and bill page links to the official
-      record. If anything here disagrees with it, please
-      <a href="https://github.com/uprightsleepy/badger-politics/issues" class="underline">open an issue</a>.
-      Corrections are treated as the highest priority bugs.
-    </p>
-    <p class="mt-2">
-      Source operators can use the same issue tracker to request changes to
-      automated access, report a problem, or suggest a preferred data source.
-    </p>
+        <h3 id="compensation" class="t-question">Pay</h3>
+        <p>
+          Salaries are set by statute and are the same for every member. Per diem rates come from each
+          chamber's rules. What individual members actually claim is released by the chief clerks on
+          request once a year, and is labeled that way where it's shown.
+        </p>
+      </section>
+
+      <section id="checks" class="flex flex-col gap-4" aria-labelledby="checks-heading">
+        <h2 id="checks-heading" class="t-section">Checks the data must pass</h2>
+        <ul class={LIST}>
+          <li>
+            <strong>Integrity checks gate every update.</strong> If any check fails, the site simply isn't
+            updated that night. Checks are never loosened to make a run pass.
+          </li>
+          <li>
+            <strong>Counts are reconciled against the source.</strong> Every month of campaign finance
+            records must match the state system's own record count exactly before it's accepted.
+          </li>
+          <li>
+            <strong>History is checked again every night.</strong> Committees can amend old filings, so a
+            rotating sample of past months is fetched again each night and refreshed if the official record
+            changed.
+          </li>
+          <li>
+            <strong>An independent source checks our math.</strong> We compare each lawmaker's totals
+            against the National Institute on Money in State Politics
+            (<a href="https://www.followthemoney.org" class="underline [overflow-wrap:anywhere]">followthemoney.org</a>), which processes
+            the same filings separately. Their data is used only for checking and isn't republished here.
+          </li>
+          <li>
+            <strong>The site itself is tested.</strong> Every build runs automated accessibility scans and
+            functional checks, from search quality to district lookup, before it ships.
+          </li>
+        </ul>
+      </section>
+
+      <section id="principles" class="flex flex-col gap-4" aria-labelledby="principles-heading">
+        <h2 id="principles-heading" class="t-section">What we won't do</h2>
+        <ul class={LIST}>
+          <li>
+            We never infer. If a link between records can't be established from official identifiers, the
+            page says so instead of guessing. Gaps are labeled as gaps.
+          </li>
+          <li>
+            We don't put donations next to votes or suggest that money caused a vote. Both are shown, on
+            separate pages, and you can draw your own conclusions.
+          </li>
+          <li>
+            We don't track you. Analytics is a single privacy-respecting counter
+            (<a href="https://www.goatcounter.com" class="underline">GoatCounter</a>) with no cookies.
+            Personalization lives in your browser and nowhere else.
+          </li>
+        </ul>
+      </section>
+
+      <section id="contact" class="flex flex-col gap-4" aria-labelledby="contact-heading">
+        <h2 id="contact-heading" class="t-section">Contact and corrections</h2>
+        <p>
+          Accuracy is the whole point. Every vote and bill page links to the official record. If anything
+          here disagrees with it, please
+          {" "}<a href="https://github.com/uprightsleepy/badger-politics/issues" class="underline">open an issue</a>.
+          Corrections are treated as the highest-priority bugs.
+        </p>
+        <p>
+          Source operators can use the same issue tracker to ask for changes to automated access, report a
+          problem or suggest a preferred data source.
+        </p>
+      </section>
+    </div>
   </div>
 </Base>
+
+<style>
+  .about {
+    display: grid;
+    gap: 2rem;
+    grid-template-areas: "head" "rail" "body";
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .a-head { grid-area: head; }
+  .a-rail { grid-area: rail; }
+  .a-body { grid-area: body; }
+  .a-body :is(h2, h3) {
+    scroll-margin-top: 6rem;
+  }
+  .a-body h3 {
+    margin-top: 1rem;
+  }
+  @media (min-width: 64rem) {
+    .about {
+      grid-template-areas: "head rail" "body rail";
+      grid-template-columns: minmax(0, 1fr) 20rem;
+      grid-template-rows: auto 1fr;
+      column-gap: 3.5rem;
+    }
+    .a-rail {
+      align-self: start;
+      position: sticky;
+      top: 1.5rem;
+      /* a short window scrolls the list rather than hiding its end */
+      max-height: calc(100vh - 3rem);
+      overflow-y: auto;
+      /* room inside the scroll box for the 5px focus ring */
+      padding: 0.375rem;
+      margin: -0.375rem;
+    }
+  }
+</style>
