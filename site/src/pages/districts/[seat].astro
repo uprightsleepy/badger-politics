@@ -5,6 +5,8 @@
 import Base from "../../layouts/Base.astro";
 import FollowButton from "../../components/FollowButton.astro";
 import Portrait from "../../components/Portrait.astro";
+import ElectionResult from "../../components/ElectionResult.astro";
+import SeatMapFigure from "../../components/SeatMapFigure.astro";
 import {
   seatTerms, sittingPeople, electionFor, electionHistoryFor, lastMarginFor, ballotPhase,
   writeInPending, meta, serviceRecordsBegin,
@@ -12,8 +14,7 @@ import {
 import { personSlug, monthYear, chamberName, partyWord, fmtDate } from "../../lib/format";
 import { safeHref } from "../../lib/html";
 import { mergeServiceSpans } from "../../lib/service";
-import { ballotStatus, seatOffice, writeInSentence } from "../../lib/ballot";
-import { hasSeatMap, stateLocatorSvg, SEAT_MAP_FILL } from "../../lib/seatMap";
+import { article, ballotStatus, nameList, seatOffice, withParty, writeInSentence } from "../../lib/ballot";
 
 export function getStaticPaths() {
   const seats = [
@@ -73,20 +74,12 @@ const since = holder ? lineage.find((s) => s.person_id === holder.id && !s.end)?
 const recordsBegin = serviceRecordsBegin();
 const sinceAtLeast = !!since && !!recordsBegin && since <= recordsBegin;
 
-// ---- words ----
-const article = (w: string) => (/^[aeiou]/i.test(w) ? "an" : "a");
-const who = (name: string, party: string | null) =>
-  party ? `${name}, ${article(partyWord(party))} ${partyWord(party)}` : name;
-// as the subject of a sentence: "Dana Whitfield, a Democrat, won"
-const subject = (name: string, party: string | null) => (party ? `${who(name, party)},` : name);
+// ---- words (shared ones live in lib/ballot.ts) ----
 /** "January 2025" */
 const monthLong = (iso: string) =>
   new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
-// names carry ", a Republican", so two of them need a comma before "and"
-const list = (xs: string[]) =>
-  xs.length < 2 ? xs.join("") : xs.length === 2 ? `${xs[0]}, and ${xs[1]}` : `${xs.slice(0, -1).join("; ")}; and ${xs.at(-1)}`;
-const others = list(
-  opponents.map((o) => who(o.name, o.party) + (o.ballot_status === "Challenged" ? " (ballot access challenged)" : "")),
+const others = nameList(
+  opponents.map((o) => withParty(o.name, o.party) + (o.ballot_status === "Challenged" ? " (ballot access challenged)" : "")),
 );
 const writeInLine = openPrimaries.length ? ` ${writeInSentence(openPrimaries)}` : "";
 let ballotLine = "";
@@ -113,28 +106,7 @@ const marginLine = lastMargin
     ? `In ${lastMargin.year}, the winner ran unopposed.`
     : `In ${lastMargin.year}, the race was decided by ${lastMargin.margin.toFixed(1)} points.`
   : "";
-const pct = (votes: number, total: number) => (total ? `${((votes / total) * 100).toFixed(1)}%` : "");
-/** One sentence on who won, honest about ties and missing totals. */
-const resultLine = (h: (typeof history)[number]) => {
-  const [first, second] = h.candidates;
-  const cast = h.total ? ` of ${h.total.toLocaleString()} votes cast` : "";
-  if (h.candidates.length === 1) {
-    return `${subject(first.candidate, first.party)} ran unopposed and got ${first.votes.toLocaleString()}${cast ? cast : " votes"}.`;
-  }
-  if (second && second.votes === first.votes) {
-    return `${who(first.candidate, first.party)}, and ${who(second.candidate, second.party)}, tied with ${first.votes.toLocaleString()} votes each.`;
-  }
-  return h.total
-    ? `${subject(first.candidate, first.party)} won with ${pct(first.votes, h.total)}${cast}.`
-    : `${subject(first.candidate, first.party)} won with ${first.votes.toLocaleString()} votes.`;
-};
 const pulledOn = meta().imported_at?.slice(0, 10);
-const mapLabel = isSenate
-  ? `Map of ${seatName} and its three Assembly districts`
-  : `Map of ${seatName} inside Senate District ${senateOf}`;
-const mapCaption = isSenate
-  ? `${seatName} is filled, with white lines between its three Assembly districts. The small map shows where it is in Wisconsin.`
-  : `${seatName} is shaded, inside Senate District ${senateOf}, outlined. The small map shows where it is in Wisconsin.`;
 ---
 
 <Base
@@ -179,15 +151,7 @@ const mapCaption = isSenate
         <FollowButton kind="districts" id={seatKey} label={`Follow ${seatName}`} variant="primary" />
         <p class="text-fine text-granite">Following saves it on this device.</p>
       </div>
-      {hasSeatMap(seatKey) && (
-        <figure class="flex flex-col gap-3 rounded-[0.75rem] bg-white p-4">
-          <img src={`/data/maps/seats/${seatKey}.svg`} alt={mapLabel} width="700" height="490" class="h-auto w-full rounded-[0.5rem]" />
-          <figcaption class="flex flex-wrap items-start gap-3 text-fine text-granite">
-            <Fragment set:html={stateLocatorSvg(seatKey, SEAT_MAP_FILL.senate, ' class="h-auto w-14 shrink-0" aria-hidden="true"')} />
-            <span class="min-w-0 flex-[1_1_8rem] [overflow-wrap:anywhere]">{mapCaption} Boundaries are the Legislature's 2024 maps.</span>
-          </figcaption>
-        </figure>
-      )}
+      <SeatMapFigure seatKey={seatKey} seatName={seatName} />
     </aside>
 
     <div class="s-body flex max-w-[47.5rem] flex-col gap-10">
@@ -257,41 +221,9 @@ const mapCaption = isSenate
             votes cast, including write-ins.
           </p>
           <div class="mt-4 flex flex-col">
-            {history.map((h) => {
-              const [first, second] = h.candidates;
-              return (
-                <section class="flex flex-col gap-3 border-t border-rule py-5" aria-labelledby={`results-${h.year}`}>
-                  <h3 id={`results-${h.year}`} class="t-question">November {h.year}</h3>
-                  <p>{resultLine(h)}</p>
-                  {h.candidates.length === 2 && (
-                    <div class="flex flex-col gap-1.5">
-                      <div class="split flex h-3 overflow-hidden rounded-full bg-fog" aria-hidden="true">
-                        <span class="block h-full bg-spruce" style={`width:${((first.votes / (first.votes + second.votes)) * 100).toFixed(1)}%`}></span>
-                      </div>
-                      <div class="flex flex-wrap justify-between gap-x-4 text-small">
-                        <span><span class="font-bold">{first.candidate}</span>{first.party && `, ${partyWord(first.party)}`}: {first.votes.toLocaleString()} <span class="text-granite">{pct(first.votes, h.total)}</span></span>
-                        <span class="text-right"><span class="font-bold">{second.candidate}</span>{second.party && `, ${partyWord(second.party)}`}: {second.votes.toLocaleString()} <span class="text-granite">{pct(second.votes, h.total)}</span></span>
-                      </div>
-                    </div>
-                  )}
-                  {h.candidates.length > 2 && (
-                    <ul class="flex flex-col gap-2" role="list">
-                      {h.candidates.map((c) => (
-                        <li class="flex flex-col gap-1">
-                          <p class="flex flex-wrap items-baseline justify-between gap-x-4 text-small">
-                            <span><span class="font-bold">{c.candidate}</span>{c.party && `, ${partyWord(c.party)}`}</span>
-                            <span class="tabular-nums">{c.votes.toLocaleString()} <span class="text-granite">{pct(c.votes, h.total)}</span></span>
-                          </p>
-                          <div class="split h-2 rounded-full bg-fog" aria-hidden="true">
-                            <span class="block h-full rounded-full bg-lake" style={`width:${h.total ? ((c.votes / h.total) * 100).toFixed(1) : 0}%`}></span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </section>
-              );
-            })}
+            {history.map((h) => (
+              <ElectionResult id={`results-${h.year}`} title={`November ${h.year}`} candidates={h.candidates} total={h.total} />
+            ))}
           </div>
         </section>
       )}
@@ -324,16 +256,6 @@ const mapCaption = isSenate
     }
     .s-rail {
       align-self: start;
-    }
-  }
-  @media (forced-colors: active) {
-    .split {
-      forced-color-adjust: none;
-      border: 1px solid CanvasText;
-      background: Canvas;
-    }
-    .split span {
-      background: CanvasText;
     }
   }
 </style>

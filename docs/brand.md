@@ -261,6 +261,23 @@ Used on My reps and lawmaker pages:
 Two-sided tallies (Yes against No, two-candidate results) use one bar in Spruce and Fog with both
 numbers at its ends. The winner is named in words.
 
+### Races (`raceSentenceHtml`, `ElectionResult`)
+
+- **One sentence per race,** from one function (`site/src/lib/ballot.ts`) for the race lists, race pages
+  and the reader's own ballot: "Dana Whitfield, the Democratic incumbent, faces Jordan Pike, a
+  Republican." An open seat leads with "Open seat." in bold. A status the Elections Commission hasn't
+  posted is said as such, never read as a retirement.
+- **Past results** are a sentence naming the winner and the share of all votes cast, then a split bar
+  (two candidates) or one bar each. Results from before the 2024 maps say "previous maps".
+- **Candidates are person cards** with the party written out. A candidate without a legislative record
+  has only their filing; the page says so once.
+
+### Calendar
+
+Days with events are buttons whose names carry the counts ("Wednesday, October 14, 2 hearings"). On
+phones each kind of event is a shape, not a color: a square for an election day, a dot for a hearing,
+a ring for a city council meeting. From 640 px up the day says it in words. Today has a Spruce ring.
+
 ### Money lists (`MoneyRows`)
 
 - **One row style** for every ranked money list: rank, name (a link when we have a page), a note

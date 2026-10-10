@@ -1,0 +1,27 @@
+---
+/** A legislative seat's map with a small Wisconsin locator, for the rail
+ * of district and race pages. Senate maps fill their three Assembly
+ * districts; Assembly maps sit inside their Senate district's outline. */
+import { hasSeatMap, stateLocatorSvg, SEAT_MAP_FILL } from "../lib/seatMap";
+interface Props { seatKey: string; seatName: string }
+const { seatKey, seatName } = Astro.props;
+const isSenate = seatKey.startsWith("senate-");
+const district = Number(seatKey.split("-")[1]);
+// Senate District n holds Assembly Districts 3n-2, 3n-1 and 3n
+const senateOf = Math.ceil(district / 3);
+const mapLabel = isSenate
+  ? `Map of ${seatName} and its three Assembly districts`
+  : `Map of ${seatName} inside Senate District ${senateOf}`;
+const mapCaption = isSenate
+  ? `${seatName} is filled, with white lines between its three Assembly districts. The small map shows where it is in Wisconsin.`
+  : `${seatName} is shaded, inside Senate District ${senateOf}, outlined. The small map shows where it is in Wisconsin.`;
+---
+{hasSeatMap(seatKey) && (
+  <figure class="flex flex-col gap-3 rounded-[0.75rem] bg-white p-4">
+    <img src={`/data/maps/seats/${seatKey}.svg`} alt={mapLabel} width="700" height="490" class="h-auto w-full rounded-[0.5rem]" />
+    <figcaption class="flex flex-wrap items-start gap-3 text-fine text-granite">
+      <Fragment set:html={stateLocatorSvg(seatKey, SEAT_MAP_FILL.senate, ' class="h-auto w-14 shrink-0" aria-hidden="true"')} />
+      <span class="min-w-0 flex-[1_1_8rem] [overflow-wrap:anywhere]">{mapCaption} Boundaries are the Legislature's 2024 maps.</span>
+    </figcaption>
+  </figure>
+)}

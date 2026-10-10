@@ -1,66 +1,101 @@
 ---
+/** Committee hearings and election days on one month grid, with the
+ * reader's own city council meetings added on this device when an
+ * address is saved. The grid is drawn by script from /data/calendar.json;
+ * the hearings list and the session schedule below it are static. */
 import Base from "../layouts/Base.astro";
 import HearingsList from "../components/HearingsList.astro";
 import SCHEDULE from "../data/session-schedule.json";
+import ELECTION_DAYS from "../data/election-days.json";
+import { upcomingHearings } from "../lib/db";
 import { fmtDate } from "../lib/format";
+
+const today = new Date().toISOString().slice(0, 10);
+const upcoming = upcomingHearings(today).length;
+const nextElection = (ELECTION_DAYS as [string, string][]).find(([date]) => date >= today);
+const longDate = (iso: string) =>
+  new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
 ---
 
-<Base title="Civic Calendar" description="Interactive calendar of Wisconsin Legislature hearings and election days, with the session schedule and the full upcoming hearings list.">
-  <h1 class="text-2xl font-bold">Civic Calendar</h1>
-  <p class="mt-1 text-sm text-navy-700">
-    Committee hearings and election days.
-    <a href="/calendar/hearings.ics" class="underline">Subscribe (hearings)</a> ·
-    <a href="/calendar/election-days.ics" class="underline">election days</a> ·
-    <a href="/testify/" class="underline">how to testify</a>
-  </p>
-  <p id="city-hint" class="mt-1 text-xs text-navy-600" data-pagefind-ignore>
-    Saved an address on <a href="/my-reps/" class="underline">Your Reps</a> in
-    Milwaukee or West Allis? Your city's council meetings appear here too, on
-    this device only.
-  </p>
-
-  <div class="mt-4 rounded-lg border border-navy-100 bg-white p-4">
-    <div class="flex items-center justify-between">
-      <button id="prev" class="rounded-lg border border-navy-100 px-3 py-1 hover:bg-navy-50" aria-label="Previous month">←</button>
-      <h2 id="month-label" aria-live="polite" class="text-lg font-bold"></h2>
-      <button id="next" class="rounded-lg border border-navy-100 px-3 py-1 hover:bg-navy-50" aria-label="Next month">→</button>
-    </div>
-    <div class="mt-3 grid grid-cols-7 gap-px text-center text-xs font-semibold text-navy-600">
-      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div>{d}</div>)}
-    </div>
-    <div id="grid" class="mt-1 grid grid-cols-7 gap-px rounded bg-navy-100"></div>
-    <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-navy-600" data-pagefind-ignore>
-      <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-gold-500"></span> Election day</span>
-      <span class="flex items-center gap-1"><span class="h-1.5 w-1.5 rounded-full bg-navy-600"></span> State: committee hearing</span>
-      <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-moss-600"></span> City: your council's meeting, with a saved address</span>
+<Base
+  title="Calendar"
+  description="Interactive calendar of Wisconsin Legislature hearings and election days, with the session schedule and the full upcoming hearings list."
+  layout="wide"
+>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">Calendar</h1>
+    <p class="sm:text-lead">
+      {upcoming > 0
+        ? `${upcoming.toLocaleString()} committee ${upcoming === 1 ? "hearing is" : "hearings are"} scheduled at the Capitol`
+        : "No committee hearings are scheduled right now"}{nextElection
+        ? `, and the next election is the ${nextElection[1].replace(/^Wisconsin /, "").toLowerCase()} on ${longDate(nextElection[0])}.`
+        : "."}
     </p>
+    <p id="city-hint" class="text-small text-granite" data-pagefind-ignore>
+      Saved an address on <a href="/my-reps/" class="underline">Find your lawmakers</a> in Milwaukee or
+      West Allis? Your city's council meetings appear here too, on this device only.
+    </p>
+    <ul class="mt-2 flex flex-wrap gap-3" role="list">
+      <li><a href="/calendar/hearings.ics" class="btn btn-secondary">Add hearings to your calendar</a></li>
+      <li><a href="/calendar/election-days.ics" class="btn btn-secondary">Add election days to your calendar</a></li>
+    </ul>
+    <p class="text-small"><a href="/testify/" class="underline">How to testify at a hearing</a></p>
+  </header>
+
+  <div class="cal mt-8">
+    <div class="min-w-0">
+      {/* with very large text the next button drops below rather than spilling */}
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <button id="prev" type="button" class="btn btn-secondary px-3" aria-label="Previous month">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+          <span class="hidden sm:inline">Previous</span>
+        </button>
+        <h2 id="month-label" aria-live="polite" class="t-section grow text-center text-[1.375rem]"></h2>
+        <button id="next" type="button" class="btn btn-secondary px-3" aria-label="Next month">
+          <span class="hidden sm:inline">Next</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </div>
+      {/* full bleed on phones so each day is at least 44px wide at 320px */}
+      <div class="-mx-5 mt-4 grid grid-cols-7 text-center text-small font-bold text-granite sm:mx-0" aria-hidden="true">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div class="py-1">{d}</div>)}
+      </div>
+      <div id="grid" class="-mx-5 mt-1 grid grid-cols-7 gap-px overflow-hidden border-y border-rule bg-rule sm:mx-0 sm:rounded-[0.75rem] sm:border-x"></div>
+      <ul class="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-small text-granite" role="list" data-pagefind-ignore>
+        <li class="flex items-center gap-2"><span class="mark mark-election" aria-hidden="true"></span> Election day</li>
+        <li class="flex items-center gap-2"><span class="mark mark-hearing" aria-hidden="true"></span> Committee hearing at the Capitol</li>
+        <li class="flex items-center gap-2"><span class="mark mark-council" aria-hidden="true"></span> Your city council's meeting, with a saved address</li>
+      </ul>
+    </div>
+
+    <section id="day-panel" aria-labelledby="day-label" tabindex="-1" class="hidden min-w-0">
+      <h2 id="day-label" class="t-section text-[1.375rem]"></h2>
+      <ul id="day-events" class="mt-3 border-b border-rule" role="list"></ul>
+    </section>
   </div>
 
-  <section id="day-panel" aria-labelledby="day-label" tabindex="-1" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4">
-    <h2 id="day-label" class="font-bold"></h2>
-    <ul id="day-events" class="mt-2 space-y-2 text-sm"></ul>
-  </section>
-
-  <div class="mt-8">
+  <div class="mt-14">
     <HearingsList />
   </div>
 
-  <section class="mt-8">
-    <h2 class="text-xl font-bold">Session schedule</h2>
-    <p class="mt-1 max-w-3xl text-sm text-navy-700">
-      The {SCHEDULE.session} floorperiods as scheduled by
-      <a href={SCHEDULE.source_url} class="underline">enrolled 2025 Senate Joint Resolution 1</a>.
-      Bills still pending when the final general-business floorperiod ends
-      formally fail; the biennial session period ends at noon on {fmtDate(SCHEDULE.session_end)}.
+  <section class="mt-14 max-w-[47.5rem]" aria-labelledby="schedule-heading">
+    <h2 id="schedule-heading" class="t-section">Session schedule</h2>
+    <p class="mt-2">
+      The Legislature meets to vote during set floorperiods. Bills still waiting when the last
+      general-business floorperiod ends fail, and the {SCHEDULE.session} session ends at noon on
+      {" "}{longDate(SCHEDULE.session_end)}.
     </p>
-    <details class="mt-3 rounded-lg border border-navy-100 bg-white">
-      <summary class="cursor-pointer px-4 py-3 font-semibold">Show the full session schedule</summary>
-      <ul class="grid grid-cols-1 gap-1 px-4 pb-4 sm:grid-cols-2 lg:grid-cols-3">
+    <p class="mt-2 text-small text-granite">
+      The schedule is set by <a href={SCHEDULE.source_url} class="underline">enrolled 2025 Senate Joint Resolution 1</a>.
+    </p>
+    <details class="mt-3">
+      <summary class="inline-flex min-h-11 cursor-pointer items-center font-display font-bold text-lake underline">Show the full session schedule</summary>
+      <ul class="mt-2 grid gap-x-8 border-b border-rule sm:grid-cols-2" role="list">
         {SCHEDULE.floorperiods.map((f) => (
-          <li class="rounded-lg border border-navy-100 px-3 py-2 text-sm">
-            <span class="tabular-nums">{fmtDate(f.start)} – {fmtDate(f.end)}</span>
+          <li class="border-t border-rule py-2">
+            <span class="tabular-nums">{fmtDate(f.start)} to {fmtDate(f.end)}</span>
             {"label" in f && f.label && (
-              <span class="block text-xs font-semibold text-badger-700">{f.label}</span>
+              <span class="block text-small font-bold text-granite">{f.label}</span>
             )}
           </li>
         ))}
@@ -86,6 +121,12 @@ import { fmtDate } from "../lib/format";
     const panel = document.getElementById("day-panel")!;
     const dayLabel = document.getElementById("day-label")!;
     const dayEvents = document.getElementById("day-events")!;
+    const NEW_TAB = '<span class="sr-only"> (opens in a new tab)</span>';
+    const KIND: Record<string, string> = {
+      election: "Election day",
+      hearing: "Committee hearing at the Capitol",
+      council: "City council meeting",
+    };
 
     function iso(y: number, m: number, d: number) {
       return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -94,10 +135,10 @@ import { fmtDate } from "../lib/format";
     function pollingBlock(): string {
       const place = savedPollingPlace();
       if (!place) {
-        return `<p class="mt-1 text-xs text-navy-700">Look up your polling place once on MyVote, then <a class="underline" href="/my-reps/#polling">save it here</a> to see it on every election day.</p>`;
+        return `<p class="mt-2 text-small">Look up your polling place once on MyVote, then <a class="underline" href="/my-reps/#polling">save it here</a> to see it on every election day.</p>`;
       }
-      return `<p class="mt-1 text-sm">📍 Your saved polling place: <strong>${place.replace(/[<>&]/g, "")}</strong> <a class="text-xs underline" href="/my-reps/#polling">change</a></p>`
-        + `<p class="mt-0.5 text-xs text-navy-700">Double-check on MyVote before voting. Locations can change.</p>`;
+      return `<p class="mt-2">Your saved polling place: <strong>${esc(place)}</strong>. <a class="underline" href="/my-reps/#polling">Change it</a></p>`
+        + `<p class="mt-0.5 text-small text-granite">Check it on MyVote before you go. Locations can change.</p>`;
     }
 
     function linksBlock(links: { label: string; url: string }[]): string {
@@ -105,11 +146,11 @@ import { fmtDate } from "../lib/format";
         .map((l) => {
           const href = safeHref(l.url);
           return href
-            ? `<a class="py-1 font-semibold underline" target="_blank" rel="noopener" href="${esc(href)}">${esc(l.label)} ↗</a>`
-            : `<span class="font-semibold">${esc(l.label)}</span>`;
+            ? `<li><a class="underline" target="_blank" rel="noopener" href="${esc(href)}">${esc(l.label)}${NEW_TAB}</a></li>`
+            : `<li>${esc(l.label)}</li>`;
         })
         .join("");
-      return `<p class="mt-1 flex flex-wrap gap-x-4 gap-y-1">${anchors}</p>` + pollingBlock();
+      return `<ul class="mt-2 flex flex-wrap gap-x-5 gap-y-1">${anchors}</ul>` + pollingBlock();
     }
 
     function showDay(date: string, focus = true) {
@@ -120,24 +161,24 @@ import { fmtDate } from "../lib/format";
       dayEvents.innerHTML = list.length
         ? list
             .map((e) => {
-              const emoji = e.type === "election" ? '<span aria-hidden="true">🗳️ </span>' : "";
               // the title carries the official-notice link itself; the
               // label, detail, and url are scraped data and never trusted
               const href = safeHref(e.url);
               const title = href
-                ? `<a class="py-1 font-semibold underline" target="_blank" rel="noopener" href="${esc(href)}">${emoji}${esc(e.label)}<span class="sr-only"> official notice, opens in a new tab</span></a>`
-                : `<span class="font-semibold">${emoji}${esc(e.label)}</span>`;
+                ? `<a class="underline" target="_blank" rel="noopener" href="${esc(href)}">${esc(e.label)}<span class="sr-only"> official notice, opens in a new tab</span></a>`
+                : esc(e.label);
               return `
-        <li class="rounded border ${e.type === "election" ? "border-gold-500 bg-gold-100" : e.type === "council" ? "border-moss-600" : "border-navy-100"} p-2">
-          ${e.type === "hearing" ? `<span class="mr-1 rounded bg-navy-50 px-1 text-xs font-semibold">State</span>` : ""}${e.type === "council" ? `<span class="mr-1 rounded bg-moss-50 px-1 text-xs font-semibold">City</span>` : ""}${title}
-          ${e.detail ? `<span class="text-navy-600"> · ${esc(e.detail)}</span>` : ""}
+        <li class="border-t border-rule py-3">
+          <p class="flex items-center gap-2 text-small font-bold text-granite"><span class="mark mark-${esc(e.type)}" aria-hidden="true"></span>${esc(KIND[e.type] ?? "Event")}</p>
+          <p class="mt-1 font-display font-bold">${title}</p>
+          ${e.detail ? `<p class="text-small text-granite">${esc(e.detail)}</p>` : ""}
           ${e.links?.length ? linksBlock(e.links) : ""}
-          ${e.type === "hearing" ? `<p class="mt-1 text-xs text-navy-600">Confirm against the official notice before attending.</p>` : ""}
-          ${e.type === "council" ? `<p class="mt-1 text-xs text-navy-600">Open to the public; confirm time and place on the posted agenda.</p>` : ""}
+          ${e.type === "hearing" ? `<p class="mt-1 text-small text-granite">Confirm against the official notice before you go.</p>` : ""}
+          ${e.type === "council" ? `<p class="mt-1 text-small text-granite">Open to the public. Confirm the time and place on the posted agenda.</p>` : ""}
         </li>`;
             })
             .join("")
-        : "<li class='text-navy-600'>Nothing scheduled.</li>";
+        : `<li class="border-t border-rule py-3 text-granite">Nothing scheduled.</li>`;
       panel.classList.remove("hidden");
       if (!focus) return; // opened for the reader, not by the reader
       panel.focus({ preventScroll: true });
@@ -155,36 +196,37 @@ import { fmtDate } from "../lib/format";
       const today = new Date();
       const todayIso = iso(today.getFullYear(), today.getMonth(), today.getDate());
       for (let i = 0; i < firstDow; i++) {
-        grid.appendChild(Object.assign(document.createElement("div"), { className: "min-h-16 bg-paper" }));
+        grid.appendChild(Object.assign(document.createElement("div"), { className: "min-h-16 bg-limestone sm:min-h-24" }));
       }
       for (let d = 1; d <= daysInMonth; d++) {
         const date = iso(year, month, d);
         const dayList = events[date] ?? [];
+        const isToday = date === todayIso;
         // only event days are interactive; plain days stay out of the tab order
         const cell = document.createElement(dayList.length ? "button" : "div");
         cell.className =
-          "min-h-16 bg-white p-1 text-left align-top text-xs " +
-          (date === todayIso ? "ring-2 ring-inset ring-navy-600 " : "") +
-          (dayList.length ? "hover:bg-navy-50" : "");
+          "flex min-h-16 flex-col items-start gap-1 bg-white p-1.5 text-left text-small sm:min-h-24 sm:p-2 " +
+          (isToday ? "ring-2 ring-inset ring-spruce " : "") +
+          (dayList.length ? "cursor-pointer hover:bg-fog" : "");
+        if (isToday) cell.dataset.today = "";
         const hearings = dayList.filter((e) => e.type === "hearing").length;
         const elections = dayList.filter((e) => e.type === "election").length;
         const councils = dayList.filter((e) => e.type === "council").length;
-        // phones get dot markers (text chips don't fit 45px cells); the
+        // phones get shape markers (words don't fit 45px cells); the
         // aria-label carries the counts either way
-        const dots =
-          (elections ? `<span class="h-2 w-2 rounded-full bg-gold-500"></span>` : "") +
-          (councils ? `<span class="h-2 w-2 rounded-full bg-moss-600"></span>` : "") +
-          `<span class="h-1.5 w-1.5 rounded-full bg-navy-600"></span>`.repeat(Math.min(hearings, 3));
+        const marks =
+          (elections ? `<span class="mark mark-election"></span>` : "") +
+          (councils ? `<span class="mark mark-council"></span>` : "") +
+          `<span class="mark mark-hearing"></span>`.repeat(Math.min(hearings, 3));
+        // words from 640px up; they wrap rather than clip in narrow cells
+        const line = (kind: string, text: string) =>
+          `<span class="hidden w-full items-baseline gap-1.5 leading-tight sm:flex"><span class="mark mark-${kind}"></span><span class="min-w-0">${text}</span></span>`;
         cell.innerHTML =
-          `<span class="font-semibold">${d}</span>` +
-          (dots ? `<span class="mt-0.5 flex items-center gap-0.5 sm:hidden" aria-hidden="true">${dots}</span>` : "") +
-          (elections ? `<span class="mt-0.5 hidden truncate rounded bg-gold-100 px-1 font-semibold sm:block">🗳️ Election day</span>` : "") +
-          (councils
-            ? `<span class="mt-0.5 hidden truncate rounded bg-moss-50 px-1 font-semibold sm:block">Council meeting</span>`
-            : "") +
-          (hearings
-            ? `<span class="mt-0.5 hidden truncate rounded bg-navy-50 px-1 sm:block">${hearings} hearing${hearings > 1 ? "s" : ""}</span>`
-            : "");
+          `<span class="font-display font-bold">${d}</span>` +
+          (marks ? `<span class="flex flex-wrap items-center gap-1 sm:hidden" aria-hidden="true">${marks}</span>` : "") +
+          (elections ? line("election", "Election day") : "") +
+          (councils ? line("council", "Council meeting") : "") +
+          (hearings ? line("hearing", `${hearings} hearing${hearings > 1 ? "s" : ""}`) : "");
         if (dayList.length) {
           cell.setAttribute("type", "button");
           const spoken = new Date(date + "T12:00:00").toLocaleDateString("en-US", {
@@ -194,7 +236,7 @@ import { fmtDate } from "../lib/format";
           if (elections) parts.push("election day");
           if (councils) parts.push(`${councils} council meeting${councils > 1 ? "s" : ""}`);
           if (hearings) parts.push(`${hearings} hearing${hearings > 1 ? "s" : ""}`);
-          cell.setAttribute("aria-label", `${spoken}, ${parts.join(", ")}`);
+          cell.setAttribute("aria-label", `${spoken}${isToday ? ", today" : ""}, ${parts.join(", ")}`);
           cell.addEventListener("click", () => showDay(date));
         }
         grid.appendChild(cell);
@@ -223,7 +265,7 @@ import { fmtDate } from "../lib/format";
             if (mine) {
               const hint = document.getElementById("city-hint");
               if (hint) hint.textContent =
-                `Your saved address is in ${mine.city}; its council meetings are shown here, on this device only.`;
+                `Your saved address is in ${mine.city}, so its council meetings are shown here, on this device only.`;
             }
             for (const m of mine?.meetings ?? []) {
               (events[m.date] ??= []).push({
@@ -248,8 +290,62 @@ import { fmtDate } from "../lib/format";
       .catch(() => {
         label.textContent = "Calendar unavailable";
         grid.innerHTML =
-          `<p class="col-span-7 bg-white p-4 text-sm">Couldn't load the calendar. ` +
+          `<p class="col-span-7 bg-white p-4">Couldn't load the calendar. ` +
           `Try the <a class="underline" href="/calendar/#hearings">hearings list</a> instead.</p>`;
       });
   </script>
 </Base>
+
+<style>
+  .cal {
+    display: grid;
+    gap: 2rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (min-width: 64rem) {
+    .cal {
+      grid-template-columns: minmax(0, 1fr) 22rem;
+      column-gap: 3.5rem;
+      align-items: start;
+    }
+  }
+  /* event markers are told apart by shape, not color: a square for
+     election days, a dot for hearings, a ring for council meetings */
+  :global(.mark) {
+    display: inline-block;
+    width: 0.625rem;
+    height: 0.625rem;
+    flex-shrink: 0;
+  }
+  :global(.mark-election) {
+    background: var(--color-spruce);
+  }
+  :global(.mark-hearing) {
+    background: var(--color-lake);
+    border-radius: 9999px;
+  }
+  :global(.mark-council) {
+    border: 2px solid var(--color-spruce);
+    border-radius: 9999px;
+  }
+  @media (forced-colors: active) {
+    :global(.mark-election),
+    :global(.mark-hearing) {
+      forced-color-adjust: none;
+      background: CanvasText;
+    }
+    :global(.mark-council) {
+      border-color: CanvasText;
+    }
+    /* the hairlines between days and today's ring are drawn with fills and
+       shadows, which forced colors drop; outlines survive */
+    :global(#grid > *) {
+      outline: 1px solid CanvasText;
+      outline-offset: -1px;
+    }
+    :global(#grid > [data-today]) {
+      outline: 3px solid Highlight;
+      outline-offset: -3px;
+    }
+  }
+</style>

@@ -13,14 +13,16 @@
  * exist, so election night is a data import, not a redesign.
  */
 import Base from "../../../layouts/Base.astro";
-import SourceStrip from "../../../components/SourceStrip.astro";
 import FollowButton from "../../../components/FollowButton.astro";
-import PartyChip from "../../../components/PartyChip.astro";
 import Portrait from "../../../components/Portrait.astro";
-import DistrictMap from "../../../components/DistrictMap.astro";
-import { sittingPeople, electionFor, electionHistoryFor, lastMarginFor, personIdByName, ballotPhase, writeInPending } from "../../../lib/db";
-import { chamberName, personSlug } from "../../../lib/format";
-import { ballotStatus, seatOffice } from "../../../lib/ballot";
+import ElectionResult from "../../../components/ElectionResult.astro";
+import SeatMapFigure from "../../../components/SeatMapFigure.astro";
+import {
+  sittingPeople, electionFor, electionHistoryFor, lastMarginFor, personIdByName, ballotPhase,
+  writeInPending, meta,
+} from "../../../lib/db";
+import { chamberName, fmtDate, partyWord, personSlug } from "../../../lib/format";
+import { ballotStatus, raceSentenceHtml, seatOffice, writeInSentence } from "../../../lib/ballot";
 
 export function getStaticPaths() {
   return sittingPeople()
@@ -43,20 +45,28 @@ const margin = lastMarginFor(person.chamber, person.district);
 const approved = election.opponents.filter((o) => o.ballot_status === "Approve");
 const pending = election.opponents.length - approved.length;
 const ballot = ballotStatus(election);
-const running = ballot.kind === "on-ballot";
-const open = ballot.kind === "not-running";
-// no status posted yet: neither a matchup nor an open seat
-const statusPending = ballot.kind === "pending";
+const status = ballot.kind === "on-ballot" || ballot.kind === "not-running" ? ballot.kind : "pending";
+const running = status === "on-ballot";
+const open = status === "not-running";
 const general = ballotPhase() === "general";
-const pendingParties = writeInPending(seatOffice(person.chamber, person.district)).map((p) => p.party);
+const phase = general ? "general" : "primary";
+const openPrimaries = writeInPending(seatOffice(person.chamber, person.district));
+const holderHref = `/legislators/${personSlug(person.id)}/`;
+const others = approved.map((o) => {
+  const pid = personIdByName(o.name);
+  return { ...o, pid, href: pid ? `/legislators/${personSlug(pid)}/` : null };
+});
+const lead = raceSentenceHtml({
+  holder: { name: person.name, party: person.party, href: holderHref },
+  status,
+  others,
+  phase,
+});
 
 // certified 2026 rows appear here after the canvass; until then the
 // section simply doesn't exist
 const results2026 = history.find((h) => h.year === 2026);
 const past = history.filter((h) => h.year !== 2026);
-
-const pct = (votes: number, total: number | null) =>
-  total ? `${((votes / total) * 100).toFixed(1)}%` : "";
 
 const candidateCount = (running ? 1 : 0) + approved.length;
 const description =
@@ -66,6 +76,19 @@ const description =
     : `${person.name}'s ballot status not yet posted`) +
   `, ${candidateCount} ${general ? "candidate" : "approved candidate"}${candidateCount === 1 ? "" : "s"}` +
   `${general ? " on the November ballot" : ""}, and official past results.`;
+const marginLine = margin
+  ? margin.margin === null
+    ? `In ${margin.year}${margin.year < 2024 ? ", on the previous maps" : ""}, the winner ran unopposed.`
+    : `In ${margin.year}${margin.year < 2024 ? ", on the previous maps" : ""}, this seat was decided by ${margin.margin.toFixed(1)} points.`
+  : "";
+const pulledOn = meta().imported_at?.slice(0, 10);
+// how each candidate got onto the ballot, said once per kind
+const howOn = (party: string | null) =>
+  !general
+    ? "Approved for the ballot by the Elections Commission."
+    : party === "Independent" || !party
+      ? "An independent candidate the Elections Commission approved."
+      : `The ${party} nominee, from the certified August 11 primary.`;
 ---
 
 <Base
@@ -76,202 +99,154 @@ const description =
     { name: "2026", url: "/elections/2026/" },
   ]}
   filters={{ type: "Race", session: "2026 election", chamber: chamberName(person.chamber) }}
+  layout="wide"
 >
-  <p class="text-sm text-navy-600">
-    <a href="/elections/2026/" class="underline">&larr; All 2026 races</a>
-  </p>
-  <div class="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-    <h1 class="text-2xl font-bold">{seatName}</h1>
-    <span class="text-navy-700">November 3, 2026</span>
-    {open && (
-      <span class="rounded-full bg-badger-50 px-2.5 py-0.5 text-sm font-bold text-badger-700">
-        Open seat
-      </span>
-    )}
-    <span class="ml-auto" data-pagefind-ignore>
-      <FollowButton kind="races" id={seatKey} />
-    </span>
-  </div>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Who is running for this seat, whether the incumbent is on the ballot, and how the district has voted before.
-  </p>
-  <SourceStrip
-    sources={[{ label: "Wisconsin Elections Commission", href: "https://elections.wi.gov" }]}
-    through={null}
-  />
-  <p id="race-mine" class="mt-2 hidden rounded-lg bg-navy-50 px-3 py-2 text-sm font-semibold text-navy-800">
-    This is your district's race.
-  </p>
+  <div class="race">
+    <header class="r-head flex max-w-[47.5rem] flex-col gap-2.5">
+      <a href="/elections/2026/" class="self-start text-small underline">2026 elections</a>
+      <h1 class="t-display">{seatName}</h1>
+      <p class="sm:text-lead" data-no-rep-highlight>
+        {open && <strong>Open seat. </strong>}<Fragment set:html={lead} />
+        {openPrimaries.length > 0 && ` ${writeInSentence(openPrimaries)}`}
+      </p>
+      <p class="text-small text-granite">
+        Election day is Tuesday, November 3, 2026.
+        {general
+          ? " Each party's candidate won the certified August 11 primary."
+          : " The final ballot is set after the August 11 primary."}
+      </p>
+      <p data-mine-seat={seatKey} data-pagefind-ignore hidden>
+        <span class="mine">This is your district's race</span>
+      </p>
+    </header>
 
-  {results2026 && (
-    <section class="mt-4 rounded-lg border border-moss-600/40 bg-white p-4">
-      <h2 class="font-bold">Official results</h2>
-      <div class="overflow-x-auto"><table class="mt-2 w-full text-sm">
-        <caption class="sr-only">Certified 2026 results for {seatName}</caption>
-        <tbody>
-          {results2026.candidates.map((c) => (
-            <tr class="border-t border-navy-100">
-              <td class="py-1.5"><PartyChip party={c.party} size="sm" /> {c.candidate}</td>
-              <td class="py-1.5 text-right tabular-nums">{c.votes.toLocaleString()}</td>
-              <td class="py-1.5 text-right tabular-nums text-navy-600">{pct(c.votes, results2026.total)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table></div>
-      <p class="mt-1 text-xs text-navy-600">Certified canvass, {results2026.total?.toLocaleString()} ballots cast.</p>
-    </section>
-  )}
+    <aside class="r-rail flex flex-col gap-5" data-pagefind-ignore data-no-rep-highlight>
+      <div class="flex flex-col gap-2">
+        <FollowButton kind="races" id={seatKey} label="Follow this race" variant="primary" />
+        <p class="text-fine text-granite">Following saves it on this device.</p>
+      </div>
+      <SeatMapFigure seatKey={seatKey} seatName={seatName} />
+      <p><a href={`/districts/${seatKey}/`} class="font-bold underline">About {seatName}: who has held it and its results</a></p>
+    </aside>
 
-  <div class="mt-4 grid gap-4 lg:grid-cols-[1fr_240px]">
-    <section>
-      <h2 class="text-xl font-bold">{running ? "The matchup" : "Candidates"}</h2>
-      {open && (
-        <p class="mt-1 text-sm text-navy-700">
-          {person.name} is not on the November ballot, so this seat changes hands.
-          <a href={`/legislators/${personSlug(person.id)}/`} class="ml-1 underline">
-            {person.name}'s record &rarr;
-          </a>
-        </p>
+    <div class="r-main flex max-w-[47.5rem] flex-col gap-10">
+      {results2026 && (
+        <section aria-labelledby="results-2026-heading">
+          <h2 id="results-2026-heading" class="t-section">Official results</h2>
+          <ElectionResult id="results-2026" title="November 2026" candidates={results2026.candidates} total={results2026.total} />
+          <p class="text-fine text-granite">Certified canvass, {results2026.total?.toLocaleString()} votes cast.</p>
+        </section>
       )}
-      {statusPending && (
-        <p class="mt-1 text-sm text-navy-700">
-          The Elections Commission has not yet posted whether {person.name} is running.
-        </p>
-      )}
-      <ul class="mt-3 grid gap-3 sm:grid-cols-2">
-        {running && (
-          <li class="rounded-lg border border-navy-100 bg-white p-4">
-            <div class="flex items-center gap-3">
-              <Portrait src={person.image_url} name={person.name} size={56} />
-              <div>
-                <p class="font-bold">
-                  <a href={`/legislators/${personSlug(person.id)}/`} class="underline">{person.name}</a>
-                </p>
-                <p class="mt-0.5 text-sm text-navy-700">
-                  <PartyChip party={person.party} size="sm" /> {person.party ?? "Party not stated"} &middot; incumbent
-                </p>
-              </div>
-            </div>
-            <p class="mt-2 text-xs text-navy-600">
-              The record is one click away: votes, sponsored bills, committees
-              and campaign money, from official filings.
-            </p>
-          </li>
-        )}
-        {approved.map((o) => {
-          const pid = personIdByName(o.name);
-          return (
-            <li class="rounded-lg border border-navy-100 bg-white p-4">
-              <div class="flex items-center gap-3">
-                <Portrait src={null} name={o.name} size={56} />
-                <div>
-                  <p class="font-bold">
-                    {pid ? (
-                      <a href={`/legislators/${personSlug(pid)}/`} class="underline">{o.name}</a>
-                    ) : (
-                      o.name
-                    )}
-                  </p>
-                  <p class="mt-0.5 text-sm text-navy-700">
-                    <PartyChip party={o.party} size="sm" /> {o.party ?? "Party not stated"}
-                  </p>
+
+      <section aria-labelledby="candidates-heading" data-no-rep-highlight>
+        <h2 id="candidates-heading" class="t-section">{general ? "On the ballot" : "Approved for the ballot"}</h2>
+        <ul class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" role="list">
+          {running && (
+            <li class="sheet flex flex-col gap-3 p-5">
+              <div class="flex flex-wrap items-center gap-4">
+                <Portrait src={person.image_url} name={person.name} size={56} />
+                <div class="min-w-0 flex-[1_1_8rem] [overflow-wrap:anywhere]">
+                  <h3 class="t-question text-[1.1875rem] [overflow-wrap:anywhere]">
+                    <a href={holderHref} class="underline">{person.name}</a>
+                  </h3>
+                  <p class="text-granite">{person.party ? partyWord(person.party) : "Party not stated"}. Holds this seat now.</p>
                 </div>
               </div>
-              <p class="mt-2 text-xs text-navy-600">
-                {pid
-                  ? "A current or former legislator: their record is on their profile."
-                  : `${!general ? "Approved for the ballot by the WEC." : o.party === "Independent" ? "An independent candidate the WEC approved for the ballot." : `The ${o.party} nominee, from the certified August 11 primary.`} We publish records, not campaign material, so candidates without a legislative record carry only their filing here.`}
+              <p class="text-small"><a href={holderHref} class="underline">Their record: votes, bills, committees and campaign money</a></p>
+            </li>
+          )}
+          {others.map((o) => (
+            <li class="sheet flex flex-col gap-3 p-5">
+              <div class="flex flex-wrap items-center gap-4">
+                <Portrait src={null} name={o.name} size={56} />
+                <div class="min-w-0 flex-[1_1_8rem] [overflow-wrap:anywhere]">
+                  <h3 class="t-question text-[1.1875rem] [overflow-wrap:anywhere]">
+                    {o.href ? <a href={o.href} class="underline">{o.name}</a> : o.name}
+                  </h3>
+                  <p class="text-granite">{o.party ? partyWord(o.party) : "Party not stated"}.</p>
+                </div>
+              </div>
+              <p class="text-small">
+                {o.href ? "A current or former legislator, with a record on their page." : howOn(o.party)}
               </p>
             </li>
-          );
-        })}
+          ))}
+        </ul>
         {candidateCount === 0 && (
-          <li class="rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600">
-            {general ? "No candidate is on the November ballot for this seat." : "No approved candidates on file yet."}
-          </li>
+          <p class="mt-4">{general ? "No candidate is on the November ballot for this seat." : "No approved candidates on file yet."}</p>
         )}
-      </ul>
-      {pendingParties.length > 0 && (
-        <p class="mt-2 rounded-lg border border-gold-500 bg-gold-100 px-3 py-2 text-sm text-navy-800">
-          {pendingParties.join(" and ")} primary: no candidate's name was printed, and write-in
-          votes may have produced a nominee the certified results do not name.
-          Check your own ballot at <a href="https://myvote.wi.gov/en-us/My-Voter-Info" class="underline">MyVote</a>.
+        <p class="mt-4 text-small text-granite">
+          We publish records, not campaign material, so a candidate without a legislative record has only
+          their filing here.
+          {!general && pending > 0 && ` ${pending} more ${pending === 1 ? "filing wasn't" : "filings weren't"} approved.`}
+          {" "}Check your own ballot at <a href="https://myvote.wi.gov/en-us/My-Voter-Info" class="underline">MyVote Wisconsin</a>.
         </p>
-      )}
-      <p class="mt-2 text-xs text-navy-600">
-        {general
-          ? "Each party's candidate is the winner of the certified August 11 primary; independent candidates are those the Wisconsin Elections Commission approved for the ballot."
-          : <>Candidates the Wisconsin Elections Commission has approved for the
-            ballot{pending > 0 && `; ${pending} filing${pending === 1 ? "" : "s"} not approved`}.
-            The final ballot is certified after the August 11 primary.</>}
-      </p>
-    </section>
+      </section>
+    </div>
 
-    <aside>
-      <DistrictMap seat={seatKey} label={seatName} />
-      <p class="mt-2 text-sm">
-        <a href={`/districts/${seatKey}/`} class="underline">
-          District profile: members and history &rarr;
-        </a>
-      </p>
-      {margin?.margin != null && (
-        <p class="mt-2 rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm text-navy-700">
-          Decided by <strong>{margin.margin.toFixed(1)} points</strong> in {margin.year}.
-        </p>
-      )}
-    </aside>
-  </div>
+    <div class="r-more flex max-w-[47.5rem] flex-col gap-10">
 
-  {past.length > 0 && (
-    <section class="mt-8">
-      <h2 class="text-xl font-bold">How this seat has voted</h2>
-      <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Certified results. Wisconsin's legislative maps were redrawn for
-        2024, so earlier results are the previous District {person.district}:
-        the same number over substantially different lines.
-      </p>
-      <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {past.map((h) => (
-          <div class="rounded-lg border border-navy-100 bg-white p-3 text-sm">
-            <p class="font-bold">
-              {h.year}
-              {h.year < 2024 && (
-                <span class="ml-2 text-xs font-normal text-navy-600">previous maps</span>
-              )}
-            </p>
-            <div class="overflow-x-auto"><table class="mt-1 w-full">
-              <caption class="sr-only">{h.year} general election, {seatName}</caption>
-              <tbody>
-                {h.candidates.map((c) => (
-                  <tr class="border-t border-navy-100">
-                    <td class="py-1"><PartyChip party={c.party} size="sm" decorative /> {c.candidate}</td>
-                    <td class="py-1 text-right tabular-nums">{c.votes.toLocaleString()}</td>
-                    <td class="py-1 text-right tabular-nums text-navy-600">{pct(c.votes, h.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table></div>
+      {past.length > 0 && (
+        <section aria-labelledby="past-heading">
+          <h2 id="past-heading" class="t-section">How this seat has voted</h2>
+          <p class="mt-2 text-small text-granite">
+            {marginLine && `${marginLine} `}Certified results. Wisconsin's legislative maps were redrawn for
+            2024, so earlier results are the previous District {person.district}: the same number over
+            substantially different lines.
+          </p>
+          <div class="mt-4 flex flex-col">
+            {past.map((h) => (
+              <ElectionResult
+                id={`results-${h.year}`}
+                title={`November ${h.year}`}
+                note={h.year < 2024 ? "previous maps" : undefined}
+                candidates={h.candidates}
+                total={h.total}
+              />
+            ))}
           </div>
-        ))}
-      </div>
-    </section>
-  )}
+        </section>
+      )}
 
-  <p class="mt-8 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-    <a href="https://myvote.wi.gov/en-us/Find-My-Polling-Place" class="py-1 font-semibold underline">Find where you vote &#8599;</a>
-    <a href="https://myvote.wi.gov/en-us/Vote-Absentee-Guide" class="py-1 font-semibold underline">Vote absentee &#8599;</a>
-    <a href="/calendar/election-days.ics" class="py-1 underline">Add election days to your calendar</a>
-  </p>
+      <section aria-labelledby="vote-heading" class="flex flex-col gap-3">
+        <h2 id="vote-heading" class="t-section">How to vote</h2>
+        <ul class="flex flex-wrap gap-3" role="list">
+          <li><a href="https://myvote.wi.gov/en-us/Find-My-Polling-Place" class="btn btn-secondary">Find where you vote</a></li>
+          <li><a href="https://myvote.wi.gov/en-us/Vote-Absentee-Guide" class="btn btn-secondary">Vote absentee</a></li>
+          <li><a href="/calendar/election-days.ics" class="btn btn-secondary">Add election days to your calendar</a></li>
+        </ul>
+      </section>
 
-  <script>
-    // marks the reader's own race, from the district saved in this browser
-    import { savedDistrict } from "../../../lib/district";
-    const saved = savedDistrict();
-    const mine = document.getElementById("race-mine");
-    if (saved && mine) {
-      const [kind, num] = location.pathname.replace(/\/$/, "").split("/").pop()!.split("-");
-      const d = kind === "senate" ? saved.sd : saved.ad;
-      if (String(d) === num) mine.classList.remove("hidden");
-    }
-  </script>
+      <p class="text-fine text-granite">
+        Candidates from the <a href="https://elections.wi.gov" class="underline">Wisconsin Elections Commission</a>'s
+        ballot-access report{general && " and certified August 11 primary"}; past results from its certified
+        canvasses{pulledOn && `; checked ${fmtDate(pulledOn)}`}.
+      </p>
+    </div>
+  </div>
 </Base>
+
+<style>
+  /* phones: who is running comes before the map and follow button */
+  .race {
+    display: grid;
+    gap: 2.5rem;
+    grid-template-areas: "head" "main" "rail" "more";
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .r-head { grid-area: head; }
+  .r-main { grid-area: main; }
+  .r-rail { grid-area: rail; }
+  .r-more { grid-area: more; }
+  @media (min-width: 64rem) {
+    .race {
+      grid-template-areas: "head rail" "main rail" "more rail";
+      grid-template-columns: minmax(0, 1fr) 20rem;
+      grid-template-rows: auto auto 1fr;
+      column-gap: 3.5rem;
+    }
+    .r-rail {
+      align-self: start;
+    }
+  }
+</style>
