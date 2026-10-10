@@ -125,7 +125,7 @@ provenance(table_name, row_id, source, fetched_at)   -- optional; `source` cols 
   - Bill count for the active session must be ≥ last run's count − small tolerance (catches a silently broken scrape).
   - Every vote_record.person_id resolves to a person (name-matching failures fail the run, logged with the unmatched name).
 - **Election-cycle rule (WI-specific, hardcoded with tests):** Assembly = every even year, all 99 districts. Senate = odd-numbered districts in midterm years (2026, 2030…), even-numbered in presidential years (2028, 2032…). `import_wec.py` overlays WEC's certified candidate list (CSV download) for the active cycle to fill `on_ballot` and `opponents_json`.
-- **LegiScan rows are display-only.** `source='legiscan'` rows must never be included in any future bulk-export/download feature (ToS boundary). Openstates/manual rows are public-domain-clean.
+- **LegiScan rows are display-only.** `source='legiscan'` rows must never be included in any bulk-export/download feature. Openstates/manual rows are public-domain-clean. LegiScan licenses its API and datasets under CC BY 4.0 (checked October 2026), so site pages show these rows with credit: LegiScan named and linked, the license linked, and the plain-language retelling noted (`site/src/lib/legiscan.ts`).
 
 ---
 
@@ -239,7 +239,9 @@ openstates-scrapers (wi) → SQLite → Astro static build → Firebase Hosting.
 - Every page footer must include the independence disclaimer (see site/src/components/Footer).
 - Analytics = GoatCounter only. Never add Google Analytics, tracking cookies, or any consent-banner-requiring script.
 - Personalization is localStorage-only. No accounts, no server-side user data; addresses are never transmitted except to the Census geocoder, never stored.
-- The static JSON API and all exports are provenance-filtered: source='legiscan' rows never leave the SQLite.
+- The static JSON API and all exports are provenance-filtered: source='legiscan' rows never appear in them.
+  Site pages may show those rows, credited to LegiScan with links to the record and its CC BY 4.0
+  license (site/src/lib/legiscan.ts).
 - Interact with openstates-scrapers ONLY as a subprocess CLI (os-update). Never `import` their modules into our Apache-2.0 code (GPL boundary).
 - Vote attribution: match against a session-scoped roster; any ambiguous surname is a hard failure, never a best guess.
 - Dependencies are hash-pinned (uv.lock / package-lock.json); `npm ci --ignore-scripts` in the pipeline image. No deploy ever runs from a PR.
@@ -260,7 +262,7 @@ openstates-scrapers (wi) → SQLite → Astro static build → Firebase Hosting.
 | docs.legis markup change breaks scraper | ~1–2×/session (per issue-tracker history) | loud alert, site serves stale-but-correct, patch (~450-line scraper) & upstream |
 | Name-matching drift (legislator turnover) | after each election | importer fails on unmatched names; update people table from openstates/people YAML |
 | Firebase free-tier transfer exceeded | only if the site gets popular | Cloudflare free CDN in front, or GCS+LB; revisit at >50k views/mo |
-| LegiScan ToS ambiguity | low (display-only use) | provenance column + no-export rule; prefer full self-scrape backfill so LegiScan rows → zero |
+| LegiScan ToS ambiguity | low (display-only use; API and datasets are CC BY 4.0) | provenance column + no-export rule + credit on every page that shows a LegiScan row; prefer full self-scrape backfill so LegiScan rows → zero |
 | WEC changes candidate-list format | each cycle | import is a small CSV mapper; update per cycle |
 | Census geocoder CORS/availability | low | it's geocoding-only; PIP against bundled LTSB GeoJSON is authoritative and offline-capable |
 | Vote misattribution (same-surname legislators) | medium, catastrophic for trust | session-scoped roster matching; ambiguity = hard build failure; regression test on known duplicate surnames |

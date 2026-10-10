@@ -33,7 +33,9 @@ Separate gated releases build Astro and publish Firebase Hosting. See docs/night
 - Every page footer must include the independence disclaimer (see site/src/components/Footer).
 - Analytics = GoatCounter only. Never add Google Analytics, tracking cookies, or any consent-banner-requiring script.
 - Personalization is localStorage-only. No accounts, no server-side user data; addresses are never transmitted except to the Census geocoder, never stored.
-- The static JSON API and all exports are provenance-filtered: source='legiscan' rows never leave the SQLite.
+- The static JSON API and all exports are provenance-filtered: source='legiscan' rows never appear in them.
+  Site pages may show those rows, credited to LegiScan with links to the record and its CC BY 4.0
+  license (site/src/lib/legiscan.ts).
 - Interact with openstates-scrapers ONLY as a subprocess CLI (os-update). Never `import` their modules into our Apache-2.0 code (GPL boundary).
 - Vote attribution: match against a session-scoped roster; any ambiguous surname is a hard failure, never a best guess.
 - Dependencies are hash-pinned (uv.lock / package-lock.json); `npm ci --ignore-scripts`

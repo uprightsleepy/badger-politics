@@ -27,6 +27,10 @@ export interface Bill {
   committee_at_death: string | null;
   committee_chamber_at_death: string | null;
   committee_chair_at_death: string | null;
+  /** Where the row came from: "openstates" (the Legislature's own
+   * pages), "manual", or "legiscan" (shown with credit, never exported;
+   * see lib/legiscan). */
+  source: string | null;
 }
 export interface Person {
   id: string;
@@ -202,8 +206,17 @@ export const federalLatestVoteDate = (): string | null =>
     ? ((prep("SELECT MAX(date) AS d FROM federal_votes").get() as { d: string | null }).d)
     : null;
 
+/** Whether any bill or roll call came from LegiScan, so pages credit it
+ * only when it applies (lib/legiscan). */
+export const usesLegiscan = once((): boolean =>
+  !!prep(
+    `SELECT 1 AS hit FROM bills WHERE source = 'legiscan'
+     UNION ALL SELECT 1 FROM vote_events WHERE source = 'legiscan' LIMIT 1`,
+  ).get(),
+);
+
 export const billsFor = (sessionId: string): Bill[] =>
-  prep("SELECT * FROM bills WHERE session_id = ? AND source != 'legiscan' ORDER BY id")
+  prep("SELECT * FROM bills WHERE session_id = ? ORDER BY id")
     .all(sessionId) as Bill[];
 
 export const actionsFor = (billId: string) =>
@@ -245,6 +258,7 @@ export interface VoteEvent {
   no_count: number | null;
   nv_count: number | null;
   source_url: string | null;
+  source: string | null;
 }
 
 export const voteRecordsFor = (voteEventId: string) =>
@@ -330,7 +344,7 @@ export const personSponsorships = (personId: string, limit = -1, offset = 0) => 
       `SELECT s.is_primary, s.classification, b.id AS bill_id, b.identifier,
               b.title, b.status, b.session_id, b.died_without_hearing
        FROM sponsorships s JOIN bills b ON b.id = s.bill_id
-       WHERE s.person_id = ? AND b.source != 'legiscan'
+       WHERE s.person_id = ?
        ORDER BY b.id DESC LIMIT ? OFFSET ?`,
     )
     .all(personId, limit, offset) as {
@@ -356,7 +370,7 @@ export const personSponsorships = (personId: string, limit = -1, offset = 0) => 
 export const personSponsorshipCount = (personId: string): number =>
   (prep(
       "SELECT COUNT(*) AS n FROM sponsorships s JOIN bills b ON b.id = s.bill_id" +
-        " WHERE s.person_id = ? AND b.source != 'legiscan'",
+        " WHERE s.person_id = ?",
     ).get(personId) as { n: number }).n;
 
 export const electionFor = memoBy((personId: string) => {
@@ -463,7 +477,7 @@ export const personIdByName = (name: string | null): string | null =>
 export const recentlyActedBills = (sessionIds: string[], limit = 8) =>
   prep(
       `SELECT * FROM bills WHERE session_id IN (${sessionIds.map(() => "?").join(",")})
-       AND classification = 'bill' AND source != 'legiscan'
+       AND classification = 'bill'
        ORDER BY latest_action_date DESC LIMIT ?`,
     )
     .all(...sessionIds, limit) as Bill[];
@@ -578,7 +592,7 @@ export const governorsDesk = () => {
     prep(
       `SELECT id, session_id, identifier, title, latest_action_date, latest_action_desc
        FROM bills WHERE session_id IN (${marks}) AND status = ?
-       AND classification = 'bill' AND source != 'legiscan'
+       AND classification = 'bill'
        ORDER BY latest_action_date DESC, id`,
     ).all(...ids, status) as {
       id: string; session_id: string; identifier: string; title: string | null;
@@ -1133,7 +1147,7 @@ export const allCommittees = once(() =>
               (SELECT MIN(h.date) FROM hearings h
                 WHERE h.committee_id = c.id AND h.date >= date('now')) AS next_hearing,
               (SELECT COUNT(*) FROM bills b
-                WHERE b.died_without_hearing = 1 AND b.source != 'legiscan'
+                WHERE b.died_without_hearing = 1
                 AND b.committee_at_death = c.name
                 AND COALESCE(b.committee_chamber_at_death, '') = COALESCE(c.chamber, '')
               ) AS died_here
@@ -1221,7 +1235,7 @@ export const committeeFor = (committeeId: string) => {
 export const subjectIndex = once(() => {
   const rows = prep(
       `SELECT s.subject, s.bill_id FROM bill_subjects s
-       JOIN bills b ON b.id = s.bill_id WHERE b.source != 'legiscan'
+       JOIN bills b ON b.id = s.bill_id
        ORDER BY b.session_id`,
     )
     .all() as { subject: string; bill_id: string }[];
@@ -1244,7 +1258,7 @@ export const billsForSubject = (subject: string) =>
       `SELECT b.id, b.session_id, b.identifier, b.title, b.status,
               b.died_without_hearing, b.latest_action_date
        FROM bill_subjects s JOIN bills b ON b.id = s.bill_id
-       WHERE s.subject = ? AND b.source != 'legiscan'
+       WHERE s.subject = ?
        ORDER BY b.session_id DESC, LENGTH(b.identifier), b.identifier`,
     )
     .all(subject) as {
@@ -1326,7 +1340,7 @@ export const lawsFor = memoBy((biennium: number): Law[] => {
   const rows = prep(
       `SELECT b.id, b.session_id, b.identifier, b.title, a.description
        FROM bills b JOIN actions a ON a.bill_id = b.id
-       WHERE b.status = 'enacted' AND b.source != 'legiscan'
+       WHERE b.status = 'enacted'
        AND CAST(substr(b.session_id, 1, 4) AS INTEGER) IN (?, ?)
        AND a.description LIKE '%Wisconsin Act %'`,
     )
@@ -1387,7 +1401,7 @@ export const vetoTracker = (): VetoBiennium[] =>
           `SELECT b.id AS bill_id, b.session_id, b.identifier, b.title, a.date
            FROM bills b LEFT JOIN actions a ON a.bill_id = b.id
              AND LOWER(a.description) LIKE '%vetoed by the governor%'
-           WHERE b.status = 'vetoed' AND b.source != 'legiscan'
+           WHERE b.status = 'vetoed'
            AND CAST(substr(b.session_id, 1, 4) AS INTEGER) IN (?, ?)
            GROUP BY b.id ORDER BY MAX(a.date) DESC, b.id`,
         )
@@ -1398,7 +1412,6 @@ export const vetoTracker = (): VetoBiennium[] =>
                   a.date, a.description
            FROM actions a JOIN bills b ON b.id = a.bill_id
            WHERE LOWER(a.description) LIKE '%notwithstanding the objections%'
-           AND b.source != 'legiscan'
            AND CAST(substr(b.session_id, 1, 4) AS INTEGER) IN (?, ?)
            ORDER BY a.date DESC, b.id`,
         )

@@ -4,7 +4,8 @@ import "../styles/global.css";
 // avoids a late swap from the fallback face. Other subsets load on demand.
 import overpassLatin from "@fontsource-variable/overpass/files/overpass-latin-wght-normal.woff2?url";
 import atkinsonLatin from "@fontsource-variable/atkinson-hyperlegible-next/files/atkinson-hyperlegible-next-latin-wght-normal.woff2?url";
-import { meta } from "../lib/db";
+import { meta, usesLegiscan } from "../lib/db";
+import { LEGISCAN_LICENSE_URL, LEGISCAN_WI_URL } from "../lib/legiscan";
 import { fmtDate } from "../lib/format";
 interface Props {
   title: string;
@@ -282,6 +283,9 @@ const mainClass =
         <p class="max-w-[45rem]">
           Built from the Wisconsin Legislature's official records{pulledOn && <span>, last checked <strong class="font-semibold text-spruce">{fmtDate(pulledOn)}</strong></span>}{dataThrough && <span>. The newest action they record is from <strong class="font-semibold text-spruce">{fmtDate(dataThrough)}</strong></span>}.
           Every page links to the <a href="https://docs.legis.wisconsin.gov" class="underline">official source</a> so you can check our work.
+          {usesLegiscan() && (
+            <>Some records come from <a href={LEGISCAN_WI_URL} class="underline">LegiScan</a>, used under the <a href={LEGISCAN_LICENSE_URL} class="underline">CC BY 4.0 license</a>, and each one says so on its page. </>
+          )}
           Free, with no ads and no tracking cookies.
         </p>
         <div class="grid gap-6 border-t border-rule pt-5 sm:grid-cols-3">

@@ -26,6 +26,7 @@ import { tellStory, plainHistory, sessionClosed } from "../../../lib/billStory";
 import type { TermId } from "../../../lib/glossary";
 import JsonLd from "../../../components/JsonLd.astro";
 import { linkifyAction } from "../../../lib/actionLinks";
+import { LEGISCAN_LICENSE_URL, isLegiscan, legiscanBillUrl } from "../../../lib/legiscan";
 
 export function getStaticPaths() {
   return builtSessions().flatMap((session) =>
@@ -133,7 +134,7 @@ if (primary.length === 1) {
     `The ${committeeIntro[1].replace(/^committee/i, "Committee")} introduced it${/request of (?:the )?governor/i.test(introLine) ? " at the governor's request" : ""}.`,
   );
 } else {
-  whoLines.push("The official record doesn't name its authors.");
+  whoLines.push(isLegiscan(bill) ? "The record doesn't name its authors." : "The official record doesn't name its authors.");
 }
 if (cosponsors.length) {
   whoLines.push(
@@ -185,6 +186,11 @@ if (votes.length) terms.push("roll-call");
 const usedTerms = [...new Set(terms)];
 const hasSuspension = votes.some((v) => /suspend/i.test(v.motion ?? ""));
 const pulledOn = meta().imported_at?.slice(0, 10);
+// a bill whose record came from LegiScan says so wherever it quotes that
+// record, and credits it at the foot (lib/legiscan)
+const fromLegiscan = isLegiscan(bill);
+const legiscanUrl = legiscanBillUrl(bill.session_id, bill.identifier);
+const record = fromLegiscan ? "LegiScan's copy of the record" : "the official record";
 ---
 
 <Base
@@ -254,7 +260,7 @@ const pulledOn = meta().imported_at?.slice(0, 10);
       <div class="flex flex-col gap-1.5 border-t border-rule pt-3.5 text-fine text-granite">
         {officialMarked && (
           <p>
-            Latest entry in the official record{officialDate && `, ${fmtDate(officialDate)}`}: <PlainText text={`“${officialMarked}”`} />
+            Latest entry in {record}{officialDate && `, ${fmtDate(officialDate)}`}: <PlainText text={`“${officialMarked}”`} />
           </p>
         )}
         {bill.died_without_hearing === 1 && deathCommittee ? (
@@ -428,8 +434,8 @@ const pulledOn = meta().imported_at?.slice(0, 10);
         </ol>
         <details class="group border-t border-rule pt-3.5">
           <summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">
-            <span class="group-open:hidden">See the official record, word for word</span>
-            <span class="hidden group-open:inline">Hide the official record</span>
+            <span class="group-open:hidden">See {record}, word for word</span>
+            <span class="hidden group-open:inline">Hide {record}</span>
           </summary>
           <div
             class="mt-3 max-h-96 overflow-y-auto pl-2 scroll-body scroll-on-paper"
@@ -456,10 +462,19 @@ const pulledOn = meta().imported_at?.slice(0, 10);
         <TermsOnPage terms={usedTerms} />
       </div>
 
-      <p class="text-fine text-granite">
-        From the Wisconsin Legislature's official record{pulledOn && `, checked ${fmtDate(pulledOn)}`}.{" "}
-        <a href={bill.text_url ?? "https://docs.legis.wisconsin.gov"} class="underline">See the source</a>
-      </p>
+      {fromLegiscan ? (
+        <p class="text-fine text-granite">
+          This bill's record comes from <a href={legiscanUrl} class="underline">LegiScan</a>, used under the
+          {" "}<a href={LEGISCAN_LICENSE_URL} class="underline">Creative Commons Attribution 4.0 license</a>{pulledOn && `, checked ${fmtDate(pulledOn)}`}.
+          We retell its history in plain words; the record itself is above, word for word.{" "}
+          <a href={legiscanUrl} class="underline">See this bill on LegiScan</a>
+        </p>
+      ) : (
+        <p class="text-fine text-granite">
+          From the Wisconsin Legislature's official record{pulledOn && `, checked ${fmtDate(pulledOn)}`}.{" "}
+          <a href={bill.text_url ?? "https://docs.legis.wisconsin.gov"} class="underline">See the source</a>
+        </p>
+      )}
     </div>
     <TermPopovers terms={usedTerms} />
   </article>
