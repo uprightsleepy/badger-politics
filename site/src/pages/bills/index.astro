@@ -2,9 +2,9 @@
 import Base from "../../layouts/Base.astro";
 import { allSessions, builtSessions, sessionStats } from "../../lib/db";
 import { sessionPlainName } from "../../lib/format";
+import { leadSentence } from "../../lib/billRows";
 const built = new Set(builtSessions().map((s) => s.id));
 const sessions = allSessions();
-const n = (x: number) => x.toLocaleString();
 ---
 
 <Base
@@ -35,9 +35,12 @@ const n = (x: number) => x.toLocaleString();
             )}
           </h2>
           <p>
-            {`${n(stats.bills)} bills and resolutions. ${n(stats.enacted ?? 0)} became law` +
-              ((stats.vetoed ?? 0) > 0 ? `, ${n(stats.vetoed)} ${stats.vetoed === 1 ? "was" : "were"} vetoed,` : "") +
-              ` and ${n(stats.graveyard ?? 0)} never got a public hearing.`}
+            {leadSentence({
+              total: stats.bills,
+              enacted: stats.enacted ?? 0,
+              vetoed: stats.vetoed ?? 0,
+              noHearing: stats.graveyard ?? 0,
+            })}
           </p>
           {s.data_quality === "partial" && (
             <p class="text-small text-granite">

@@ -167,8 +167,12 @@ Every list of bills uses one row (`site/src/components/BillList.astro`):
 2. A small route (dots only, hidden from screen readers) and the same status headline the bill's own
    page shows, then "Last action" and its date.
 
-The headline comes from the same code as the bill page (`lib/billRows.ts` calls `tellStory`), so a
-list and a page never describe a bill two ways.
+- **One story per bill:** the headline comes from the same code as the bill page (`lib/billRows.ts`
+  calls `tellStory`), so a list and a page never describe a bill two ways.
+- **No Prairie in lists:** the current stop is a thick Spruce ring. A list has many bills, and only one
+  thing per screen gets Prairie.
+- **Out of the search index:** the status line repeats on every row, so it's marked
+  `data-pagefind-ignore`; the number and title stay searchable.
 
 ### Chips
 
@@ -353,7 +357,7 @@ The baseline is WCAG 2.2 AA, checked with axe in `site/scripts/a11y.mjs` plus a 
 | Navy masthead with gold call-to-action | White header, search, "Your districts" chip |
 | "Hearing: None", "Veto Tracker", "The Governor's Desk", "Civic Calendar" | Plain names, for example "Bills that never got a hearing", "Vetoes", "Governor's decisions", "Calendar" (URLs may change later, with redirects) |
 | Gold silhouette mark | Spruce silhouette with a Prairie Capitol dot |
-| Homepage flow diagram (colored ribbons) | One list of outcomes in route order, each with a count, its share and a Lake bar |
+| Homepage flow diagram (colored ribbons) | "How far the session's bills got": each bill counted once at the furthest stop it reached, with a count, its share and a Lake bar |
 | System font only | Overpass and Atkinson Hyperlegible Next, self-hosted |
 
 ## Rolling it out

@@ -54,9 +54,9 @@ const MEANS: Record<string, string> = {
     "Passed one chamber but not the other. A resolution only one chamber votes on is adopted by that vote.",
   passed: "Passed both chambers, with no decision by the governor recorded yet.",
   enacted: "Passed both chambers and became law.",
-  vetoed: "Passed both chambers, then the governor vetoed them.",
+  vetoed: "Passed both chambers, then vetoed by the governor.",
   adopted: "Resolutions adopted by both chambers. Resolutions don't go to the governor.",
-  failed_sjr1: "They hadn't finished the route when the session's last voting day passed, so they stopped.",
+  failed_sjr1: "Not finished when the session's last voting day passed, so stopped there.",
 };
 const n = (x: number) => x.toLocaleString();
 ---
@@ -77,7 +77,8 @@ const n = (x: number) => x.toLocaleString();
     <p class="t-label text-granite">{plain[0].toUpperCase() + plain.slice(1)}</p>
     <h1 class="t-display">{label}</h1>
     <p class="sm:text-lead">
-      {n(total)} of the session's {n(all)} bills and resolutions. {MEANS[status] ?? ""}
+      {n(total)} of the session's {n(all)} {all === 1 ? "bill or resolution" : "bills and resolutions"}.
+      {" "}{MEANS[status] ?? ""}
     </p>
     {pages > 1 && (
       <p class="text-small text-granite">
@@ -96,6 +97,6 @@ const n = (x: number) => x.toLocaleString();
     page={page}
     pages={pages}
     href={(p) => (p === 1 ? base : `${base}${p}/`)}
-    label={`${label}: pages`}
+    label="Pages of this list"
   />
 </Base>

@@ -11,7 +11,7 @@ import FilterBar from "../../../components/FilterBar.astro";
 import Pager from "../../../components/Pager.astro";
 import { builtSessions, billsFor } from "../../../lib/db";
 import { sessionPlainName } from "../../../lib/format";
-import { sessionCounts } from "../../../lib/billRows";
+import { sessionLead } from "../../../lib/billRows";
 import { PER_PAGE, pageBounds, pageCount } from "../../../lib/paging";
 
 export function getStaticPaths() {
@@ -27,19 +27,8 @@ const pages = pageCount(bills.length);
 const { last } = pageBounds(1, bills.length);
 const name = session.name ?? session.id;
 const plain = sessionPlainName(session.id, name);
-const c = sessionCounts(session.id);
 const n = (x: number) => x.toLocaleString();
-// counts out of the session's total: what became of them, in route order
-const outcomes = [
-  `${n(c.enacted)} became law`,
-  c.vetoed ? `${n(c.vetoed)} ${c.vetoed === 1 ? "was" : "were"} vetoed` : "",
-  c.noHearing ? `${n(c.noHearing)} never got a public hearing` : "",
-].filter(Boolean);
-const lead =
-  `${n(c.total)} ${c.total === 1 ? "bill or resolution" : "bills and resolutions"}. ` +
-  (outcomes.length > 1
-    ? `${outcomes.slice(0, -1).join(", ")}${outcomes.length > 2 ? "," : ""} and ${outcomes.at(-1)}.`
-    : `${outcomes[0]}.`);
+const lead = sessionLead(session.id);
 ---
 
 <Base

@@ -4,12 +4,14 @@ import { PLACES_KEY } from "../lib/placesKey";
 import JsonLd from "../components/JsonLd.astro";
 import BillList from "../components/BillList.astro";
 import SessionOutcomes from "../components/SessionOutcomes.astro";
-import { builtSessions, sessionBillFlow, recentlyActedBills } from "../lib/db";
+import { builtSessions, recentlyActedBills } from "../lib/db";
 import { sessionPlainName } from "../lib/format";
+import { sessionCounts, sessionOutcomes } from "../lib/billRows";
 const sessions = builtSessions();
 const current = sessions.find((s) => s.id === "2025") ?? sessions[0];
 const recent = recentlyActedBills(sessions.map((s) => s.id), 6);
-const flow = sessionBillFlow(current.id);
+const outcomes = sessionOutcomes(current.id);
+const everything = sessionCounts(current.id).total;
 const sessionName = current.name ?? current.id;
 const plain = sessionPlainName(current.id, sessionName);
 const n = (x: number) => x.toLocaleString();
@@ -57,13 +59,13 @@ const FIELD =
     }}
   />
 
-  <section class="flex max-w-[47.5rem] flex-col gap-3" aria-labelledby="home-title">
-    <h1 id="home-title" class="t-display">Wisconsin's Legislature, in plain words</h1>
+  <div class="flex max-w-[47.5rem] flex-col gap-3">
+    <h1 class="t-display">Wisconsin's Legislature, in plain words</h1>
     <p class="sm:text-lead">
       Where every bill stands, how your lawmakers vote, and who pays for their campaigns. Built
       from official state records, free, with no ads.
     </p>
-  </section>
+  </div>
 
   <div class="mt-8 grid items-start gap-5 lg:grid-cols-2">
     <section class="sheet flex min-w-0 flex-col gap-3 p-5 sm:p-7" aria-labelledby="home-addr-heading">
@@ -110,7 +112,7 @@ const FIELD =
       </p>
     </section>
 
-    <section id="search" class="sheet flex min-w-0 scroll-mt-4 flex-col gap-3 p-5 sm:p-7" aria-labelledby="search-heading">
+    <section id="search" class="sheet flex min-w-0 scroll-mt-4 flex-col gap-3 p-5 sm:p-7">
       <h2 id="search-heading" class="t-section">Look something up</h2>
       <p>Search every bill, lawmaker, committee and campaign donor.</p>
       <form id="search-form" action="/#search" method="get" class="flex flex-col gap-2" role="search" aria-labelledby="search-heading">
@@ -172,19 +174,18 @@ const FIELD =
 
   <section class="mt-14 max-w-[47.5rem]" aria-labelledby="outcomes-heading">
     <h2 id="outcomes-heading" class="t-section">
-      What happened to the {plain}'s {n(flow.introduced)} bills
+      How far the {plain}'s {n(outcomes.bills)} bills got
     </h2>
     <p class="mt-2">
-      Every bill, from introduction to where it ended up. Each bill is counted once.
+      Each bill is counted once, at the furthest point on its route.
     </p>
     <div class="mt-5">
-      <SessionOutcomes flow={flow} session={current.id} />
+      <SessionOutcomes session={current.id} />
     </div>
     <p class="mt-3 text-small text-granite">
-      Bills only. {flow.resolutions === 1
-        ? "This session's 1 resolution is counted separately, because resolutions"
-        : `The ${n(flow.resolutions)} resolutions this session are counted separately, because they`}
-      {" "}never go to the governor and can't become law.
+      Bills only. Resolutions never go to the governor and can't become law{outcomes.resolutions > 0
+        ? `, so the session's ${n(outcomes.resolutions)} ${outcomes.resolutions === 1 ? "resolution is" : "resolutions are"} left out`
+        : ""}.
     </p>
     <p class="mt-3 flex flex-wrap gap-x-6 gap-y-2">
       <a href={`/bills/${current.id}/`} class="underline">Every bill and resolution</a>
@@ -194,11 +195,11 @@ const FIELD =
 
   <section class="mt-14" aria-labelledby="latest-heading">
     <h2 id="latest-heading" class="t-section">Latest activity</h2>
-    <p class="mt-2">The most recent entries in the official record, newest first.</p>
+    <p class="mt-2">Bills with the most recent action in the official record, newest first.</p>
     <BillList bills={recent} class="mt-4" />
     <p class="mt-4">
       <a href={`/bills/${current.id}/`} class="font-bold underline">
-        All {n(flow.introduced + flow.resolutions)} bills and resolutions this session
+        All {n(everything)} bills and resolutions this session
       </a>
     </p>
   </section>
@@ -497,8 +498,8 @@ const FIELD =
   import { esc } from "../lib/html";
   import { attachSuggest } from "../scripts/addressSuggest";
   import { partyWord } from "../lib/format";
-  import { answers } from "../lib/repAnswers";
   import type { RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
+  import type { answers as Answers } from "../lib/repAnswers";
 
   // Show saved representatives inline using browser storage and static JSON.
   const form = document.getElementById("home-addr-form") as HTMLFormElement | null;
@@ -593,7 +594,7 @@ const FIELD =
     '<circle cx="24" cy="24" r="24" fill="#E6EBE7"/><circle cx="24" cy="19" r="7.5" fill="#848E88"/>' +
     '<rect x="10" y="30.5" width="28" height="24" rx="12" fill="#848E88"/></svg>';
 
-  function card(house: "assembly" | "senate", district: number, slim: RepSlim | undefined, full: RepSummary | undefined, summaries: RepSummaries | null): string {
+  function card(answers: typeof Answers, house: "assembly" | "senate", district: number, slim: RepSlim | undefined, full: RepSummary | undefined, summaries: RepSummaries | null): string {
     if (!slim) return "";
     const chamber = house === "assembly" ? "Assembly" : "Senate";
     const title = house === "assembly" ? "representative" : "state senator";
@@ -626,14 +627,16 @@ const FIELD =
   function render(saved: { ad: number; sd: number }) {
     const section = document.getElementById("my-reps-home")!;
     const cards = document.getElementById("my-reps-cards")!;
+    // the answer wording loads only for readers with a saved district
     Promise.all([
       fetch("/data/reps.json").then((r) => r.json()),
       fetch("/data/rep-summaries.json").then((r) => r.json()).catch(() => null),
+      import("../lib/repAnswers"),
     ])
-      .then(([reps, summaries]: [Reps, RepSummaries | null]) => {
+      .then(([reps, summaries, { answers }]: [Reps, RepSummaries | null, { answers: typeof Answers }]) => {
         const html =
-          card("assembly", saved.ad, reps.assembly?.[saved.ad], summaries?.assembly?.[saved.ad], summaries) +
-          card("senate", saved.sd, reps.senate?.[saved.sd], summaries?.senate?.[saved.sd], summaries);
+          card(answers, "assembly", saved.ad, reps.assembly?.[saved.ad], summaries?.assembly?.[saved.ad], summaries) +
+          card(answers, "senate", saved.sd, reps.senate?.[saved.sd], summaries?.senate?.[saved.sd], summaries);
         if (html) {
           cards.innerHTML = html;
           section.classList.remove("hidden");
