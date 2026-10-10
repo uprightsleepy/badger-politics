@@ -1,91 +1,144 @@
 ---
 import Base from "../layouts/Base.astro";
 import { PLACES_KEY } from "../lib/placesKey";
+import { ELECTION_CYCLE } from "../lib/ballot";
+import ELECTION_DAYS from "../data/election-days.json";
+
+// the general election this cycle's ballot answers point at
+const general =
+  (ELECTION_DAYS as [string, string][]).find(
+    ([date, name]) => date.startsWith(String(ELECTION_CYCLE)) && /general/i.test(name),
+  )?.[0] ?? "";
 ---
 
-<Base title="Find my legislators" description="Enter your address once. Your Assembly and Senate districts are remembered on this device only.">
-  <h1 class="text-2xl font-bold">Find My Legislators</h1>
-  <p class="mt-2 max-w-2xl text-navy-700">
-    Enter your address, or use your location. Your district is saved
-    <strong>on this device only</strong>. Your address is never stored. {PLACES_KEY
-      ? "As you type, suggestions come from Google Places; the address you submit goes to the U.S. Census geocoder to get coordinates."
-      : "It is sent to one place, the U.S. Census geocoder, just to get coordinates."} After that,
-    every bill page shows how your two legislators voted.
-  </p>
+<Base
+  title="Find your state lawmakers"
+  description="Enter your address once to see your representative and state senator: how they vote, how often they show up, and whether they're on your ballot. Your districts are remembered on this device only."
+  layout="wide"
+>
+  <!-- phones read top to bottom: intro, map or form, then what you'll see;
+       wider screens put the map or the preview beside them -->
+  <div class="grid grid-cols-[minmax(0,1fr)] gap-x-12 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:items-center">
+    <div class="flex max-w-[37.5rem] flex-col gap-3">
+      <h1 id="page-title" tabindex="-1" class="t-display">Find your state lawmakers</h1>
+      <p id="intro-start" class="sm:text-lead">
+        Everyone in Wisconsin has two: a representative in the Assembly and a
+        senator in the Senate. Enter your address to see yours.
+      </p>
+      <p id="intro-result" class="sm:text-lead" hidden></p>
+      <p id="change-wrap" hidden>
+        <button type="button" id="change-addr" class="inline-flex min-h-11 cursor-pointer items-center font-bold text-lake underline underline-offset-4 hover:text-spruce">
+          Change address
+        </button>
+      </p>
+    </div>
 
-  <form id="addr-form" class="mt-5 flex max-w-xl flex-wrap gap-2">
-    <label class="sr-only" for="addr">Street address in Wisconsin</label>
-    <input
-      id="addr"
-      type="text"
-      required
-      autocomplete="street-address"
-      placeholder="e.g. 7525 W Greenfield Ave, West Allis, WI"
-      class="min-w-48 basis-full rounded-lg border border-navy-100 bg-white px-3 py-2 sm:basis-64 sm:flex-1"
-    />
-    <button type="submit" class="rounded-lg bg-navy-800 px-4 py-2 font-semibold text-white hover:bg-navy-700">
-      Find
-    </button>
-    <button type="button" id="geo-btn" class="rounded-lg border border-navy-100 bg-white px-4 py-2 hover:bg-navy-50">
-      Use my location
-    </button>
-  </form>
-  <p id="status" class="mt-3 text-sm text-navy-600" role="status"></p>
+    <figure id="map" class="m-0 flex flex-col gap-2 lg:col-start-2 lg:row-start-1" hidden>
+      <img id="map-img" alt="" width="400" height="280" class="aspect-[10/7] h-auto w-full rounded-[0.75rem] bg-fog" />
+      <figcaption id="map-caption" class="text-fine text-granite"></figcaption>
+    </figure>
 
-  <div id="result" class="mt-6 hidden max-w-3xl rounded-lg border border-navy-100 bg-white p-4">
-    <h2 id="result-heading" tabindex="-1" class="text-lg font-bold">Your districts</h2>
-    <div id="reps" class="mt-2 space-y-4" data-no-rep-highlight></div>
-    <p class="mt-3 text-xs text-navy-600">
-      Districts follow the Legislature's official 2024 boundaries. Saved in
-      your browser only. <button id="forget" class="underline">Forget this</button>.
-    </p>
+    <div id="lookup" class="flex max-w-[35rem] flex-col gap-4 lg:col-start-1">
+      <form id="addr-form" class="flex flex-col gap-2.5">
+        <label for="addr" class="t-label">Your Wisconsin address</label>
+        <input
+          id="addr"
+          type="text"
+          required
+          autocomplete="street-address"
+          placeholder="Street and city, e.g. 7525 W Greenfield Ave, West Allis"
+          class="min-h-13 w-full rounded-[0.625rem] border-2 border-edge bg-white px-3.5 text-body text-spruce placeholder:text-granite focus:border-lake"
+        />
+        <button type="submit" class="btn btn-primary">Find my lawmakers</button>
+        <button
+          type="button"
+          id="geo-btn"
+          class="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 font-bold text-lake underline underline-offset-4 hover:text-spruce"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
+          Use my location instead
+        </button>
+      </form>
+      <p class="flex items-start gap-2.5 text-small text-granite">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mt-0.5 shrink-0 text-spruce"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+        <span>
+          {PLACES_KEY
+            ? "As you type, suggestions come from Google Places. The address you pick goes to the U.S. Census to find your districts, then it's forgotten."
+            : "Your address goes to the U.S. Census to find your districts, then it's forgotten."}
+          {" "}Only the district numbers stay, on this device. <a href="/about/#districts" class="underline">Details</a>
+        </span>
+      </p>
+    </div>
+
+    <aside id="preview" class="flex flex-col gap-3 border-t border-rule pt-5 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0" aria-labelledby="preview-heading">
+      <h2 id="preview-heading" class="t-label text-[1.1875rem]">What you'll see</h2>
+      <ul class="flex list-disc flex-col gap-1.5 pl-5">
+        <li>Who they are and how to reach them</li>
+        <li>How they vote, and how often they show up</li>
+        <li>Whether they're on your ballot this November</li>
+      </ul>
+    </aside>
   </div>
 
-  <div id="polling" class="mt-4 max-w-xl rounded-lg border border-navy-100 bg-white p-4">
-    <h2 class="text-lg font-bold">Your polling place</h2>
-    <p class="mt-1 text-sm text-navy-700">
-      Polling places are assigned by ward and can change between elections, so
-      the official lookup is the source of truth.
-      <a href="https://myvote.wi.gov/en-us/Find-My-Polling-Place" class="font-semibold underline">
-        Look yours up on MyVote ↗
-      </a>
-      then save it here. It stays on this device and shows up on election days.
+  <p id="status" class="mt-3 max-w-[35rem] text-small text-granite" role="status"></p>
+
+  <section id="result" class="mt-8 hidden" aria-labelledby="result-heading">
+    <h2 id="result-heading" class="sr-only">Your lawmakers</h2>
+    <div id="reps" class="flex flex-wrap items-start gap-6" data-no-rep-highlight data-general={general}></div>
+    <p class="mt-6 flex max-w-[45rem] items-start gap-2.5 rounded-[0.75rem] bg-prairie-tint px-4 py-3.5">
+      <span class="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-spruce" aria-hidden="true"></span>
+      <span>From now on, every bill page shows how these two voted, and they're marked wherever they appear on this site.</span>
     </p>
-    <form id="polling-form" class="mt-3 flex flex-wrap gap-2">
+    <p class="mt-4 text-fine text-granite">
+      Districts follow the Legislature's 2024 maps. Records from the Wisconsin
+      Legislature and the Wisconsin Elections Commission. Your districts are
+      saved on this device only.{" "}
+      <button id="forget" type="button" class="inline-flex min-h-11 cursor-pointer items-center font-bold text-lake underline underline-offset-4 hover:text-spruce">Forget my districts</button>
+    </p>
+  </section>
+
+  <section id="polling" class="mt-10 flex max-w-[35rem] flex-col gap-2.5 border-t border-rule pt-6" aria-labelledby="polling-heading">
+    <h2 id="polling-heading" class="t-label text-[1.25rem]">Where do I vote?</h2>
+    <p>
+      Your polling place depends on your ward and can change between
+      elections. <a href="https://myvote.wi.gov/en-us/Find-My-Polling-Place" class="underline">Find your polling place on MyVote Wisconsin</a>,
+      the state's official voter site.
+    </p>
+    <p class="text-small text-granite">Want it handy on election day? Save it here. It stays on this device.</p>
+    <form id="polling-form" class="flex flex-wrap gap-2">
       <label class="sr-only" for="polling-input">Polling place</label>
       <input
         id="polling-input"
         type="text"
         placeholder="e.g. West Allis City Hall, 7525 W Greenfield Ave"
-        class="min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm"
+        class="min-h-12 min-w-0 flex-[1_1_16rem] rounded-[0.625rem] border-2 border-edge bg-white px-3 text-spruce placeholder:text-granite focus:border-lake"
       />
-      <button type="submit" class="rounded-lg bg-navy-800 px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700">
-        Save
-      </button>
+      <button type="submit" class="btn btn-secondary">Save</button>
     </form>
-    <p id="polling-saved" role="status" class="mt-2 hidden text-sm">
+    <p id="polling-saved" role="status" class="hidden">
       Saved: <strong id="polling-value"></strong>
-      <button id="polling-forget" class="ml-2 text-xs underline">forget</button>
-      <span class="mt-1 block text-xs text-navy-600">
-        Double-check on MyVote before each election. Locations can change.
-      </span>
+      <button id="polling-forget" type="button" class="ml-1 inline-flex min-h-11 cursor-pointer items-center font-bold text-lake underline underline-offset-4">Forget</button>
+      <span class="block text-small text-granite">Check MyVote before each election. Locations can change.</span>
     </p>
-  </div>
+  </section>
 
   <script>
     import { savedDistrict, saveDistrict, forgetDistrict } from "../lib/district";
     import { forgetCityDistrict, resolveCity, savedCityDistrict } from "../lib/cityDistrict";
     import { attachSuggest } from "../scripts/addressSuggest";
+    import { isFollowing, toggleFollow } from "../scripts/follows";
     import { esc } from "../lib/html";
     import { ballotStatus } from "../lib/ballot";
-    import { fmtDate, partyChipHtml, shortTitle } from "../lib/format";
+    import { clip, fmtDate, partyPlural, partyWord } from "../lib/format";
     import { districtForAddress, districtForBrowser } from "../lib/lookup";
     import { forgetPollingPlace, savePollingPlace, savedPollingPlace } from "../lib/pollingPlace";
-    import type { LocalReps, RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
+    import type { LocalReps, RepSlim, RepSummaries, RepSummary, Reps, Typical } from "../lib/wire";
 
-    const statusEl = document.getElementById("status")!;
-    const resultEl = document.getElementById("result")!;
-    const repsEl = document.getElementById("reps")!;
+    const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+    const statusEl = $("status");
+    const resultEl = $("result");
+    const repsEl = $("reps");
+    const general = repsEl.dataset.general ?? "";
     let reps: Reps | null = null;
     let summaries: RepSummaries | null = null;
     let localReps: LocalReps | null = null;
@@ -95,232 +148,358 @@ import { PLACES_KEY } from "../lib/placesKey";
     // needs to draw the cards.
     async function loadData() {
       if (!reps) {
-        statusEl.textContent = "Loading your districts…";
+        // only speak up when nothing else is in progress, and only clear
+        // our own message
+        const loading = "Loading your districts…";
+        if (!statusEl.textContent) statusEl.textContent = loading;
         [reps, summaries, localReps] = await Promise.all([
           fetch("/data/reps.json").then((r) => r.json()),
           fetch("/data/rep-summaries.json").then((r) => r.json()).catch(() => null),
           fetch("/data/local-reps.json").then((r) => r.json()).catch(() => null),
         ]);
+        if (statusEl.textContent === loading) statusEl.textContent = "";
       }
     }
 
-    const VOTE_STYLES: Record<string, { label: string; cls: string }> = {
-      yes: { label: "Aye", cls: "bg-moss-50 text-moss-600" },
-      no: { label: "Nay", cls: "bg-badger-50 text-badger-700" },
+    // ---- small pieces ----
+    const fig = (n: number | string) => `<span class="figure">${esc(String(n))}</span>`;
+    const link = (href: string, text: string) => `<a href="${esc(href)}" class="underline">${esc(text)}</a>`;
+    const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+    const a = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
+    const round = (n: number) => Math.round(n);
+    // sentences spell the month out: "November 3, 2026"
+    const longDate = (iso: string) => {
+      const [y, m, d] = iso.split("-").map(Number);
+      return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
+        month: "long", day: "numeric", year: "numeric", timeZone: "UTC",
+      });
     };
-    const voteStyle = (option: string) =>
-      VOTE_STYLES[option] ?? { label: "No vote", cls: "bg-navy-50 text-navy-600" };
+    // "Avery Lund, a Republican, and Jordan Pike, a Democrat"
+    const people = (list: { name: string; party: string | null }[]) => {
+      const each = list.map((p) =>
+        p.party ? `${esc(p.name)}, ${a(partyWord(p.party))} ${esc(partyWord(p.party))}` : esc(p.name),
+      );
+      if (each.length < 2) return each.join("");
+      if (each.length === 2) return `${each[0]}, and ${each[1]}`;
+      return `${each.slice(0, -1).join("; ")}; and ${each.at(-1)}`;
+    };
+    const question = (q: string, body: string) =>
+      `<div class="flex flex-col gap-1.5 border-t border-rule pt-4"><h3 class="t-question">${esc(q)}</h3>${body}</div>`;
 
-    // chair, then co-chair, then vice-chair, then rank-and-file
-    const roleRank = (role: string) =>
-      /^chair/i.test(role) ? 0 : /^co-chair/i.test(role) ? 1 : /^vice/i.test(role) ? 2 : 3;
-    const titleCase = (text: string) => text.replace(/\b\w/g, (c) => c.toUpperCase());
-
-    const MAIL_ICON =
-      '<svg class="h-4 w-4 shrink-0 text-navy-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">' +
-      '<path d="M3 4h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm.6 2L10 10.4 16.4 6H3.6Z"/></svg>';
-    const PHONE_ICON =
-      '<svg class="h-4 w-4 shrink-0 text-navy-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">' +
-      '<path d="M6.6 2.5 8.4 6 6.9 7.9a11 11 0 0 0 5.2 5.2L14 11.6l3.5 1.8v3.1a1 1 0 0 1-1.1 1A14.4 14.4 0 0 1 2.5 3.6a1 1 0 0 1 1-1.1h3.1Z"/></svg>';
-
-    /** One number, one label. Counts read at a glance instead of buried in prose. */
-    const tile = (value: number, label: string, tone = "text-ink") =>
-      '<div class="rounded-lg border border-navy-100 bg-paper px-3 py-2">' +
-      `<p class="text-xl font-bold tabular-nums ${tone}">${value.toLocaleString()}</p>` +
-      `<p class="text-xs leading-tight text-navy-600">${esc(label)}</p></div>`;
-
-    const contactChip = (href: string, label: string, icon: string) =>
-      '<a class="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-lg border border-navy-100' +
-      ` bg-paper px-2.5 py-1.5 text-sm hover:bg-navy-50" href="${esc(href)}">` +
-      `${icon}<span class="truncate">${esc(label)}</span></a>`;
-
-    const sectionLabel = (text: string) =>
-      `<p class="mt-4 text-xs font-semibold uppercase tracking-wide text-navy-600">${esc(text)}</p>`;
-
-    function repCard(
-      seat: string, districtHref: string, slim: RepSlim | undefined, full: RepSummary | undefined,
-    ): string {
-      if (!slim) return "";
-      const head =
-        '<div class="flex items-start gap-3">' +
-        '<div class="min-w-0 flex-1">' +
-        '<a class="inline-block py-1 text-xs font-semibold uppercase tracking-wide text-navy-600 hover:underline"' +
-        ` href="${esc(districtHref)}">${esc(seat)}</a>` +
-        `<p class="mt-0.5"><a class="text-lg font-bold leading-tight hover:underline" href="/legislators/${esc(slim.slug)}/">${esc(slim.name)}</a></p>` +
+    /** One value against the middle half of the chamber. Text says it all;
+     * the bar is the same fact drawn. */
+    function rangeBar(opts: {
+      value: number; min: number; max: number; typical: Typical;
+      left: string; right: string;
+    }) {
+      const span = Math.max(opts.max - opts.min, 1);
+      const pos = (n: number) => Math.min(100, Math.max(0, ((n - opts.min) / span) * 100));
+      const lo = pos(opts.typical.low);
+      const width = Math.max(pos(opts.typical.high) - lo, 2);
+      return (
+        // the sentence beside the bar carries the same facts, so the bar
+        // itself is hidden from assistive tech
+        '<div class="range mt-1" aria-hidden="true">' +
+        '<div class="relative mx-2.5 h-2.5 rounded-full bg-fog">' +
+        `<span class="absolute inset-y-0 rounded-full bg-lake-tint" style="left:${lo.toFixed(1)}%;width:${width.toFixed(1)}%"></span>` +
+        `<span class="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-spruce" style="left:${pos(opts.value).toFixed(1)}%"></span>` +
         '</div>' +
-        partyChipHtml(slim.party, { dims: "h-6 w-6 text-xs" }) +
-        '</div>';
-      const shell = (body: string) =>
-        `<div class="rounded-lg border border-navy-100 p-4">${head}${body}</div>`;
-      if (!full) return shell("");
-
-      const status = ballotStatus(full.election);
-      const ballotText =
-        status.kind === "on-ballot" ? `On the November ${status.year} ballot`
-        : status.kind === "not-running" ? `Not on the November ${status.year} ballot`
-        : status.kind === "pending" ? `November ${status.year} ballot status not yet posted`
-        : status.kind === "future" ? `Seat next on the ballot in ${status.year}`
-        : "";
-      const onBallot = status.kind === "on-ballot";
-      const ballot = ballotText
-        ? `<p class="mt-2"><span class="inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${
-            onBallot ? "bg-gold-100 text-navy-900" : "bg-navy-50 text-navy-700"
-          }">${esc(ballotText)}</span></p>`
-        : "";
-
-      const att = full.attendance;
-      const au = full.authored;
-      const tiles = [
-        att.total > 0
-          ? tile(
-              att.missed,
-              att.missed === 1 ? "Floor vote missed" : "Floor votes missed",
-              att.missed > 0 ? "text-badger-700" : "text-moss-600",
-            )
-          : "",
-        att.total > 0 ? tile(att.total, "Floor votes held") : "",
-        tile(au.total, "Bills led"),
-        tile(au.signedOn, "Bills cosigned"),
-      ].filter(Boolean);
-      const statGrid = tiles.length
-        ? `<div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">${tiles.join("")}</div>`
-        : "";
-      const caption =
-        (au.total > 0
-          ? `Of the ${au.total} bills they led this session, ${au.enacted} became law, ` +
-            `${au.vetoed} ${au.vetoed === 1 ? "was" : "were"} vetoed, and ${au.noHearing} ` +
-            `died without a hearing.`
-          : "They have not led a bill this session.") +
-        (att.total > 0 ? " Floor-vote counts cover this biennium." : "");
-      const captionEl = `<p class="mt-2 text-xs leading-relaxed text-navy-600">${esc(caption)}</p>`;
-
-      const contact = full.contact
-        ? '<div class="mt-3 flex flex-wrap gap-2">' +
-          contactChip(`mailto:${full.contact.email}`, full.contact.email, MAIL_ICON) +
-          (full.contact.phone
-            ? contactChip(
-                `tel:${full.contact.phone.replace(/\D/g, "")}`,
-                full.contact.phone,
-                PHONE_ICON,
-              )
-            : "") +
-          '</div>'
-        : "";
-
-      const cs = (full.committees ?? [])
-        .slice()
-        .sort((a, b) => roleRank(a.role) - roleRank(b.role));
-      const committees = cs.length
-        ? sectionLabel(`Committees \u00b7 ${cs.length}`) +
-          '<div class="mt-1 flex flex-wrap gap-1.5">' +
-          cs
-            .map(
-              (c) =>
-                '<a class="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-navy-100' +
-                ` bg-paper px-2.5 py-1 text-xs leading-snug hover:bg-navy-50" href="/committees/${esc(c.slug)}/">` +
-                `<span>${esc(c.name)}</span>` +
-                (roleRank(c.role) < 3
-                  ? `<span class="shrink-0 font-bold text-gold-600">${esc(titleCase(c.role))}</span>`
-                  : "") +
-                '</a>',
-            )
-            .join("") +
-          '</div>'
-        : "";
-
-      // Two lines per vote: verdict and bill up top, the bill's own title below
-      // with room to actually read it. The motion is what separates two
-      // same-day votes on the same bill.
-      const votes = (full.recentVotes ?? [])
-        .map((v) => {
-          const vs = voteStyle(v.option);
-          return (
-            '<li class="border-t border-navy-100 py-2 first:border-t-0 first:pt-0">' +
-            '<div class="flex items-center gap-2">' +
-            `<span class="w-16 shrink-0 rounded px-1 py-0.5 text-center text-xs font-bold ${vs.cls}">${esc(vs.label)}</span>` +
-            `<a class="font-semibold hover:underline" href="/bills/${esc(v.session)}/${esc(v.slug)}/">${esc(v.identifier)}</a>` +
-            `<span class="ml-auto shrink-0 text-xs tabular-nums text-navy-600">${esc(fmtDate(v.date))}</span>` +
-            '</div>' +
-            `<p class="mt-1 line-clamp-2 text-sm leading-snug text-navy-700">${esc(shortTitle(v.title))}</p>` +
-            '<p class="mt-0.5 flex items-baseline gap-x-2 text-xs text-navy-600">' +
-            `<span class="min-w-0 flex-1 truncate">${esc(v.motion ?? "")}</span>` +
-            `<a class="shrink-0 py-1 underline" href="/votes/${esc(v.event)}/">roll call</a></p>` +
-            '</li>'
-          );
-        })
-        .join("");
-      const voteBlock = votes
-        ? sectionLabel("Latest roll-call votes") + `<ul class="mt-1">${votes}</ul>`
-        : "";
-
-      return shell(
-        ballot +
-          statGrid +
-          captionEl +
-          contact +
-          committees +
-          voteBlock +
-          `<p class="mt-3"><a class="inline-block py-1 text-sm font-semibold underline" href="/legislators/${esc(slim.slug)}/">Full profile &rarr;</a></p>`,
+        `<div class="mt-1.5 flex justify-between text-fine text-granite"><span>${esc(opts.left)}</span><span>${esc(opts.right)}</span></div>` +
+        '</div>'
       );
     }
 
-    /** The council card, for addresses inside a covered city. Appended
-     * after the two state cards; absent for everyone else. */
+    const PORTRAIT_FALLBACK =
+      '<svg width="72" height="72" viewBox="0 0 48 48" aria-hidden="true" class="shrink-0 rounded-full">' +
+      '<circle cx="24" cy="24" r="24" fill="#E6EBE7"/><circle cx="24" cy="19" r="7.5" fill="#848E88"/>' +
+      '<rect x="10" y="30.5" width="28" height="24" rx="12" fill="#848E88"/></svg>';
+
+    const ROLE_RANK = (role: string) =>
+      /^chair/i.test(role) ? 0 : /^co-chair/i.test(role) ? 1 : /^vice/i.test(role) ? 2 : 3;
+    const ROLE_LABEL = (role: string) =>
+      /^chair/i.test(role) ? "Chair" : /^co-chair/i.test(role) ? "Co-chair" : /^vice/i.test(role) ? "Vice-chair" : "Member";
+
+    // ---- one lawmaker ----
+    function personCard(house: "assembly" | "senate", district: number, slim: RepSlim | undefined, full: RepSummary | undefined): string {
+      const chamber = house === "assembly" ? "Assembly" : "Senate";
+      const title = house === "assembly" ? "representative" : "state senator";
+      const members = house === "assembly" ? "representatives" : "senators";
+      const districtHref = `/districts/${house}-${district}/`;
+      if (!slim) {
+        return (
+          '<section class="sheet flex min-w-0 flex-[1_1_26rem] flex-col gap-2 p-5 sm:p-7">' +
+          `<h2 class="t-section">${chamber} District ${esc(String(district))}</h2>` +
+          `<p>This seat is empty right now. ${link(districtHref, `See ${chamber} District ${district}`)}</p></section>`
+        );
+      }
+      const headingId = `rep-${house}`;
+      const portrait = slim.image
+        ? `<img src="${esc(slim.image)}" alt="" width="72" height="72" loading="lazy" decoding="async" class="h-[72px] w-[72px] shrink-0 rounded-full bg-fog object-cover object-[50%_20%]">`
+        : PORTRAIT_FALLBACK;
+      const head =
+        // the portrait moves above the name when text is very large
+        '<div class="flex flex-wrap items-center gap-4">' + portrait +
+        '<div class="min-w-0 flex-[1_1_12rem]">' +
+        `<h2 id="${headingId}" class="t-section"><a href="/legislators/${esc(slim.slug)}/" class="text-spruce no-underline hover:underline">${esc(slim.name)}</a></h2>` +
+        `<p class="text-granite">Your ${title} for ${link(districtHref, `${chamber} District ${district}`)}.` +
+        `${slim.party ? ` ${esc(partyWord(slim.party))}.` : ""}</p>` +
+        '</div></div>';
+
+      const blocks: string[] = [];
+      if (full?.contact) {
+        const tel = full.contact.phone?.replace(/\D/g, "");
+        blocks.push(
+          '<div class="flex flex-wrap gap-2.5">' +
+          `<a class="btn btn-secondary max-w-full flex-wrap [overflow-wrap:anywhere]" href="mailto:${esc(full.contact.email)}">Email <span class="font-sans font-normal">${esc(full.contact.email)}</span></a>` +
+          (tel ? `<a class="btn btn-secondary" href="tel:${esc(tel)}">Call <span class="font-sans font-normal">${esc(full.contact.phone!)}</span></a>` : "") +
+          '</div>',
+        );
+      }
+
+      if (full) {
+        const typical = summaries?.typical?.[house];
+        // 1. how often they vote: yes or no, out of every roll call held
+        // while they served, against the rest of their chamber
+        const v = full.voted;
+        if (v && v.total > 0) {
+          const skipped = v.total - v.cast;
+          let body = skipped === 0
+            ? `<p>Voted on all ${fig(v.total.toLocaleString())} roll call votes this session.</p>`
+            : `<p>Voted on ${fig(v.cast.toLocaleString())} of ${fig(v.total.toLocaleString())} roll call votes this session. Didn't vote on ${fig(skipped.toLocaleString())}.</p>`;
+          const t = typical?.notVoting;
+          if (t) {
+            const rate = (skipped / v.total) * 100;
+            const pct = (n: number) => (n > 0 && n < 1 ? "under 1%" : `${round(n)}%`);
+            const words = round(t.high) === 0 && t.high < 0.5
+              ? `The middle half of ${members} voted on every one, or nearly.`
+              : `The middle half of ${members} didn't vote on ${pct(t.low)} to ${pct(t.high)} of them.`;
+            const top = Math.max(5, Math.ceil(Math.max(t.max, rate)));
+            body += rangeBar({
+              value: rate, min: 0, max: top, typical: t,
+              left: "Voted on all", right: `Didn't vote on ${top}%`,
+            }) + `<p class="text-fine text-granite">${esc(words)} Not voting counts being away and choosing not to vote alike.</p>`;
+          }
+          blocks.push(question("How often do they vote?", body));
+        } else {
+          blocks.push(question("How often do they vote?", "<p>No roll call votes are recorded for them yet this session.</p>"));
+        }
+
+        // 2. party agreement, Democrats and Republicans only
+        if (slim.party === "Democratic" || slim.party === "Republican") {
+          const l = full.loyalty;
+          let body: string;
+          if (l) {
+            const pct = round(l.pct);
+            body = `<p>Voted with most ${esc(partyPlural(slim.party))} on ${fig(`${pct}%`)} of ${fig(l.n.toLocaleString())} votes in the ${esc(l.label)}.</p>`;
+            const t = typical?.loyalty;
+            if (t && t.session === l.session) {
+              const words = `The middle half of ${members} voted with their party ${round(t.low)}% to ${round(t.high)}% of the time.`;
+              body += rangeBar({
+                value: l.pct, min: 50, max: 100, typical: t,
+                left: "50%", right: "100%",
+              }) + `<p class="text-fine text-granite">${esc(words)}</p>`;
+            }
+          } else {
+            body = "<p>Not enough recorded votes yet this session to measure.</p>";
+          }
+          blocks.push(question("How often do they vote with their party?", body));
+        }
+
+        // 3. bills
+        const au = full.authored;
+        const bills = [
+          au.total > 0
+            ? `Led ${fig(au.total)} ${plural(au.total, "bill", "bills")} this session.` +
+              (au.enacted === 0 ? " None became law." : ` ${fig(au.enacted)} became law.`) +
+              (au.vetoed ? ` ${fig(au.vetoed)} ${plural(au.vetoed, "was", "were")} vetoed.` : "") +
+              (au.noHearing ? ` ${fig(au.noHearing)} never got a hearing.` : "")
+            : "They haven't led a bill this session.",
+          au.signedOn ? ` Signed on in support of ${fig(au.signedOn)} more.` : "",
+        ].join("");
+        blocks.push(question("What have they tried to pass?",
+          `<p>${bills} ${link(`/legislators/${slim.slug}/#bills-led`, "See their bills")}</p>`));
+
+        // 4. committees, leaders first
+        const cs = (full.committees ?? []).slice().sort((x, y) => ROLE_RANK(x.role) - ROLE_RANK(y.role));
+        if (cs.length) {
+          const byRole = new Map<string, string[]>();
+          for (const c of cs) {
+            const role = ROLE_LABEL(c.role);
+            byRole.set(role, [...(byRole.get(role) ?? []), link(`/committees/${c.slug}/`, c.name)]);
+          }
+          blocks.push(question("Which committees are they on?",
+            '<ul class="flex flex-col gap-1">' +
+            [...byRole.entries()].map(([role, list]) => `<li><span class="font-bold">${role}:</span> ${list.join(", ")}</li>`).join("") +
+            '</ul>'));
+        }
+
+        // 5. the ballot
+        const status = ballotStatus(full.election);
+        const seat = `/elections/${status.kind !== "none" ? status.year : ""}/${house}-${district}/`;
+        const opponents = full.opponents ?? [];
+        const when = general ? longDate(general) : "";
+        const raceLink = status.kind !== "none" && status.kind !== "future" ? ` ${link(seat, "See the race")}` : "";
+        const writeIns = full.writeInPending ?? [];
+        // a write-in nominee may exist that the certified results don't name
+        const writeInLine = writeIns.length
+          ? ` The ${esc(writeIns.join(" and "))} primary had no printed candidate, so a write-in nominee may also be on the ballot.`
+          : "";
+        let ballot = "";
+        if (status.kind === "on-ballot") {
+          ballot = summaries?.phase === "general"
+            ? opponents.length
+              ? `Yes. ${when ? `On ${esc(when)}, they` : "They"} face ${people(opponents)}.`
+              : writeIns.length
+                ? `Yes. No other candidate's name is on the ballot for this seat${when ? ` on ${esc(when)}` : ""}.`
+                : `Yes. They're running unopposed${when ? ` on ${esc(when)}` : ""}.`
+            : `Yes, they're on the ${status.year} ballot.` + (opponents.length ? ` Others approved for this seat: ${people(opponents)}.` : "");
+          ballot += writeInLine;
+        } else if (status.kind === "not-running") {
+          // not on the November ballot: retired, lost a primary, or not
+          // approved; the report doesn't say which, so neither do we
+          ballot = `No. They're not on the November ${status.year} ballot.` +
+            (opponents.length ? ` On the ballot for this seat: ${people(opponents)}.` : "") + writeInLine;
+        } else if (status.kind === "pending") {
+          ballot = `The Elections Commission hasn't posted yet whether they're running in ${status.year}.`;
+        } else if (status.kind === "future") {
+          ballot = `Not this year. This seat is next on the ballot in ${status.year}.`;
+        }
+        if (ballot) {
+          blocks.push(question("Are they on your ballot?",
+            `<p>${ballot}${raceLink}</p>` +
+            (status.kind !== "future"
+              ? '<p class="text-fine text-granite">From the Elections Commission\'s ballot report. Check MyVote Wisconsin for your own ballot.</p>'
+              : "")));
+        }
+
+        // 6. the latest vote, then the few before it
+        const votes = full.recentVotes ?? [];
+        const voteLine = (v: RepSummary["recentVotes"][number], long: boolean) => {
+          const how = v.option === "yes" ? "Voted yes" : v.option === "no" ? "Voted no" : "Didn't vote";
+          // the official title, as written, after its "Relating to:"
+          const about = (v.title ?? "").replace(/^\s*relating to:\s*/i, "").replace(/\.\s*$/, "");
+          const subject = about ? `, relating to ${esc(clip(about, long ? 90 : 60))}` : "";
+          return `${how} on ${link(`/bills/${v.session}/${v.slug}/`, v.identifier)}${subject}. ${esc(fmtDate(v.date))}. ${link(`/votes/${v.event}/`, long ? "See the vote" : "Vote")}` +
+            (v.motion ? `<span class="block text-fine text-granite">Official motion: “${esc(v.motion)}”</span>` : "");
+        };
+        if (votes.length) {
+          let body = `<p>${voteLine(votes[0], true)}</p>`;
+          if (votes.length > 1) {
+            body +=
+              '<details class="group"><summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">' +
+              `<span class="group-open:hidden">See ${votes.length - 1} earlier ${plural(votes.length - 1, "vote", "votes")}</span><span class="hidden group-open:inline">Hide earlier votes</span></summary>` +
+              '<ul class="flex flex-col">' +
+              votes.slice(1).map((v) => `<li class="border-t border-rule py-2 text-small">${voteLine(v, false)}</li>`).join("") +
+              '</ul></details>';
+          }
+          blocks.push(question("How did they vote most recently?", body));
+        }
+      }
+
+      const foot =
+        '<div class="flex flex-wrap items-center gap-5 border-t border-rule pt-4">' +
+        `<button type="button" class="btn btn-secondary aria-pressed:border-lake" data-follow-kind="legislators" data-follow-id="${esc(slim.slug)}" aria-pressed="false" aria-describedby="${headingId}"><span data-follow-text>Follow</span></button>` +
+        `<a href="/legislators/${esc(slim.slug)}/" class="font-bold underline">Full record</a>` +
+        '</div>';
+
+      return (
+        `<section class="sheet flex min-w-0 flex-[1_1_26rem] flex-col gap-5 break-words p-5 sm:p-7" aria-labelledby="${headingId}">` +
+        head + blocks.join("") + foot + '</section>'
+      );
+    }
+
+    /** The council card, for addresses inside a covered city. */
     function cityCard(): string {
       const saved = savedCityDistrict();
       const info = saved && localReps ? localReps[saved.t] : null;
       if (!saved || !info) return "";
       const alders = info.districts[String(saved.d)] ?? [];
       return (
-        '<div class="rounded-lg border border-navy-100 p-4">' +
-        '<div class="min-w-0 flex-1">' +
-        `<a class="inline-block py-1 text-xs font-semibold uppercase tracking-wide text-navy-600 hover:underline" href="/local/${esc(info.slug)}/">${esc(info.council)} · District ${saved.d}</a>` +
-        alders
-          .map(
-            (a) =>
-              '<p class="mt-1.5 flex items-center gap-2">' +
-              (a.image
-                ? `<img src="${esc(a.image)}" alt="" width="40" height="40" loading="lazy" decoding="async" class="h-10 w-10 shrink-0 rounded-full border border-navy-100 bg-navy-50 object-cover object-[50%_25%]">`
-                : "") +
-              `<a class="text-lg font-bold leading-tight hover:underline" href="/local/${esc(info.slug)}/${esc(a.slug)}/">${esc(a.name)}</a></p>`,
-          )
-          .join("") +
-        '</div>' +
-        `<p class="mt-2 text-sm"><a class="inline-block py-1 font-semibold underline" href="/local/${esc(info.slug)}/">How the ${esc(info.city)} council votes &rarr;</a></p>` +
-        '</div>'
+        '<section class="sheet flex min-w-0 flex-[1_1_26rem] flex-col gap-3 p-5 sm:p-7" aria-labelledby="rep-city">' +
+        `<h2 id="rep-city" class="t-label text-[1.1875rem]">Your city council: ${link(`/local/${info.slug}/`, `${info.council}, District ${saved.d}`)}</h2>` +
+        alders.map((m) =>
+          '<p class="flex items-center gap-3">' +
+          (m.image
+            ? `<img src="${esc(m.image)}" alt="" width="48" height="48" loading="lazy" decoding="async" class="h-12 w-12 shrink-0 rounded-full bg-fog object-cover object-[50%_25%]">`
+            : "") +
+          `<a class="t-question text-spruce no-underline hover:underline" href="/local/${esc(info.slug)}/${esc(m.slug)}/">${esc(m.name)}</a></p>`,
+        ).join("") +
+        `<p>${link(`/local/${info.slug}/`, `How the ${info.city} council votes`)}</p>` +
+        '</section>'
       );
+    }
+
+    function paintFollows() {
+      repsEl.querySelectorAll<HTMLButtonElement>("[data-follow-kind]").forEach((btn) => {
+        const id = btn.dataset.followId!;
+        const text = btn.querySelector<HTMLElement>("[data-follow-text]")!;
+        const paint = (on: boolean) => {
+          btn.setAttribute("aria-pressed", String(on));
+          text.textContent = on ? "Following" : "Follow";
+        };
+        paint(isFollowing("legislators", id));
+        btn.addEventListener("click", () => paint(toggleFollow("legislators", id)));
+      });
+    }
+
+    // ---- the two states of the page ----
+    const titleEl = $("page-title");
+    const introStart = $("intro-start");
+    const introResult = $("intro-result");
+    const changeWrap = $("change-wrap");
+    const lookupEl = $("lookup");
+    const mapEl = $("map");
+    const previewEl = $("preview");
+
+    function showStart() {
+      titleEl.textContent = "Find your state lawmakers";
+      introStart.hidden = false;
+      introResult.hidden = true;
+      changeWrap.hidden = true;
+      lookupEl.hidden = false;
+      mapEl.hidden = true;
+      previewEl.hidden = false;
+      resultEl.classList.add("hidden");
     }
 
     function show(props: { ad: number; sd: number }, announce = false) {
       saveDistrict(props);
+      const { ad, sd } = props;
+      titleEl.textContent = "Your state lawmakers";
+      introStart.hidden = true;
+      introResult.textContent =
+        `You live in Assembly District ${ad} and Senate District ${sd}. ` +
+        "Everyone in Wisconsin has two state lawmakers: one in each half of the Legislature.";
+      introResult.hidden = false;
+      changeWrap.hidden = false;
+      lookupEl.hidden = true;
+      previewEl.hidden = true;
+      // Wisconsin nests three Assembly districts in each Senate district
+      if (Math.ceil(ad / 3) === sd) {
+        const img = $<HTMLImageElement>("map-img");
+        img.src = `/data/maps/assembly-${ad}.svg`;
+        img.alt = `Map: Assembly District ${ad} inside Senate District ${sd}`;
+        $("map-caption").textContent = `Assembly District ${ad} (yellow) sits inside Senate District ${sd} (outlined).`;
+        mapEl.hidden = false;
+      } else {
+        mapEl.hidden = true;
+      }
       repsEl.innerHTML = [
-        repCard(
-          `Assembly District ${props.ad}`,
-          `/districts/assembly-${props.ad}/`,
-          reps!.assembly[props.ad],
-          summaries?.assembly?.[props.ad],
-        ),
-        repCard(
-          `Senate District ${props.sd}`,
-          `/districts/senate-${props.sd}/`,
-          reps!.senate[props.sd],
-          summaries?.senate?.[props.sd],
-        ),
+        personCard("assembly", ad, reps!.assembly[ad], summaries?.assembly?.[ad]),
+        personCard("senate", sd, reps!.senate[sd], summaries?.senate?.[sd]),
         cityCard(),
-        '<p class="rounded-lg bg-navy-50 px-3 py-2 text-sm text-navy-700">Every bill page will now pin how these two voted, and they are highlighted anywhere they appear.</p>',
-      ]
-        .filter(Boolean)
-        .join("");
+      ].filter(Boolean).join("");
+      paintFollows();
       resultEl.classList.remove("hidden");
       if (announce) {
-        statusEl.textContent = `Found: Assembly District ${props.ad}, Senate District ${props.sd}.`;
-        document.getElementById("result-heading")!.focus();
+        statusEl.textContent = `Found: Assembly District ${ad}, Senate District ${sd}.`;
+        titleEl.focus();
       }
     }
 
-    document.getElementById("addr-form")!.addEventListener("submit", async (e) => {
+    $("addr-form").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const addr = (document.getElementById("addr") as HTMLInputElement).value;
+      const addr = $<HTMLInputElement>("addr").value;
       statusEl.textContent = "Looking up address…";
       const [result] = await Promise.all([districtForAddress(addr), loadData()]);
       if ("error" in result) {
@@ -331,10 +510,9 @@ import { PLACES_KEY } from "../lib/placesKey";
       show(result.district, true);
     });
 
-    attachSuggest(document.getElementById("addr") as HTMLInputElement, () =>
-      (document.getElementById("addr-form") as HTMLFormElement).requestSubmit());
+    attachSuggest($<HTMLInputElement>("addr"), () => $<HTMLFormElement>("addr-form").requestSubmit());
 
-    document.getElementById("geo-btn")!.addEventListener("click", async () => {
+    $("geo-btn").addEventListener("click", async () => {
       statusEl.textContent = "Asking your browser for your location…";
       try {
         const result = await districtForBrowser();
@@ -356,12 +534,18 @@ import { PLACES_KEY } from "../lib/placesKey";
       }
     });
 
-    document.getElementById("forget")!.addEventListener("click", () => {
+    $("change-addr").addEventListener("click", () => {
+      lookupEl.hidden = false;
+      changeWrap.hidden = true;
+      $<HTMLInputElement>("addr").focus();
+    });
+
+    $("forget").addEventListener("click", () => {
       forgetDistrict();
       forgetCityDistrict();
-      resultEl.classList.add("hidden");
-      statusEl.textContent = "Forgotten.";
-      (document.getElementById("addr") as HTMLInputElement).focus();
+      showStart();
+      statusEl.textContent = "Forgotten. Your districts are no longer saved on this device.";
+      $<HTMLInputElement>("addr").focus();
     });
 
     const saved = savedDistrict();
@@ -370,9 +554,9 @@ import { PLACES_KEY } from "../lib/placesKey";
     }
 
     // polling place: user-entered, device-only
-    const pollingInput = document.getElementById("polling-input") as HTMLInputElement;
-    const pollingSaved = document.getElementById("polling-saved")!;
-    const pollingValue = document.getElementById("polling-value")!;
+    const pollingInput = $<HTMLInputElement>("polling-input");
+    const pollingSaved = $("polling-saved");
+    const pollingValue = $("polling-value");
     function renderPolling() {
       const place = savedPollingPlace();
       pollingSaved.classList.toggle("hidden", !place);
@@ -381,7 +565,7 @@ import { PLACES_KEY } from "../lib/placesKey";
         pollingInput.value = place;
       }
     }
-    document.getElementById("polling-form")!.addEventListener("submit", (e) => {
+    $("polling-form").addEventListener("submit", (e) => {
       e.preventDefault();
       const value = pollingInput.value.trim();
       if (value) {
@@ -389,7 +573,7 @@ import { PLACES_KEY } from "../lib/placesKey";
         renderPolling();
       }
     });
-    document.getElementById("polling-forget")!.addEventListener("click", () => {
+    $("polling-forget").addEventListener("click", () => {
       forgetPollingPlace();
       pollingInput.value = "";
       renderPolling();
@@ -398,3 +582,13 @@ import { PLACES_KEY } from "../lib/placesKey";
     renderPolling();
   </script>
 </Base>
+
+<style is:global>
+  /* the range bar keeps its track and marks in Windows High Contrast */
+  @media (forced-colors: active) {
+    .range,
+    .range * {
+      forced-color-adjust: none;
+    }
+  }
+</style>
