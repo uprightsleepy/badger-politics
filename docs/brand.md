@@ -152,7 +152,8 @@ vote in the other chamber, Governor, Law. A resolution's route ends at Adopted.
   - Not reached: a hollow dot with an Edge border and a dashed Edge line.
 - **Labels:** the current stop gets a sentence ("Stopped here. No hearing was scheduled."). The stops
   around it get only their name and date.
-- **Layout:** vertical on phones, horizontal from 720 px.
+- **Layout:** vertical in narrow spaces, horizontal once the route's own container is 34rem (544 px)
+  wide, so it works the same in the status block and anywhere else it appears.
 - **Markup:** an `<ol>` with each stop's state in text, for example a visually hidden ", not reached".
   It must work in forced-colors mode.
 - **The stopping point is honest:** a bill that never got a hearing stops at Committee, not at
@@ -167,6 +168,17 @@ A white sheet at the top of every bill page:
 3. The route.
 4. One line of fine print with the official wording, for example "Failed to pass pursuant to Senate
    Joint Resolution 1", with its term linked.
+
+### Header
+
+- **Desktop:** white, two quiet rows. First the mark and wordmark, search, and the "Your districts" chip
+  (or "Find your lawmakers" before an address is saved). Then the sections: Bills, Lawmakers, Money,
+  Calendar, Elections, Following.
+- **Phones:** mark, a search button and Menu. Once an address is saved, the districts chip sits under
+  the bar.
+- **Section names** are plain: "All bills", "New laws", "Bills by subject", "Governor's decisions",
+  "Vetoes", "Bills that never got a hearing", "State lawmakers", "Members of Congress", "City councils",
+  "Campaign money", "Outside spending".
 
 ### "You are here" highlight
 
@@ -189,11 +201,13 @@ Nothing else uses Prairie.
 ### Terms (inline definitions)
 
 - **In the text:** a term of art gets a dotted Granite underline the first time it appears on a page.
-  Activating it opens a small popover on desktop or a bottom sheet on phones. The first line is a bold
-  one-sentence definition, then optional detail, then "Official term" and a link to the glossary.
+  Activating it opens its definition: a bottom sheet on phones, a small card on wider screens. It's a
+  native `popover`, so it needs no script. The card gives the plain name, a one-sentence definition,
+  "Official term" and a link to the glossary.
 - **At the foot of the page:** bill, lawmaker and money pages end with "Terms on this page", generated
   from the terms the page used.
-- **One source:** the glossary is the single source of every definition.
+- **One source:** the glossary is the single source of every definition (`site/src/lib/glossary.ts`):
+  full entries for the glossary page, short plain ones for "Terms on this page".
 
 ### Range bar (a value against what's typical)
 
@@ -320,6 +334,18 @@ The baseline is WCAG 2.2 AA, checked with axe in `site/scripts/a11y.mjs` plus a 
 | `StatusBadge` colored pills | Status headline and route |
 | `Stepper` (✕ on Introduced for committee deaths) | Route with an honest stopping point |
 | Navy masthead with gold call-to-action | White header, search, "Your districts" chip |
-| "Hearing: None", "Veto Tracker", "The Governor's Desk", "Civic Calendar" | Plain names, for example "Bills that never got a hearing", "Vetoes", "Waiting for the governor", "Calendar" (URLs may change, with redirects) |
+| "Hearing: None", "Veto Tracker", "The Governor's Desk", "Civic Calendar" | Plain names, for example "Bills that never got a hearing", "Vetoes", "Governor's decisions", "Calendar" (URLs may change later, with redirects) |
 | Gold silhouette mark | Spruce silhouette with a Prairie Capitol dot |
 | System font only | Overpass and Atkinson Hyperlegible Next, self-hosted |
+
+## Rolling it out
+
+The redesign ships one page type at a time. Until a page type is redone:
+
+- **Legacy color names** (`navy-*`, `gold-*`, `badger-*`, `moss-*`, `paper`, `ink`) are mapped onto this
+  palette in `global.css`, so older pages already use the new colors without red, blue or party hues.
+  Each name is removed once nothing uses it.
+- **Redesigned pages** opt into the new frame with `<Base layout="wide">` (1160 px, wider gutters).
+  Others keep the original 1024 px column.
+- **Shared pieces** (header, footer, fonts, party and status chips, roll calls, follow buttons) are
+  already new everywhere.

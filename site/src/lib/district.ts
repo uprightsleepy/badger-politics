@@ -31,8 +31,9 @@ export const forgetDistrict = (): void => {
 };
 
 /** How the reader's own things look everywhere: their reps, their
- * districts, their race. */
-export const MINE_CLASS = "bg-gold-100 rounded px-1 font-semibold";
+ * districts, their race. The `.mine` style (Prairie tint) lives in
+ * global.css; it is the one "look here" color the brand allows. */
+export const MINE_CLASS = "mine";
 
 /** A spoken prefix for screen readers, ahead of the visible text. */
 export const srPrefix = (el: Element, text: string): void => {

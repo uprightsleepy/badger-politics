@@ -1,24 +1,62 @@
 /** Regenerate public/og.png, the social share card. Run after a brand or
- * tagline change: `node scripts/make-og.mjs`. Reuses the real favicon
- * artwork so the card can never drift from the site's mark. */
-import { readFile, writeFile } from "node:fs/promises";
-import sharp from "sharp";
+ * tagline change: `BROWSER_PATH=... node scripts/make-og.mjs`.
+ *
+ * Renders with the same headless browser the harness uses, so the card is
+ * set in the site's own self-hosted fonts (Overpass and Atkinson
+ * Hyperlegible Next) and reuses the real mark. See docs/brand.md. */
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { launchBrowser } from "./lib/serve.mjs";
 
-const fav = await readFile("public/favicon.svg", "utf-8");
-const inner = fav.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+// fonts inline as data: URLs, so the page needs no file or network access
+const font = async (pkg, file) =>
+  "data:font/woff2;base64," +
+  (await readFile(fileURLToPath(new URL(`../node_modules/@fontsource-variable/${pkg}/files/${file}`, import.meta.url)))).toString("base64");
+const overpass = await font("overpass", "overpass-latin-wght-normal.woff2");
+const atkinson = await font("atkinson-hyperlegible-next", "atkinson-hyperlegible-next-latin-wght-normal.woff2");
+const mark = await readFile(fileURLToPath(new URL("../public/mark.svg", import.meta.url)), "utf-8");
 
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="#16233a"/>
-  <rect x="0" y="610" width="1200" height="20" fill="#c9962e"/>
-  <svg x="88" y="150" width="320" height="320" viewBox="0 0 1000 1000">${inner}</svg>
-  <text x="468" y="248" font-family="Georgia, 'Times New Roman', serif" font-size="80" font-weight="700" fill="#ffffff">Badger Politics</text>
-  <text x="468" y="314" font-family="Georgia, 'Times New Roman', serif" font-size="34" fill="#c9962e">Wisconsin&#8217;s Legislature, in plain sight.</text>
-  <text x="468" y="388" font-family="Arial, Helvetica, sans-serif" font-size="27" fill="#d9e2ee">Every bill. Every vote. Every committee graveyard.</text>
-  <text x="468" y="434" font-family="Arial, Helvetica, sans-serif" font-size="27" fill="#d9e2ee">Free, independent, and never behind a login.</text>
-  <text x="468" y="512" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#c9962e">badgerpolitics.org</text>
-</svg>`;
+const html = `<!doctype html><meta charset="utf-8"><style>
+@font-face { font-family: Overpass; src: url(${overpass}); font-weight: 100 900; }
+@font-face { font-family: Atkinson; src: url(${atkinson}); font-weight: 200 800; }
+html, body { margin: 0; }
+body { width: 1200px; height: 630px; background: #F4F6F2; color: #18241F; font-family: Atkinson, sans-serif; position: relative; overflow: hidden; }
+.mark { position: absolute; left: 96px; top: 118px; width: 300px; }
+.mark svg { width: 100%; height: auto; display: block; }
+.copy { position: absolute; left: 470px; top: 150px; right: 80px; }
+h1 { font: 800 84px/1 Overpass, sans-serif; margin: 0; letter-spacing: -0.01em; }
+.tag { font: 700 34px/1.2 Overpass, sans-serif; margin: 22px 0 0; }
+.sub { font-size: 29px; line-height: 1.4; color: #55605A; margin: 22px 0 0; }
+.url { font: 700 28px/1 Overpass, sans-serif; color: #0D5C63; margin: 34px 0 0; }
+.route { position: absolute; left: 96px; right: 96px; bottom: 64px; height: 30px; }
+.road { position: absolute; top: 13px; height: 0; }
+.done { left: 9px; width: 40%; border-top: 5px solid #0D5C63; }
+.ahead { left: 40%; right: 9px; border-top: 5px dashed #848E88; }
+.dot { position: absolute; top: 6px; width: 18px; height: 18px; border-radius: 50%; box-sizing: border-box; background: #fff; border: 4px solid #848E88; }
+.dot.past { background: #0D5C63; border-color: #0D5C63; }
+.dot.here { top: -1px; width: 32px; height: 32px; margin-left: -7px; background: #F2C34F; border: 4px solid #18241F; }
+</style>
+<div class="mark">${mark}</div>
+<div class="copy">
+  <h1>Badger Politics</h1>
+  <p class="tag">Wisconsin's Legislature, in plain words.</p>
+  <p class="sub">Every bill, where it stands, and who's behind it. Free and independent.</p>
+  <p class="url">badgerpolitics.org</p>
+</div>
+<div class="route" aria-hidden="true">
+  <div class="road done"></div><div class="road ahead"></div>
+  ${[0, 20, 40, 60, 80, 100].map((x, i) => `<span class="dot ${i < 2 ? "past" : i === 2 ? "here" : ""}" style="left: calc(${x}% - ${x / 100 * 18}px)"></span>`).join("")}
+</div>`;
 
-await writeFile("scripts/.og.svg", svg);
-await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toFile("public/og.png");
-const m = await sharp("public/og.png").metadata();
-console.log(`og.png ${m.width}x${m.height}`);
+const browser = await launchBrowser();
+try {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1200, height: 630, deviceScaleFactor: 1 });
+  await page.setContent(html, { waitUntil: "load" });
+  await page.evaluate(() => document.fonts.ready);
+  const out = fileURLToPath(new URL("../public/og.png", import.meta.url));
+  await page.screenshot({ path: out, clip: { x: 0, y: 0, width: 1200, height: 630 } });
+  console.log("og.png 1200x630");
+} finally {
+  await browser.close();
+}

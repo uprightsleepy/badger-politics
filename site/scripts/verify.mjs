@@ -91,20 +91,21 @@ check(
 // portraits from third-party hosts and the check below reads the DOM.
 await page.goto("http://127.0.0.1:8931/legislators/", { waitUntil: "domcontentloaded" });
 await page.waitForFunction(
-  () => [...document.querySelectorAll("a")].some((a) => a.classList.contains("bg-gold-100")),
+  () => [...document.querySelectorAll("a")].some((a) => a.classList.contains("mine")),
   { timeout: 30000 },
 ).catch(() => {});
-const highlighted = await page.$$eval("a.bg-gold-100", (as) => as.map((a) => a.textContent.trim()));
+const highlighted = await page.$$eval("a.mine", (as) => as.map((a) => a.textContent.trim()));
 check(
   "saved reps highlighted on legislators index",
   highlighted.some((t) => t.includes("Tenorio")) && highlighted.some((t) => t.includes("Hutton")),
   JSON.stringify(highlighted.slice(0, 4)),
 );
 
-// 4. AB 656 page shows Hearing None banner + LRB analysis
+// 4. AB 656 page says plainly it stopped without a hearing + LRB analysis
 await page.goto("http://127.0.0.1:8931/bills/2025/ab656/", { waitUntil: "networkidle2" });
 const body = await page.$eval("body", (el) => el.textContent);
-check("AB 656 shows Hearing None banner", body.includes("died at the end of the session without ever receiving"));
+check("AB 656 says it stopped in committee without a hearing",
+  body.includes("Stopped in committee") && body.includes("never got a public hearing"));
 check("AB 656 leads with LRB analysis", body.includes("marriageable age"));
 check("footer carries independence disclaimer", body.includes("independent project, not affiliated with the State of Wisconsin"));
 check("GoatCounter script requested", goatRequested, "");

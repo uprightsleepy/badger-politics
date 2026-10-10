@@ -213,12 +213,15 @@ export const actionsFor = (billId: string) =>
 
 export const sponsorsFor = (billId: string) =>
   prep(
-      `SELECT s.name, s.person_id, s.is_primary, p.party, p.district, p.chamber
+      `SELECT s.name, s.person_id, s.is_primary, p.party, p.district, p.chamber,
+         p.name AS full_name
        FROM sponsorships s LEFT JOIN people p ON p.id = s.person_id
        WHERE s.bill_id = ? ORDER BY s.is_primary DESC, s.name`,
     )
     .all(billId) as {
     name: string;
+    /** The member's full name, when the sponsor resolved to a person. */
+    full_name: string | null;
     person_id: string | null;
     is_primary: number;
     party: string | null;

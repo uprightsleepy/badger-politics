@@ -1,4 +1,4 @@
-import PERSON_SLUGS from "../data/person-slugs.json";
+import PERSON_SLUGS from "../data/person-slugs.json" with { type: "json" };
 import { esc } from "./html.ts";
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -23,23 +23,50 @@ export const STATUS_SHORT: Record<string, string> = {
   failed_sjr1: "Died",
 };
 
-export const STATUS_STYLES: Record<string, string> = {
-  introduced: "bg-navy-50 text-navy-700",
-  in_committee: "bg-gold-100 text-navy-800",
-  passed_chamber: "bg-navy-100 text-navy-800",
-  passed: "bg-navy-100 text-navy-800",
-  adopted: "bg-moss-50 text-moss-600",
-  enacted: "bg-moss-50 text-moss-600",
-  vetoed: "bg-badger-50 text-badger-700",
-  failed_sjr1: "bg-badger-50 text-badger-700",
+// Status is told by its words, never by color: every status shares one
+// neutral chip (docs/brand.md, "No status colors").
+const STATUS_CHIP = "bg-fog text-spruce";
+export const STATUS_STYLES: Record<string, string> = Object.fromEntries(
+  Object.keys(STATUS_LABELS).map((k) => [k, STATUS_CHIP]),
+);
+
+// Party is a word, not a color: one neutral style for every party.
+export const partyStyle = (_party: string | null): string =>
+  "bg-white text-spruce ring-1 ring-inset ring-edge";
+
+/** "Democratic" (the party's name) -> "Democrat" (what a member is). */
+export const partyWord = (party: string | null): string =>
+  party === "Democratic" ? "Democrat" : (party ?? "Party not recorded");
+
+/** "Democratic" -> "Democrats"; for counts in sentences. */
+export const partyPlural = (party: string): string =>
+  party === "Democratic"
+    ? "Democrats"
+    : party === "Republican"
+      ? "Republicans"
+      : /^independent$/i.test(party)
+        ? "independents"
+        : `${party} members`;
+
+const IDENT_WORDS: Record<string, string> = {
+  AB: "Assembly Bill",
+  SB: "Senate Bill",
+  AJR: "Assembly Joint Resolution",
+  SJR: "Senate Joint Resolution",
+  AR: "Assembly Resolution",
+  SR: "Senate Resolution",
+};
+/** "AB 656" -> "Assembly Bill 656". Unknown prefixes stay as printed. */
+export const identifierLong = (identifier: string): string => {
+  const m = /^([A-Z]+)\s*(\d+)$/.exec(identifier.trim());
+  return m && IDENT_WORDS[m[1]] ? `${IDENT_WORDS[m[1]]} ${m[2]}` : identifier;
 };
 
-export const partyStyle = (party: string | null): string =>
-  party === "Republican"
-    ? "bg-badger-50 text-badger-700"
-    : party === "Democratic"
-      ? "bg-navy-50 text-navy-700"
-      : "bg-gold-100 text-navy-800";
+/** "2025" -> "2025–26 session"; special sessions keep their own name. */
+export const sessionPlainName = (sessionId: string, name: string): string =>
+  /^\d{4}$/.test(sessionId)
+    ? `${sessionId}–${String((Number(sessionId) + 1) % 100).padStart(2, "0")} session`
+    : name;
 
 export const partyLetter = (party: string | null): string =>
   party ? party[0] : "?";
@@ -169,47 +196,3 @@ export const COMPENSATION = {
   assembly: { overnight: 171, day: 85.5 },
   senate: { overnight: 140, note: "half rate for Dane County members" },
 };
-
-/** How a bill becomes law: the stepper's stations, derived from status.
- * Resolutions never go to the governor, so their track ends at adoption. */
-export function stepperState(
-  status: string | null,
-  chamber: string | null,
-  classification: string | null = null,
-) {
-  const first = chamber === "upper" ? "Senate" : "Assembly";
-  const second = chamber === "upper" ? "Assembly" : "Senate";
-  const isResolution = classification?.includes("resolution") ?? false;
-  const oneHouse = isResolution && !(classification ?? "").includes("joint");
-  const steps = isResolution
-    ? [
-        { label: "Introduced" },
-        { label: `Passes ${first}` },
-        ...(oneHouse ? [] : [{ label: `Passes ${second}` }]),
-        { label: "Adopted" },
-      ]
-    : [
-        { label: "Introduced" },
-        { label: `Passes ${first}` },
-        { label: `Passes ${second}` },
-        { label: "Governor signs" },
-        { label: "Law" },
-      ];
-  const reached: Record<string, number> = {
-    introduced: 1,
-    in_committee: 1,
-    passed_chamber: 2,
-    passed: 3,
-    adopted: steps.length,
-    failed_sjr1: 1,
-    // a vetoed bill passed BOTH chambers; the stop is the governor's desk
-    vetoed: 4,
-    enacted: 5,
-  };
-  // a one-house resolution is fully adopted at "passed one chamber"
-  if (oneHouse && status === "passed_chamber") {
-    return { steps, reached: steps.length, failed: false };
-  }
-  const failed = status === "failed_sjr1" || status === "vetoed";
-  return { steps, reached: reached[status ?? "introduced"] ?? 1, failed };
-}
