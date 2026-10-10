@@ -14,7 +14,6 @@
  */
 import Base from "../../../layouts/Base.astro";
 import FilterBar from "../../../components/FilterBar.astro";
-import SourceStrip from "../../../components/SourceStrip.astro";
 import StanceChip from "../../../components/StanceChip.astro";
 import { independentExpenditures, conduitFlows } from "../../../lib/db";
 import { fmtMoney, fmtDate } from "../../../lib/format";
@@ -35,117 +34,100 @@ const facets = [
 ---
 
 <Base
-  title="Outside Spending on Wisconsin Candidates"
+  title="Outside spending on Wisconsin candidates"
   description="Every independent-expenditure filing in Wisconsin, one record at a time, with the Ethics Commission's transaction IDs and links to the reports they were filed on."
   breadcrumbs={[{ name: "Money", url: "/money/" }]}
+  layout="wide"
 >
-  <p class="text-sm text-navy-600"><a href="/money/" class="underline">Campaign money</a></p>
-  <h1 class="mt-1 text-2xl font-bold">Outside Spending, Filing by Filing</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Groups other than a candidate's own committee can spend unlimited
-    amounts on ads about that candidate, as long as they don't coordinate
-    with the campaign. The Ethics Commission calls each such purchase an
-    <strong>independent expenditure</strong>; the group filing it records
-    whether the ad supports or opposes a campaign. Below is every one we
-    hold, exactly as filed: nothing is added up. Each row carries the
-    Commission's transaction ID and links to the report it appeared on and
-    to the filer's official page.
-  </p>
-  <SourceStrip
-    sources={[{
-      label: "Wisconsin Ethics Commission filings",
-      href: "https://campaignfinance.wi.gov/browse-data/transactions",
-    }]}
-    through={latest}
-  />
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <a href="/money/" class="self-start text-small underline">Campaign money</a>
+    <h1 class="t-display">Outside spending, filing by filing</h1>
+    <p class="sm:text-lead">
+      Groups other than a candidate's own committee can spend any amount on ads about that candidate,
+      as long as they don't coordinate with the campaign. Here is every such filing we have, exactly as
+      filed. Nothing is added up.
+    </p>
+    <p class="text-small text-granite">
+      The Ethics Commission calls each purchase an “independent expenditure,” and the
+      group that files it says whether the ad supports or opposes a campaign. Each row has the Commission's
+      transaction ID and links to the report it was on and to the filer's official page.
+      {latest && ` The newest filing is from ${fmtDate(latest)}.`}
+    </p>
+  </header>
 
-  <div class="mt-4">
+  <div class="mt-4 max-w-[47.5rem]">
     <FilterBar
+      wide
       id="filing-filter"
       statusId="filing-filter-status"
-      label="Filter filings"
-      placeholder="e.g. Crowley, Believe in Wisconsin, Beacon Media…"
+      label="Find a filing"
+      placeholder="A group, candidate or vendor"
       facetAttr="stance"
-      facetLabel="Filed as"
+      facetLabel="Show filings that are"
       facets={facets}
     />
   </div>
 
-  <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+  <ul class="mt-3 max-w-[60rem] border-b border-rule" role="list">
     {filings.map((t) => (
       <li
         data-filing-row
         data-text={`${t.filer_name ?? ""} ${t.related_name ?? ""} ${t.purpose ?? ""} ${t.other_name ?? ""} ${t.related_office ?? ""} ${t.related_district ?? ""} ${t.id}`.toLowerCase()}
         data-stance={t.stance.toLowerCase()}
-        class="px-4 py-2"
+        class="flex flex-col gap-1.5 border-t border-rule py-3"
       >
-        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(t.date)}</span>
-          <span class="min-w-0 flex-1">
-            <a href={officialUrl(t.filer_entity_id)} class="underline">
-              {t.filer_name ?? "committee not named"}
-            </a>
-            {t.filer_type && <span class="text-xs text-navy-600"> &middot; {t.filer_type}</span>}
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <span class="min-w-0 flex-1 [overflow-wrap:anywhere]">
+            <a href={officialUrl(t.filer_entity_id)} class="font-bold underline">{t.filer_name ?? "Committee not named"}</a>{t.filer_type && <span class="text-small text-granite">, {t.filer_type}</span>}
           </span>
-          <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(t.amount)}</span>
+          <span class="shrink-0 font-display font-bold tabular-nums">{fmtMoney(t.amount)}</span>
         </div>
-        <p class="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:pl-[6.75rem]">
+        <p class="flex flex-wrap items-center gap-x-2 gap-y-1">
           <StanceChip stance={t.stance} />
-          <span class="min-w-0">{t.related_name}</span>
-          {(t.related_office || t.related_district) && (
-            <span class="text-xs text-navy-600">
-              ({[t.related_office, t.related_district].filter(Boolean).join(" ")})
-            </span>
-          )}
+          <span class="min-w-0">
+            {t.related_name}
+            {(t.related_office || t.related_district) && (
+              <span class="text-small text-granite"> ({[t.related_office, t.related_district].filter(Boolean).join(" ")})</span>
+            )}
+          </span>
         </p>
-        <p class="mt-0.5 text-xs text-navy-600 sm:pl-[6.75rem]">
-          {t.other_name && <>Paid to {t.other_name}{t.purpose ? ` for ${t.purpose.toLowerCase()}` : ""} &middot; </>}
-          Commission transaction ID <span class="font-semibold tabular-nums">{t.id}</span>
-          {t.report_id != null && (
-            <>
-              {" "}&middot;{" "}
-              <a href={`https://campaignfinance.wi.gov/browse-data/report/${t.report_id}`} class="underline">
-                {t.report_name ?? "filed report"} &#8599;
-              </a>
-            </>
-          )}
+        <p class="text-small text-granite">
+          {fmtDate(t.date)}.
+          {t.other_name && <> Paid to {t.other_name}{t.purpose ? ` for ${t.purpose.toLowerCase()}` : ""}.</>}
+          {" "}Transaction ID <span class="tabular-nums">{t.id}</span>{t.report_id != null && <>, on <a href={`https://campaignfinance.wi.gov/browse-data/report/${t.report_id}`} class="underline">{t.report_name ?? "the filed report"}</a></>}.
         </p>
       </li>
     ))}
   </ul>
-  <p id="filing-no-match" class="mt-3 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600">
-    No filings match. Try a shorter word, or clear the filter.
-  </p>
+  <p id="filing-no-match" class="mt-4 hidden text-granite"></p>
 
   {conduits.length > 0 && (
-    <section class="mt-10">
-      <h2 class="text-xl font-bold">Conduit pass-throughs</h2>
-      <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        A conduit collects earmarked money from individuals and forwards it
-        to a candidate. The conduit files the transaction, but the money is
-        not the conduit's own. The individuals chose the recipient. Shown
-        by where the money actually landed.
+    <section class="mt-12 max-w-[60rem]" aria-labelledby="conduits-heading">
+      <h2 id="conduits-heading" class="t-section">Money passed through conduits</h2>
+      <p class="mt-2 max-w-[47.5rem] text-small text-granite">
+        A conduit collects money that individuals have set aside for a candidate and passes it on. The
+        conduit files the transaction, but the money isn't its own: the individuals chose who gets it.
+        Shown by where the money ended up.
       </p>
-      <ul class="mt-3 space-y-1">
+      <ul class="mt-3 border-b border-rule" role="list">
         {conduits.map((c) => (
-          <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
-            <span class="min-w-0 flex-1 truncate font-semibold">{c.conduit}</span>
-            <span class="shrink-0 text-navy-600">→</span>
-            <span class="min-w-0 flex-1 truncate">{c.recipient}</span>
-            <span class="shrink-0 text-xs text-navy-600">{c.n.toLocaleString()} gifts</span>
-            <span class="shrink-0 font-semibold tabular-nums">{fmtMoney(c.total)}</span>
+          <li class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-rule py-2.5">
+            <span class="min-w-0 flex-1 [overflow-wrap:anywhere]">
+              <span class="font-bold">{c.conduit}</span> to {c.recipient}
+              <span class="block text-small text-granite">{c.n.toLocaleString()} {c.n === 1 ? "gift" : "gifts"}</span>
+            </span>
+            <span class="shrink-0 font-display font-bold tabular-nums">{fmtMoney(c.total)}</span>
           </li>
         ))}
       </ul>
     </section>
   )}
 
-  <p class="mt-8 max-w-3xl text-xs text-navy-600">
-    Source: Wisconsin Ethics Commission campaign finance filings, browsable
-    at <a href="https://campaignfinance.wi.gov/browse-data/transactions" class="underline">campaignfinance.wi.gov</a>.
-    Committees register and report only after crossing statutory
-    thresholds, so spending below them never appears in any filing.
-    <a href="/about/#money" class="underline"> Full methodology</a>
+  <p class="mt-10 max-w-[47.5rem] text-fine text-granite">
+    From the Wisconsin Ethics Commission's campaign finance filings, which you can search in
+    {" "}<a href="https://campaignfinance.wi.gov/browse-data/transactions" class="underline">the Commission's transaction browser</a>.
+    Committees register and report only after crossing amounts set by law, so spending below them never
+    appears in any filing. <a href="/about/#money" class="underline">Full methodology</a>
   </p>
 
   <script>

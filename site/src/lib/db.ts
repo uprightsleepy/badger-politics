@@ -1022,6 +1022,9 @@ const partyTotals = (where: string, extra: Record<string, unknown> = {}) =>
 
 // covered = members whose linked committees actually carry receipts; a
 // receipt-less mapping is an incomplete link, not coverage
+/** How many sitting legislators have collected receipts, of how many. */
+export const moneyCoverage = (): { covered: number; sitting: number } => coverage();
+
 const coverage = once(() => ({
   covered: (prep("SELECT COUNT(DISTINCT person_id) AS n FROM contributions").get() as { n: number }).n,
   sitting: (prep("SELECT COUNT(*) AS n FROM people WHERE current_role IN ('Representative', 'Senator')")

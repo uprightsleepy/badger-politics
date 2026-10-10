@@ -346,12 +346,7 @@ const ledSentence =
                   const pid = personIdByName(c.candidate);
                   return (
                     <li class={isThem ? "font-bold" : ""}>
-                      {pid && pid !== person.id ? (
-                        <a href={`/legislators/${personSlug(pid)}/`} class="underline">{c.candidate}</a>
-                      ) : (
-                        c.candidate
-                      )}
-                      {c.party && `, ${partyWord(c.party)}`}: <span class="figure">{pct}%</span>
+                      {pid && pid !== person.id ? <a href={`/legislators/${personSlug(pid)}/`} class="underline">{c.candidate}</a> : c.candidate}{c.party && `, ${partyWord(c.party)}`}: <span class="figure">{pct}%</span>
                       <span class="text-small font-normal text-granite"> ({c.votes.toLocaleString()} votes)</span>
                     </li>
                   );
