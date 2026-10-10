@@ -1,9 +1,8 @@
 ---
 import Base from "../../layouts/Base.astro";
 import FilterBar from "../../components/FilterBar.astro";
-import SourceStrip from "../../components/SourceStrip.astro";
-import { allCommittees } from "../../lib/db";
-import { committeeChamber, committeeSlug, personSlug, fmtDate } from "../../lib/format";
+import { allCommittees, committeeFor, hearingsBegin, meta } from "../../lib/db";
+import { committeeChamber, committeeSlug, committeeTitle, personSlug, fmtDate } from "../../lib/format";
 
 const committees = allCommittees();
 const chamberKey = (c: string | null) => (c == null ? "joint" : c);
@@ -12,84 +11,92 @@ const facets = [
   { key: "upper", label: "Senate" },
   { key: "joint", label: "Joint and legislative" },
 ].map((f) => ({ ...f, count: committees.filter((c) => chamberKey(c.chamber) === f.key).length }));
+const n = (x: number) => x.toLocaleString();
+const plural = (x: number, one: string, many: string) => `${n(x)} ${x === 1 ? one : many}`;
+const pulledOn = meta().imported_at?.slice(0, 10);
+// hearing records begin later than the bill records: say from when
+const since = hearingsBegin();
+const sinceText = since
+  ? new Date(`${since}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })
+  : null;
+// co-chaired committees name both
+const chairsOf = (id: string) => committeeFor(id).members.filter((m) => /^(co-)?chair$/i.test(m.role));
 ---
 
 <Base
   title="Committees"
   description="Every Wisconsin Legislature committee: members, chairs, hearings, and the bills that died there without a hearing."
   breadcrumbs={[{ name: "Legislature", url: "/bills/" }]}
+  layout="wide"
 >
-  <h1 class="text-2xl font-bold">Committees</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Committees decide which bills get hearings. A chair alone decides whether
-    a bill is heard, which makes these small rooms the most consequential
-    places in the Capitol.
-  </p>
-  <SourceStrip sources={[{ label: "Wisconsin Legislature", href: "https://docs.legis.wisconsin.gov" }]} />
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">Committees</h1>
+    <p class="sm:text-lead">
+      Most bills are sent to a committee first. The committee's chair decides whether a bill gets a
+      public hearing, and a bill that never gets one rarely moves.
+    </p>
+    {sinceText && (
+      <p class="text-small text-granite">
+        Hearing counts start in {sinceText}, when our hearing records begin. Bills that never got a
+        hearing are counted across every session on record.
+      </p>
+    )}
+  </header>
 
-  <div class="mt-4">
+  <div class="mt-4 max-w-[47.5rem]">
     <FilterBar
+      wide
       id="cmte-filter"
       statusId="cmte-filter-status"
-      label="Filter committees"
-      placeholder="e.g. education, Jagler, agriculture…"
+      label="Find a committee"
+      placeholder="A topic or a chair's name"
       facetAttr="chamber"
-      facetLabel="Chamber"
+      facetLabel="Show committees from"
       facets={facets}
     />
   </div>
 
-  <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
+  <ul class="cmte-rows mt-3 border-t border-rule" role="list">
     {committees.map((c) => (
       <li
         data-cmte-row
-        data-text={`${c.name} ${c.chair_name ?? ""} ${committeeChamber(c.chamber)}`.toLowerCase()}
+        data-text={`${committeeTitle(c.name, c.chamber)} ${chairsOf(c.id).map((m) => m.name).join(" ")} ${committeeChamber(c.chamber)}`.toLowerCase()}
         data-chamber={chamberKey(c.chamber)}
-        class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5"
+        class="cmte-row flex flex-col gap-1 border-b border-rule py-4"
       >
-        <span class="min-w-0 flex-1 basis-56">
-          <a href={`/committees/${committeeSlug(c.id)}/`} class="font-semibold underline">
-            {c.name}
-          </a>
-          <span class="ml-2 rounded-full bg-navy-50 px-2 py-0.5 text-xs text-navy-700">
-            {committeeChamber(c.chamber)}
-          </span>
-        </span>
-        {c.chair_name && (
-          <span class="text-xs text-navy-600">
-            Chair:{" "}
-            {c.chair_person_id ? (
-              <a href={`/legislators/${personSlug(c.chair_person_id)}/`} class="inline-block py-1.5 underline">
-                {c.chair_name}
-              </a>
-            ) : (
-              c.chair_name
-            )}
-          </span>
-        )}
-        <span class="shrink-0 text-xs tabular-nums text-navy-600">{c.member_count} members</span>
-        <span class="shrink-0 text-xs tabular-nums text-navy-600">
-          {c.hearings_held.toLocaleString()} hearings
-        </span>
+        <h2 class="t-question">
+          <a href={`/committees/${committeeSlug(c.id)}/`} class="inline-flex min-h-11 items-center underline">{committeeTitle(c.name, c.chamber)}</a>
+        </h2>
+        <p class="text-small">
+          {(() => {
+            const chairs = chairsOf(c.id);
+            if (!chairs.length) return null;
+            const label = chairs.some((m) => /^co-/i.test(m.role)) ? (chairs.length > 1 ? "Co-chairs" : "Co-chair") : "Chair";
+            return (
+              <>{label}: {chairs.map((m, i) => (
+                <>{i > 0 && (i === chairs.length - 1 ? " and " : ", ")}<a href={`/legislators/${personSlug(m.id)}/`} class="underline">{m.name}</a></>
+              ))}. </>
+            );
+          })()}
+          {plural(c.member_count, "member", "members")}. {plural(c.hearings_past, "public hearing", "public hearings")}{sinceText ? ` since ${sinceText}` : ""}.
+        </p>
         {c.next_hearing ? (
-          <span class="shrink-0 text-xs font-semibold text-moss-600">
-            Next hearing {fmtDate(c.next_hearing)}
-          </span>
+          <p class="text-small font-bold">Next hearing: {fmtDate(c.next_hearing)}</p>
         ) : (
           c.died_here > 0 && (
-            <a
-              href={`/committees/${committeeSlug(c.id)}/`}
-              class="inline-block shrink-0 py-1.5 text-xs tabular-nums text-badger-700 underline"
-            >
-              {c.died_here.toLocaleString()} {c.died_here === 1 ? "bill" : "bills"} died without a hearing
-            </a>
+            <p class="text-small text-granite">
+              {plural(c.died_here, "bill", "bills")} sent here never got a hearing.
+            </p>
           )
         )}
       </li>
     ))}
   </ul>
-  <p id="cmte-no-match" class="mt-3 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600">
-    No committees match. Try a shorter word, or clear the chamber filter.
+  <p id="cmte-no-match" class="mt-4 hidden text-granite"></p>
+
+  <p class="mt-8 text-fine text-granite">
+    From the <a href="https://docs.legis.wisconsin.gov/committees" class="underline">Legislature's committee pages</a>
+    and hearing notices{pulledOn && `, checked ${fmtDate(pulledOn)}`}.
   </p>
 
   <script>
@@ -104,3 +111,16 @@ const facets = [
     });
   </script>
 </Base>
+
+<style>
+  @media (min-width: 48rem) {
+    .cmte-rows {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 2.5rem;
+    }
+  }
+  .cmte-row:global(.sorted-hidden) {
+    display: none;
+  }
+</style>

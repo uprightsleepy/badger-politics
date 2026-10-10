@@ -1,16 +1,19 @@
 ---
+/** One legislative seat: who holds it now, where it sits (Wisconsin nests
+ * three Assembly districts inside each Senate district), whether it is on
+ * the ballot, everyone who has held it, and its official results. */
 import Base from "../../layouts/Base.astro";
-import SourceStrip from "../../components/SourceStrip.astro";
 import FollowButton from "../../components/FollowButton.astro";
-import DistrictMap from "../../components/DistrictMap.astro";
+import Portrait from "../../components/Portrait.astro";
 import {
   seatTerms, sittingPeople, electionFor, electionHistoryFor, lastMarginFor, ballotPhase,
-  writeInPending,
+  writeInPending, meta, serviceRecordsBegin,
 } from "../../lib/db";
-import { partyLetter, partyStyle, personSlug, monthYear, chamberName } from "../../lib/format";
+import { personSlug, monthYear, chamberName, partyWord, fmtDate } from "../../lib/format";
 import { safeHref } from "../../lib/html";
 import { mergeServiceSpans } from "../../lib/service";
-import { ballotStatus, seatOffice } from "../../lib/ballot";
+import { ballotStatus, seatOffice, writeInSentence } from "../../lib/ballot";
+import { hasSeatMap, stateLocatorSvg, SEAT_MAP_FILL } from "../../lib/seatMap";
 
 export function getStaticPaths() {
   const seats = [
@@ -26,15 +29,17 @@ const { chamber, district } = Astro.props;
 // the shape map is keyed the way the URL is: assembly-14 / senate-5
 const seatKey = `${chamber === "upper" ? "senate" : "assembly"}-${district}`;
 const seatName = `${chamberName(chamber)} District ${district}`;
+const isSenate = chamber === "upper";
+// Senate District n holds Assembly Districts 3n-2, 3n-1 and 3n
+const senateOf = Math.ceil(district / 3);
+const assemblyIn = [3 * district - 2, 3 * district - 1, 3 * district];
 
 const holder = sittingPeople().find((p) => p.chamber === chamber && p.district === district);
 const election = holder ? electionFor(holder.id) : undefined;
 const opponents = election?.opponents.filter((o) => o.ballot_status !== "Deny") ?? [];
 const ballot = ballotStatus(election);
-const openPrimaries = writeInPending(seatOffice(chamber, district)).map((p) => p.party);
-const alone = openPrimaries.length
-  ? `; the ${openPrimaries.join(" and ")} write-in line is still open`
-  : ballotPhase() === "general" ? ", unopposed" : ", unopposed so far";
+const phase = ballotPhase();
+const openPrimaries = writeInPending(seatOffice(chamber, district));
 const history = electionHistoryFor(chamber, district);
 const lastMargin = lastMarginFor(chamber, district);
 
@@ -61,6 +66,75 @@ const lineage = [...byPerson.entries()]
     })),
   )
   .sort((a, b) => (a.start < b.start ? 1 : -1));
+// when the current holder's present stint began, for the lead
+const since = holder ? lineage.find((s) => s.person_id === holder.id && !s.end)?.start : undefined;
+// the records begin with the 2009 session: a stint that starts there may
+// have started earlier
+const recordsBegin = serviceRecordsBegin();
+const sinceAtLeast = !!since && !!recordsBegin && since <= recordsBegin;
+
+// ---- words ----
+const article = (w: string) => (/^[aeiou]/i.test(w) ? "an" : "a");
+const who = (name: string, party: string | null) =>
+  party ? `${name}, ${article(partyWord(party))} ${partyWord(party)}` : name;
+// as the subject of a sentence: "Dana Whitfield, a Democrat, won"
+const subject = (name: string, party: string | null) => (party ? `${who(name, party)},` : name);
+/** "January 2025" */
+const monthLong = (iso: string) =>
+  new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+// names carry ", a Republican", so two of them need a comma before "and"
+const list = (xs: string[]) =>
+  xs.length < 2 ? xs.join("") : xs.length === 2 ? `${xs[0]}, and ${xs[1]}` : `${xs.slice(0, -1).join("; ")}; and ${xs.at(-1)}`;
+const others = list(
+  opponents.map((o) => who(o.name, o.party) + (o.ballot_status === "Challenged" ? " (ballot access challenged)" : "")),
+);
+const writeInLine = openPrimaries.length ? ` ${writeInSentence(openPrimaries)}` : "";
+let ballotLine = "";
+if (holder && ballot.kind === "on-ballot") {
+  ballotLine =
+    phase === "general"
+      ? opponents.length
+        ? `${holder.name} is on the November ${ballot.year} ballot, running against ${others}.`
+        : openPrimaries.length
+          ? `${holder.name} is on the November ${ballot.year} ballot. No other nominee for this seat is settled yet.`
+          : `${holder.name} is on the November ${ballot.year} ballot, running unopposed.`
+      : `${holder.name} is on the ${ballot.year} ballot.` + (opponents.length ? ` Also running for this seat: ${others}.` : "");
+  ballotLine += writeInLine;
+} else if (holder && ballot.kind === "not-running") {
+  ballotLine = `${holder.name} isn't on the November ${ballot.year} ballot.` +
+    (opponents.length ? ` Running for this seat: ${others}.` : "") + writeInLine;
+} else if (holder && ballot.kind === "pending") {
+  ballotLine = `The Elections Commission hasn't posted yet whether ${holder.name} is running in ${ballot.year}.`;
+} else if (ballot.kind === "future") {
+  ballotLine = `This seat is next on the ballot in November ${ballot.year}.`;
+}
+const marginLine = lastMargin
+  ? lastMargin.margin === null
+    ? `In ${lastMargin.year}, the winner ran unopposed.`
+    : `In ${lastMargin.year}, the race was decided by ${lastMargin.margin.toFixed(1)} points.`
+  : "";
+const pct = (votes: number, total: number) => (total ? `${((votes / total) * 100).toFixed(1)}%` : "");
+/** One sentence on who won, honest about ties and missing totals. */
+const resultLine = (h: (typeof history)[number]) => {
+  const [first, second] = h.candidates;
+  const cast = h.total ? ` of ${h.total.toLocaleString()} votes cast` : "";
+  if (h.candidates.length === 1) {
+    return `${subject(first.candidate, first.party)} ran unopposed and got ${first.votes.toLocaleString()}${cast ? cast : " votes"}.`;
+  }
+  if (second && second.votes === first.votes) {
+    return `${who(first.candidate, first.party)}, and ${who(second.candidate, second.party)}, tied with ${first.votes.toLocaleString()} votes each.`;
+  }
+  return h.total
+    ? `${subject(first.candidate, first.party)} won with ${pct(first.votes, h.total)}${cast}.`
+    : `${subject(first.candidate, first.party)} won with ${first.votes.toLocaleString()} votes.`;
+};
+const pulledOn = meta().imported_at?.slice(0, 10);
+const mapLabel = isSenate
+  ? `Map of ${seatName} and its three Assembly districts`
+  : `Map of ${seatName} inside Senate District ${senateOf}`;
+const mapCaption = isSenate
+  ? `${seatName} is filled, with white lines between its three Assembly districts. The small map shows where it is in Wisconsin.`
+  : `${seatName} is shaded, inside Senate District ${senateOf}, outlined. The small map shows where it is in Wisconsin.`;
 ---
 
 <Base
@@ -68,117 +142,198 @@ const lineage = [...byPerson.entries()]
   breadcrumbs={[{ name: "Districts", url: "/districts/" }]}
   filters={{ type: "District" }}
   description={`${seatName}: the current member, everyone who has held the seat since 2009, and official election results.`}
+  layout="wide"
 >
-  <p class="text-sm text-navy-600"><a href="/districts/" class="underline">← All districts</a></p>
-  <div class="mt-2 flex flex-wrap items-center gap-3">
-    <h1 class="text-2xl font-bold">{seatName}</h1>
-    <span class="ml-auto" data-pagefind-ignore>
-      <FollowButton kind="districts" id={seatKey} />
-    </span>
-  </div>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    The district's current member, everyone who has held the seat since 2009, and official election results.
-  </p>
-  <SourceStrip
-    sources={[
-      { label: "Wisconsin LTSB (2024 boundaries)" },
-      { label: "Wisconsin Elections Commission", href: "https://elections.wi.gov" },
-    ]}
-    through={null}
-  />
-
-  <div class="mt-3 max-w-[240px]">
-    <DistrictMap seat={seatKey} label={seatName} />
-  </div>
-
-  {holder ? (
-    <div class="mt-3 rounded-lg border border-navy-100 bg-white p-4">
-      <p class="text-sm text-navy-600">Current member</p>
-      <p class="mt-1 flex items-baseline gap-2 text-lg font-bold">
-        <a href={`/legislators/${personSlug(holder.id)}/`} class="underline">{holder.name}</a>
-        <span class={`rounded px-1.5 text-sm ${partyStyle(holder.party)}`}>{holder.party ?? "?"}</span>
+  <div class="seat">
+    <header class="s-head flex max-w-[47.5rem] flex-col gap-2.5">
+      <a href="/districts/" class="self-start text-small underline">All districts</a>
+      <h1 class="t-display">{seatName}</h1>
+      <p class="sm:text-lead">
+        {holder ? (
+          <>Represented by <a href={`/legislators/${personSlug(holder.id)}/`} class="underline">{holder.name}</a>{holder.party ? `, ${article(partyWord(holder.party))} ${partyWord(holder.party)},` : ""}{since ? (sinceAtLeast ? ` since at least ${monthLong(since)}.` : ` since ${monthLong(since)}.`) : "."}</>
+        ) : (
+          "This seat is empty right now."
+        )}
+        {" "}
+        {isSenate ? (
+          <>
+            It holds three Assembly districts:{" "}
+            {assemblyIn.map((ad, i) => (
+              <>{i > 0 && (i === assemblyIn.length - 1 ? " and " : ", ")}<a href={`/districts/assembly-${ad}/`} class="underline">Assembly District {ad}</a></>
+            ))}.
+          </>
+        ) : (
+          <>
+            It's one of three Assembly districts in{" "}
+            <a href={`/districts/senate-${senateOf}/`} class="underline">Senate District {senateOf}</a>.
+          </>
+        )}
       </p>
-      {ballot.kind !== "none" && (
-        <p class="mt-1 text-sm text-navy-700">
-          {ballot.kind === "on-ballot"
-            ? `On the November ${ballot.year} ballot${opponents.length ? `, challenged by ${opponents.map((o) => `${o.name} (${partyLetter(o.party)})`).join(", ")}` : alone}`
-            : ballot.kind === "not-running"
-              ? `Not on the November ${ballot.year} ballot`
-              : ballot.kind === "pending"
-                ? `November ${ballot.year} ballot status not yet posted by the Elections Commission`
-                : `Seat next on the ballot in November ${ballot.year}`}
-          {ballot.kind !== "future" && (
-            <a href={`/elections/2026/${seatKey}/`} class="ml-2 underline">2026 race &rarr;</a>
-          )}
-        </p>
-      )}
-      {lastMargin && (
-        <p class="mt-1 text-sm text-navy-600">
-          {lastMargin.margin === null
-            ? `Unopposed in ${lastMargin.year}.`
-            : `Decided by ${lastMargin.margin.toFixed(1)} points in ${lastMargin.year}.`}
-        </p>
-      )}
-    </div>
-  ) : (
-    <p class="mt-3 rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600">
-      The seat is currently vacant.
-    </p>
-  )}
-
-  <section class="mt-6">
-    <h2 class="text-xl font-bold">Who has held this seat</h2>
-    <p class="mt-1 max-w-3xl text-sm text-navy-600">
-      From the Legislature's service records; our records begin with the 2009
-      session. District boundaries were redrawn in 2011, 2022, and again in
-      2024, so the seat's constituency shifts across those lines.
-    </p>
-    <ul class="mt-3 space-y-1">
-      {lineage.map((s) => (
-        <li class="rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
-          <div class="flex flex-wrap items-baseline gap-x-3">
-            <a href={`/legislators/${personSlug(s.person_id)}/`} class="min-w-0 py-1 font-bold underline">{s.name}</a>
-            <span class={`shrink-0 rounded px-1 text-xs ${partyStyle(s.party)}`}>{partyLetter(s.party)}</span>
-            <span class="shrink-0 text-navy-700">{monthYear(s.start)} to {s.end ? monthYear(s.end) : "present"}</span>
-          </div>
-          {s.end_label && (
-            <p class="text-xs text-navy-600">
-              {safeHref(s.end_url) ? <a href={safeHref(s.end_url)} class="inline-block py-1 underline">{s.end_label}</a> : <span class="inline-block py-1">{s.end_label}</span>}
-            </p>
-          )}
-        </li>
-      ))}
-    </ul>
-  </section>
-
-  {history.length > 0 && (
-    <section class="mt-6">
-      <h2 class="text-xl font-bold">General-election results</h2>
-      <p class="mt-1 text-sm text-navy-600">
-        Official Wisconsin Elections Commission canvass results.
+      <p data-mine-seat={seatKey} data-pagefind-ignore hidden>
+        <span class="mine">This is your district</span>
       </p>
-      <div class="mt-3 space-y-3">
-        {history.map((h) => (
-          <div class="rounded-lg border border-navy-100 bg-white px-4 py-3 text-sm">
-            <p class="flex flex-wrap items-baseline gap-x-3 font-bold">
-              November {h.year}
-              <span class="text-xs font-normal text-navy-600">{h.total.toLocaleString()} ballots cast</span>
-            </p>
-            <ul class="mt-1 space-y-0.5">
-              {h.candidates.map((c) => (
-                <li class="flex flex-wrap items-baseline gap-x-3">
-                  <span class="min-w-0 flex-1">{c.candidate}</span>
-                  <span class={`shrink-0 rounded px-1 text-xs ${partyStyle(c.party)}`}>{partyLetter(c.party)}</span>
-                  <span class="w-20 shrink-0 text-right tabular-nums">{c.votes.toLocaleString()}</span>
-                  <span class="w-14 shrink-0 text-right tabular-nums text-navy-600">
-                    {h.total ? `${((c.votes / h.total) * 100).toFixed(1)}%` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+    </header>
+
+    <aside class="s-rail flex flex-col gap-5" data-pagefind-ignore>
+      <div class="flex flex-col gap-2">
+        <FollowButton kind="districts" id={seatKey} label={`Follow ${seatName}`} variant="primary" />
+        <p class="text-fine text-granite">Following saves it on this device.</p>
       </div>
-    </section>
-  )}
+      {hasSeatMap(seatKey) && (
+        <figure class="flex flex-col gap-3 rounded-[0.75rem] bg-white p-4">
+          <img src={`/data/maps/seats/${seatKey}.svg`} alt={mapLabel} width="700" height="490" class="h-auto w-full rounded-[0.5rem]" />
+          <figcaption class="flex flex-wrap items-start gap-3 text-fine text-granite">
+            <Fragment set:html={stateLocatorSvg(seatKey, SEAT_MAP_FILL.senate, ' class="h-auto w-14 shrink-0" aria-hidden="true"')} />
+            <span class="min-w-0 flex-[1_1_8rem] [overflow-wrap:anywhere]">{mapCaption} Boundaries are the Legislature's 2024 maps.</span>
+          </figcaption>
+        </figure>
+      )}
+    </aside>
+
+    <div class="s-body flex max-w-[47.5rem] flex-col gap-10">
+      {holder && (
+        <section class="sheet flex flex-col gap-4 p-5 sm:p-7" aria-labelledby="member-heading" data-no-rep-highlight>
+          <div class="flex flex-wrap items-center gap-4">
+            <Portrait src={holder.image_url} name={holder.name} size={64} />
+            <div class="min-w-0 flex-[1_1_12rem]">
+              <h2 id="member-heading" class="t-section text-[1.375rem]">
+                <a href={`/legislators/${personSlug(holder.id)}/`} class="text-spruce no-underline hover:underline">{holder.name}</a>
+              </h2>
+              <p class="text-granite">
+                {isSenate ? "State senator" : "State representative"}{holder.party && `. ${partyWord(holder.party)}`}.
+              </p>
+            </div>
+          </div>
+          {(ballotLine || marginLine) && (
+            <div class="flex flex-col gap-1.5 border-t border-rule pt-4">
+              <h3 class="t-question">On the ballot</h3>
+              {ballotLine && (
+                <p>
+                  {ballotLine}
+                  {ballot.kind !== "future" && ballot.kind !== "none" && (
+                    <> <a href={`/elections/2026/${seatKey}/`} class="underline">See the race</a></>
+                  )}
+                </p>
+              )}
+              {marginLine && <p class="text-small text-granite">{marginLine}</p>}
+            </div>
+          )}
+          <p class="border-t border-rule pt-4">
+            <a href={`/legislators/${personSlug(holder.id)}/`} class="font-bold underline">Their full record</a>
+          </p>
+        </section>
+      )}
+
+      <section aria-labelledby="held-heading">
+        <h2 id="held-heading" class="t-section">Who has held this seat</h2>
+        <p class="mt-2 text-small text-granite">
+          From the Legislature's service records, which begin with the 2009 session. District lines
+          were redrawn in 2011, 2022 and 2024, so the area this seat covers has changed over time.
+        </p>
+        <ol class="mt-4 border-y border-rule" role="list" data-no-rep-highlight>
+          {lineage.map((s, i) => (
+            <li class:list={["flex flex-col gap-0.5 py-3", i > 0 && "border-t border-rule"]}>
+              <p class="flex flex-wrap items-baseline gap-x-2">
+                <a href={`/legislators/${personSlug(s.person_id)}/`} class="font-display font-bold underline">{s.name}</a>
+                {s.party && <span class="text-granite">{partyWord(s.party)}</span>}
+              </p>
+              <p class="text-small">{monthYear(s.start)} to {s.end ? monthYear(s.end) : "now"}</p>
+              {s.end_label && (
+                <p class="text-fine text-granite">
+                  {safeHref(s.end_url) ? <a href={safeHref(s.end_url)} class="underline">{s.end_label}</a> : s.end_label}
+                </p>
+              )}
+            </li>
+          ))}
+        </ol>
+        {lineage.length === 0 && <p class="mt-3 text-granite">No service records for this seat yet.</p>}
+      </section>
+
+      {history.length > 0 && (
+        <section aria-labelledby="results-heading">
+          <h2 id="results-heading" class="t-section">Election results</h2>
+          <p class="mt-2 text-small text-granite">
+            Official general-election counts from the Wisconsin Elections Commission. Shares are of all
+            votes cast, including write-ins.
+          </p>
+          <div class="mt-4 flex flex-col">
+            {history.map((h) => {
+              const [first, second] = h.candidates;
+              return (
+                <section class="flex flex-col gap-3 border-t border-rule py-5" aria-labelledby={`results-${h.year}`}>
+                  <h3 id={`results-${h.year}`} class="t-question">November {h.year}</h3>
+                  <p>{resultLine(h)}</p>
+                  {h.candidates.length === 2 && (
+                    <div class="flex flex-col gap-1.5">
+                      <div class="split flex h-3 overflow-hidden rounded-full bg-fog" aria-hidden="true">
+                        <span class="block h-full bg-spruce" style={`width:${((first.votes / (first.votes + second.votes)) * 100).toFixed(1)}%`}></span>
+                      </div>
+                      <div class="flex flex-wrap justify-between gap-x-4 text-small">
+                        <span><span class="font-bold">{first.candidate}</span>{first.party && `, ${partyWord(first.party)}`}: {first.votes.toLocaleString()} <span class="text-granite">{pct(first.votes, h.total)}</span></span>
+                        <span class="text-right"><span class="font-bold">{second.candidate}</span>{second.party && `, ${partyWord(second.party)}`}: {second.votes.toLocaleString()} <span class="text-granite">{pct(second.votes, h.total)}</span></span>
+                      </div>
+                    </div>
+                  )}
+                  {h.candidates.length > 2 && (
+                    <ul class="flex flex-col gap-2" role="list">
+                      {h.candidates.map((c) => (
+                        <li class="flex flex-col gap-1">
+                          <p class="flex flex-wrap items-baseline justify-between gap-x-4 text-small">
+                            <span><span class="font-bold">{c.candidate}</span>{c.party && `, ${partyWord(c.party)}`}</span>
+                            <span class="tabular-nums">{c.votes.toLocaleString()} <span class="text-granite">{pct(c.votes, h.total)}</span></span>
+                          </p>
+                          <div class="split h-2 rounded-full bg-fog" aria-hidden="true">
+                            <span class="block h-full rounded-full bg-lake" style={`width:${h.total ? ((c.votes / h.total) * 100).toFixed(1) : 0}%`}></span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <p class="text-fine text-granite">
+        Boundaries from the Legislative Technology Services Bureau's 2024 maps. Results from the
+        {" "}<a href="https://elections.wi.gov" class="underline">Wisconsin Elections Commission</a>.
+        {pulledOn && ` Checked ${fmtDate(pulledOn)}.`}
+      </p>
+    </div>
+  </div>
 </Base>
+
+<style>
+  .seat {
+    display: grid;
+    gap: 2rem;
+    grid-template-areas: "head" "rail" "body";
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .s-head { grid-area: head; }
+  .s-rail { grid-area: rail; }
+  .s-body { grid-area: body; }
+  @media (min-width: 64rem) {
+    .seat {
+      grid-template-areas: "head rail" "body rail";
+      grid-template-columns: minmax(0, 1fr) 20rem;
+      grid-template-rows: auto 1fr;
+      column-gap: 3.5rem;
+    }
+    .s-rail {
+      align-self: start;
+    }
+  }
+  @media (forced-colors: active) {
+    .split {
+      forced-color-adjust: none;
+      border: 1px solid CanvasText;
+      background: Canvas;
+    }
+    .split span {
+      background: CanvasText;
+    }
+  }
+</style>

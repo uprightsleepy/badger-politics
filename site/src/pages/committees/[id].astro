@@ -1,17 +1,24 @@
 ---
+/** One committee: who chairs it and sits on it, its hearings, and the
+ * bills sent here that never got one. */
 import Base from "../../layouts/Base.astro";
-import SourceStrip from "../../components/SourceStrip.astro";
 import FollowButton from "../../components/FollowButton.astro";
-import PartyChip from "../../components/PartyChip.astro";
 import { existsSync } from "node:fs";
-import { allCommittees, committeeFor } from "../../lib/db";
-import { committeeChamber, committeeSlug, personSlug, fmtDate, fmtTime, roleAbbr } from "../../lib/format";
+import { allCommittees, committeeFor, hearingsBegin, meta } from "../../lib/db";
+import {
+  committeeChamber, committeeSlug, committeeTitle, personSlug, fmtDate, fmtTime, chamberName,
+  partyWord, sessionPlainName,
+} from "../../lib/format";
+import { safeHref } from "../../lib/html";
 
 export function getStaticPaths() {
-  // the directory row already carries this page's two headline counts
+  // the directory row already carries this page's headline counts
   return allCommittees().map((c) => ({
     params: { id: committeeSlug(c.id) },
-    props: { committeeId: c.id, record: { hearingsHeld: c.hearings_held, diedUnheard: c.died_here } },
+    props: {
+      committeeId: c.id,
+      record: { hearingsPast: c.hearings_past, diedUnheard: c.died_here },
+    },
   }));
 }
 const { committeeId, record } = Astro.props;
@@ -24,146 +31,167 @@ const hasFeed = existsSync(
 const today = new Date().toISOString().slice(0, 10);
 const upcoming = hearings.filter((h) => (h.date ?? "") >= today).reverse();
 const recent = hearings.filter((h) => (h.date ?? "") < today);
+const shown = upcoming.length > 0 ? upcoming : recent;
+const title = committeeTitle(committee.name, committee.chamber);
+const ROLE: Record<string, string> = { chair: "Chair", "co-chair": "Co-chair", "vice-chair": "Vice-chair" };
 const roleLabel = (role: string) =>
-  role === "member" ? null : role.replace(/\b\w/g, (c) => c.toUpperCase());
+  ROLE[role.toLowerCase()] ?? (role === "member" ? null : role.replace(/^\w/, (c) => c.toUpperCase()));
+const chairs = members.filter((m) => /^(co-)?chair$/i.test(m.role));
+const n = (x: number) => x.toLocaleString();
+const plural = (x: number, one: string, many: string) => `${n(x)} ${x === 1 ? one : many}`;
+const seat = (m: (typeof members)[number]) =>
+  m.chamber && m.district != null ? `${chamberName(m.chamber)} District ${m.district}` : "";
+const pulledOn = meta().imported_at?.slice(0, 10);
+// hearing records begin later than the bill records: say from when
+const since = hearingsBegin();
+const sinceText = since
+  ? new Date(`${since}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })
+  : null;
+const article = (w: string) => (/^[aeiou]/i.test(w) ? "an" : "a");
+const chairName = (m: (typeof members)[number]) =>
+  m.party ? `${m.name}, ${article(partyWord(m.party))} ${partyWord(m.party)}` : m.name;
 ---
 
 <Base
-  title={committee.name}
+  title={title}
   filters={{ type: "Committee", chamber: committeeChamber(committee.chamber) }}
-  description={`${committeeChamber(committee.chamber)} committee: members, hearings, and bills that died here without a hearing.`}
+  description={`${title}: members, hearings, and bills that died here without a hearing.`}
   breadcrumbs={[{ name: "Committees", url: "/committees/" }]}
+  layout="wide"
 >
-  <p class="text-sm text-navy-600"><a href="/committees/" class="underline">Committees</a></p>
-  <div class="mt-1 flex flex-wrap items-center gap-3">
-    <h1 class="text-2xl font-bold">
-      {committee.chamber ? `${committeeChamber(committee.chamber)} ` : ""}{committee.name}
-    </h1>
-    <span class="ml-auto flex items-center gap-3" data-pagefind-ignore>
-      <FollowButton kind="committees" id={committeeSlug(committee.id)} />
-      {hasFeed && (
-        <a href={`/feeds/committees/${committeeSlug(committee.id)}.xml`} class="text-xs underline">Atom feed</a>
-      )}
-    </span>
-  </div>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    This committee's members, its hearings, and the bills referred here, including the ones that never got a hearing.
-  </p>
-  <SourceStrip sources={[{ label: "Wisconsin Legislature", href: "https://docs.legis.wisconsin.gov" }]} />
-
-  <section class="mt-4 rounded-lg border border-navy-100 bg-white p-4">
-      <h2 class="font-bold">What this committee did</h2>
-      <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Committees decide which bills get hearings. A chair alone decides
-        whether a bill is heard, which makes these small rooms the most
-        consequential places in the Capitol.
+  <div class="cmte">
+    <header class="c-head flex max-w-[47.5rem] flex-col gap-2.5">
+      <a href="/committees/" class="self-start text-small underline">All committees</a>
+      <h1 class="t-display">{title}</h1>
+      <p class="sm:text-lead">
+        {chairs.length > 0 && (
+          <>
+            {chairs.length === 1 ? "Chaired by " : "Co-chaired by "}
+            {chairs.map((m, i) => (
+              <>{i > 0 && (chairs.length === 2 ? ", and " : i === chairs.length - 1 ? "; and " : "; ")}<a href={`/legislators/${personSlug(m.id)}/`} class="underline">{m.name}</a>{chairName(m).slice(m.name.length)}</>
+            ))}.{" "}
+          </>
+        )}
+        It has {plural(members.length, "member", "members")}, and has held
+        {" "}{plural(record.hearingsPast, "public hearing", "public hearings")}{sinceText ? ` since ${sinceText}` : ""}.
+        {record.diedUnheard > 0 && ` Across every session on record, ${plural(record.diedUnheard, "bill", "bills")} sent here died without a hearing.`}
       </p>
-      <div class="mt-3 grid gap-3 sm:grid-cols-2">
-        <div class="rounded-lg border border-navy-100 bg-paper px-4 py-3">
-          <p class="text-2xl font-bold tabular-nums">{record.hearingsHeld.toLocaleString()}</p>
-          <p class="text-sm text-navy-600">
-            public hearings held, across every session on record
-          </p>
-        </div>
-        <a
-          href={graveyard.length > 0 ? `/hearing-none/${graveyard[0].session_id}/` : "/hearing-none/"}
-          class="rounded-lg border border-badger-600/30 bg-badger-50 px-4 py-3 hover:border-badger-600"
-        >
-          <p class="text-2xl font-bold tabular-nums text-badger-700">
-            {record.diedUnheard.toLocaleString()}
-          </p>
-          <p class="text-sm text-navy-700">
-            bills died here without ever getting one &rarr;
-          </p>
-        </a>
-      </div>
-  </section>
+    </header>
 
-  <div class="mt-4 grid gap-6 lg:grid-cols-2">
-    <section class="min-w-0">
-      <h2 class="text-xl font-bold">Members · {members.length}</h2>
-      <div
-        class="mt-2 max-h-96 overflow-y-auto rounded-lg border border-navy-100 bg-white scroll-body"
-        role="region"
-        tabindex="0"
-        aria-label="Committee members"
-      >
-      <ul class="divide-y divide-navy-100 text-sm">
-        {members.map((m) => (
-          <li class="flex items-center gap-2 px-4 py-1.5">
-            <PartyChip party={m.party} size="sm" />
-            <a href={`/legislators/${personSlug(m.id)}/`} class="min-w-0 flex-1 truncate py-1 underline">
-              {m.name}
-            </a>
-            {roleLabel(m.role) && (
-              <span class="shrink-0 rounded-full bg-gold-100 px-2 py-0.5 text-xs font-semibold">
-                {roleLabel(m.role)}
+    <aside class="c-rail flex flex-col gap-2" data-pagefind-ignore>
+      <FollowButton kind="committees" id={committeeSlug(committee.id)} label="Follow this committee" variant="primary" />
+      <p class="text-fine text-granite">
+        Following saves it on this device.
+        {hasFeed && (
+          <> You can also <a href={`/feeds/committees/${committeeSlug(committee.id)}.xml`} class="underline">get hearing updates in a feed reader</a>.</>
+        )}
+      </p>
+    </aside>
+
+    <div class="c-body flex max-w-[47.5rem] flex-col gap-10">
+      <section aria-labelledby="hearings-heading">
+        <h2 id="hearings-heading" class="t-section">{upcoming.length > 0 ? "Upcoming hearings" : "Recent hearings"}</h2>
+        {shown.length > 0 ? (
+          <>
+            <ul class="mt-4 border-y border-rule" role="list">
+              {shown.map((h, i) => (
+                <li class:list={["flex flex-col gap-1 py-3", i > 0 && "border-t border-rule"]}>
+                  <p class="font-display font-bold">
+                    {fmtDate(h.date)}{h.time && `, ${fmtTime(h.time)}`}
+                  </p>
+                  {h.location && <p class="text-small">{h.location}</p>}
+                  {(safeHref(h.video_url) || safeHref(h.source_url)) && (
+                    <p class="flex flex-wrap gap-x-5 text-small">
+                      {safeHref(h.video_url) && (
+                        <a href={safeHref(h.video_url)} class="inline-flex min-h-11 items-center underline">Watch on WisconsinEye</a>
+                      )}
+                      {safeHref(h.source_url) && (
+                        <a href={safeHref(h.source_url)} class="inline-flex min-h-11 items-center underline">Official notice</a>
+                      )}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p class="mt-3 text-small text-granite">
+              {upcoming.length > 0 && "Times and rooms can change, so check the official notice before you go. "}
+              <a href="/testify/" class="underline">How to speak at a hearing</a>
+            </p>
+          </>
+        ) : (
+          <p class="mt-3">No hearings on record for this committee yet.</p>
+        )}
+      </section>
+
+      <section aria-labelledby="members-heading">
+        <h2 id="members-heading" class="t-section">Members</h2>
+        <ul class="mt-4 border-y border-rule" role="list">
+          {members.map((m, i) => (
+            <li class:list={["flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2.5", i > 0 && "border-t border-rule"]}>
+              <a href={`/legislators/${personSlug(m.id)}/`} class="font-display font-bold underline">{m.name}</a>
+              {roleLabel(m.role) && <span class="font-bold">{roleLabel(m.role)}</span>}
+              <span class="basis-full text-small text-granite">
+                {[m.party ? partyWord(m.party) : null, seat(m)].filter(Boolean).join(", ")}
               </span>
-            )}
-            <span class="sr-only shrink-0 text-xs text-navy-600 sm:not-sr-only sm:inline">
-              {roleAbbr(m.chamber)} {m.district}
-            </span>
-          </li>
-        ))}
-      </ul>
-      </div>
-    </section>
-
-    <section class="min-w-0">
-      <h2 class="text-xl font-bold">Hearing None record</h2>
-      <p class="mt-1 text-sm text-navy-600">
-        Bills referred here that died at session's end without a public hearing.
-      </p>
-      {graveyard.length > 0 ? (
-        <div
-          class="mt-2 max-h-96 overflow-y-auto rounded-lg border border-navy-100 bg-white scroll-body"
-          role="region"
-          tabindex="0"
-          aria-label="Hearing None record by session"
-        >
-        <ul class="divide-y divide-navy-100 text-sm">
-          {graveyard.map((g) => (
-            <li class="flex items-center gap-3 px-4 py-2">
-              <span class="w-16 shrink-0 font-semibold">{g.session_id}</span>
-              <span class="min-w-0 flex-1">{g.n} bill{g.n > 1 ? "s" : ""} died without a hearing</span>
-              <a href={`/hearing-none/${g.session_id}/`} class="shrink-0 py-1 text-xs underline">details</a>
             </li>
           ))}
         </ul>
-        </div>
-      ) : (
-        <p class="mt-2 rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600">
-          No bills on record died in this committee without a hearing.
-        </p>
-      )}
+      </section>
 
-      {(upcoming.length > 0 || recent.length > 0) && (
-        <h2 class="mt-6 text-xl font-bold">
-          {upcoming.length > 0 ? "Upcoming hearings" : "Recent hearings"}
-        </h2>
-      )}
-      {(upcoming.length > 0 || recent.length > 0) && (
-        <div
-          class="mt-2 max-h-96 space-y-2 overflow-y-auto scroll-body scroll-on-paper"
-          role="region"
-          tabindex="0"
-          aria-label={upcoming.length > 0 ? "Upcoming hearings" : "Recent hearings"}
-        >
-          {(upcoming.length > 0 ? upcoming : recent).map((h) => (
-            <p class="rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
-              <span class="font-semibold">{fmtDate(h.date)}</span>
-              {h.time && ` · ${fmtTime(h.time)}`}
-              {h.location && ` · ${h.location}`}
-              {h.source_url && (
-                <a href={h.source_url} class="ml-2 underline">official notice</a>
-              )}
-              {h.video_url && (
-                <a href={h.video_url} class="ml-2 font-semibold underline">watch on WisconsinEye</a>
-              )}
-            </p>
-          ))}
-        </div>
-      )}
-    </section>
+      <section id="never-heard" aria-labelledby="never-heard-heading">
+        <h2 id="never-heard-heading" class="t-section">Bills that never got a hearing here</h2>
+        <p class="mt-2 text-small text-granite">
+          Bills sent to this committee that died when their session ended without a public hearing.
+        </p>
+        {graveyard.length > 0 ? (
+          <ul class="mt-4 border-y border-rule" role="list">
+            {graveyard.map((g, i) => (
+              <li class:list={["flex flex-wrap items-baseline justify-between gap-x-4 py-2.5", i > 0 && "border-t border-rule"]}>
+                <span>
+                  <span class="font-bold">{sessionPlainName(g.session_id, g.session_id).replace(/^./, (c) => c.toUpperCase())}:</span>
+                  {" "}{plural(g.n, "bill", "bills")}
+                </span>
+                <a href={`/hearing-none/${g.session_id}/`} class="inline-flex min-h-11 items-center text-small underline">
+                  See that session's list
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="mt-3">
+            No bills on record died in this committee without a hearing.
+            {" "}<a href="/hearing-none/" class="underline">Bills that never got a hearing, by session</a>
+          </p>
+        )}
+      </section>
+
+      <p class="text-fine text-granite">
+        From the <a href="https://docs.legis.wisconsin.gov/committees" class="underline">Legislature's committee pages</a>
+        and hearing notices{pulledOn && `, checked ${fmtDate(pulledOn)}`}.
+      </p>
+    </div>
   </div>
 </Base>
+
+<style>
+  .cmte {
+    display: grid;
+    gap: 2rem;
+    grid-template-areas: "head" "rail" "body";
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .c-head { grid-area: head; }
+  .c-rail { grid-area: rail; }
+  .c-body { grid-area: body; }
+  @media (min-width: 64rem) {
+    .cmte {
+      grid-template-areas: "head rail" "body rail";
+      grid-template-columns: minmax(0, 1fr) 20rem;
+      grid-template-rows: auto 1fr;
+      column-gap: 3.5rem;
+    }
+    .c-rail {
+      align-self: start;
+    }
+  }
+</style>

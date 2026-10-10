@@ -6,6 +6,8 @@ export const paintChips = (
   for (const chip of chips) {
     const on = isOn(chip);
     chip.setAttribute("aria-pressed", String(on));
+    // brand chips (.chip) take their look from aria-pressed alone
+    if (chip.classList.contains("chip")) continue;
     chip.classList.toggle("border-navy-800", on);
     chip.classList.toggle("bg-navy-800", on);
     chip.classList.toggle("text-white", on);

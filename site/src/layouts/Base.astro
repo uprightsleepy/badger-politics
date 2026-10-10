@@ -363,9 +363,13 @@ const mainClass =
           [`/districts/assembly-${ad}/`, "Your Assembly district: "],
           [`/districts/senate-${sd}/`, "Your Senate district: "],
         ];
+        // a district's own page says so when it is the reader's
+        document.querySelectorAll<HTMLElement>("[data-mine-seat]").forEach((el) => {
+          if (el.dataset.mineSeat === `assembly-${ad}` || el.dataset.mineSeat === `senate-${sd}`) el.hidden = false;
+        });
         for (const [href, srLabel] of districtLinks) {
           document.querySelectorAll<HTMLAnchorElement>(`a[href="${href}"]`).forEach((a) => {
-            if (!a.closest("nav")) markAsMine(a, srLabel);
+            if (!a.closest("nav") && !a.closest("[data-no-rep-highlight]")) markAsMine(a, srLabel);
           });
         }
         // highlight the saved district's reps anywhere they appear; every

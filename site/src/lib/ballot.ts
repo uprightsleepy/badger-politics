@@ -23,3 +23,18 @@ export const ballotStatus = (
     election.on_ballot === 1 ? "on-ballot" : election.on_ballot === 0 ? "not-running" : "pending";
   return { kind, year };
 };
+
+/** Why a party's nominee isn't settled, in a sentence, from the
+ * certified primary (importer/wec_primary.py names the reason). */
+export const writeInSentence = (pending: { party: string; reason: string }[]): string =>
+  pending
+    .map(({ party, reason }) =>
+      /tied/i.test(reason)
+        ? `The ${party} primary ended in a tie, so its nominee isn't settled yet.`
+        : /could exceed/i.test(reason)
+          ? `In the ${party} primary, write-in votes could outnumber the leader's, so its nominee isn't settled yet.`
+          : /qualified/i.test(reason)
+            ? `The ${party} primary had no printed candidate, and a write-in candidate may have qualified.`
+            : `The ${party} primary's nominee isn't settled yet.`,
+    )
+    .join(" ");
