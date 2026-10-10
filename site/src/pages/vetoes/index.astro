@@ -1,108 +1,134 @@
 ---
+/** Every full veto, partial veto and override attempt, per session,
+ * straight from the official bill histories. */
 import Base from "../../layouts/Base.astro";
-import SourceStrip from "../../components/SourceStrip.astro";
-import { vetoTracker, vetoMessageUrl } from "../../lib/db";
-import { billSlug, chamberName, fmtDate, shortTitle } from "../../lib/format";
+import BillLine from "../../components/BillLine.astro";
+import MoreRows from "../../components/MoreRows.astro";
+import { vetoTracker, vetoMessageUrl, meta } from "../../lib/db";
+import { billSlug, chamberName, fmtDate } from "../../lib/format";
 const bienniums = vetoTracker();
+const pulledOn = meta().imported_at?.slice(0, 10);
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+const SHOWN = 10;
+const newest = bienniums[0];
 ---
 
 <Base
-  title="Veto Tracker"
+  title="Vetoes"
   description="Every gubernatorial veto, partial veto, and override attempt, from the official bill histories."
+  layout="wide"
 >
-  <h1 class="text-2xl font-bold">Veto Tracker</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-600">
-    Wisconsin governors can veto a bill outright or, on appropriation bills,
-    strike parts and sign the rest (<a href="/partial-veto/" class="underline">how
-    the partial veto works</a>). The Legislature can pass a bill over a veto
-    with a two-thirds vote of both chambers. Everything below comes verbatim
-    from the official bill histories; where docs.legis publishes the
-    governor's veto message, it's linked. An override needs two-thirds in
-    both chambers; attempts that passed one chamber but not the other did
-    not become law.
-  </p>
-  <SourceStrip sources={[{ label: "Wisconsin Legislature", href: "https://docs.legis.wisconsin.gov" }]} />
-  {bienniums.map((b) => (
-    <section class="mt-6">
-      <h2 class="text-xl font-bold">{b.biennium}–{b.biennium + 1}</h2>
-      <p class="mt-1 text-sm text-navy-600">
-        {b.fullVetoes.length} bills vetoed · {b.partialVetoes.length} signed
-        with a partial veto · {b.attempts.length} override
-        {b.attempts.length === 1 ? " attempt" : " attempts"} recorded
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">Vetoes</h1>
+    {newest ? (
+      <p class="sm:text-lead">
+        In the {newest.biennium}–{newest.biennium + 1} session, the governor vetoed
+        {" "}<span class="figure">{plural(newest.fullVetoes.length, "bill", "bills")}</span> and signed
+        {" "}<span class="figure">{newest.partialVetoes.length.toLocaleString()}</span> with a partial veto.
+        {newest.attempts.length > 0
+          ? ` Lawmakers tried to override a veto ${newest.attempts.length === 1 ? "once" : `${newest.attempts.length.toLocaleString()} times`}.`
+          : " Lawmakers haven't tried to override any of them."}
       </p>
+    ) : (
+      <p class="sm:text-lead">No vetoes are recorded for the sessions on this site.</p>
+    )}
+    <p class="text-small text-granite">
+      A Wisconsin governor can veto a whole bill or, on a bill that spends money, strike parts of it and
+      sign the rest (<a href="/partial-veto/" class="underline">how the partial veto works</a>). Overriding a
+      veto takes a two-thirds vote in both chambers; an attempt that passes only one doesn't become law.
+    </p>
+  </header>
+
+  {bienniums.map((b) => (
+    <section class="mt-12 max-w-[60rem]" aria-labelledby={`session-${b.biennium}`}>
+      <h2 id={`session-${b.biennium}`} class="t-section">{b.biennium}–{b.biennium + 1} session</h2>
+      <p class="mt-2 text-granite">
+        {plural(b.fullVetoes.length, "bill", "bills")} vetoed, {b.partialVetoes.length.toLocaleString()} signed with a partial
+        veto, {plural(b.attempts.length, "override attempt", "override attempts")}.
+      </p>
+
       {b.attempts.length > 0 && (
-        <details class="mt-2 rounded-lg border border-navy-100 bg-white" open={b.attempts.length <= 10}>
-          <summary class="cursor-pointer px-3 py-2 text-sm font-semibold">
-            Override attempts · {b.attempts.length}
-          </summary>
-          <ul class="space-y-1 px-3 pb-3">
-            {b.attempts.map((a) => (
-              <li class="flex flex-wrap items-baseline gap-x-3 border-t border-navy-100 pt-1 text-sm">
-                <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(a.date)}</span>
-                <a href={`/bills/${a.session_id}/${billSlug(a.identifier)}/`} class="w-20 shrink-0 font-bold underline">
-                  {a.identifier}
-                </a>
-                <span class="min-w-0 flex-1 basis-64">{a.description}</span>
-                {a.vote && (
-                  <a href={`/votes/${a.vote.id}/`} class="shrink-0 py-1 text-xs underline tabular-nums">
-                    {chamberName(a.vote.chamber)} roll call {a.vote.yes}–{a.vote.no}
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
-        </details>
+        <section class="mt-6" aria-labelledby={`attempts-${b.biennium}`}>
+          <h3 id={`attempts-${b.biennium}`} class="t-question text-[1.1875rem]">Override attempts: {b.attempts.length.toLocaleString()}</h3>
+          <p class="mt-1 text-small text-granite">Each line is the official history's own wording.</p>
+          <div class="mt-2">
+            <MoreRows rest={Math.max(0, b.attempts.length - SHOWN)} label={`override attempts, ${b.biennium}–${b.biennium + 1}`}>
+              {b.attempts.slice(0, SHOWN).map((a) => (
+                <BillLine href={`/bills/${a.session_id}/${billSlug(a.identifier)}/`} identifier={a.identifier} title={a.title} date={fmtDate(a.date)}>
+                {a.description}.
+                {a.vote && <> <a href={`/votes/${a.vote.id}/`} class="underline">{chamberName(a.vote.chamber)} roll call, {a.vote.yes} to {a.vote.no}</a></>}
+              </BillLine>
+              ))}
+              <Fragment slot="rest">
+                {b.attempts.slice(SHOWN).map((a) => (
+                  <BillLine href={`/bills/${a.session_id}/${billSlug(a.identifier)}/`} identifier={a.identifier} title={a.title} date={fmtDate(a.date)}>
+                {a.description}.
+                {a.vote && <> <a href={`/votes/${a.vote.id}/`} class="underline">{chamberName(a.vote.chamber)} roll call, {a.vote.yes} to {a.vote.no}</a></>}
+              </BillLine>
+                ))}
+              </Fragment>
+            </MoreRows>
+          </div>
+        </section>
       )}
+
       {b.fullVetoes.length > 0 && (
-        <details class="mt-2 rounded-lg border border-navy-100 bg-white">
-          <summary class="cursor-pointer px-3 py-2 text-sm font-semibold">
-            Vetoed bills · {b.fullVetoes.length}
-          </summary>
-          <div class="max-h-96 overflow-y-auto border-t border-navy-100 scroll-body scroll-on-paper" role="region" tabindex="0" aria-label={`Bills vetoed in ${b.biennium}–${b.biennium + 1}`}>
-            <ul class="space-y-1 p-3 text-sm">
-              {b.fullVetoes.map((v) => {
+        <section class="mt-8" aria-labelledby={`vetoed-${b.biennium}`}>
+          <h3 id={`vetoed-${b.biennium}`} class="t-question text-[1.1875rem]">Vetoed bills: {b.fullVetoes.length.toLocaleString()}</h3>
+          <p class="mt-1 text-small text-granite">Newest first, with the governor's veto message where the Legislature publishes one.</p>
+          <div class="mt-2">
+            <MoreRows rest={Math.max(0, b.fullVetoes.length - SHOWN)} label={`vetoed bills, ${b.biennium}–${b.biennium + 1}`}>
+              {b.fullVetoes.slice(0, SHOWN).map((v) => {
                 const msg = vetoMessageUrl(v.bill_id);
                 return (
-                  <li class="flex items-baseline gap-2">
-                    <span class="w-24 shrink-0 text-xs tabular-nums text-navy-600">{fmtDate(v.date)}</span>
-                    <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="w-20 shrink-0 font-semibold underline">
-                      {v.identifier}
-                    </a>
-                    <span class="min-w-0 flex-1 truncate">{shortTitle(v.title)}</span>
-                    {msg && (
-                      <a href={msg} class="shrink-0 py-1 text-xs underline">veto message</a>
-                    )}
-                  </li>
+                  <BillLine href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} identifier={v.identifier} title={v.title} date={fmtDate(v.date)}>
+                    {msg && <a href={msg} class="underline">The governor's veto message</a>}
+                  </BillLine>
                 );
               })}
-            </ul>
+              <Fragment slot="rest">
+                {b.fullVetoes.slice(SHOWN).map((v) => {
+                  const msg = vetoMessageUrl(v.bill_id);
+                  return (
+                    <BillLine href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} identifier={v.identifier} title={v.title} date={fmtDate(v.date)}>
+                      {msg && <a href={msg} class="underline">The governor's veto message</a>}
+                    </BillLine>
+                  );
+                })}
+              </Fragment>
+            </MoreRows>
           </div>
-        </details>
+        </section>
       )}
+
       {b.partialVetoes.length > 0 && (
-        <details class="mt-2 rounded-lg border border-navy-100 bg-white">
-          <summary class="cursor-pointer px-3 py-2 text-sm font-semibold">
-            Signed with a partial veto · {b.partialVetoes.length}
-          </summary>
-          <ul class="space-y-1 px-3 pb-3">
-            {b.partialVetoes.map((l) => {
-              const msg = vetoMessageUrl(l.bill_id);
-              return (
-                <li class="flex items-baseline gap-2 border-t border-navy-100 pt-1 text-sm">
-                  <span class="w-16 shrink-0 font-bold tabular-nums">Act {l.act}</span>
-                  <a href={`/bills/${l.session_id}/${billSlug(l.identifier)}/`} class="w-20 shrink-0 font-semibold underline">
-                    {l.identifier}
-                  </a>
-                  <span class="min-w-0 flex-1 truncate">{shortTitle(l.title)}</span>
-                  {msg && (
-                    <a href={msg} class="shrink-0 py-1 text-xs underline">veto message</a>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </details>
+        <section class="mt-8" aria-labelledby={`partial-${b.biennium}`}>
+          <h3 id={`partial-${b.biennium}`} class="t-question text-[1.1875rem]">Signed with a partial veto: {b.partialVetoes.length.toLocaleString()}</h3>
+          <p class="mt-1 text-small text-granite">In act order. The parts the governor struck are in the veto message.</p>
+          <div class="mt-2">
+            <MoreRows rest={Math.max(0, b.partialVetoes.length - SHOWN)} label={`partial vetoes, ${b.biennium}–${b.biennium + 1}`}>
+              {b.partialVetoes.slice(0, SHOWN).map((l) => (
+                <BillLine href={`/bills/${l.session_id}/${billSlug(l.identifier)}/`} identifier={l.identifier} title={l.title} lead={`Act ${l.act}`} date={l.approved ? fmtDate(l.approved) : ""}>
+                  {vetoMessageUrl(l.bill_id) && <a href={vetoMessageUrl(l.bill_id)!} class="underline">The governor's veto message</a>}
+                </BillLine>
+              ))}
+              <Fragment slot="rest">
+                {b.partialVetoes.slice(SHOWN).map((l) => (
+                  <BillLine href={`/bills/${l.session_id}/${billSlug(l.identifier)}/`} identifier={l.identifier} title={l.title} lead={`Act ${l.act}`} date={l.approved ? fmtDate(l.approved) : ""}>
+                  {vetoMessageUrl(l.bill_id) && <a href={vetoMessageUrl(l.bill_id)!} class="underline">The governor's veto message</a>}
+                </BillLine>
+                ))}
+              </Fragment>
+            </MoreRows>
+          </div>
+        </section>
       )}
     </section>
   ))}
+
+  <p class="mt-12 max-w-[47.5rem] text-fine text-granite">
+    From each bill's official history at the
+    {" "}<a href="https://docs.legis.wisconsin.gov" class="underline">Wisconsin Legislature</a>{pulledOn && `, checked ${fmtDate(pulledOn)}`}.
+    {" "}<a href="/governors-desk/" class="underline">Everything the governor decided this session</a>
+  </p>
 </Base>

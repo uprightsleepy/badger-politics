@@ -1,26 +1,37 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { builtSessions, sessionStats } from "../../lib/db";
+import { builtSessions } from "../../lib/db";
+import { neverHeard } from "../../lib/billRows";
 const sessions = builtSessions();
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 ---
 <Base
   description="Bills that died at the end of a Wisconsin legislative session without ever receiving a public hearing, by session and by committee."
-  title="Hearing None">
-  <h1 class="text-3xl font-bold">Hearing: None</h1>
-  <p class="mt-2 max-w-3xl text-navy-700">
-    Most bills never get voted down. They die in a committee that never gave
-    them a hearing. Pick a session:
-  </p>
-  <ul class="mt-4 space-y-2">
-    {sessions.map((s) => (
-      <li>
-        <a href={`/hearing-none/${s.id}/`} class="font-semibold underline">
-          {s.name ?? s.id}
-        </a>
-        <span class="ml-2 text-sm text-navy-600">
-          {sessionStats(s.id).graveyard.toLocaleString()} bills died unheard
-        </span>
-      </li>
-    ))}
+  title="Bills that never got a hearing"
+  layout="wide"
+>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">Bills that never got a hearing</h1>
+    <p class="sm:text-lead">
+      Most bills that fail are never voted down. They wait in a committee that never holds a public
+      hearing on them, and they die when the session ends.
+    </p>
+  </header>
+  <ul class="mt-8 max-w-[47.5rem] border-b border-rule" role="list">
+    {sessions.map((s) => {
+      const h = neverHeard(s.id);
+      return (
+        <li class="flex flex-col gap-0.5 border-t border-rule py-3">
+          <a href={`/hearing-none/${s.id}/`} class="inline-flex min-h-11 items-center self-start font-display text-[1.1875rem] font-bold underline">
+            {(s.name ?? s.id).replace(/ Regular Session$/, " session").replace(/(\d{4})-(\d{4})/, "$1–$2")}
+          </a>
+          <span class="text-granite">
+            {h.bills + h.resolutions === 0
+              ? "None recorded yet. Bills are counted once the Legislature records them as failed, after its last voting days."
+              : `${h.bills.toLocaleString()} of ${plural(h.totalBills, "bill", "bills")}${h.resolutions ? ` and ${h.resolutions.toLocaleString()} of ${plural(h.totalResolutions, "resolution", "resolutions")}` : ""} never got a hearing.`}
+          </span>
+        </li>
+      );
+    })}
   </ul>
 </Base>

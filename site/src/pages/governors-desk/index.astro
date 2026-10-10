@@ -1,160 +1,165 @@
 ---
+/** What the governor did with the bills the Legislature passed this
+ * session: signed, vetoed, still waiting, and every override roll call,
+ * straight from the official bill statuses. */
 import Base from "../../layouts/Base.astro";
-import { governorsDesk, governorInfo } from "../../lib/db";
-import { billSlug, fmtDate, partyStyle, shortTitle } from "../../lib/format";
+import BillLine from "../../components/BillLine.astro";
+import MoreRows from "../../components/MoreRows.astro";
+import { governorsDesk, governorInfo, lawsFor, vetoTracker, meta } from "../../lib/db";
+import { billSlug, chamberName, fmtDate, partyWord } from "../../lib/format";
+import { safeHref } from "../../lib/html";
 
 const desk = governorsDesk();
 const gov = governorInfo();
+const pulledOn = meta().imported_at?.slice(0, 10);
 const pct = (votes: number, total: number) =>
-  total > 0 ? ((votes / total) * 100).toFixed(1) : null;
-const billRow = (b: {
-  id: string; session_id: string; identifier: string; title: string | null;
-  latest_action_date: string | null; latest_action_desc: string | null;
-}) => ({
-  href: `/bills/${b.session_id}/${billSlug(b.identifier)}/`,
-  label: b.identifier,
-  title: b.title ?? "",
-  date: b.latest_action_date,
-  desc: b.latest_action_desc,
-});
+  total > 0 ? `${((votes / total) * 100).toFixed(1)}%` : null;
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+const reached = desk.enacted.length + desk.vetoed.length + desk.awaiting.length;
+const session = `${desk.biennium}–${desk.biennium + 1}`;
+const SHOWN = 10;
+type Row = (typeof desk.enacted)[number];
+const href = (b: Row) => `/bills/${b.session_id}/${billSlug(b.identifier)}/`;
+// the date of the governor's own action, from the official history: the
+// signing date for acts, the veto date for vetoes (latest action otherwise)
+const signedOn = new Map(lawsFor(desk.biennium).map((l) => [l.bill_id, l.approved]));
+const vetoedOn = new Map(
+  (vetoTracker().find((b) => b.biennium === desk.biennium)?.fullVetoes ?? []).map((v) => [v.bill_id, v.date]),
+);
+// no date rather than a different action's date; undated bills go last
+const byDate = (when: Map<string, string | null>) => (rows: Row[]) =>
+  rows
+    .map((b) => ({ ...b, when: when.get(b.id) ?? null }))
+    .sort((a, b) => (b.when ?? "").localeCompare(a.when ?? "") || a.identifier.localeCompare(b.identifier, "en", { numeric: true }));
+const vetoed = byDate(vetoedOn)(desk.vetoed);
+const enacted = byDate(signedOn)(desk.enacted);
+const approvedRunning = gov?.candidates2026.filter((c) => c.ballot_status === "Approve").length ?? 0;
+const runnerUp = gov?.lastElection?.runnerUp;
 ---
 
 <Base
-  title="Governor's Desk"
+  title="Governor's decisions"
   description="Wisconsin bills awaiting the governor's signature, signed into law, vetoed, and veto-override votes, straight from official bill histories."
+  layout="wide"
 >
-  <h1 class="text-2xl font-bold">The Governor's Desk</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    What happened after the Legislature acted, this session: bills awaiting the
-    governor, signed into law, vetoed, and every veto-override roll call. All
-    of it derives from each bill's
-    <a href="https://docs.legis.wisconsin.gov" class="underline">official history</a>,
-    linked on every bill page.
-  </p>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">Governor's decisions</h1>
+    <p class="sm:text-lead">
+      {reached > 0 ? (
+        <>
+          Of the <span class="figure">{reached.toLocaleString()}</span> {reached === 1 ? "bill" : "bills"} that reached the governor in the {session} session,
+          the governor signed <span class="figure">{desk.enacted.length.toLocaleString()}</span> into law and vetoed
+          {" "}<span class="figure">{desk.vetoed.length.toLocaleString()}</span>.
+          {desk.awaiting.length > 0 && ` ${plural(desk.awaiting.length, "is", "are")} still waiting for a decision.`}
+        </>
+      ) : `No bills have reached the governor in the ${session} session yet.`}
+    </p>
+    <p class="text-small text-granite">
+      Resolutions aren't counted: they never go to the governor. <a href="/vetoes/" class="underline">Vetoes, session by session</a>
+      {" "}and <a href="/partial-veto/" class="underline">how the partial veto works</a>.
+    </p>
+  </header>
 
   {gov && (
-    <div class="mt-4 rounded-lg border border-navy-100 bg-white p-4">
-      <div class="flex flex-wrap items-center gap-2">
-        <h2 class="text-lg font-bold">Governor {gov.name}</h2>
-        {gov.party && (
-          <span class={`rounded-full px-2 py-0.5 text-xs font-bold ${partyStyle(gov.party)}`}>
-            {gov.party}
-          </span>
-        )}
-      </div>
-      <div class="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-        {gov.lastElection && (
-          <p>
-            Elected November {gov.lastElection.year} with{" "}
-            <strong>{pct(gov.lastElection.votes, gov.lastElection.total)}%</strong>{" "}
-            ({gov.lastElection.votes.toLocaleString()} votes)
-            {gov.lastElection.runnerUp && (
-              <span class="text-navy-600">
-                {" "}over {gov.lastElection.runnerUp.candidate.split(" / ")[0]}
-                {" "}({pct(gov.lastElection.runnerUp.votes, gov.lastElection.total)}%)
-              </span>
-            )}
-, certified WEC canvass.
-          </p>
-        )}
+    <section class="sheet mt-8 flex max-w-[47.5rem] flex-col gap-2 p-5 sm:p-7" aria-labelledby="governor-heading">
+      <h2 id="governor-heading" class="t-section text-[1.375rem]">Governor {gov.name}</h2>
+      <p class="text-granite">{gov.party ? `${partyWord(gov.party)}.` : "Party not recorded."}</p>
+      {gov.lastElection && (
         <p>
-          This session: <strong>{desk.enacted.length}</strong> bills signed into law,
-          {" "}<strong>{desk.vetoed.length}</strong> vetoed.
-          {" "}<a href="/vetoes/" class="underline">Veto tracker</a> ·
-          {" "}<a href="/partial-veto/" class="underline">the partial veto</a>
+          Elected in November {gov.lastElection.year} with {pct(gov.lastElection.votes, gov.lastElection.total)} of the
+          vote ({gov.lastElection.votes.toLocaleString()} of {gov.lastElection.total.toLocaleString()} votes cast){runnerUp
+            ? `, ahead of ${runnerUp.candidate.split(" / ")[0]} with ${pct(runnerUp.votes, gov.lastElection.total)}`
+            : ""}, in the certified canvass.
         </p>
-        {gov.notRunning && (
-          <p class="font-semibold text-badger-700">
-            Not seeking reelection in 2026
-            {gov.candidates2026.length > 0 && (
-              <span class="font-normal text-navy-600">
-                {" "}and {gov.candidates2026.length} candidates have filed for the open seat.
-              </span>
-            )}
-            {" "}<a href="/elections/2026/" class="font-normal underline">2026 ballot</a>
-          </p>
-        )}
-      </div>
-    </div>
-  )}
-
-  {desk.awaiting.length > 0 && (
-    <section class="mt-6">
-      <h2 class="text-xl font-bold">Awaiting action · {desk.awaiting.length}</h2>
-      <p class="mt-1 text-sm text-navy-600">Passed both chambers; not yet signed or vetoed.</p>
-      <ul class="mt-3 space-y-1">
-        {desk.awaiting.map(billRow).map((r) => (
-          <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
-            <a href={r.href} class="w-20 shrink-0 font-bold underline">{r.label}</a>
-            <span class="min-w-0 flex-1 truncate">{shortTitle(r.title)}</span>
-            {r.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(r.date)}</span>}
-          </li>
-        ))}
-      </ul>
+      )}
+      {gov.notRunning && (
+        <p>
+          Not running for reelection in 2026.
+          {approvedRunning > 0 && ` ${plural(approvedRunning, "candidate is", "candidates are")} on the ballot for governor.`}
+          {" "}<a href="/elections/2026/" class="underline">The 2026 ballot</a>
+        </p>
+      )}
     </section>
   )}
 
-  <section class="mt-6">
-    <h2 class="text-xl font-bold">Veto-override votes · {desk.overrides.length}</h2>
-    <p class="mt-1 max-w-3xl text-sm text-navy-600">
-      Overriding a veto takes a two-thirds vote in each chamber. Motion text is
-      the journal's own; each links to the official roll call.
+  {desk.awaiting.length > 0 && (
+    <section class="mt-12 max-w-[60rem]" aria-labelledby="awaiting-heading">
+      <h2 id="awaiting-heading" class="t-section">Waiting for the governor: {desk.awaiting.length.toLocaleString()}</h2>
+      <p class="mt-2 text-small text-granite">Passed both chambers, and not yet signed or vetoed. Newest first.</p>
+      <div class="mt-3">
+        <MoreRows rest={Math.max(0, desk.awaiting.length - SHOWN)} label="bills waiting for the governor">
+          {desk.awaiting.slice(0, SHOWN).map((b) => (
+            <BillLine href={href(b)} identifier={b.identifier} title={b.title} date={b.latest_action_date ? fmtDate(b.latest_action_date) : ""}>{b.latest_action_desc}</BillLine>
+          ))}
+          <Fragment slot="rest">
+            {desk.awaiting.slice(SHOWN).map((b) => (
+              <BillLine href={href(b)} identifier={b.identifier} title={b.title} date={b.latest_action_date ? fmtDate(b.latest_action_date) : ""}>{b.latest_action_desc}</BillLine>
+            ))}
+          </Fragment>
+        </MoreRows>
+      </div>
+    </section>
+  )}
+
+  <section class="mt-12 max-w-[60rem]" aria-labelledby="overrides-heading">
+    <h2 id="overrides-heading" class="t-section">Votes to override a veto: {desk.overrides.length.toLocaleString()}</h2>
+    <p class="mt-2 max-w-[47.5rem] text-small text-granite">
+      Overriding a veto takes a two-thirds vote in each chamber. The motion is the journal's own wording,
+      and each vote links to its roll call.
     </p>
     {desk.overrides.length === 0 ? (
-      <p class="mt-3 rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600">
-        No override votes this session.
-      </p>
+      <p class="mt-3">No override votes this session.</p>
     ) : (
-      <div class="mt-3 max-h-96 overflow-y-auto scroll-body scroll-on-paper" role="region" tabindex="0" aria-label="Veto-override votes">
-      <ul class="space-y-1">
-        {desk.overrides.map((o) => (
-          <li class="rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
-            <div class="flex flex-wrap items-baseline gap-x-3">
-              <a href={`/bills/${o.session_id}/${billSlug(o.identifier)}/`} class="w-20 shrink-0 font-bold underline">{o.identifier}</a>
-              <span class="min-w-0 flex-1 truncate">{shortTitle(o.title)}</span>
-              {o.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(o.date)}</span>}
-            </div>
-            <div class="flex flex-wrap items-baseline gap-x-3 text-xs text-navy-700">
-              <span class="py-1">{o.motion}, Ayes {o.yes_count}, Noes {o.no_count} ({o.result === "pass" ? "override succeeded" : "override failed"})</span>
-              <a href={`/votes/${o.id}/`} class="py-1 underline">roll call</a>
-              {o.source_url && (
-                <a href={o.source_url} class="py-1 underline">official record<span class="sr-only"> (opens in a new tab)</span></a>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+      <div class="mt-3">
+        <MoreRows rest={Math.max(0, desk.overrides.length - SHOWN)} label="override votes">
+          {desk.overrides.slice(0, SHOWN).map((o) => (
+            <BillLine href={`/bills/${o.session_id}/${billSlug(o.identifier)}/`} identifier={o.identifier} title={o.title} date={o.date ? fmtDate(o.date) : ""}>
+              {chamberName(o.chamber)}: {o.result === "pass" ? "the override passed" : "the override failed"}, {o.yes_count} to {o.no_count}.
+              {o.motion && ` The motion: “${o.motion}”${/[.?!]$/.test(o.motion) ? "" : "."}`} See <a href={`/votes/${o.id}/`} class="underline">the roll call</a>{safeHref(o.source_url) ? <> or <a href={safeHref(o.source_url)} class="underline">the official record</a>.</> : "."}
+            </BillLine>
+          ))}
+          <Fragment slot="rest">
+            {desk.overrides.slice(SHOWN).map((o) => (
+              <BillLine href={`/bills/${o.session_id}/${billSlug(o.identifier)}/`} identifier={o.identifier} title={o.title} date={o.date ? fmtDate(o.date) : ""}>
+              {chamberName(o.chamber)}: {o.result === "pass" ? "the override passed" : "the override failed"}, {o.yes_count} to {o.no_count}.
+                {o.motion && ` The motion: “${o.motion}”${/[.?!]$/.test(o.motion) ? "" : "."}`} See <a href={`/votes/${o.id}/`} class="underline">the roll call</a>{safeHref(o.source_url) ? <> or <a href={safeHref(o.source_url)} class="underline">the official record</a>.</> : "."}
+              </BillLine>
+            ))}
+          </Fragment>
+        </MoreRows>
       </div>
     )}
   </section>
 
-  <section class="mt-6">
-    <h2 class="text-xl font-bold">Vetoed · {desk.vetoed.length}</h2>
-    <div class="mt-3 max-h-96 overflow-y-auto scroll-body scroll-on-paper" role="region" tabindex="0" aria-label="Vetoed bills">
-    <ul class="space-y-1">
-      {desk.vetoed.map(billRow).map((r) => (
-        <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
-          <a href={r.href} class="w-20 shrink-0 font-bold underline">{r.label}</a>
-          <span class="min-w-0 flex-1 truncate">{shortTitle(r.title)}</span>
-          {r.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(r.date)}</span>}
-        </li>
-      ))}
-    </ul>
-    </div>
-  </section>
+  {[
+    { id: "vetoed", label: "Vetoed", rows: vetoed, note: "By the date of the veto, newest first." },
+    { id: "enacted", label: "Signed into law", rows: enacted, note: "By the date the governor signed, newest first. Each act's number is on its page and in the list of new laws." },
+  ].map((s) => (
+    <section class="mt-12 max-w-[60rem]" aria-labelledby={`${s.id}-heading`}>
+      <h2 id={`${s.id}-heading`} class="t-section">{s.label}: {s.rows.length.toLocaleString()}</h2>
+      <p class="mt-2 text-small text-granite">{s.note}</p>
+      {s.rows.length === 0 ? (
+        <p class="mt-3">None yet this session.</p>
+      ) : (
+        <div class="mt-3">
+          <MoreRows rest={Math.max(0, s.rows.length - SHOWN)} label={s.label.toLowerCase()}>
+            {s.rows.slice(0, SHOWN).map((b) => (
+              <BillLine href={href(b)} identifier={b.identifier} title={b.title} date={b.when ? fmtDate(b.when) : ""} />
+            ))}
+            <Fragment slot="rest">
+              {s.rows.slice(SHOWN).map((b) => (
+                <BillLine href={href(b)} identifier={b.identifier} title={b.title} date={b.when ? fmtDate(b.when) : ""} />
+              ))}
+            </Fragment>
+          </MoreRows>
+        </div>
+      )}
+    </section>
+  ))}
 
-  <section class="mt-6">
-    <h2 class="text-xl font-bold">Signed into law · {desk.enacted.length}</h2>
-    <div class="mt-3 max-h-96 overflow-y-auto scroll-body scroll-on-paper" role="region" tabindex="0" aria-label="Bills signed into law">
-    <ul class="space-y-1">
-      {desk.enacted.map(billRow).map((r) => (
-        <li class="flex flex-wrap items-baseline gap-x-3 rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm">
-          <a href={r.href} class="w-20 shrink-0 font-bold underline">{r.label}</a>
-          <span class="min-w-0 flex-1 truncate">{shortTitle(r.title)}</span>
-          {r.date && <span class="shrink-0 text-xs text-navy-600">{fmtDate(r.date)}</span>}
-        </li>
-      ))}
-    </ul>
-    </div>
-  </section>
+  <p class="mt-12 max-w-[47.5rem] text-fine text-granite">
+    From each bill's <a href="https://docs.legis.wisconsin.gov" class="underline">official history</a>, linked on
+    every bill page; the governor's election result is the Wisconsin Elections Commission's certified
+    canvass{pulledOn && `. Checked ${fmtDate(pulledOn)}`}.
+  </p>
 </Base>

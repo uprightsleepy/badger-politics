@@ -20,9 +20,11 @@ const pct = (n: number) =>
     : `${share(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}%`;
 const k = o.committeeNoHearing;
 const inCommittee = o.counts["stopped-committee"];
+// the no-hearing flag is set only once the session's failures are
+// recorded, so "each had a hearing" needs every one's own history to say so
 const committeeNote =
   k === 0
-    ? "Each had a public hearing."
+    ? o.committeeHeard === inCommittee ? "Each had a public hearing." : ""
     : k === inCommittee
       ? "None of them got a public hearing."
       : `${num(k)} of them never got a public hearing.`;
@@ -58,7 +60,7 @@ const rows = ROWS.map((r) => ({ ...r, n: o.counts[r.key] })).filter((r) => r.n >
         <p class="text-small text-granite">
           {r.note}
           {r.key === "stopped-committee" && k > 0 && (
-            <> <a href={`/hearing-none/${session}/`} class="underline">Which committees held no hearings</a></>
+            <> <a href={`/hearing-none/${session}/`} class="underline">Where bills died without a hearing</a></>
           )}
         </p>
       </li>

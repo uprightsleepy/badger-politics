@@ -3,20 +3,23 @@ import Base from "../../layouts/Base.astro";
 ---
 
 <Base
-  title="The Partial Veto"
+  title="The partial veto"
   description="How Wisconsin's one-of-a-kind partial veto works, how it has been narrowed, and where to see it used."
+  layout="wide"
 >
-  <h1 class="text-2xl font-bold">Wisconsin's Partial Veto</h1>
-  <p class="mt-2 max-w-3xl text-navy-700">
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+  <h1 class="t-display">Wisconsin's partial veto</h1>
+  <p class="sm:text-lead">
     Wisconsin's governor has a power no other American governor has in this
     form: on bills that spend money, the governor can strike out parts, such as
     words, numbers or whole sections, and sign what's left into law. The
     edited version becomes the law, without going back to the Legislature.
   </p>
+  </header>
 
-  <section class="mt-6 max-w-3xl">
-    <h2 class="text-xl font-bold">How it works</h2>
-    <ul class="mt-2 list-disc space-y-2 pl-5 text-sm text-navy-700">
+  <section class="mt-12 max-w-[47.5rem]">
+    <h2 class="t-section">How it works</h2>
+    <ul class="mt-3 flex list-disc flex-col gap-2 pl-5">
       <li>
         It applies only to <strong>appropriation bills</strong>, meaning bills that
         spend money, most importantly the state budget. Other bills must be
@@ -41,45 +44,46 @@ import Base from "../../layouts/Base.astro";
     </ul>
   </section>
 
-  <section class="mt-6 max-w-3xl">
-    <h2 class="text-xl font-bold">How it has been narrowed</h2>
-    <ul class="mt-2 list-disc space-y-2 pl-5 text-sm text-navy-700">
-      <li>
-        <strong>1930</strong>: a constitutional amendment creates the power:
-        appropriation bills "may be approved in whole or in part."
+  <section class="mt-12 max-w-[47.5rem]">
+    <h2 class="t-section">How it has been narrowed</h2>
+    <ol class="mt-3 border-b border-rule" role="list">
+      <li class="flex flex-col gap-0.5 border-t border-rule py-3 sm:flex-row sm:gap-5">
+        <span class="shrink-0 font-display font-bold sm:w-28">1930</span>
+        <span>A constitutional amendment creates the power: appropriation bills “may be approved in whole or in part.”</span>
       </li>
-      <li>
-        <strong>1990</strong>: voters ban the "Vanna White" veto: striking
-        individual letters within words to spell new words.
+      <li class="flex flex-col gap-0.5 border-t border-rule py-3 sm:flex-row sm:gap-5">
+        <span class="shrink-0 font-display font-bold sm:w-28">1990</span>
+        <span>Voters ban the “Vanna White” veto: striking individual letters within words to spell new words.</span>
       </li>
-      <li>
-        <strong>2008</strong>: voters ban the "Frankenstein" veto: stitching
-        parts of two or more sentences into a new sentence.
+      <li class="flex flex-col gap-0.5 border-t border-rule py-3 sm:flex-row sm:gap-5">
+        <span class="shrink-0 font-display font-bold sm:w-28">2008</span>
+        <span>Voters ban the “Frankenstein” veto: stitching parts of two or more sentences into a new sentence.</span>
       </li>
-      <li>
-        <strong>Still allowed</strong>: striking whole words, digits, and
-        punctuation. In the 2023 budget the governor struck digits and a dash
-        from a school-funding provision written to end with the "2024–25"
-        school year, leaving it to run "to 2425", four extra centuries of
-        annual revenue-limit increases. The Wisconsin Supreme Court upheld
-        that veto in 2025.
+      <li class="flex flex-col gap-0.5 border-t border-rule py-3 sm:flex-row sm:gap-5">
+        <span class="shrink-0 font-display font-bold sm:w-28">Still allowed</span>
+        <span>
+          Striking whole words, digits and punctuation. In the 2023 budget the governor struck digits and a dash
+          from a school-funding provision written to end with the “2024–25” school year, leaving it to run “to
+          2425”, four extra centuries of annual revenue-limit increases. The Wisconsin Supreme Court upheld that
+          veto in 2025.
+        </span>
       </li>
-    </ul>
+    </ol>
   </section>
 
-  <section class="mt-6 max-w-3xl">
-    <h2 class="text-xl font-bold">See it in use</h2>
-    <p class="mt-2 text-sm text-navy-700">
-      The <a href="/vetoes/" class="underline">veto tracker</a> lists every
-      full veto, partial veto, and override attempt by session, and the
-      <a href="/laws/" class="underline"> New laws</a> pages flag every act
+  <section class="mt-12 max-w-[47.5rem]">
+    <h2 class="t-section">See it in use</h2>
+    <p class="mt-3">
+      <a href="/vetoes/" class="underline">Vetoes</a> lists every full veto,
+      partial veto and override attempt by session, and the
+      {" "}<a href="/laws/" class="underline">new laws</a> pages note every act
       signed with a partial veto.
     </p>
   </section>
 
-  <section class="mt-6 max-w-3xl">
-    <h2 class="text-xl font-bold">Sources</h2>
-    <ul class="mt-2 list-disc space-y-1 pl-5 text-sm">
+  <section class="mt-12 max-w-[47.5rem]">
+    <h2 class="t-section">Sources</h2>
+    <ul class="mt-3 flex list-disc flex-col gap-1.5 pl-5 text-small">
       <li>
         <a href="https://docs.legis.wisconsin.gov/misc/lrb/reading_the_constitution/reading_the_constitution_4_1.pdf" class="underline">
           Legislative Reference Bureau: "The Wisconsin Governor's Partial Veto"

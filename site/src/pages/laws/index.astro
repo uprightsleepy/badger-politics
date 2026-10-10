@@ -2,30 +2,38 @@
 import Base from "../../layouts/Base.astro";
 import { lawBienniums } from "../../lib/db";
 const bienniums = lawBienniums();
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 ---
 
 <Base
-  title="New Laws"
+  title="New laws"
   description="Every Wisconsin Act, by legislative session, from the official bill histories."
+  layout="wide"
 >
-  <h1 class="text-2xl font-bold">New Laws</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-600">
-    Every bill signed into law becomes a numbered Wisconsin Act. Each biennium
-    below lists its acts in order, with the governor's approval date and the
-    final recorded floor votes, all from the official bill histories.
-  </p>
-  <ul class="mt-4 space-y-2">
-    {bienniums.map(({ biennium, laws }) => (
-      <li class="flex flex-wrap items-baseline gap-3 rounded-lg border border-navy-100 bg-white px-4 py-3">
-        <a href={`/laws/${biennium}/`} class="font-bold underline">
-          {biennium}–{biennium + 1} session
-        </a>
-        <span class="text-sm text-navy-600">
-          {laws.length} acts
-          {laws.filter((l) => l.partial).length > 0 &&
-            ` · ${laws.filter((l) => l.partial).length} signed with a partial veto`}
-        </span>
-      </li>
-    ))}
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">New laws</h1>
+    <p class="sm:text-lead">
+      Every bill the governor signs becomes a numbered Wisconsin Act. Each session's list has its acts in
+      order, with the date the governor signed and each chamber's final vote.
+    </p>
+  </header>
+  <ul class="mt-8 max-w-[47.5rem] border-b border-rule" role="list">
+    {bienniums.map(({ biennium, laws }) => {
+      const partial = laws.filter((l) => l.partial).length;
+      return (
+        <li class="flex flex-col gap-0.5 border-t border-rule py-3">
+          <a href={`/laws/${biennium}/`} class="inline-flex min-h-11 items-center self-start font-display text-[1.1875rem] font-bold underline">
+            {biennium}–{biennium + 1} session
+          </a>
+          <span class="text-granite">
+            {plural(laws.length, "act", "acts")}{partial > 0 && `, ${plural(partial, "signed", "signed")} with a partial veto`}
+          </span>
+        </li>
+      );
+    })}
   </ul>
+  <p class="mt-8 max-w-[47.5rem] text-small">
+    <a href="/vetoes/" class="underline">Bills the governor vetoed</a> and
+    {" "}<a href="/partial-veto/" class="underline">how the partial veto works</a>
+  </p>
 </Base>

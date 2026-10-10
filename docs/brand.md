@@ -261,6 +261,14 @@ Used on My reps and lawmaker pages:
 Two-sided tallies (Yes against No, two-candidate results) use one bar in Spruce and Fog with both
 numbers at its ends. The winner is named in words.
 
+### Bill lines (`BillLine`, `MoreRows`)
+
+Where a section already says what happened to its bills (signed, vetoed, waiting for the governor,
+never heard), each bill is one compact line instead of a full bill row: the date of that action, then
+the bill number and title as one link, then a note (final votes, the veto message). Long lists show
+the first ten and the rest behind "Show N more", in the same order and still in the page. A list the
+reader filters (new laws) shows every row.
+
 ### Races (`raceSentenceHtml`, `ElectionResult`)
 
 - **One sentence per race,** from one function (`site/src/lib/ballot.ts`) for the race lists, race pages
