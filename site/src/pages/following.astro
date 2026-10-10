@@ -60,7 +60,7 @@ const KINDS: [string, string][] = [
     import { getFollows, toggleFollow, lastSeen, markSeen, FOLLOW_KINDS } from "../scripts/follows";
     import type { Follows } from "../scripts/follows";
     import { esc } from "../lib/html";
-    import { fmtDate, partyWord, shortTitle } from "../lib/format";
+    import { fmtDate, partyWord, sessionPlainName, shortTitle } from "../lib/format";
     import { raceSentenceHtml } from "../lib/ballot";
     import type { Ballot, Reps } from "../lib/wire";
 
@@ -90,7 +90,9 @@ const KINDS: [string, string][] = [
       row(kind, id, id, link(href, what), "We couldn't load its latest record right now.");
 
     async function billRow(id: string, seen: string | null): Promise<Row> {
-      const at = id.indexOf("-");
+      // ids are "{session}-{slug}"; a special session's key has a hyphen
+      // of its own ("2013s-dec"), a bill's slug never does
+      const at = id.lastIndexOf("-");
       const [session, slug] = [id.slice(0, at), id.slice(at + 1)];
       const href = `/bills/${session}/${slug}/`;
       try {
@@ -99,7 +101,8 @@ const KINDS: [string, string][] = [
         const latest = b.latest_action_date
           ? `Latest action${b.latest_action_desc ? `: ${esc(b.latest_action_desc)},` : ""} ${esc(fmtDate(b.latest_action_date))}.`
           : "";
-        return row("bills", id, b.identifier ?? id,
+        const sessionLabel = /^\d{4}$/.test(session) ? sessionPlainName(session, session) : `${session} session`;
+        return row("bills", id, `${b.identifier ?? id}, ${sessionLabel}`,
           `${link(href, b.identifier ?? id)}${b.title ? `: ${esc(shortTitle(b.title))}` : ""}`, latest, changed);
       } catch {
         return failed("bills", id, href, "This bill");
@@ -114,7 +117,8 @@ const KINDS: [string, string][] = [
         const changed = !!(seen && last?.date && last.date > seen);
         const how = last?.option === "yes" ? "Voted yes" : last?.option === "no" ? "Voted no" : "Didn't vote";
         const detail = last
-          ? `Latest roll call: ${how} on ${esc(last.identifier ?? "a bill")}, ${esc(fmtDate(last.date))}.`
+          ? `Latest roll call, ${esc(fmtDate(last.date))}: ${how.toLowerCase()} on ${esc(last.identifier ?? "a bill")}` +
+            `${last.motion ? `, on the motion “${esc(last.motion)}”` : ""}.`
           : "No roll calls on record yet.";
         return row("legislators", id, p.name ?? id, link(href, p.name ?? id), detail, changed);
       } catch {
@@ -129,11 +133,16 @@ const KINDS: [string, string][] = [
       try {
         const xml = await (await fetch(`/feeds/committees/${id}.xml`)).text();
         const name = (xml.match(/<title>([^<]+)<\/title>/)?.[1] ?? id).replace(/ — hearings$/, "");
-        const updated = xml.match(/<entry>.*?<updated>([^<]+)<\/updated>/s)?.[1]?.slice(0, 10);
-        const changed = !!(seen && updated && updated > seen);
-        const detail = updated
-          ? `${updated >= today ? "Next hearing" : "Latest hearing"}: ${esc(fmtDate(updated))}.`
-          : "No hearings on record yet.";
+        // entries run oldest first; each one's <updated> is its hearing date
+        const dates = [...xml.matchAll(/<entry>.*?<updated>([^<]+)<\/updated>/gs)].map((m) => m[1].slice(0, 10)).sort();
+        const next = dates.find((d) => d >= today);
+        const latest = dates.at(-1);
+        // a hearing held since the last visit; an upcoming one was already
+        // on the list then, so it isn't news by itself
+        const changed = !!seen && dates.some((d) => d > seen && d <= today);
+        const detail = next
+          ? `Next hearing: ${esc(fmtDate(next))}.`
+          : latest ? `Latest hearing: ${esc(fmtDate(latest))}.` : "No hearings on record yet.";
         return row("committees", id, name, link(href, name), detail, changed);
       } catch {
         return failed("committees", id, href, "This committee");
@@ -142,7 +151,8 @@ const KINDS: [string, string][] = [
 
     function raceRow(id: string, ballot: Ballot | null): Row {
       const [kind, num] = id.split("-");
-      const r = kind === "senate" ? ballot?.senate[num] : ballot?.assembly[num];
+      const table = kind === "senate" ? ballot?.senate : ballot?.assembly;
+      const r = table && Object.hasOwn(table, num) ? table[num] : undefined;
       const detail = r && ballot
         ? (r.incumbentStatus === "not-running" ? "<strong>Open seat.</strong> " : "") +
           raceSentenceHtml({
@@ -153,7 +163,8 @@ const KINDS: [string, string][] = [
             others: r.candidates,
             phase: ballot.phase,
             unsettled: !!r.writeIn,
-          })
+          }) +
+          (r.writeIn ? ` ${esc(r.writeIn)}` : "")
         : ballot ? "We don't have this race's candidates yet." : "We couldn't load the candidates right now.";
       return row("races", id, seatName(id), link(`/elections/2026/${id}/`, seatName(id)), detail);
     }
@@ -176,7 +187,8 @@ const KINDS: [string, string][] = [
 
     function districtRow(id: string, reps: Reps | null): Row {
       const [kind, num] = id.split("-");
-      const holder = reps ? (kind === "senate" ? reps.senate[num] : reps.assembly[num]) : undefined;
+      const table = kind === "senate" ? reps?.senate : reps?.assembly;
+      const holder = table && Object.hasOwn(table, num) ? table[num] : undefined;
       const detail = !reps
         ? ""
         : holder
@@ -209,8 +221,16 @@ const KINDS: [string, string][] = [
       fill("bills", await Promise.all(follows.bills.map((id) => billRow(id, seen))));
       fill("legislators", await Promise.all(follows.legislators.map((id) => legislatorRow(id, seen))));
       fill("committees", await Promise.all(follows.committees.map((id) => committeeRow(id, seen))));
-      fill("races", follows.races.map((id) => raceRow(id, ballot)));
-      fill("districts", follows.districts.map((id) => districtRow(id, reps)));
+      // a stored id that matches nothing still gets a row and its Unfollow
+      const safely = (kind: string, id: string, href: string, what: string, make: () => Row): Row => {
+        try {
+          return make();
+        } catch {
+          return failed(kind, id, href, what);
+        }
+      };
+      fill("races", follows.races.map((id) => safely("races", id, `/elections/2026/${id}/`, "This race", () => raceRow(id, ballot))));
+      fill("districts", follows.districts.map((id) => safely("districts", id, `/districts/${id}/`, "This district", () => districtRow(id, reps))));
       fill("council", await Promise.all(follows.council.map((id) => councilRow(id, seen))));
 
       const note = document.getElementById("follow-changed-note")!;
