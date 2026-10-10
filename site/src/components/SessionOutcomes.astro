@@ -1,0 +1,80 @@
+---
+/** What became of a session's bills, as one list in route order: each
+ * outcome's count, its share of every bill introduced, and a link to those
+ * bills. Every bill lands in exactly one row (lib/db sessionBillFlow), so
+ * the rows add up to the total. Plain text and CSS bars: no chart to
+ * describe, nothing that needs a script. */
+import type { sessionBillFlow } from "../lib/db";
+interface Props {
+  flow: ReturnType<typeof sessionBillFlow>;
+  session: string;
+}
+const { flow, session } = Astro.props;
+const num = (n: number) => n.toLocaleString();
+const share = (n: number) => (flow.introduced ? (n / flow.introduced) * 100 : 0);
+const pct = (n: number) =>
+  n > 0 && share(n) < 1
+    ? "under 1%"
+    : `${share(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}%`;
+const rows = [
+  {
+    label: "Became law", n: flow.enacted,
+    href: `/bills/${session}/status/enacted/`,
+    note: "Passed both chambers and became law.",
+  },
+  {
+    label: "Vetoed by the governor", n: flow.vetoed,
+    href: `/bills/${session}/status/vetoed/`,
+    note: "Passed both chambers, then the governor vetoed it.",
+  },
+  {
+    label: "Still moving", n: flow.moving,
+    href: `/bills/${session}/`,
+    note: "Not finished, and not recorded as stopped, when this page was built.",
+  },
+  {
+    label: "Had a hearing, then stopped", n: flow.heard,
+    href: `/bills/${session}/status/failed_sjr1/`,
+    note: "Got a public hearing but hadn't finished the route when the session ended.",
+  },
+  {
+    label: "Never got a public hearing", n: flow.noHearing,
+    href: `/hearing-none/${session}/`,
+    note: "Not voted down: never taken up. A committee's chair decides whether a bill gets a hearing.",
+  },
+].filter((r) => r.n > 0);
+---
+{flow.introduced > 0 ? (
+  <ul class="border-b border-rule" role="list">
+    {rows.map((r) => (
+      <li class="flex flex-col gap-2 border-t border-rule py-4">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <a href={r.href} class="t-question underline">{r.label}</a>
+          <p class="flex items-baseline gap-2">
+            <span class="font-display text-[1.375rem] font-bold tabular-nums leading-none">{num(r.n)}</span>
+            <span class="text-small text-granite">{pct(r.n)} of all bills</span>
+          </p>
+        </div>
+        <div class="outcome-track h-2.5 rounded-full bg-fog" aria-hidden="true">
+          <span class="block h-full rounded-full bg-lake" style={`width:${Math.max(share(r.n), 0.6).toFixed(1)}%`}></span>
+        </div>
+        <p class="text-small text-granite">{r.note}</p>
+      </li>
+    ))}
+  </ul>
+) : (
+  <p class="text-granite">No bills are recorded for this session yet.</p>
+)}
+
+<style>
+  @media (forced-colors: active) {
+    .outcome-track {
+      forced-color-adjust: none;
+      border: 1px solid CanvasText;
+      background: Canvas;
+    }
+    .outcome-track span {
+      background: CanvasText;
+    }
+  }
+</style>

@@ -1,0 +1,33 @@
+---
+/** The views of one session's bills: all of them, or one status at a
+ * time. Real links, so every view is a URL that can be shared and
+ * crawled. The current view is marked with aria-current. */
+import { STATUS_PLAIN } from "../lib/format";
+import { sessionCounts } from "../lib/billRows";
+interface Props {
+  sessionId: string;
+  /** The status shown, or "all". */
+  current: string;
+  /** False on a view's later pages: the view is current, the page isn't
+   * the one its link goes to. */
+  firstPage?: boolean;
+}
+const { sessionId, current, firstPage = true } = Astro.props;
+const { total, byStatus } = sessionCounts(sessionId);
+const views: [string, string, number, string][] = [
+  ["all", "All", total, `/bills/${sessionId}/`],
+  ...byStatus.map(([key, n]): [string, string, number, string] =>
+    [key, STATUS_PLAIN[key] ?? key, n, `/bills/${sessionId}/status/${key}/`]),
+];
+---
+<nav aria-label="Show bills by where they stand" data-pagefind-ignore>
+  <ul class="flex flex-wrap gap-2" role="list">
+    {views.map(([key, label, n, href]) => (
+      <li class="max-w-full">
+        <a class="chip" href={href} aria-current={key === current ? (firstPage ? "page" : "true") : undefined}>
+          {label} <span class="figure">{n.toLocaleString()}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</nav>

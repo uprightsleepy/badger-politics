@@ -4,8 +4,10 @@
  * those bills do not exist. */
 import Base from "../../../../layouts/Base.astro";
 import BillList from "../../../../components/BillList.astro";
+import BillViews from "../../../../components/BillViews.astro";
 import Pager from "../../../../components/Pager.astro";
 import { builtSessions, billsFor } from "../../../../lib/db";
+import { sessionPlainName } from "../../../../lib/format";
 import { PER_PAGE, pageBounds, pageCount } from "../../../../lib/paging";
 
 export function getStaticPaths() {
@@ -24,26 +26,32 @@ const all = billsFor(session.id);
 const bills = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 const { first, last } = pageBounds(page, all.length);
 const name = session.name ?? session.id;
+const plain = sessionPlainName(session.id, name);
 ---
 
 <Base
-  title={`Bills · ${name} · page ${page}`}
-  description={`Bills ${first.toLocaleString()}–${last.toLocaleString()} of ${all.length.toLocaleString()} in the ${name}, with status and latest action from the official record.`}
+  title={`Bills in the ${plain}, page ${page}`}
+  description={`Bills ${first.toLocaleString()}–${last.toLocaleString()} of ${all.length.toLocaleString()} in the ${name}: where each one stands and its latest action, from the official record.`}
   breadcrumbs={[
     { name: "Bills", url: "/bills/" },
     { name, url: `/bills/${session.id}/` },
   ]}
+  layout="wide"
 >
-  <p class="text-sm text-navy-600">
-    <a href={`/bills/${session.id}/`} class="underline">← {name}</a>
-  </p>
-  <h1 class="mt-1 text-2xl font-bold">{name}</h1>
-  <p class="mt-1 text-sm text-navy-600">
-    Showing {first.toLocaleString()}–{last.toLocaleString()} of
-    {" "}{all.length.toLocaleString()} proposals.
-  </p>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <a href="/bills/" class="self-start text-small underline">All sessions</a>
+    <h1 class="t-display">Bills in the {plain}</h1>
+    <p class="sm:text-lead">
+      Page {page} of {pages}: bills {first.toLocaleString()} to {last.toLocaleString()} of
+      {" "}{all.length.toLocaleString()}.
+    </p>
+  </header>
 
-  <BillList bills={bills} sessionId={session.id} />
+  <div class="mt-7">
+    <BillViews sessionId={session.id} current="all" firstPage={false} />
+  </div>
+
+  <BillList bills={bills} class="mt-6" />
 
   <Pager
     page={page}

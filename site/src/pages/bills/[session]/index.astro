@@ -1,16 +1,18 @@
 ---
 /** Page 1 of a session's bills. This used to render all 2,749 proposals in
- * one 2 MB document behind a client-side filter. Filter chips are now real
- * links to per-status pages: same one-tap behaviour, but each view is a
- * shareable URL a crawler can reach, and no page carries the whole session. */
+ * one 2 MB document behind a client-side filter. The views by status are
+ * real links to per-status pages: same one-tap behaviour, but each view is
+ * a shareable URL a crawler can reach, and no page carries the whole
+ * session. */
 import Base from "../../../layouts/Base.astro";
 import BillList from "../../../components/BillList.astro";
+import BillViews from "../../../components/BillViews.astro";
 import FilterBar from "../../../components/FilterBar.astro";
 import Pager from "../../../components/Pager.astro";
 import { builtSessions, billsFor } from "../../../lib/db";
-import { STATUS_SHORT } from "../../../lib/format";
-
-const PER_PAGE = 200;
+import { sessionPlainName } from "../../../lib/format";
+import { sessionCounts } from "../../../lib/billRows";
+import { PER_PAGE, pageBounds, pageCount } from "../../../lib/paging";
 
 export function getStaticPaths() {
   return builtSessions().map((session) => ({
@@ -21,59 +23,66 @@ export function getStaticPaths() {
 
 const { session } = Astro.props;
 const bills = billsFor(session.id);
-const pages = Math.max(1, Math.ceil(bills.length / PER_PAGE));
-
-const counts = new Map<string, number>();
-for (const b of bills) {
-  const key = b.status ?? "introduced";
-  counts.set(key, (counts.get(key) ?? 0) + 1);
-}
-const statuses = [...counts].sort((a, b) => b[1] - a[1]);
+const pages = pageCount(bills.length);
+const { last } = pageBounds(1, bills.length);
+const name = session.name ?? session.id;
+const plain = sessionPlainName(session.id, name);
+const c = sessionCounts(session.id);
+const n = (x: number) => x.toLocaleString();
+// counts out of the session's total: what became of them, in route order
+const outcomes = [
+  `${n(c.enacted)} became law`,
+  c.vetoed ? `${n(c.vetoed)} ${c.vetoed === 1 ? "was" : "were"} vetoed` : "",
+  c.noHearing ? `${n(c.noHearing)} never got a public hearing` : "",
+].filter(Boolean);
+const lead =
+  `${n(c.total)} ${c.total === 1 ? "bill or resolution" : "bills and resolutions"}. ` +
+  (outcomes.length > 1
+    ? `${outcomes.slice(0, -1).join(", ")}${outcomes.length > 2 ? "," : ""} and ${outcomes.at(-1)}.`
+    : `${outcomes[0]}.`);
 ---
 
 <Base
-  title={`Bills · ${session.name ?? session.id}`}
-  description={`All ${bills.length.toLocaleString()} bills and resolutions of the ${session.name ?? session.id}, with status, latest action and links to every roll call.`}
+  title={`Bills in the ${plain}`}
+  description={`All ${n(bills.length)} bills and resolutions of the ${name}: where each one stands, its latest action, and links to every roll call.`}
   breadcrumbs={[{ name: "Bills", url: "/bills/" }]}
+  layout="wide"
 >
-  <h1 class="text-2xl font-bold">{session.name ?? session.id}</h1>
-  <p class="mt-1 text-sm text-navy-600">
-    {bills.length.toLocaleString()} proposals
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <a href="/bills/" class="self-start text-small underline">All sessions</a>
+    <h1 class="t-display">Bills in the {plain}</h1>
+    <p class="sm:text-lead">{lead}</p>
     {session.data_quality === "partial" && (
-      <span class="ml-2 rounded-full bg-gold-100 px-2 py-0.5 text-xs font-semibold">
-        partial data: individual roll calls unavailable for this session
-      </span>
+      <p class="text-small text-granite">
+        Partial records: individual roll call votes aren't available for this session.
+      </p>
     )}
+  </header>
+
+  <div class="mt-7">
+    <BillViews sessionId={session.id} current="all" />
+  </div>
+
+  <div class="mt-4">
+    <FilterBar
+      wide
+      id="bill-filter"
+      statusId="filter-status"
+      label="Find a bill on this page"
+      placeholder="Number or words from its title"
+    />
+  </div>
+  <p class="text-small text-granite">
+    {pages > 1 ? `Showing 1–${n(last)} of ${n(bills.length)}.` : `Showing all ${n(bills.length)}.`}
   </p>
 
-  <FilterBar
-    id="bill-filter"
-    statusId="filter-status"
-    label="Filter this page by number or title"
-    placeholder="Filter this page…"
-  >
-    <div class="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Filter by what happened to the bill">
-      <span class="shrink-0 rounded-full border border-navy-800 bg-navy-800 px-3 py-1 text-xs font-semibold text-white">
-        All {bills.length.toLocaleString()}
-      </span>
-      {statuses.map(([key, n]) => (
-        <a
-          href={`/bills/${session.id}/status/${key}/`}
-          class="shrink-0 rounded-full border border-navy-100 bg-white px-3 py-1 text-xs font-semibold hover:bg-navy-50"
-        >
-          {STATUS_SHORT[key] ?? key} {n.toLocaleString()}
-        </a>
-      ))}
-    </div>
-  </FilterBar>
-
-  <BillList bills={bills.slice(0, PER_PAGE)} sessionId={session.id} />
-  <p id="no-match" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600"></p>
+  <BillList bills={bills.slice(0, PER_PAGE)} class="mt-3" />
+  <p id="no-match" class="mt-4 hidden text-granite"></p>
 
   <Pager
     page={1}
     pages={pages}
-    href={(n) => (n === 1 ? `/bills/${session.id}/` : `/bills/${session.id}/page/${n}/`)}
+    href={(p) => (p === 1 ? `/bills/${session.id}/` : `/bills/${session.id}/page/${p}/`)}
     label="Bill list pages"
   />
 

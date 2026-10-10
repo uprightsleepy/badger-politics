@@ -8,26 +8,35 @@ interface Props {
   facetAttr?: string;
   facetLabel?: string;
   facets?: { key: string; label: string; count: number }[];
+  /** Redesigned pages (Base layout="wide"): a visible label and brand
+   * controls, in the page flow rather than pinned over the list. */
+  wide?: boolean;
 }
-const { id, statusId, label, placeholder, facetAttr, facetLabel, facets } = Astro.props;
+const { id, statusId, label, placeholder, facetAttr, facetLabel, facets, wide = false } = Astro.props;
 const chips = facets?.filter((f) => f.count > 0) ?? [];
 const total = chips.reduce((sum, f) => sum + f.count, 0);
 const CHIP = "min-h-11 max-w-full rounded-full border px-3 py-2 text-sm font-semibold";
 ---
 <div
-  class="sticky top-0 z-20 -mx-4 border-b border-navy-100 bg-paper/95 px-4 py-3 backdrop-blur"
+  class:list={[
+    wide
+      ? "py-3"
+      : "sticky top-0 z-20 -mx-4 border-b border-navy-100 bg-paper/95 px-4 py-3 backdrop-blur",
+  ]}
   data-pagefind-ignore
 >
   <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-    <label class="sr-only" for={id}>{label}</label>
+    <label class={wide ? "basis-full text-small font-bold" : "sr-only"} for={id}>{label}</label>
     <input
       type="search"
       id={id}
       placeholder={placeholder}
-      class="min-h-11 min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm sm:max-w-md sm:flex-none sm:basis-96"
+      class={wide
+        ? "min-h-12 min-w-0 flex-1 rounded-[0.625rem] border-2 border-edge bg-white px-3 text-body focus:border-lake sm:max-w-md sm:flex-none sm:basis-96 lg:min-h-11"
+        : "min-h-11 min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm sm:max-w-md sm:flex-none sm:basis-96"}
     />
-    <p id={statusId} role="status" class="shrink-0 text-sm text-navy-600"></p>
-    <button type="button" data-filter-clear={id} class="hidden min-h-11 px-2 text-sm font-semibold underline">Clear filters</button>
+    <p id={statusId} role="status" class={wide ? "shrink-0 text-small text-granite" : "shrink-0 text-sm text-navy-600"}></p>
+    <button type="button" data-filter-clear={id} class={wide ? "hidden min-h-11 px-2 text-small font-bold text-lake underline" : "hidden min-h-11 px-2 text-sm font-semibold underline"}>Clear filters</button>
   </div>
   {chips.length > 1 && (
     <div class="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={facetLabel}>

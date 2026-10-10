@@ -17,27 +17,28 @@ const { page, pages, href, label } = Astro.props;
 // without printing eighty links on a long session
 const window = new Set<number>([1, pages, page - 1, page, page + 1]);
 const shown = [...window].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
-const LINK = "rounded-lg border border-navy-100 bg-white px-3 py-2 hover:bg-navy-50";
+const LINK =
+  "inline-flex min-h-11 min-w-11 items-center justify-center rounded-[0.625rem] border-2 border-edge bg-white px-3 font-display font-bold text-spruce no-underline hover:border-spruce";
 ---
 {pages > 1 && (
-  <nav class="mt-4 flex flex-wrap items-center gap-2 text-sm" aria-label={label}>
+  <nav class="mt-6 flex flex-wrap items-center gap-2 text-small" aria-label={label}>
     {page > 1 && (
-      <a class={`${LINK} font-semibold`} rel="prev" href={href(page - 1)}>← Previous</a>
+      <a class={LINK} rel="prev" href={href(page - 1)}>Previous</a>
     )}
     {shown.map((n, i) => (
       <>
-        {i > 0 && shown[i - 1] !== n - 1 && <span class="px-1 text-navy-600">…</span>}
+        {i > 0 && shown[i - 1] !== n - 1 && <span class="px-1 text-granite">…</span>}
         {n === page ? (
-          <span class="rounded-lg bg-navy-800 px-3 py-2 font-semibold text-white" aria-current="page">
-            {n}
+          <span class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[0.625rem] border-2 border-spruce bg-spruce px-3 font-display font-bold text-white" aria-current="page">
+            <span class="sr-only">Page </span>{n}
           </span>
         ) : (
-          <a class={LINK} href={href(n)}>{n}</a>
+          <a class={LINK} href={href(n)}><span class="sr-only">Page </span>{n}</a>
         )}
       </>
     ))}
     {page < pages && (
-      <a class={`${LINK} font-semibold`} rel="next" href={href(page + 1)}>Next →</a>
+      <a class={LINK} rel="next" href={href(page + 1)}>Next</a>
     )}
   </nav>
 )}

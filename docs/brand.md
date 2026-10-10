@@ -159,6 +159,23 @@ vote in the other chamber, Governor, Law. A resolution's route ends at Adopted.
 - **The stopping point is honest:** a bill that never got a hearing stops at Committee, not at
   Introduced.
 
+### Bill rows
+
+Every list of bills uses one row (`site/src/components/BillList.astro`):
+
+1. The bill number and its official title, as one link. The whole row is the link's target.
+2. A small route (dots only, hidden from screen readers) and the same status headline the bill's own
+   page shows, then "Last action" and its date.
+
+The headline comes from the same code as the bill page (`lib/billRows.ts` calls `tellStory`), so a
+list and a page never describe a bill two ways.
+
+### Chips
+
+Views and filters are chips: fully round, a 2 px Edge border, at least 44 px tall. The chosen one is
+filled Spruce with white text, marked with `aria-current` (a link to a view) or `aria-pressed` (a
+toggle). Counts sit inside the chip in regular weight.
+
 ### Status block
 
 A white sheet at the top of every bill page:
@@ -336,6 +353,7 @@ The baseline is WCAG 2.2 AA, checked with axe in `site/scripts/a11y.mjs` plus a 
 | Navy masthead with gold call-to-action | White header, search, "Your districts" chip |
 | "Hearing: None", "Veto Tracker", "The Governor's Desk", "Civic Calendar" | Plain names, for example "Bills that never got a hearing", "Vetoes", "Governor's decisions", "Calendar" (URLs may change later, with redirects) |
 | Gold silhouette mark | Spruce silhouette with a Prairie Capitol dot |
+| Homepage flow diagram (colored ribbons) | One list of outcomes in route order, each with a count, its share and a Lake bar |
 | System font only | Overpass and Atkinson Hyperlegible Next, self-hosted |
 
 ## Rolling it out
