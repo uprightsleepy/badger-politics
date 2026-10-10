@@ -36,7 +36,7 @@ const exists = async (p) => {
 
 // --- every session in the database must have been built -------------------
 const sessions = db
-  .prepare("SELECT DISTINCT session_id FROM bills WHERE source != 'legiscan' ORDER BY session_id")
+  .prepare("SELECT DISTINCT session_id FROM bills ORDER BY session_id")
   .all()
   .map((r) => r.session_id);
 // a missing directory is itself a finding, so never let it throw
@@ -68,7 +68,7 @@ const counts = [
   {
     what: "bill pages",
     expected: db
-      .prepare("SELECT COUNT(*) AS n FROM bills WHERE source != 'legiscan'")
+      .prepare("SELECT COUNT(*) AS n FROM bills")
       .get().n,
     dir: "bills",
     nested: true,
@@ -83,8 +83,7 @@ const counts = [
     what: "roll-call pages",
     expected: db
       .prepare(
-        "SELECT COUNT(*) AS n FROM vote_events e JOIN bills b ON b.id = e.bill_id" +
-          " WHERE b.source != 'legiscan'",
+        "SELECT COUNT(*) AS n FROM vote_events e JOIN bills b ON b.id = e.bill_id",
       )
       .get().n,
     dir: "votes",

@@ -135,7 +135,8 @@ These are hard rules. A change that violates one is wrong even if it works.
    a time, as filed, with the Commission's transaction ID and the report
    it appeared on; nothing is summed by stance.
 6. **Provenance filtering.** Rows with `source='legiscan'`, if ever
-   present, never leave the SQLite via any export. FollowTheMoney data is
+   present, never appear in any export. Site pages may show them, credited
+   to LegiScan and linked, under its CC BY 4.0 license. FollowTheMoney data is
    cross-check input only and is never read by the importer or the site
    build. Org logos render only for entities in
    `site/src/data/org-domains.json`, each entry human-verified with a
