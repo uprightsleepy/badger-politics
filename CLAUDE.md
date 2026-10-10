@@ -32,7 +32,10 @@ Separate gated releases build Astro and publish Firebase Hosting. See docs/night
 - Cost ceiling is ~$2/mo: reject any change that adds a paid GCP resource.
 - Every page footer must include the independence disclaimer (see site/src/components/Footer).
 - Analytics = GoatCounter only. Never add Google Analytics, tracking cookies, or any consent-banner-requiring script.
-- Personalization is localStorage-only. No accounts, no server-side user data; addresses are never transmitted except to the Census geocoder, never stored.
+- Personalization is localStorage-only. No accounts, no server-side user data; addresses are never stored.
+  A submitted address goes only to the Census geocoder. The one exception: when PUBLIC_PLACES_KEY is set,
+  as-you-type suggestions (site/src/scripts/addressSuggest.ts) send the typed text to Google Places, and
+  every address field and the About page must say so (conditional on PLACES_KEY). No other address traffic.
 - The static JSON API and all exports are provenance-filtered: source='legiscan' rows never appear in them.
   Site pages may show those rows, credited to LegiScan with links to the record and its CC BY 4.0
   license (site/src/lib/legiscan.ts).
