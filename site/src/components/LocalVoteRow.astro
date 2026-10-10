@@ -1,7 +1,12 @@
 ---
+/** One council item in a vote list: the date, the item and its title,
+ * then the member's vote and the council's action exactly as the clerk
+ * recorded them (the glossary on the page says what the words mean), the
+ * tally where the list has one, and the clerk's meeting record. */
 import { fmtDate } from "../lib/format";
-import { actionLabel, castStyle } from "../lib/localGloss";
+import { actionLabel } from "../lib/localGloss";
 import { recordText } from "../lib/recordText.mjs";
+import { safeHref } from "../lib/html";
 
 interface Props {
   v: {
@@ -9,25 +14,24 @@ interface Props {
     matter_file: string | null; matter_url: string | null; insite_url: string;
   };
   dissent?: boolean;
+  /** The council's tally, in words: "8 Aye, 1 No". */
+  tally?: string;
 }
-const { v, dissent = false } = Astro.props;
+const { v, dissent = false, tally } = Astro.props;
+const matter = safeHref(v.matter_url) ?? safeHref(v.insite_url);
+const meeting = safeHref(v.insite_url);
 ---
-<li class="px-4 py-3" data-y={dissent ? v.date.slice(0, 4) : undefined}>
-  <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-    {v.value && (
-      <span class={`shrink-0 rounded-full px-3 py-0.5 text-center font-bold ${castStyle(v.value)}`}>{v.value}</span>
-    )}
-    <time datetime={v.date} class="shrink-0 tabular-nums text-navy-600">{fmtDate(v.date)}</time>
-    {v.matter_file && (
-      <a href={v.matter_url || v.insite_url} class="min-h-6 break-words font-semibold leading-6 underline">{v.matter_file}</a>
-    )}
-    {Astro.slots.has("tally") && <span class="ml-auto"><slot name="tally" /></span>}
+<li class="flex flex-col gap-0.5 border-t border-rule py-3 sm:flex-row sm:gap-5" data-y={dissent ? v.date.slice(0, 4) : undefined}>
+  <time datetime={v.date} class="shrink-0 text-small tabular-nums text-granite sm:w-28 sm:pt-0.5">{fmtDate(v.date)}</time>
+  <div class="min-w-0 flex-1 [overflow-wrap:anywhere]">
+    <p class="whitespace-pre-line">
+      {v.matter_file && (matter ? <a href={matter} class="font-bold underline">{v.matter_file}</a> : <span class="font-bold">{v.matter_file}</span>)}{v.matter_file && ": "}{recordText(v.title) || "Untitled item"}
+    </p>
+    <p class="mt-0.5 text-small text-granite">
+      {v.value && <>Their vote: <span class="font-bold text-spruce">{v.value}</span>. </>}
+      The council's action: {recordText(actionLabel(v.action))}.
+      {tally && ` ${tally}.`}
+      {meeting && <>{" "}<a href={meeting} class="underline">Meeting record<span class="sr-only"> for {fmtDate(v.date)}</span></a></>}
+    </p>
   </div>
-  <p class="mt-1.5 whitespace-pre-line break-words">
-    {recordText(v.title) || "Untitled item"}
-  </p>
-  <p class="mt-1 whitespace-pre-line break-words text-xs text-navy-600">
-    <span class="font-semibold">Action:</span>{" "}{recordText(actionLabel(v.action))}
-    {" · "}<a href={v.insite_url} class="inline-block min-h-6 leading-6 underline">Meeting record</a>
-  </p>
 </li>

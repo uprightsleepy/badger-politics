@@ -12,10 +12,10 @@ const start = coverage?.start_date ? new Date(`${coverage.start_date}T00:00:00Z`
 ---
 
 {coverage && (
-  <p class="mt-2 max-w-3xl text-xs text-navy-600" role="note">
+  <p class="max-w-[47.5rem] text-small text-granite" role="note">
     Coverage starts {start ? `on ${start}` : `in ${coverage.since}`}.
     {coverage.pending_meetings > 0 && <>
-      {" "}<strong>History is still being collected.</strong>{" "}
+      {" "}<strong class="text-spruce">History is still being collected.</strong>{" "}
       {coverage.pending_meetings.toLocaleString()} listed {coverage.pending_meetings === 1
         ? "meeting awaits" : "meetings await"} collection or refresh.
     </>}

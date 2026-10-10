@@ -13,17 +13,17 @@ const backdrop = shapes[`_${body}`];
 const viewBox = shapes[`_${body}_viewBox`];
 ---
 {path && (
-  <figure class="rounded-lg border border-navy-100 bg-white p-3">
+  <figure class="flex flex-col gap-3 rounded-[0.75rem] bg-white p-4">
     <svg
       viewBox={viewBox}
-      class="mx-auto h-auto w-full max-w-[220px]"
+      class="mx-auto h-auto w-full max-w-[280px]"
       role="img"
       aria-label={`Map of ${label} within ${city}`}
     >
-      <path d={backdrop} fill="var(--color-navy-50)" stroke="var(--color-navy-100)" stroke-width="0.5" />
-      <path d={path} fill="var(--color-navy-600)" stroke="var(--color-navy-800)" stroke-width="0.8" />
+      <path d={backdrop} fill="var(--color-fog)" stroke="#fff" stroke-width="0.8" />
+      <path d={path} fill="var(--color-lake)" stroke="#fff" stroke-width="0.8" />
     </svg>
-    <figcaption class="mt-2 text-center text-xs text-navy-600">
+    <figcaption class="text-fine text-granite">
       {label} within {city}. Boundaries are the city's own 2024 district files.
     </figcaption>
   </figure>

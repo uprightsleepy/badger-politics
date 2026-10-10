@@ -1,20 +1,22 @@
 ---
-/** One council member's voting record. Bounded like the legislator
- * profiles: recent votes in a scroll panel, votes with dissent in full, and
- * the clerk's page linked from every row. */
+/** One council member's voting record: who they are and their term, plain
+ * answers about their record with what each number is out of, then the
+ * votes themselves (ties broken, sole no votes, votes with dissent, motions
+ * and recent votes), each linking the clerk's record. */
 import Base from "../../../layouts/Base.astro";
-import SourceStrip from "../../../components/SourceStrip.astro";
-import ScrollPanel from "../../../components/ScrollPanel.astro";
 import Portrait from "../../../components/Portrait.astro";
 import LocalProfileNotice from "../../../components/LocalProfileNotice.astro";
 import LocalCoverageNotice from "../../../components/LocalCoverageNotice.astro";
 import FollowButton from "../../../components/FollowButton.astro";
 import JsonLd from "../../../components/JsonLd.astro";
-import { localBodies, localMembers } from "../../../lib/db";
-import { RECENT, councilMemberProfile } from "../../../lib/council";
+import MoreRows from "../../../components/MoreRows.astro";
 import YearChips from "../../../components/YearChips.astro";
 import LocalVoteRow from "../../../components/LocalVoteRow.astro";
+import { localBodies, localMembers, meta } from "../../../lib/db";
+import { RECENT, councilMemberProfile } from "../../../lib/council";
 import { fmtDate } from "../../../lib/format";
+import { longDate } from "../../../lib/federal";
+import { safeHref } from "../../../lib/html";
 
 export function getStaticPaths() {
   return localBodies().flatMap((body) =>
@@ -30,15 +32,28 @@ const {
   glossary, years,
 } = councilMemberProfile(body.tenant, member);
 const pct = (n: number, d: number) => (d > 0 ? `${Math.round((n / d) * 100)}%` : "");
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 const followId = `${body.slug}/${member.slug}`;
-const role = member.seat != null
-  ? `${body.city} Common Council, District ${member.seat}`
-  : presiding
-    ? `Mayor, presiding over the ${body.name}`
-    : body.name;
 const termLabel = (t: string | null) =>
-  t === "Ald." ? "Alderperson" : t === "President" ? "Council President" : (t ?? "Member");
-
+  t === "Ald." ? "Alderperson" : t === "President" ? "Council president" : (t ?? "Member");
+const SHOWN = 10;
+const first = <T,>(rows: T[]) => rows.slice(0, SHOWN);
+const rest = <T,>(rows: T[]) => rows.slice(SHOWN);
+const tally = (ayes: number, noes: number) => `${ayes} Aye, ${noes} No`;
+const role = presiding
+    ? `${member.is_current ? "Mayor" : "Former mayor"} of ${body.city}, presiding over the ${body.name}`
+    : `${member.is_current ? "Member" : "Former member"} of the ${body.name}`;
+const tel = member.phone ? `tel:${member.phone.replace(/\D/g, "")}` : null;
+const imageBasis = safeHref(member.image_basis);
+// the date the records were pulled, the same day is_current was decided
+const asOf = (meta().imported_at ?? new Date().toISOString()).slice(0, 10);
+// spring elections fall on the first Tuesday in April
+const firstTuesdayOfApril = (year: string) => {
+  const day = new Date(Date.UTC(Number(year), 3, 1)).getUTCDay();
+  return `${year}-04-0${1 + ((9 - day) % 7)}`;
+};
+const springHeld = springYear ? asOf > firstTuesdayOfApril(springYear) : false;
+const seatBasis = safeHref(member.seat_basis);
 ---
 
 <Base
@@ -46,9 +61,10 @@ const termLabel = (t: string | null) =>
   description={`${member.name}'s ${body.name} voting record from the city's own legislative system: ${stats.total.toLocaleString()} recorded votes.`}
   filters={{ type: "City Council", city: body.city }}
   breadcrumbs={[
-    { name: "City Councils", url: "/local/" },
+    { name: "City councils", url: "/local/" },
     { name: body.name, url: `/local/${body.slug}/` },
   ]}
+  layout="wide"
 >
   <JsonLd
     data={{
@@ -64,296 +80,280 @@ const termLabel = (t: string | null) =>
       memberOf: { "@type": "GovernmentOrganization", name: body.name },
     }}
   />
-  <p class="text-sm text-navy-600">
-    <a href={`/local/${body.slug}/`} class="underline">&larr; {body.name}</a>
-  </p>
-  <div class="mt-1 flex flex-wrap items-center gap-3">
-    <h1 class="text-2xl font-bold">{member.name}</h1>
-    <span class="ml-auto flex items-center gap-3" data-pagefind-ignore>
-      <FollowButton kind="council" id={followId} />
-      <a href={`/feeds/local/${followId}.xml`} class="text-xs underline">Atom feed</a>
-    </span>
-  </div>
-  <p class="mt-1 text-sm text-navy-700">
-    {member.is_current ? "" : "Former member, "}
-    {member.seat != null ? (
-      <>{body.city} Common Council, <a href={`/local/${body.slug}/district/${member.seat}/`} class="underline">District {member.seat}</a></>
-    ) : role}
-    <span class="text-xs text-navy-600"> &middot; nonpartisan office</span>
-    {member.record_name && member.record_name !== member.name && (
-      <span class="text-xs text-navy-600">
-        {" "}&middot; listed as &ldquo;{member.record_name}&rdquo; in the council's records
-      </span>
-    )}
-    {member.seat_basis && (
-      <span class="text-xs text-navy-600">
-        {" "}&middot; district per <a href={member.seat_basis} class="underline">the city's roster</a>
-      </span>
-    )}
-  </p>
-  <SourceStrip
-    sources={[{ label: `${body.name} records`, href: body.insite_url }]}
-    through={stats.last}
-  />
-  <LocalCoverageNotice tenant={body.tenant} />
+  <div class="council">
+    <header class="c-head flex max-w-[47.5rem] flex-col gap-2.5">
+      <a href={`/local/${body.slug}/`} class="self-start text-small underline">{body.name}</a>
+      <h1 class="t-display">{member.name}</h1>
+      <p class="sm:text-lead">
+        {member.seat != null
+          ? <>{member.is_current ? "Alderperson" : "Former alderperson"} for <a href={`/local/${body.slug}/district/${member.seat}/`} class="underline">District {member.seat}</a> on the {body.name}.</>
+          : `${role}.`}
+        {" "}A nonpartisan office.
+        {termEnd && ` The current term ends ${longDate(termEnd)}${springYear ? `, so the seat ${springHeld ? "was" : "is"} on the April ${springYear} spring ballot` : ""}.`}
+      </p>
+      {seatBasis && terms.length === 0 && (
+        <p class="text-small text-granite">The district is from <a href={seatBasis} class="underline">the city's roster</a>.</p>
+      )}
+      {member.record_name && member.record_name !== member.name && (
+        <p class="text-small text-granite">Listed as “{member.record_name}” in the council's records.</p>
+      )}
+      <LocalCoverageNotice tenant={body.tenant} />
+    </header>
 
-  <div class="mt-4 flex flex-col gap-6 md:flex-row">
-    <aside class="w-full shrink-0 md:w-64" aria-label={`About ${member.name}`}>
-      <div class="rounded-lg border border-navy-100 bg-white p-4">
-        <Portrait src={member.image_url} name={member.name} size={120} className="mb-3 rounded" />
-        {member.is_current && <LocalProfileNotice tenant={body.tenant} />}
-        {member.image_basis && (
-          <p class="text-xs text-navy-600">
-            Official portrait from <a href={member.image_basis} class="underline">the city's page</a>.
-          </p>
-        )}
-        {terms.length > 0 && (
-          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
-            <h2 class="font-bold">Service</h2>
-            {terms.map((t) => (
-              <p class="mt-1">
-                {termLabel(t.title)}: {fmtDate(t.start)} to {t.end ? fmtDate(t.end) : "present"}
-              </p>
-            ))}
-            <p class="mt-1 text-xs text-navy-600">From the council's own office records.</p>
-          </div>
-        )}
-        {termEnd && (
-          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
-            <h2 class="font-bold">{springYear ? `Up for reelection: spring ${springYear}` : "Current term"}</h2>
-            <p class="mt-1">Term ends {fmtDate(termEnd)}.</p>
-            <p class="mt-1 text-xs text-navy-600">
-              Per the council's office records{springYear ? "; council seats are filled at the April spring election" : ""}.
-            </p>
-          </div>
-        )}
-        {member.is_current && (member.email || member.phone) && (
-          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
-            <h2 class="font-bold">Contact</h2>
-            {member.email && (
-              <p class="mt-1 break-all">
-                <a href={`mailto:${member.email}`} class="underline">{member.email}</a>
-              </p>
-            )}
-            {member.phone && (
-              <p class="mt-1">
-                <a href={`tel:${member.phone.replace(/\D/g, "")}`} class="underline">{member.phone}</a>
-              </p>
-            )}
-            <p class="mt-1 text-xs text-navy-600">
-              Official office contacts, from the council's records and the city's page for the district.
-            </p>
-          </div>
-        )}
-        {attendance.meetings > 0 && (
-          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
-            <h2 class="font-bold">Attendance</h2>
-            <p class="mt-1">
-              {rated
-                ? `Present at ${attendance.present.toLocaleString()} of ${attendance.meetings.toLocaleString()} meetings where the roll was called (${pct(attendance.present, attendance.meetings)}).`
-                : `Listed at ${attendance.meetings.toLocaleString()} meetings where the roll was called. Presiding officers' attendance labels vary by city, so no rate is shown.`}
-            </p>
-            <ul class="mt-1 text-xs text-navy-600">
-              {attendance.values.map((a) => (
-                <li>{a.value}: {a.n.toLocaleString()}</li>
-              ))}
-            </ul>
-            <p class="mt-1 text-xs text-navy-600">
-              From the clerk's roll-call records, values exactly as recorded.
-            </p>
-          </div>
-        )}
-        {committees.length > 0 && (
-          <div class="mt-3 rounded bg-navy-50 p-3 text-sm">
-            <h2 class="font-bold">Committees · {committees.length}</h2>
-            <ul class="mt-1 space-y-1">
-              {committees.map((c) => (
-                <li>
-                  {c.body_url ? (
-                    <a href={c.body_url} class="underline">{c.body_name}</a>
-                  ) : (
-                    c.body_name
-                  )}
-                  {c.role && /chair|president/i.test(c.role) && (
-                    <span class="ml-1 rounded-full bg-gold-100 px-1.5 py-0.5 text-xs font-semibold">{c.role}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <p class="mt-1 text-xs text-navy-600">Current assignments, from the council's own records.</p>
-          </div>
-        )}
+    <aside class="c-rail flex flex-col gap-5" aria-label={`About ${member.name}`}>
+      <div class="flex flex-col gap-2" data-pagefind-ignore>
+        <FollowButton kind="council" id={followId} label={`Follow ${member.name}`} variant="primary" />
+        <p class="text-fine text-granite">
+          Following saves them on this device. You can also <a href={`/feeds/local/${followId}.xml`} class="underline">get updates in a feed reader</a>.
+        </p>
       </div>
+
+      <section class="sheet flex flex-col gap-4 p-5" aria-label="Portrait and contact">
+        <div class="flex items-center gap-4">
+          <Portrait src={member.image_url} name={member.name} size={80} />
+          {imageBasis && <p class="text-fine text-granite">Official portrait from <a href={imageBasis} class="underline">the city's page</a>.</p>}
+        </div>
+        {!!member.is_current && (member.email || tel) && (
+          <div class="flex flex-col gap-2">
+            {member.email && (
+              <a href={`mailto:${member.email}`} class="btn btn-secondary w-full flex-col gap-0.5">
+                Email
+                <span class="text-small font-sans font-normal [overflow-wrap:anywhere]">{member.email}</span>
+              </a>
+            )}
+            {tel && (
+              <a href={tel} class="btn btn-secondary w-full flex-col gap-0.5">
+                Call
+                <span class="text-small font-sans font-normal">{member.phone}</span>
+              </a>
+            )}
+            <p class="text-fine text-granite">Official office contacts, from the city's published records.</p>
+          </div>
+        )}
+        {!!member.is_current && <LocalProfileNotice tenant={body.tenant} />}
+      </section>
+
+      {terms.length > 0 && (
+        <section class="flex flex-col gap-2" aria-labelledby="service-heading">
+          <h2 id="service-heading" class="t-question">Service</h2>
+          <ul class="border-b border-rule text-small" role="list">
+            {terms.map((t) => (
+              <li class="border-t border-rule py-2">{termLabel(t.title)}: {fmtDate(t.start)} to {t.end ? fmtDate(t.end) : member.is_current ? "now" : "an end date not recorded"}</li>
+            ))}
+          </ul>
+          <p class="text-fine text-granite">
+            From the council's own office records.
+            {seatBasis && <> The district is from <a href={seatBasis} class="underline">the city's roster</a>.</>}
+          </p>
+        </section>
+      )}
+
+      {committees.length > 0 && (
+        <section class="flex flex-col gap-2" aria-labelledby="committees-heading">
+          <h2 id="committees-heading" class="t-question">Committees: {committees.length.toLocaleString()}</h2>
+          <ul class="border-b border-rule text-small" role="list">
+            {committees.map((c) => {
+              const href = safeHref(c.body_url);
+              return (
+                <li class="border-t border-rule py-2">
+                  {href ? <a href={href} class="underline">{c.body_name}</a> : c.body_name}{c.role && /chair|president/i.test(c.role) && <span class="font-bold">, {c.role.toLowerCase()}</span>}
+                </li>
+              );
+            })}
+          </ul>
+          <p class="text-fine text-granite">Current assignments, from the council's own records.</p>
+        </section>
+      )}
     </aside>
 
-    <div class="min-w-0 flex-1">
-  <dl class="grid max-w-2xl gap-x-6 gap-y-3 rounded-lg border border-navy-100 bg-white p-4 text-sm sm:grid-cols-3">
-    <div>
-      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Recorded votes</dt>
-      <dd class="mt-0.5 text-xl font-bold tabular-nums">{stats.total.toLocaleString()}</dd>
-    </div>
-    <div>
-      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Voted No</dt>
-      <dd class="mt-0.5 text-xl font-bold tabular-nums">{stats.noes.toLocaleString()}</dd>
-    </div>
-    <div>
-      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Other than Aye/No</dt>
-      <dd class="mt-0.5 text-xl font-bold tabular-nums">{stats.other.toLocaleString()}</dd>
-    </div>
-    <div>
-      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">On the losing side</dt>
-      <dd class="mt-0.5 text-xl font-bold tabular-nums">
-        {outcomes.lost.toLocaleString()}
-        {outcomes.decided > 0 && <span class="ml-1 text-sm font-normal text-navy-600">{pct(outcomes.lost, outcomes.decided)}</span>}
-      </dd>
-    </div>
-    <div>
-      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Sole No votes</dt>
-      <dd class="mt-0.5 text-xl font-bold tabular-nums">{soleNoes.length.toLocaleString()}</dd>
-    </div>
-    <div>
-      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Attendance</dt>
-      <dd class="mt-0.5 text-xl font-bold tabular-nums">
-        {attendance.meetings > 0 && rated ? pct(attendance.present, attendance.meetings) : "n/a"}
-        {attendance.meetings > 0 && rated && <span class="ml-1 text-sm font-normal text-navy-600">{attendance.present.toLocaleString()} of {attendance.meetings.toLocaleString()}</span>}
-      </dd>
-    </div>
-  </dl>
-  <p class="mt-1 max-w-2xl text-xs text-navy-600">
-    "Other" is everything the clerk recorded besides Aye or No: excused,
-    absent, abstaining, voting "present", or presiding without a vote,
-    shown on each row exactly as recorded. "On the losing side" counts Aye and No votes that
-    ended opposite the clerk's recorded outcome, of
-    {" "}{outcomes.decided.toLocaleString()} with an outcome on record.
-    Attendance is meetings where the roll call records the member present,
-    of the meetings where the roll was called with the member listed.{!rated &&
-    " The record also includes presiding entries where the mayor did not cast a vote."}
-  </p>
-  {glossary.length > 0 && (
-    <details class="mt-3 max-w-2xl rounded-lg border border-navy-100 bg-white text-sm">
-      <summary class="cursor-pointer px-4 py-2 font-semibold">What the words on this page mean</summary>
-      <dl class="grid gap-x-4 gap-y-1 px-4 pb-3 sm:grid-cols-[max-content_1fr]">
-        {glossary.map((g) => (
-          <>
-            <dt class="font-semibold">{g.term}</dt>
-            <dd class="text-navy-700">{g.meaning}</dd>
-          </>
-        ))}
-      </dl>
-      <p class="px-4 pb-3 text-xs text-navy-600">
-        The clerk's own words appear on each row and on the linked pages; these are plain-language readings of them.
-      </p>
-    </details>
-  )}
+    <div class="c-body flex max-w-[47.5rem] flex-col gap-12">
+      <section class="flex flex-col gap-5" aria-labelledby="record-heading">
+        <h2 id="record-heading" class="t-section">Their record</h2>
+        {attendance.meetings > 0 && (
+          <div class="flex flex-col gap-1">
+            <h3 class="t-question">Do they show up?</h3>
+            <p>
+              {rated
+                ? <>Present at <span class="figure">{attendance.present.toLocaleString()}</span> of {plural(attendance.meetings, "meeting", "meetings")} where the roll was called ({pct(attendance.present, attendance.meetings)}).</>
+                : `Listed at ${plural(attendance.meetings, "meeting", "meetings")} where the roll was called. A presiding mayor's attendance is recorded differently from city to city, so no rate is shown.`}
+            </p>
+            <p class="text-small text-granite">
+              As the clerk recorded it: {attendance.values.map((a) => `${a.value} ${a.n.toLocaleString()}`).join(", ")}.
+            </p>
+          </div>
+        )}
+        <div class="flex flex-col gap-1">
+          <h3 class="t-question">How often do they vote no?</h3>
+          <p>
+            {stats.total === 0
+              ? <>No votes are recorded for them yet. The complete record is in <a href={body.insite_url} class="underline">the city's own system</a>.</>
+              : stats.noes === 0
+                ? stats.total === 1 ? "Their one recorded vote wasn't a no." : `Never voted no in any of their ${stats.total.toLocaleString()} recorded votes.`
+                : <>Voted no <span class="figure">{stats.noes.toLocaleString()}</span> {stats.noes === 1 ? "time" : "times"} in {plural(stats.total, "recorded vote", "recorded votes")}{soleNoes.length > 0
+                  ? `, and cast the only no vote ${plural(soleNoes.length, "time", "times")}`
+                  : ", and was never the only no vote"}.</>}
+          </p>
+          {stats.other > 0 && (
+            <p class="text-small text-granite">
+              {plural(stats.other, "vote was", "votes were")} something other than yes or no: excused, absent, abstaining,
+              voting “present” or presiding without a vote, shown on each row as the clerk recorded it.
+            </p>
+          )}
+        </div>
+        {outcomes.decided > 0 && (
+          <div class="flex flex-col gap-1">
+            <h3 class="t-question">How often are they on the losing side?</h3>
+            <p>
+              {outcomes.decided === 1
+                ? <>Their one yes-or-no vote on an item with a recorded outcome {outcomes.lost === 1 ? "went the other way from" : "matched"} the council's result.</>
+                : <><span class="figure">{outcomes.lost.toLocaleString()}</span> of their {outcomes.decided.toLocaleString()} yes-or-no votes on
+                  items with a recorded outcome ({pct(outcomes.lost, outcomes.decided)}) went the other way from the council's result.</>}
+            </p>
+          </div>
+        )}
+        {presiding && (
+          <div class="flex flex-col gap-1">
+            <h3 class="t-question">When do they vote?</h3>
+            <p>
+              The mayor votes only to break a tie. {member.name} broke {tieBreaks.length === 1 ? "one tie" : `${tieBreaks.length.toLocaleString()} ties`} on
+              record{joinedAyes > 0 ? `, and ${plural(joinedAyes, "more recorded Aye", "more recorded Ayes")} joined an already unanimous council` : ""}.
+            </p>
+          </div>
+        )}
+        {motionCount > 0 && (
+          <div class="flex flex-col gap-1">
+            <h3 class="t-question">What have they moved?</h3>
+            <p>The council's record names {member.name} as the mover of {plural(motionCount, "item", "items")}.</p>
+          </div>
+        )}
+        {glossary.length > 0 && (
+          <details>
+            <summary class="inline-flex min-h-11 cursor-pointer items-center font-display font-bold text-lake underline">What the words on this page mean</summary>
+            <dl class="mt-2 grid gap-x-6 border-b border-rule sm:grid-cols-[max-content_1fr]">
+              {glossary.map((g) => (
+                <>
+                  <dt class="border-t border-rule pt-2 font-bold sm:pb-2">{g.term}</dt>
+                  <dd class="pb-2 sm:border-t sm:border-rule sm:pt-2">{g.meaning}</dd>
+                </>
+              ))}
+            </dl>
+            <p class="mt-2 text-small text-granite">
+              Each row keeps the clerk's own words, and the linked pages have the full record; these are plain readings of them.
+            </p>
+          </details>
+        )}
+      </section>
 
-  {tieBreaks.length > 0 && (
-    <section class="mt-6">
-      <h2 class="text-xl font-bold">Tie-breaking votes · {tieBreaks.length.toLocaleString()}</h2>
-      <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        The presiding officer votes only when the alderpersons split evenly.
-        {member.name} has broken {tieBreaks.length === 1 ? "one tie" : `${tieBreaks.length} ties`} on
-        record{joinedAyes > 0 ? `; ${joinedAyes.toLocaleString()} more recorded Ayes joined an already unanimous council` : ""}.
-        Each links to the clerk's page.
-      </p>
-      <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
-        {tieBreaks.map((v) => (
-          <LocalVoteRow v={v}>
-            <span slot="tally" class="font-semibold tabular-nums">{v.other_ayes}&ndash;{v.other_noes} broken</span>
-          </LocalVoteRow>
-        ))}
-      </ul>
-    </section>
-  )}
+      {tieBreaks.length > 0 && (
+        <section aria-labelledby="ties-heading">
+          <h2 id="ties-heading" class="t-section">Tie-breaking votes: {tieBreaks.length.toLocaleString()}</h2>
+          <p class="mt-2 text-small text-granite">The other members split evenly; the mayor's vote decided. Newest first.</p>
+          <div class="mt-3">
+            <MoreRows rest={rest(tieBreaks).length} label="tie-breaking votes">
+              {first(tieBreaks).map((v) => <LocalVoteRow v={v} tally={`The others split ${v.other_ayes} to ${v.other_noes}`} />)}
+              <Fragment slot="rest">{rest(tieBreaks).map((v) => <LocalVoteRow v={v} tally={`The others split ${v.other_ayes} to ${v.other_noes}`} />)}</Fragment>
+            </MoreRows>
+          </div>
+        </section>
+      )}
 
-  {soleNoes.length > 0 && (
-    <section class="mt-6">
-      <h2 class="text-xl font-bold">Sole No votes · {soleNoes.length.toLocaleString()}</h2>
-      <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Items where {member.name} cast the only No. Each row names the action
-        voted on, which may be a referral or postponement rather than final passage,
-        and links to the clerk's record.
-      </p>
-      <YearChips target="sole-no-list" label={`Filter the sole No votes by year`} years={years.soleNoes} />
-      <ScrollPanel label={`${member.name}'s sole No votes`} max="max-h-[24rem]" count={soleNoes.length}>
-        <ul id="sole-no-list" class="divide-y divide-navy-100 p-0 text-sm">
-          {soleNoes.map((v) => (
-            <LocalVoteRow v={v} dissent>
-              <span slot="tally" class="font-semibold tabular-nums">
-                <span class="text-moss-600">{v.ayes} Aye</span> &ndash; <span class="text-badger-700">1 No</span>
-              </span>
-            </LocalVoteRow>
-          ))}
-        </ul>
-      </ScrollPanel>
-    </section>
-  )}
+      {soleNoes.length > 0 && (
+        <section aria-labelledby="sole-heading">
+          <h2 id="sole-heading" class="t-section">The only no vote: {soleNoes.length.toLocaleString()}</h2>
+          <p class="mt-2 text-small text-granite">
+            Items where {member.name} cast the only no. The vote is on the action named, which may be a
+            referral or postponement rather than final passage.
+          </p>
+          <YearChips target="sole-no-list" label="Show the only-no votes from one year" years={years.soleNoes} />
+          <div id="sole-no-list" class="mt-3">
+            <MoreRows rest={rest(soleNoes).length} label="only-no votes">
+              {first(soleNoes).map((v) => <LocalVoteRow v={v} dissent tally={tally(v.ayes, 1)} />)}
+              <Fragment slot="rest">{rest(soleNoes).map((v) => <LocalVoteRow v={v} dissent tally={tally(v.ayes, 1)} />)}</Fragment>
+            </MoreRows>
+          </div>
+        </section>
+      )}
 
-  {dissentVotes.length > 0 && (
-    <section class="mt-6">
-      <h2 class="text-xl font-bold">Votes with dissent · {dissentVotes.length.toLocaleString()}</h2>
-      <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Items where at least one member voted No, showing {member.name}'s vote
-        and the council's tally. Each row names the action voted on, which may
-        be a referral or postponement rather than final passage, and links to the clerk's record.
-      </p>
-      <YearChips target="dissent-list" label={`Filter the votes with dissent by year`} years={years.dissent} />
-      <ScrollPanel label={`${member.name} on votes with dissent`} max="max-h-[28rem]" count={dissentVotes.length}>
-        <ul id="dissent-list" class="divide-y divide-navy-100 p-0 text-sm">
-          {dissentVotes.map((v) => (
-            <LocalVoteRow v={v} dissent>
-              <span slot="tally" class="shrink-0 text-xs font-semibold tabular-nums">
-                <span class="text-moss-600">{v.ayes} Aye</span> &ndash; <span class="text-badger-700">{v.noes} No</span>
-              </span>
-            </LocalVoteRow>
-          ))}
-        </ul>
-      </ScrollPanel>
-    </section>
-  )}
+      {dissentVotes.length > 0 && (
+        <section aria-labelledby="dissent-heading">
+          <h2 id="dissent-heading" class="t-section">Votes where someone voted no: {dissentVotes.length.toLocaleString()}</h2>
+          <p class="mt-2 text-small text-granite">
+            {member.name}'s vote and the council's tally on every item with at least one no. The vote is on the
+            action named, which may be a referral or postponement rather than final passage.
+          </p>
+          <YearChips target="dissent-list" label="Show the split votes from one year" years={years.dissent} />
+          <div id="dissent-list" class="mt-3">
+            <MoreRows rest={rest(dissentVotes).length} label="split votes">
+              {first(dissentVotes).map((v) => <LocalVoteRow v={v} dissent tally={tally(v.ayes, v.noes)} />)}
+              <Fragment slot="rest">{rest(dissentVotes).map((v) => <LocalVoteRow v={v} dissent tally={tally(v.ayes, v.noes)} />)}</Fragment>
+            </MoreRows>
+          </div>
+        </section>
+      )}
 
-  {motionCount > 0 && (
-    <section class="mt-6">
-      <h2 class="text-xl font-bold">Motions they moved · {motionCount.toLocaleString()}</h2>
-      <p class="mt-1 max-w-3xl text-sm text-navy-600">
-        Items where the council's record names {member.name} as the mover of
-        the action taken{motionCount > RECENT ? `, the ${RECENT} most recent` : ""}.
-        Each links to the clerk's page.
-      </p>
-      <ScrollPanel label={`Motions moved by ${member.name}`} max="max-h-[28rem]" count={Math.min(RECENT, motionCount)}>
-        <ul class="divide-y divide-navy-100 p-0 text-sm">
-          {motions.map((m) => (
-            <LocalVoteRow v={m} />
-          ))}
-        </ul>
-      </ScrollPanel>
-    </section>
-  )}
+      {motionCount > 0 && (
+        <section aria-labelledby="motions-heading">
+          <h2 id="motions-heading" class="t-section">Items they moved: {motionCount.toLocaleString()}</h2>
+          <p class="mt-2 text-small text-granite">
+            {motionCount > RECENT ? `The ${RECENT.toLocaleString()} most recent items` : "Items"} the council's record names {member.name} as the mover of, newest first.
+          </p>
+          <div class="mt-3">
+            <MoreRows rest={rest(motions).length} label="items they moved">
+              {first(motions).map((m) => <LocalVoteRow v={m} />)}
+              <Fragment slot="rest">{rest(motions).map((m) => <LocalVoteRow v={m} />)}</Fragment>
+            </MoreRows>
+          </div>
+        </section>
+      )}
 
-  <section class="mt-6">
-    <h2 class="text-xl font-bold">Recent votes</h2>
-    <p class="mt-1 max-w-3xl text-sm text-navy-600">
-      The {Math.min(RECENT, stats.total).toLocaleString()} most recent of
-      {" "}{stats.total.toLocaleString()} recorded votes; the complete
-      record lives in the <a href={body.insite_url} class="underline">city's own system</a>{stats.total > 0 && (
-        <>, and the collected votes are <a href={`/local/${body.slug}/${member.slug}/votes/1/`} class="underline">paged here</a></>
-      )}.
-    </p>
-    {yearPages.length > 1 && (
-      <p class="mt-1 max-w-3xl text-sm text-navy-600" data-pagefind-ignore>
-        Jump to a year in the collected record:
-        {yearPages.map((y) => (
-          <a href={`/local/${body.slug}/${member.slug}/votes/${y.page}/`} class="ml-2 underline tabular-nums">{y.year}</a>
-        ))}
+      {stats.total > 0 && <section aria-labelledby="recent-heading">
+        <h2 id="recent-heading" class="t-section">Recent votes</h2>
+        <p class="mt-2 text-small text-granite">
+          {stats.total > RECENT
+            ? `The ${RECENT.toLocaleString()} most recent of ${plural(stats.total, "recorded vote", "recorded votes")}, newest first.`
+            : stats.total === 1 ? "Their one recorded vote." : `All ${stats.total.toLocaleString()} recorded votes, newest first.`}
+          The complete record is in <a href={body.insite_url} class="underline">the city's own system</a>, and every vote we've collected is <a href={`/local/${body.slug}/${member.slug}/votes/1/`} class="underline">listed page by page</a>.
+        </p>
+        {yearPages.length > 1 && (
+          <p class="mt-2 flex flex-wrap items-center gap-2 text-small" data-pagefind-ignore>
+            <span class="text-granite">Start at a year:</span>
+            {yearPages.map((y) => <a href={`/local/${body.slug}/${member.slug}/votes/${y.page}/`} class="chip tabular-nums">{y.year}</a>)}
+          </p>
+        )}
+        <div class="mt-3">
+          <MoreRows rest={rest(votes).length} label="recent votes">
+            {first(votes).map((v) => <LocalVoteRow v={v} />)}
+            <Fragment slot="rest">{rest(votes).map((v) => <LocalVoteRow v={v} />)}</Fragment>
+          </MoreRows>
+        </div>
+      </section>}
+
+      <p class="text-fine text-granite">
+        From the <a href={body.insite_url} class="underline">{body.name}'s own records</a>{stats.last && `, the latest from ${fmtDate(stats.last)}`}.
       </p>
-    )}
-    <ScrollPanel label={`${member.name}'s recent votes`} max="max-h-[32rem]" count={Math.min(RECENT, stats.total)}>
-      <ul class="divide-y divide-navy-100 p-0 text-sm">
-        {votes.map((v) => (
-          <LocalVoteRow v={v} />
-        ))}
-      </ul>
-    </ScrollPanel>
-  </section>
     </div>
   </div>
 </Base>
+
+<style>
+  .council {
+    display: grid;
+    gap: 2rem;
+    grid-template-areas: "head" "rail" "body";
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .c-head { grid-area: head; }
+  .c-rail { grid-area: rail; }
+  .c-body { grid-area: body; }
+  @media (min-width: 64rem) {
+    .council {
+      grid-template-areas: "head rail" "body rail";
+      grid-template-columns: minmax(0, 1fr) 20rem;
+      grid-template-rows: auto 1fr;
+      column-gap: 3.5rem;
+    }
+    .c-rail {
+      align-self: start;
+    }
+  }
+</style>

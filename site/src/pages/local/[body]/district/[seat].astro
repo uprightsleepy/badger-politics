@@ -1,7 +1,6 @@
 ---
 /** A council district and its verified members. */
 import Base from "../../../../layouts/Base.astro";
-import SourceStrip from "../../../../components/SourceStrip.astro";
 import Portrait from "../../../../components/Portrait.astro";
 import LocalProfileNotice from "../../../../components/LocalProfileNotice.astro";
 import LocalDistrictMap from "../../../../components/LocalDistrictMap.astro";
@@ -21,6 +20,8 @@ const { body, seat } = Astro.props;
 const holders = localMembers(body.tenant).filter((m) => m.is_current && m.seat === seat);
 const name = `${body.city} Common Council District ${seat}`;
 const hasBoundary = `${body.slug}-${seat}` in SHAPES;
+const names = holders.map((m) => m.name);
+const list = names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 ---
 
 <Base
@@ -28,47 +29,82 @@ const hasBoundary = `${body.slug}-${seat}` in SHAPES;
   description={`${name}: its council members, from the city's own records.`}
   filters={{ type: "City Council", city: body.city }}
   breadcrumbs={[
-    { name: "City Councils", url: "/local/" },
+    { name: "City councils", url: "/local/" },
     { name: body.name, url: `/local/${body.slug}/` },
   ]}
+  layout="wide"
 >
-  <p class="text-sm text-navy-600">
-    <a href={`/local/${body.slug}/`} class="underline">&larr; {body.name}</a>
-  </p>
-  <h1 class="mt-1 text-2xl font-bold">{name}</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    One of {body.seats} aldermanic districts. Council seats are nonpartisan.
-  </p>
-  <SourceStrip
-    sources={[{ label: `${body.name} records`, href: body.insite_url }]}
-    through={null}
-  />
-  <LocalCoverageNotice tenant={body.tenant} />
+  <div class="ldist">
+    <header class="l-head flex max-w-[47.5rem] flex-col gap-2.5">
+      <a href={`/local/${body.slug}/`} class="self-start text-small underline">{body.name}</a>
+      <h1 class="t-display">{name}</h1>
+      <p class="sm:text-lead">
+        {holders.length > 0 ? `Represented by ${list}. ` : "No sitting member is on record for this district. "}
+        It's one of {body.city}'s {body.seats} council districts. Council seats are nonpartisan.
+      </p>
+      <LocalCoverageNotice tenant={body.tenant} />
+    </header>
 
-  <div class="mt-3 max-w-[240px]">
-    <LocalDistrictMap body={body.slug} seat={seat} label={`District ${seat}`} city={body.city} />
-  </div>
+    {hasBoundary && (
+      <aside class="l-rail" data-pagefind-ignore aria-label={`Map of District ${seat}`}>
+        <LocalDistrictMap body={body.slug} seat={seat} label={`District ${seat}`} city={body.city} />
+      </aside>
+    )}
 
-  {holders.length > 0 ? (
-    <div class="mt-3 rounded-lg border border-navy-100 bg-white p-4">
-      <p class="text-sm text-navy-600">{holders.length === 1 ? "Current member" : "Current members"}</p>
-      <LocalProfileNotice tenant={body.tenant} />
-      {holders.map((m) => (
-        <a href={`/local/${body.slug}/${m.slug}/`} class="mt-2 flex items-center gap-3 text-lg font-bold underline">
-          <Portrait src={m.image_url} name={m.name} size={48} />
-          <span>{m.name}</span>
-        </a>
-      ))}
-      <p class="mt-2 text-xs text-navy-600">From the council's own office records.</p>
+    <div class="l-body flex max-w-[47.5rem] flex-col gap-8">
+      {holders.length > 0 && (
+        <section aria-labelledby="members-heading">
+          <h2 id="members-heading" class="t-section">{holders.length === 1 ? "Its member" : "Its members"}</h2>
+          <ul class="mt-3 grid gap-4 sm:grid-cols-2" role="list">
+            {holders.map((m) => (
+              <li class="sheet p-5">
+                <a href={`/local/${body.slug}/${m.slug}/`} class="flex min-h-11 items-center gap-4 font-display text-[1.1875rem] font-bold underline">
+                  <Portrait src={m.image_url} name={m.name} size={56} />
+                  <span class="min-w-0 [overflow-wrap:anywhere]">{m.name}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p class="mt-3 text-small text-granite">From the council's own office records.</p>
+          <div class="mt-1"><LocalProfileNotice tenant={body.tenant} /></div>
+        </section>
+      )}
+
+      {hasBoundary ? (
+        <p>
+          Not sure which district you live in? <a href="/my-reps/" class="underline">Look up your address</a>;
+          the answer stays on your device.
+        </p>
+      ) : (
+        <p class="text-granite">District boundaries and address lookup for {body.city} aren't available here yet.</p>
+      )}
+
+      <p class="text-fine text-granite">
+        From the <a href={body.insite_url} class="underline">{body.name}'s own records</a>.
+      </p>
     </div>
-  ) : (
-    <p class="mt-3 text-sm text-navy-600">No sitting member on record for this district.</p>
-  )}
-
-  {hasBoundary ? <p class="mt-4 max-w-3xl text-sm text-navy-700">
-    Not sure which district you live in?
-    {" "}<a href="/my-reps/" class="underline">Look up your address</a>; the answer stays on your device.
-  </p> : <p class="mt-4 max-w-3xl text-sm text-navy-700">
-    District boundaries and address lookup for {body.city} are not yet available here.
-  </p>}
+  </div>
 </Base>
+
+<style>
+  .ldist {
+    display: grid;
+    gap: 2rem;
+    grid-template-areas: "head" "rail" "body";
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .l-head { grid-area: head; }
+  .l-rail { grid-area: rail; }
+  .l-body { grid-area: body; }
+  @media (min-width: 64rem) {
+    .ldist {
+      grid-template-areas: "head rail" "body rail";
+      grid-template-columns: minmax(0, 1fr) 20rem;
+      grid-template-rows: auto 1fr;
+      column-gap: 3.5rem;
+    }
+    .l-rail {
+      align-self: start;
+    }
+  }
+</style>

@@ -11,15 +11,15 @@ const refresh = raw ? JSON.parse(raw) as {
 ---
 
 {tenant === "madison" && (
-  <p class="mt-2 max-w-3xl text-xs text-navy-600" role="note" data-pagefind-ignore>
+  <p class="max-w-[47.5rem] text-fine text-granite" role="note" data-pagefind-ignore>
     Portraits are available on <a href="https://www.cityofmadison.com/council" class="underline">the city's roster</a>.
     Madison <a href="https://www.cityofmadison.com/policy/conditions" class="underline">requires permission to reuse its images</a>.
   </p>
 )}
 
 {refresh?.state === "retained" && (
-  <p class="mt-2 max-w-3xl text-xs text-navy-600" role="note" data-pagefind-ignore>
-    <strong>Profile details may be out of date.</strong>{" "}
+  <p class="max-w-[47.5rem] text-fine text-granite" role="note" data-pagefind-ignore>
+    <strong class="text-spruce">Profile details may be out of date.</strong>{" "}
     The city's district pages could not be refreshed. Available portraits and
     district-page contacts come from previously collected records.
     {refresh.last_success_at && <> Last collected {fmtDate(refresh.last_success_at.slice(0, 10))}.</>}
