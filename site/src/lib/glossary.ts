@@ -13,12 +13,12 @@ export interface GlossaryEntry {
 }
 
 export const GLOSSARY: GlossaryEntry[] = [
-  { id: "biennium", term: "Biennium / biennial session", definition: "The Legislature's two-year working period, starting in January of each odd year. Bills live and die within one biennium, nothing carries over." },
+  { id: "biennium", term: "Biennium / biennial session", definition: "The Legislature's two-year working period, starting in January of each odd-numbered year. Bills live and die within one biennium; nothing carries over." },
   { id: "floorperiod", term: "Floorperiod", definition: "A scheduled stretch of days when a chamber meets to debate and vote on bills. The schedule is set at the session's start by joint resolution." },
   { id: "readings", term: "First / second / third reading", definition: "The three formal stages of a bill on the floor. Amendments happen at second reading; final passage is the vote on third reading." },
   { id: "referral", term: "Referral", definition: "Assignment of a new bill to a committee. Most bills never leave the committee they're referred to." },
-  { id: "public-hearing", term: "Public hearing", definition: "A committee meeting where anyone may register or testify on a bill. Having a hearing is the first hurdle most bills fail, see Hearing None." },
-  { id: "executive-session", term: "Executive session", definition: "A committee's voting meeting (open to the public despite the name). The committee votes on whether to recommend the bill, no public testimony is taken." },
+  { id: "public-hearing", term: "Public hearing", definition: "A committee meeting where anyone may register or testify on a bill. Getting one is the first hurdle most bills fail: see Bills that never got a hearing." },
+  { id: "executive-session", term: "Executive session", definition: "A committee's voting meeting, open to the public despite the name. The committee votes on whether to recommend the bill; no public testimony is taken." },
   { id: "appearance-slip", term: "Appearance slip", definition: "The form you fill out at a hearing to register for, against, or for-information-only on a bill, with or without speaking." },
   { id: "fiscal-estimate", term: "Fiscal estimate", definition: "A state agency's projection of what a bill would cost or save, attached to the bill. Linked on bill pages here when one exists." },
   { id: "lrb-analysis", term: "LRB analysis", definition: "The Legislative Reference Bureau's neutral plain-language summary printed at the top of most bills. Shown on bill pages here, verbatim." },
@@ -34,15 +34,15 @@ export const GLOSSARY: GlossaryEntry[] = [
   { id: "enrolled", term: "Enrolled", definition: "The final, authoritative copy of a measure after passage, as sent to the governor or secretary of state." },
   { id: "act", term: "Act", definition: "What a bill becomes when the governor signs it (or a veto is overridden): a numbered Wisconsin Act, part of state law." },
   { id: "partial-veto", term: "Partial veto", definition: "Wisconsin's unusually strong line-item veto: the governor can strike words and numbers within appropriation bills, changing their meaning. Subject to override like a full veto." },
-  { id: "veto-override", term: "Veto override", definition: "The Legislature's power to enact a bill over the governor's veto. It takes a two-thirds vote in each chamber, see the Governor's desk page for every attempt." },
+  { id: "veto-override", term: "Veto override", definition: "The Legislature's power to enact a bill over the governor's veto. It takes a two-thirds vote in each chamber. The governor's decisions page lists every attempt." },
   { id: "roll-call-vote", term: "Roll call vote", definition: "A vote where each member's Aye or Nay is recorded by name. Only roll calls appear in attendance and vote records here; voice votes record no names." },
   { id: "voice-vote", term: "Voice vote", definition: "A vote by collective shout, recorded only as the outcome. No individual positions exist, so none are shown here." },
   { id: "votes-with-party", term: "Votes with party majority", definition: "How often a member's Aye or Nay matched the position most of their own party took on the same roll call, shown on member pages here. Roll calls where their party split evenly, and votes they didn't cast, aren't counted." },
   { id: "party-line", term: "Party-line / bipartisan vote", definition: "As described on roll calls here: party-line means most Democrats and most Republicans voted opposite ways; when most of both parties vote the same way, the page says so. Members who didn't vote yes or no aren't counted, and a party split evenly takes neither side." },
   { id: "special-session", term: "Special session", definition: "A session called by the governor, limited to subjects in the call. Special-session bills carry their own numbering." },
   { id: "extraordinary-session", term: "Extraordinary session", definition: "A session the Legislature calls itself, outside the scheduled floorperiods." },
-  { id: "recall-election", term: "Recall election", definition: "A mid-term election to remove a sitting legislator, triggered by petition. Recalls in 2011 and 2012 changed several Senate seats, those departures are labeled on the profiles here." },
-  { id: "sine-die", term: "Sine die", definition: "Adjournment 'without a day', the formal close of the biennial session period." },
+  { id: "recall-election", term: "Recall election", definition: "A mid-term election to remove a sitting legislator, triggered by petition. Recalls in 2011 and 2012 changed several Senate seats; those departures are labeled on the profiles here." },
+  { id: "sine-die", term: "Sine die", definition: "Adjournment “without a day”: the formal close of the biennial session period." },
 ];
 
 export interface Term {

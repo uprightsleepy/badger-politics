@@ -1,40 +1,47 @@
 ---
 import Base from "../layouts/Base.astro";
+
+const links = [
+  ["/", "Home"],
+  ["/bills/", "Bills"],
+  ["/legislators/", "State lawmakers"],
+  ["/calendar/#hearings", "Hearings"],
+  ["/money/", "Campaign money"],
+  ["/my-reps/", "Find your lawmakers"],
+];
 ---
 
 <Base
-  title="Page Not Found"
-  description="That page doesn't exist. Find bills, legislators, and hearings from here."
+  title="Page not found"
+  description="That page doesn't exist. Find bills, lawmakers and hearings from here."
+  layout="wide"
 >
-  <div class="mx-auto max-w-xl py-8 text-center">
-    <img src="/mark.svg" alt="" width="90" height="96" class="mx-auto opacity-40" />
-    <h1 class="mt-4 text-3xl font-bold">Page Not Found</h1>
-    <p class="mt-2 text-navy-700">
-      This page doesn't exist. If you followed a link here, the bill or
-      legislator may have moved when a new session started.
+  <div class="flex max-w-[40rem] flex-col gap-3 py-4">
+    <img src="/mark.svg" alt="" width="56" height="60" />
+    <h1 class="t-display">We can't find that page</h1>
+    <p class="sm:text-lead">
+      If you followed a link here, the bill or lawmaker may have moved when a new session started.
+      Searching usually finds it.
     </p>
-    <form action="/" method="get" class="mx-auto mt-6 flex max-w-md gap-2 text-left">
-      <label class="sr-only" for="q404">Search bills</label>
+    <form action="/" method="get" class="mt-2 flex flex-wrap gap-2">
+      <label class="basis-full text-small font-bold" for="q404">Search bills, lawmakers and money</label>
       <input
         id="q404"
         name="q"
         type="search"
-        placeholder="Search bills. Try “child marriage” or “AB 656”"
-        class="min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-4 py-3 shadow-sm"
+        placeholder="Try “child marriage”"
+        class="min-h-12 min-w-0 flex-1 basis-60 rounded-[0.625rem] border-2 border-edge bg-white px-3 text-body focus:border-lake"
         autocomplete="off"
       />
-      <button type="submit" class="rounded-lg bg-navy-800 px-4 py-2 font-semibold text-white hover:bg-navy-700">
-        Search
-      </button>
+      <button type="submit" class="btn btn-primary">Search</button>
     </form>
-    <p class="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm font-semibold">
-      <a href="/" class="underline">Home</a>
-      <a href="/bills/" class="underline">Bills</a>
-      <a href="/legislators/" class="underline">Legislators</a>
-      <a href="/calendar/#hearings" class="underline">Hearings</a>
-      <a href="/money/" class="underline">Money</a>
-      <a href="/my-reps/" class="underline">Find my legislators</a>
-    </p>
+    <nav class="mt-4" aria-labelledby="elsewhere-heading">
+      <h2 id="elsewhere-heading" class="t-question">Or start from</h2>
+      <ul class="mt-1 flex flex-wrap gap-x-6" role="list">
+        {links.map(([href, label]) => (
+          <li><a href={href} class="inline-flex min-h-11 items-center underline">{label}</a></li>
+        ))}
+      </ul>
+    </nav>
   </div>
-
 </Base>
