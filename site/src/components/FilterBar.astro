@@ -39,15 +39,15 @@ const CHIP = "min-h-11 max-w-full rounded-full border px-3 py-2 text-sm font-sem
     <button type="button" data-filter-clear={id} class={wide ? "hidden min-h-11 px-2 text-small font-bold text-lake underline" : "hidden min-h-11 px-2 text-sm font-semibold underline"}>Clear filters</button>
   </div>
   {chips.length > 1 && (
-    <div class="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={facetLabel}>
+    <div class={wide ? "mt-3 flex flex-wrap gap-2" : "mt-2 flex flex-wrap gap-1.5"} role="group" aria-label={facetLabel}>
       <button
         type="button"
         data-facet=""
         data-facet-for={facetAttr}
         aria-pressed="true"
-        class={`${CHIP} border-navy-800 bg-navy-800 text-white`}
+        class={wide ? "chip" : `${CHIP} border-navy-800 bg-navy-800 text-white`}
       >
-        All {total.toLocaleString()}
+        All {wide ? <span class="figure">{total.toLocaleString()}</span> : total.toLocaleString()}
       </button>
       {chips.map((f) => (
         <button
@@ -55,9 +55,9 @@ const CHIP = "min-h-11 max-w-full rounded-full border px-3 py-2 text-sm font-sem
           data-facet={f.key}
           data-facet-for={facetAttr}
           aria-pressed="false"
-          class={`${CHIP} border-navy-100 bg-white`}
+          class={wide ? "chip" : `${CHIP} border-navy-100 bg-white`}
         >
-          {f.label} {f.count.toLocaleString()}
+          {f.label} {wide ? <span class="figure">{f.count.toLocaleString()}</span> : f.count.toLocaleString()}
         </button>
       ))}
     </div>

@@ -1,61 +1,103 @@
 ---
+/** Every seat, the way Wisconsin draws them: each Senate district holds
+ * three Assembly districts (3n-2, 3n-1 and 3n inside Senate District n),
+ * so the list is 33 groups of four seats. Party is a letter in this dense
+ * list, with its key on the same screen (docs/brand.md). */
 import Base from "../../layouts/Base.astro";
-import { sittingPeople } from "../../lib/db";
-import { partyLetter, partyStyle } from "../../lib/format";
+import FilterBar from "../../components/FilterBar.astro";
+import SeatHolder from "../../components/SeatHolder.astro";
+import { sittingPeople, type Person } from "../../lib/db";
+import { partyLetter } from "../../lib/format";
 
 const holders = new Map(sittingPeople().map((p) => [`${p.chamber}-${p.district}`, p]));
-const ASSEMBLY = Array.from({ length: 99 }, (_, i) => i + 1);
 const SENATE = Array.from({ length: 33 }, (_, i) => i + 1);
+const assemblyIn = (sd: number) => [3 * sd - 2, 3 * sd - 1, 3 * sd];
+const seat = (chamber: "upper" | "lower", d: number) => ({
+  chamber,
+  d,
+  name: `${chamber === "upper" ? "Senate" : "Assembly"} District ${d}`,
+  href: `/districts/${chamber === "upper" ? "senate" : "assembly"}-${d}/`,
+  holder: holders.get(`${chamber}-${d}`) as Person | undefined,
+});
+const groups = SENATE.map((sd) => ({
+  senate: seat("upper", sd),
+  assembly: assemblyIn(sd).map((ad) => seat("lower", ad)),
+}));
+// the key lists only the parties this list shows
+const parties = [...new Set(sittingPeople().map((p) => p.party).filter(Boolean))] as string[];
+const key = parties
+  .sort()
+  .map((p) => `${partyLetter(p)}: ${p === "Democratic" ? "Democrat" : p}`)
+  .join(". ");
 ---
 
 <Base
   title="Districts"
   description="Every Wisconsin legislative seat: who holds it now, everyone who has held it since 2009, and its official election results."
+  layout="wide"
 >
-  <h1 class="text-2xl font-bold">Districts</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Every seat in the Legislature: who holds it, everyone who has held it since
-    2009 (and how each departed), and its official election results.
-    <span data-district-finder>
-      Not sure which is yours? <a href="/my-reps/" class="underline">Find your districts</a>.
-    </span>
-  </p>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">Districts</h1>
+    <p class="sm:text-lead">
+      Wisconsin has 33 Senate districts, and each one holds three Assembly districts. So every
+      address has one state senator and one representative.
+    </p>
+    <p data-district-finder>
+      Not sure which are yours? <a href="/my-reps/" class="underline">Find your lawmakers</a>.
+    </p>
+  </header>
 
-  {[["Senate", "senate", SENATE, "upper"], ["Assembly", "assembly", ASSEMBLY, "lower"]].map(
-    ([label, slug, nums, chamber]) => (
-      <section class="mt-6">
-        <h2 class="text-xl font-bold">{label} districts</h2>
-        <ul class="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-4">
-          {(nums as number[]).map((d) => {
-            const holder = holders.get(`${chamber}-${d}`);
-            return (
-              <li>
-                <a
-                  href={`/districts/${slug}-${d}/`}
-                  class="flex items-baseline gap-2 rounded px-2 py-1.5 text-sm hover:bg-navy-50"
-                >
-                  <span class="w-7 shrink-0 font-bold tabular-nums">{d}</span>
-                  {holder ? (
-                    <>
-                      <span class="min-w-0 flex-1 truncate underline">{holder.name}</span>
-                      <span class={`shrink-0 rounded px-1 text-xs ${partyStyle(holder.party)}`}>
-                        {partyLetter(holder.party)}
-                      </span>
-                    </>
-                  ) : (
-                    <span class="min-w-0 flex-1 truncate text-navy-600 underline">Vacant</span>
-                  )}
-                </a>
-              </li>
-            );
-          })}
+  <div class="mt-4 max-w-[47.5rem]">
+    <FilterBar
+      wide
+      id="district-filter"
+      statusId="district-filter-status"
+      label="Find a district or lawmaker"
+      placeholder="District number or name"
+    />
+  </div>
+  <p class="text-small text-granite">{key ? `${key}.` : ""}</p>
+
+  <ol class="district-groups mt-4 border-t border-rule" role="list">
+    {groups.map((g) => (
+      <li
+        class="district-group border-b border-rule py-4"
+        data-district-row
+        data-text={[g.senate, ...g.assembly]
+          .map((s) => `${s.name} ${s.holder?.name ?? "vacant"}`)
+          .join(" ")
+          .toLowerCase()}
+      >
+        <h2 class="t-question">
+          <a href={g.senate.href} class="inline-flex min-h-8 items-center underline">{g.senate.name}</a>
+        </h2>
+        <p class="flex min-h-8 flex-wrap items-center text-small">
+          <span><SeatHolder holder={g.senate.holder} /></span>
+        </p>
+        <ul class="mt-2 flex flex-col gap-1 border-l-2 border-rule pl-3" role="list">
+          {g.assembly.map((s) => (
+            <li class="flex min-h-8 flex-wrap items-center gap-x-2 text-small">
+              <a href={s.href} class="inline-flex min-h-8 items-center font-display font-bold underline">{s.name}</a>
+              <span><SeatHolder holder={s.holder} /></span>
+            </li>
+          ))}
         </ul>
-      </section>
-    ),
-  )}
+      </li>
+    ))}
+  </ol>
+  <p id="district-no-match" class="mt-4 hidden text-granite"></p>
 
   <script>
     import { MINE_CLASS, savedDistrict } from "../../lib/district";
+    import { initRowFilter } from "../../scripts/rowFilter";
+
+    initRowFilter({
+      input: "district-filter",
+      rows: "[data-district-row]",
+      status: "district-filter-status",
+      noMatch: "district-no-match",
+      noun: "Senate districts",
+    });
 
     // once districts are saved there's nothing left to find: show theirs
     const saved = savedDistrict();
@@ -68,3 +110,22 @@ const SENATE = Array.from({ length: 33 }, (_, i) => i + 1);
     }
   </script>
 </Base>
+
+<style>
+  @media (min-width: 48rem) {
+    .district-groups {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 2.5rem;
+    }
+  }
+  @media (min-width: 64rem) {
+    .district-groups {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  /* the row filter hides groups with this class */
+  .district-group:global(.sorted-hidden) {
+    display: none;
+  }
+</style>

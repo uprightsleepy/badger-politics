@@ -9,6 +9,9 @@
  * Decorative by design: the page states the district number, its member
  * and its communities in text, so nothing here is the only route to a
  * fact. That keeps it useful without becoming a barrier.
+ *
+ * Fog land and a Lake district: Prairie is only for the reader's own
+ * district (docs/brand.md, "Maps").
  */
 import SHAPES from "../data/district-shapes.json";
 interface Props { seat: string; label: string }
@@ -17,18 +20,30 @@ const shapes = SHAPES as Record<string, string>;
 const path = shapes[seat];
 ---
 {path && (
-  <figure class="rounded-lg border border-navy-100 bg-white p-3">
+  <figure class="rounded-[0.75rem] bg-white p-4">
     <svg
       viewBox={shapes._viewBox}
-      class="mx-auto h-auto w-full max-w-[220px]"
+      class="district-map mx-auto h-auto w-full max-w-[240px]"
       role="img"
       aria-label={`Map of ${label} within Wisconsin`}
     >
-      <path d={shapes._state} fill="var(--color-navy-50)" stroke="var(--color-navy-100)" stroke-width="0.5" />
-      <path d={path} fill="var(--color-navy-600)" stroke="var(--color-navy-800)" stroke-width="0.8" />
+      <path d={shapes._state} fill="var(--color-fog)" stroke="#fff" stroke-width="0.8" />
+      <path d={path} fill="var(--color-lake)" stroke="var(--color-lake-dark)" stroke-width="0.8" />
     </svg>
-    <figcaption class="mt-2 text-center text-xs text-navy-600">
+    <figcaption class="mt-3 text-fine text-granite">
       {label} within Wisconsin. Boundaries are the Legislature's 2024 maps.
     </figcaption>
   </figure>
 )}
+
+<style>
+  @media (forced-colors: active) {
+    .district-map path:first-child {
+      fill: Canvas;
+      stroke: CanvasText;
+    }
+    .district-map path:last-child {
+      fill: CanvasText;
+    }
+  }
+</style>
