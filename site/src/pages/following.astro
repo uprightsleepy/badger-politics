@@ -101,7 +101,7 @@ const KINDS: [string, string][] = [
         const latest = b.latest_action_date
           ? `Latest action${b.latest_action_desc ? `: ${esc(b.latest_action_desc)},` : ""} ${esc(fmtDate(b.latest_action_date))}.`
           : "";
-        const sessionLabel = /^\d{4}$/.test(session) ? sessionPlainName(session, session) : `${session} session`;
+        const sessionLabel = /^\d{4}$/.test(session) ? sessionPlainName(session, session) : `session ${session}`;
         return row("bills", id, `${b.identifier ?? id}, ${sessionLabel}`,
           `${link(href, b.identifier ?? id)}${b.title ? `: ${esc(shortTitle(b.title))}` : ""}`, latest, changed);
       } catch {
@@ -118,7 +118,7 @@ const KINDS: [string, string][] = [
         const how = last?.option === "yes" ? "Voted yes" : last?.option === "no" ? "Voted no" : "Didn't vote";
         const detail = last
           ? `Latest roll call, ${esc(fmtDate(last.date))}: ${how.toLowerCase()} on ${esc(last.identifier ?? "a bill")}` +
-            `${last.motion ? `, on the motion “${esc(last.motion)}”` : ""}.`
+            (last.motion ? `, on the motion “${esc(last.motion)}”${/[.?!]$/.test(last.motion.trim()) ? "" : "."}` : ".")
           : "No roll calls on record yet.";
         return row("legislators", id, p.name ?? id, link(href, p.name ?? id), detail, changed);
       } catch {
@@ -128,7 +128,7 @@ const KINDS: [string, string][] = [
 
     async function committeeRow(id: string, seen: string | null): Promise<Row> {
       // no per-committee JSON; the Atom feed carries the name and the
-      // newest hearing's date, which is all this row needs
+      // hearing dates, which is all this row needs
       const href = `/committees/${id}/`;
       try {
         const xml = await (await fetch(`/feeds/committees/${id}.xml`)).text();
@@ -136,13 +136,15 @@ const KINDS: [string, string][] = [
         // entries run oldest first; each one's <updated> is its hearing date
         const dates = [...xml.matchAll(/<entry>.*?<updated>([^<]+)<\/updated>/gs)].map((m) => m[1].slice(0, 10)).sort();
         const next = dates.find((d) => d >= today);
-        const latest = dates.at(-1);
+        const held = dates.filter((d) => d < today).at(-1);
         // a hearing held since the last visit; an upcoming one was already
         // on the list then, so it isn't news by itself
-        const changed = !!seen && dates.some((d) => d > seen && d <= today);
-        const detail = next
-          ? `Next hearing: ${esc(fmtDate(next))}.`
-          : latest ? `Latest hearing: ${esc(fmtDate(latest))}.` : "No hearings on record yet.";
+        const changed = !!seen && dates.some((d) => d > seen && d < today);
+        // the hearing that made it new is named, then what's next
+        const detail = [
+          held && (changed || !next) ? `Latest hearing: ${esc(fmtDate(held))}.` : "",
+          next ? `Next hearing: ${esc(fmtDate(next))}.` : "",
+        ].filter(Boolean).join(" ") || "No hearings on record yet.";
         return row("committees", id, name, link(href, name), detail, changed);
       } catch {
         return failed("committees", id, href, "This committee");
