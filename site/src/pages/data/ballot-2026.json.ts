@@ -11,9 +11,9 @@
  * showing it as though it were would be wrong.
  */
 import type { APIRoute } from "astro";
-import { sittingPeople, electionFor, statewideRaces, ballotPhase } from "../../lib/db";
+import { sittingPeople, electionFor, statewideRaces, ballotPhase, writeInPending } from "../../lib/db";
 import { personSlug } from "../../lib/format";
-import { ballotStatus } from "../../lib/ballot";
+import { ballotStatus, seatOffice, writeInSentence } from "../../lib/ballot";
 import type { Ballot, Race } from "../../lib/wire";
 
 export const GET: APIRoute = () => {
@@ -35,6 +35,8 @@ export const GET: APIRoute = () => {
         .filter((o) => o.ballot_status !== "Deny")
         .map((o) => ({ name: o.name, party: o.party })),
     };
+    const pending = writeInPending(seatOffice(p.chamber, p.district));
+    if (pending.length) race.writeIn = writeInSentence(pending);
     (p.chamber === "upper" ? senate : assembly)[String(p.district)] = race;
   }
 

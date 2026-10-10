@@ -192,7 +192,7 @@ export const hearingDisplayName = (h: {
   title: string | null;
 }): string =>
   h.committee_name
-    ? `${h.committee_chamber ? `${chamberName(h.committee_chamber)} ` : ""}${h.committee_name}`
+    ? committeeTitle(h.committee_name, h.committee_chamber)
     : (h.title ?? "Committee hearing");
 
 export const billSlug = (identifier: string): string =>

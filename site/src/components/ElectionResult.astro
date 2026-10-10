@@ -1,0 +1,66 @@
+---
+/** One certified contest: who won in a sentence, then the count. Two
+ * candidates share one split bar (docs/brand.md, "Split bar"); more get a
+ * bar each against all votes cast. Shares are of all votes cast, so they
+ * match the Commission's canvass. */
+import { partyWord } from "../lib/format";
+import { pctOf, resultSentence } from "../lib/ballot";
+interface Props {
+  id: string;
+  title: string;
+  /** A short note beside the title, e.g. "previous maps". */
+  note?: string;
+  /** Read after the title by screen readers only, so a page with several
+   * results ("The 2022 result") names each one apart. */
+  context?: string;
+  candidates: { candidate: string; party: string | null; votes: number }[];
+  total: number;
+  level?: "h3" | "h4";
+}
+const { id, title, note, context, candidates, total, level = "h3" } = Astro.props;
+const H = level;
+const [first, second] = candidates;
+---
+<section class="flex flex-col gap-3 border-t border-rule py-5" aria-labelledby={id}>
+  <H id={id} class="t-question">{title}{context && <span class="sr-only"> {context}</span>}{note && <> <span class="ml-1 font-body text-small font-normal text-granite">{note}</span></>}</H>
+  <p>{resultSentence(candidates, total)}</p>
+  {candidates.length === 2 && (
+    <div class="flex flex-col gap-1.5">
+      <div class="split flex h-3 overflow-hidden rounded-full bg-fog" aria-hidden="true">
+        <span class="block h-full bg-spruce" style={`width:${((first.votes / (first.votes + second.votes)) * 100).toFixed(1)}%`}></span>
+      </div>
+      <div class="flex flex-wrap justify-between gap-x-4 text-small">
+        <span><span class="font-bold">{first.candidate}</span>{first.party && `, ${partyWord(first.party)}`}: {first.votes.toLocaleString()} <span class="text-granite">{pctOf(first.votes, total)}</span></span>
+        <span class="text-right"><span class="font-bold">{second.candidate}</span>{second.party && `, ${partyWord(second.party)}`}: {second.votes.toLocaleString()} <span class="text-granite">{pctOf(second.votes, total)}</span></span>
+      </div>
+    </div>
+  )}
+  {candidates.length > 2 && (
+    <ul class="flex flex-col gap-2" role="list">
+      {candidates.map((c) => (
+        <li class="flex flex-col gap-1">
+          <p class="flex flex-wrap items-baseline justify-between gap-x-4 text-small">
+            <span><span class="font-bold">{c.candidate}</span>{c.party && `, ${partyWord(c.party)}`}</span>
+            <span class="tabular-nums">{c.votes.toLocaleString()} <span class="text-granite">{pctOf(c.votes, total)}</span></span>
+          </p>
+          <div class="split h-2 rounded-full bg-fog" aria-hidden="true">
+            <span class="block h-full rounded-full bg-lake" style={`width:${total ? ((c.votes / total) * 100).toFixed(1) : 0}%`}></span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  )}
+</section>
+
+<style>
+  @media (forced-colors: active) {
+    .split {
+      forced-color-adjust: none;
+      border: 1px solid CanvasText;
+      background: Canvas;
+    }
+    .split span {
+      background: CanvasText;
+    }
+  }
+</style>

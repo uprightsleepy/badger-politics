@@ -792,6 +792,8 @@ export const statewideHistory = () =>
     ).all() as {
     year: number; office: string; candidate: string;
     party: string | null; votes: number;
+    /** The contest's official Total Votes Cast, repeated on each row. */
+    total_cast: number | null;
   }[];
 
 // chair, then co-chair, then vice-chair, then rank-and-file
