@@ -138,10 +138,11 @@ export const partySplitSentence = (split: {
   const r = side(split.rep);
   const tally = (c: { yes: number; no: number }) => `${c.yes.toLocaleString()} yes and ${c.no.toLocaleString()} no`;
   const tallies = `Democrats ${tally(split.dem)}, Republicans ${tally(split.rep)}`;
-  if (d && r && d === r) return `Most of both parties voted ${d}: ${tallies}.`;
-  if (d && r) return `A party-line vote: most Democrats voted ${d} and most Republicans voted ${r} (${tallies}).`;
+  const among = "Of members who voted yes or no";
+  if (d && r && d === r) return `${among}, most of both parties voted ${d}: ${tallies}.`;
+  if (d && r) return `A party-line vote. ${among}, most Democrats voted ${d} and most Republicans voted ${r}: ${tallies}.`;
   const tied = d === null && r === null ? "Both parties" : d === null ? "Democrats" : "Republicans";
-  return `${tallies}. ${tied} split evenly.`;
+  return `${among}: ${tallies}. ${tied} split evenly.`;
 };
 
 export const partyLetter = (party: string | null): string =>

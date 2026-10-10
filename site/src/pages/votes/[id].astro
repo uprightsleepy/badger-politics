@@ -5,7 +5,7 @@
 import Base from "../../layouts/Base.astro";
 import RollCall from "../../components/RollCall.astro";
 import { builtSessions, billsFor, votesFor, voteSplit } from "../../lib/db";
-import { billSlug, chamberName, clip, fmtDate, partySplitSentence, shortTitle } from "../../lib/format";
+import { billSlug, chamberName, clip, fmtDate, identifierLong, partySplitSentence, shortTitle } from "../../lib/format";
 
 export function getStaticPaths() {
   return builtSessions().flatMap((session) =>
@@ -39,8 +39,13 @@ const seoDescription = [
 ]
   .filter(Boolean)
   .join(" ");
-const result = (v: (typeof siblings)[number]) =>
-  `${v.result === "pass" ? "Passed" : "Failed"}${v.yes_count != null ? `, ${v.yes_count} to ${v.no_count ?? 0}` : ""}.`;
+// the outcome and tally only as recorded: an unfamiliar result or a missing
+// count is left out rather than guessed (the roll call's own page has more)
+const result = (v: (typeof siblings)[number]) => {
+  const word = v.result === "pass" ? "Passed" : v.result === "fail" ? "Failed" : "";
+  const counts = v.yes_count != null && v.no_count != null ? `${v.yes_count} to ${v.no_count}` : "";
+  return word && counts ? `${word}, ${counts}.` : word ? `${word}.` : counts ? `${counts}.` : "";
+};
 ---
 
 <Base
@@ -56,14 +61,9 @@ const result = (v: (typeof siblings)[number]) =>
 >
   <header class="flex max-w-[47.5rem] flex-col gap-2.5">
     <a href={billHref} class="inline-flex min-h-11 items-center self-start text-small underline">{bill.identifier}</a>
-    <h1 class="t-display">Roll call on {bill.identifier}</h1>
+    <h1 class="t-display">Roll call on {identifierLong(bill.identifier)}</h1>
     {title && <p class="sm:text-lead">{title}</p>}
-    {split && (
-      <p>
-        {partySplitSentence(split)}
-        {" "}<span class="text-small text-granite">Counting members who voted yes or no.</span>
-      </p>
-    )}
+    {split && <p>{partySplitSentence(split)}</p>}
   </header>
 
   <div class="mt-6 max-w-[60rem]">
@@ -72,19 +72,19 @@ const result = (v: (typeof siblings)[number]) =>
 
   {siblings.length > 0 && (
     <section class="mt-10 max-w-[47.5rem]" aria-labelledby="others-heading" data-pagefind-ignore>
-      <h2 id="others-heading" class="t-section">Other roll calls on {bill.identifier}</h2>
+      <h2 id="others-heading" class="t-section">Other roll calls on this bill</h2>
       <ul class="mt-3 border-b border-rule" role="list">
         {siblings.map((v) => (
-          <li class="flex flex-col gap-0.5 border-t border-rule py-3 sm:flex-row sm:gap-5">
-            <span class="shrink-0 text-small text-granite sm:w-28 sm:pt-0.5">{fmtDate(v.date)}</span>
+          <li class="flex flex-col border-t border-rule py-2 sm:flex-row sm:gap-5">
+            <span class="shrink-0 pt-1 text-small text-granite sm:w-28 sm:pt-3">{fmtDate(v.date)}</span>
             <span class="min-w-0">
-              <a href={`/votes/${v.id}/`} class="underline">{chamberName(v.chamber)}: {v.motion ?? "Roll call"}</a>
-              <span class="block text-small text-granite">{result(v)}</span>
+              <a href={`/votes/${v.id}/`} class="inline-flex min-h-11 items-center underline">{chamberName(v.chamber)}: {v.motion ?? "Roll call"}</a>
+              {result(v) && <span class="block text-small text-granite">{result(v)}</span>}
             </span>
           </li>
         ))}
       </ul>
-      <p class="mt-3"><a href={billHref} class="underline">Everything that happened to {bill.identifier}</a></p>
+      <p class="mt-3"><a href={billHref} class="inline-flex min-h-11 items-center underline">Everything that happened to {bill.identifier}</a></p>
     </section>
   )}
 </Base>

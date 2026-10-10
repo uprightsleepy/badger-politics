@@ -266,9 +266,10 @@ numbers at its ends. The winner is named in words.
 - **Who holds a chamber** is a sentence, never a colored bar: "Of the Senate's 33 seats, Democrats hold
   15 and Republicans hold 18, a Republican majority." Parties go alphabetically. A majority is named
   only past half of all seats, vacancies included. Vacant seats are named and linked.
-- **How each party voted** on a roll call is a sentence with both tallies: "Most of both parties voted
-  yes: Democrats 14 yes and 1 no, Republicans 24 yes and 0 no." Opposite majorities read "A party-line
-  vote: …". There is no tag or pill for either.
+- **How each party voted** on a roll call is a sentence with both tallies, scoped to the members who
+  voted: "Of members who voted yes or no, most of both parties voted yes: Democrats 14 yes and 1 no,
+  Republicans 24 yes and 0 no." Opposite majorities lead with "A party-line vote." There is no tag or
+  pill for either.
 - **The reader's own lawmakers** in a directory get a Prairie label on their row ("Your state
   senator"), not the sitewide link tint, so the row reads the same with the color gone.
 

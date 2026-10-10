@@ -18,7 +18,10 @@ const chambers = [
   { key: "upper", label: "Senate", seats: 33, slug: "senate", one: "senator", rows: members.filter((m) => m.chamber === "upper") },
   { key: "lower", label: "Assembly", seats: 99, slug: "assembly", one: "representative", rows: members.filter((m) => m.chamber === "lower") },
 ];
+// a member with no district on record can't be placed, so then the open
+// seats can't be named either
 const vacant = (rows: typeof members, seats: number) => {
+  if (rows.some((m) => m.district == null)) return [];
   const held = new Set(rows.map((m) => m.district));
   return Array.from({ length: seats }, (_, i) => i + 1).filter((d) => !held.has(d));
 };
@@ -73,7 +76,7 @@ const facets = [
         <h2 id={`${c.slug}-heading`} class="t-section">{c.label}</h2>
         <p class="mt-2 max-w-[47.5rem]">
           {seatsSentence(c.label, c.seats, c.rows.map((m) => m.party))}
-          {empty.length > 0 && empty.length <= 5 && (
+          {empty.length > 0 && (
             <>
               {" "}
               {empty.map((d, i) => (
@@ -82,7 +85,6 @@ const facets = [
               {empty.length === 1 ? " is vacant." : " are vacant."}
             </>
           )}
-          {empty.length > 5 && <> {empty.length.toLocaleString()} seats are vacant; <a href="/districts/" class="underline">each district's page</a> shows who held it before.</>}
         </p>
         <ul class="mt-4 grid gap-x-8 border-b border-rule sm:grid-cols-2 lg:grid-cols-3" role="list" data-no-rep-highlight>
           {c.rows.map((m) => (
@@ -99,9 +101,9 @@ const facets = [
                 <span class="min-w-0">
                   <span class="block font-bold text-lake underline [overflow-wrap:anywhere]">{m.name}</span>
                   <span class="block text-small text-spruce">
-                    District {m.district}. {partyWord(m.party)}.{onBallot.get(m.id) && " On the 2026 ballot."}
+                    {m.district != null ? `District ${m.district}.` : "District not recorded."} {partyWord(m.party)}.{onBallot.get(m.id) && " On the 2026 ballot."}
                   </span>
-                  <span class="mt-1 block" data-mine hidden><span class="mine text-small">{c.key === "upper" ? "Your state senator" : "Your representative"}</span></span>
+                  <span class="mt-1 block" data-mine data-pagefind-ignore hidden><span class="mine text-small">{c.key === "upper" ? "Your state senator" : "Your representative"}</span></span>
                 </span>
               </a>
             </li>
@@ -158,7 +160,22 @@ const facets = [
       hideEmptySections();
     });
   }
-  document.getElementById("member-filter")!.addEventListener("input", hideEmptySections);
+  // "Clear filters" clears this page's chips too, and shows while any filter is on
+  const input = document.getElementById("member-filter") as HTMLInputElement;
+  const clear = document.querySelector<HTMLButtonElement>('[data-filter-clear="member-filter"]');
+  const syncClear = () => clear?.classList.toggle("hidden", !input.value && facet === "all");
+  for (const chip of chips) chip.addEventListener("click", syncClear);
+  clear?.addEventListener("click", () => {
+    facet = "all";
+    paintChips(chips, (c) => c.dataset.memberFacet === "all");
+    apply();
+    hideEmptySections();
+    syncClear();
+  });
+  input.addEventListener("input", () => {
+    hideEmptySections();
+    syncClear();
+  });
   hideEmptySections();
   window.addEventListener("pageshow", hideEmptySections);
   window.addEventListener("popstate", hideEmptySections);

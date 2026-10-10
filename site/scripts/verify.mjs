@@ -105,6 +105,18 @@ check(
   JSON.stringify(highlighted.slice(0, 4)),
 );
 
+// 3c. the sitewide marking (Base.astro, from /data/reps.json) still tints
+// links to the reader's own lawmakers: each district page names its holder
+for (const [path, name] of [["/districts/assembly-14/", "Tenorio"], ["/districts/senate-5/", "Hutton"]]) {
+  await page.goto(`http://127.0.0.1:8931${path}`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(
+    () => document.querySelectorAll('main a.mine[href^="/legislators/"]').length > 0,
+    { timeout: 30000 },
+  ).catch(() => {});
+  const marked = await page.$$eval('main a.mine[href^="/legislators/"]', (as) => as.map((a) => a.textContent.trim()));
+  check(`saved rep marked sitewide on ${path}`, marked.some((t) => t.includes(name)), JSON.stringify(marked));
+}
+
 // 4. AB 656 page says plainly it stopped without a hearing + LRB analysis
 await page.goto("http://127.0.0.1:8931/bills/2025/ab656/", { waitUntil: "networkidle2" });
 const body = await page.$eval("body", (el) => el.textContent);

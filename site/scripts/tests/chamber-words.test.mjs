@@ -26,13 +26,13 @@ test("seats: singular members, independents and missing parties", () => {
 
 test("party split: same side, opposite sides, and even splits", () => {
   assert.equal(partySplitSentence({ dem: { yes: 14, no: 1 }, rep: { yes: 24, no: 0 } }),
-    "Most of both parties voted yes: Democrats 14 yes and 1 no, Republicans 24 yes and 0 no.");
+    "Of members who voted yes or no, most of both parties voted yes: Democrats 14 yes and 1 no, Republicans 24 yes and 0 no.");
   assert.equal(partySplitSentence({ dem: { yes: 0, no: 35 }, rep: { yes: 2, no: 60 } }),
-    "Most of both parties voted no: Democrats 0 yes and 35 no, Republicans 2 yes and 60 no.");
+    "Of members who voted yes or no, most of both parties voted no: Democrats 0 yes and 35 no, Republicans 2 yes and 60 no.");
   assert.equal(partySplitSentence({ dem: { yes: 2, no: 33 }, rep: { yes: 62, no: 0 } }),
-    "A party-line vote: most Democrats voted no and most Republicans voted yes (Democrats 2 yes and 33 no, Republicans 62 yes and 0 no).");
+    "A party-line vote. Of members who voted yes or no, most Democrats voted no and most Republicans voted yes: Democrats 2 yes and 33 no, Republicans 62 yes and 0 no.");
   assert.equal(partySplitSentence({ dem: { yes: 5, no: 5 }, rep: { yes: 20, no: 3 } }),
-    "Democrats 5 yes and 5 no, Republicans 20 yes and 3 no. Democrats split evenly.");
+    "Of members who voted yes or no: Democrats 5 yes and 5 no, Republicans 20 yes and 3 no. Democrats split evenly.");
   assert.equal(partySplitSentence({ dem: { yes: 1, no: 1 }, rep: { yes: 2, no: 2 } }),
-    "Democrats 1 yes and 1 no, Republicans 2 yes and 2 no. Both parties split evenly.");
+    "Of members who voted yes or no: Democrats 1 yes and 1 no, Republicans 2 yes and 2 no. Both parties split evenly.");
 });
