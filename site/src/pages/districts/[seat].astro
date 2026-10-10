@@ -128,11 +128,6 @@ const resultLine = (h: (typeof history)[number]) => {
     ? `${subject(first.candidate, first.party)} won with ${pct(first.votes, h.total)}${cast}.`
     : `${subject(first.candidate, first.party)} won with ${first.votes.toLocaleString()} votes.`;
 };
-// Senators in odd-numbered districts were elected under the lines in use
-// before the 2024 maps, and represent those until the new Senate is sworn
-// in on January 4, 2027.
-const asOf = (meta().imported_at ?? new Date().toISOString()).slice(0, 10);
-const oldLinesSenate = asOf < "2027-01-04" && (isSenate ? district : senateOf) % 2 === 1;
 const pulledOn = meta().imported_at?.slice(0, 10);
 const mapLabel = isSenate
   ? `Map of ${seatName} and its three Assembly districts`
@@ -174,13 +169,6 @@ const mapCaption = isSenate
           </>
         )}
       </p>
-      {oldLinesSenate && (
-        <p class="text-small text-granite">
-          {isSenate
-            ? "Until January 2027, this seat's senator represents the district lines in place when they were elected, not the 2024 lines on this page's map. The November 2026 election uses the 2024 lines."
-            : `Until January 2027, the senator for Senate District ${senateOf} represents the district lines in place when they were elected, which may not include all of this Assembly district.`}
-        </p>
-      )}
       <p data-mine-seat={seatKey} data-pagefind-ignore hidden>
         <span class="mine">This is your district</span>
       </p>

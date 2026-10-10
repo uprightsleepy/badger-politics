@@ -5,7 +5,7 @@
  * page; the holder and party are written out inside it. */
 import Base from "../../layouts/Base.astro";
 import FilterBar from "../../components/FilterBar.astro";
-import { meta, sittingPeople, type Person } from "../../lib/db";
+import { sittingPeople, type Person } from "../../lib/db";
 import { partyWord } from "../../lib/format";
 
 const holders = new Map(sittingPeople().map((p) => [`${p.chamber}-${p.district}`, p]));
@@ -24,10 +24,6 @@ const groups = SENATE.map((sd) => ({
 }));
 const holderText = (h: Person | undefined) =>
   h ? `${h.name}${h.party ? `, ${partyWord(h.party)}` : ""}` : "Vacant";
-// senators in odd-numbered districts serve the pre-2024 lines until the
-// new Senate is sworn in on January 4, 2027
-const asOf = (meta().imported_at ?? new Date().toISOString()).slice(0, 10);
-const oldLines = asOf < "2027-01-04";
 ---
 
 <Base
@@ -41,12 +37,6 @@ const oldLines = asOf < "2027-01-04";
       Wisconsin has 33 Senate districts, and each one holds three Assembly districts. So every
       address has one state senator and one representative.
     </p>
-    {oldLines && (
-      <p class="text-small text-granite">
-        Until January 2027, senators in odd-numbered districts represent the lines in place when they
-        were elected, before the 2024 maps.
-      </p>
-    )}
     <p data-district-finder>
       Not sure which are yours? <a href="/my-reps/" class="underline">Find your lawmakers</a>.
     </p>
