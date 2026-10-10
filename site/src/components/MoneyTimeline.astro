@@ -82,8 +82,8 @@ const label = `Reported receipts by quarter from ${monthYear(entry)}: ${series.l
       )}
     </svg>
     <figcaption class="mt-2 text-fine text-granite">
-      Receipts by quarter in the selected period. The darkest bars, with a tick under
-      them, are election quarters{series.some((d) => !quarterServed(d.year, d.qn)) ? "; shaded stretches are time out of office" : ""}.
+      Receipts by quarter in the selected period. A tick under a bar marks an election
+      quarter{series.some((d) => !quarterServed(d.year, d.qn)) ? "; shaded stretches are time out of office" : ""}.
       The most was {fmtMoney(peak.total)}, in {peak.q.replace("-", " ")}.
     </figcaption>
     <details class="mt-1 text-small">

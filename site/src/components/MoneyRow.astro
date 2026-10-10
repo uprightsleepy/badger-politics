@@ -17,7 +17,7 @@ interface Props { r: MoneyRowData; n: number; ranked: boolean }
 const { r, n, ranked } = Astro.props;
 ---
 <li class="flex items-start gap-3 border-t border-rule py-2.5">
-  {ranked && <span class="w-6 shrink-0 pt-0.5 text-right text-small tabular-nums text-granite" aria-hidden="true">{n}</span>}
+  {ranked && <span class="w-6 shrink-0 pt-0.5 text-right text-small tabular-nums text-granite">{n}<span class="sr-only">.</span></span>}
   {r.logoId !== undefined && <span class="pt-1"><OrgLogo entityId={r.logoId} name={r.name} /></span>}
   {/* the amount drops under the name only when both can't share a line,
       e.g. a 320px screen with text at 200% */}

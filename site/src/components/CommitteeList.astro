@@ -4,12 +4,13 @@
  * (default view inline) and its on-demand fragments. */
 import MoneyCoverage from "./MoneyCoverage.astro";
 import OrgLogo from "./OrgLogo.astro";
-import { donorCommitteesFor, cfTypeOf } from "../lib/db";
+import { donorCommitteesFor, cfTypeOf, moneyCoverage } from "../lib/db";
 import { fmtMoney } from "../lib/format";
 import type { moneyViews } from "../lib/money-periods";
 interface Props { view: ReturnType<typeof moneyViews>[number]; unknownType: string }
 const { view, unknownType } = Astro.props;
 const selected = donorCommitteesFor(view.bounds);
+const { sitting } = moneyCoverage();
 const dates = selected.flatMap((c) => [c.first, c.last]).filter(Boolean).sort();
 ---
 <MoneyCoverage period={view.period} first={dates[0] ?? null} last={dates.at(-1) ?? null} scope={view.scope} />
@@ -22,13 +23,15 @@ const dates = selected.flatMap((c) => [c.first, c.last]).filter(Boolean).sort();
       data-text={c.name.toLowerCase()}
     >
       <span class="pt-1"><OrgLogo entityId={c.entityId} name={c.name} /></span>
-      <span class="min-w-0 flex-1 [overflow-wrap:anywhere]">
-        <a href={`/money/committees/${c.entityId}/`} class="underline">{c.name}</a>
-        <span class="block text-small text-granite">
-          {[cfTypeOf(c.entityId), `To ${c.recipients.toLocaleString()} ${c.recipients === 1 ? "legislator" : "legislators"}`].filter(Boolean).join(". ")}
+      <span class="flex min-w-0 flex-1 flex-wrap items-start gap-x-3">
+        <span class="min-w-0 grow basis-32 [overflow-wrap:anywhere]">
+          <a href={`/money/committees/${c.entityId}/`} class="underline">{c.name}</a>
+          <span class="block text-small text-granite">
+            {[cfTypeOf(c.entityId), `To ${c.recipients.toLocaleString()} of ${sitting.toLocaleString()} legislators`].filter(Boolean).join(". ")}
+          </span>
         </span>
+        <span class="ml-auto shrink-0 font-display font-bold tabular-nums">{fmtMoney(c.total)}</span>
       </span>
-      <span class="shrink-0 font-display font-bold tabular-nums">{fmtMoney(c.total)}</span>
     </li>
   ))}
 </ul>

@@ -15,13 +15,14 @@
 import Base from "../../../layouts/Base.astro";
 import FilterBar from "../../../components/FilterBar.astro";
 import StanceChip from "../../../components/StanceChip.astro";
-import { independentExpenditures, conduitFlows } from "../../../lib/db";
+import { independentExpenditures, conduitFlows, meta } from "../../../lib/db";
 import { fmtMoney, fmtDate } from "../../../lib/format";
 
 // every filing, not a sample: the whole point is completeness
 const filings = independentExpenditures(100000);
 const conduits = conduitFlows(60);
 const latest = filings[0]?.date ?? null;
+const pulledOn = meta().imported_at?.slice(0, 10);
 const officialUrl = (entityId: number) =>
   `https://campaignfinance.wi.gov/browse-data/registrant/${entityId}`;
 const facets = [
@@ -125,7 +126,7 @@ const facets = [
 
   <p class="mt-10 max-w-[47.5rem] text-fine text-granite">
     From the Wisconsin Ethics Commission's campaign finance filings, which you can search in
-    {" "}<a href="https://campaignfinance.wi.gov/browse-data/transactions" class="underline">the Commission's transaction browser</a>.
+    {" "}<a href="https://campaignfinance.wi.gov/browse-data/transactions" class="underline">the Commission's transaction browser</a>{pulledOn && `; checked ${fmtDate(pulledOn)}`}.
     Committees register and report only after crossing amounts set by law, so spending below them never
     appears in any filing. <a href="/about/#money" class="underline">Full methodology</a>
   </p>

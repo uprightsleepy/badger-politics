@@ -20,11 +20,9 @@ interface Props {
 const { m, view, level = "h2" } = Astro.props;
 const H = level;
 const headClass = level === "h3" ? "t-question text-[1.1875rem]" : "t-section";
-const pctIndividual = m.total ? Math.round((m.individualTotal / m.total) * 100) : 0;
-const pctSmall = m.individualTotal ? Math.round((m.smallDollarTotal / m.individualTotal) * 100) : 0;
 const donorHref = (entityId: number) =>
   hasDonorPage(entityId) ? `/money/committees/${entityId}/` : null;
-const period = view.period.key === "all" ? "across all available history" : `in ${view.period.label.replace(" · Current", "")}`;
+const period = view.period.key === "all" ? "in all the history we have" : `in ${view.period.label.replace(" · Current", "")}`;
 const inOffice = view.scope === "office" ? ", while in legislative office" : "";
 
 // Keep signed amounts; refunds can make a source's net receipts negative.
@@ -34,6 +32,16 @@ const parts = [
   { label: "Committees and PACs", amount: m.committeeTotal },
   { label: "Other sources", amount: otherTotal },
 ];
+// Shares only mean something when every part is positive; refunds can
+// push one below zero (the same rule MoneyMix uses for its bar).
+const sharesOk = m.total > 0 && parts.every((p) => p.amount >= 0);
+const pct = (part: number, whole: number) => {
+  const v = (part / whole) * 100;
+  return v > 0 && v < 1 ? "under 1%" : `${Math.round(v)}%`;
+};
+// net small gifts can include refunds, so show their share only when it
+// lands between none and all of what individuals gave
+const smallOk = m.individualTotal > 0 && m.smallDollarTotal >= 0 && m.smallDollarTotal <= m.individualTotal;
 // party totals are only compared when every sitting member's receipts
 // are collected (docs/brand.md, "Party totals")
 const fullCoverage = m.covered >= m.sitting;
@@ -49,9 +57,10 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} 
       <p class="max-w-[47.5rem] sm:text-lead">
         Today's legislators reported <span class="figure">{fmtMoney(m.total)}</span> in receipts {period}{inOffice},
         across {plural(m.n, "collected record", "collected records")}.
-        {m.individualTotal > 0 && (
-          <> Individuals gave <span class="figure">{pctIndividual}%</span> of it, and <span class="figure">{pctSmall}%</span> of
-          that came in amounts under $200.</>
+        {sharesOk && m.individualTotal > 0 && (
+          <> Individuals gave <span class="figure">{pct(m.individualTotal, m.total)}</span> of it{smallOk
+            ? <>, and <span class="figure">{pct(m.smallDollarTotal, m.individualTotal)}</span> of that came in amounts under $200.</>
+            : "."}</>
         )}
       </p>
     ) : null}
@@ -72,7 +81,7 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} 
             label="committees that gave the most"
             rows={m.topCommittees.map((c) => ({
               name: c.name, href: donorHref(c.entityId), logoId: c.entityId,
-              meta: `To ${plural(c.recipients, "legislator", "legislators")}`, amount: c.total,
+              meta: `To ${c.recipients.toLocaleString()} of ${m.sitting.toLocaleString()} legislators`, amount: c.total,
             }))}
           />
         </div>
@@ -139,7 +148,7 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} 
             <MoneyRows
               label="receipts by party"
               ranked={false}
-              rows={m.byParty.map((p) => ({
+              rows={[...m.byParty].sort((a, b) => (a.party ?? "~").localeCompare(b.party ?? "~")).map((p) => ({
                 name: p.party ? partyPlural(p.party) : "Party not recorded",
                 meta: plural(p.legislators, "legislator", "legislators"), amount: p.total,
               }))}

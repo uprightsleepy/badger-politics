@@ -17,9 +17,12 @@ const own = cfCommitteeFor(entityId, view.bounds);
 // (docs/brand.md, "Party totals")
 const { covered, sitting } = moneyCoverage();
 const fullCoverage = covered >= sitting;
+// party never orders a list: alphabetical, with no party recorded last
+const partySplit = [...byParty].sort((a, b) => (a.party ?? "~").localeCompare(b.party ?? "~"));
+const joiner = (i: number, n: number) => (i === 0 ? "" : i < n - 1 ? ", " : n === 2 ? " and " : ", and ");
 const parties = [...new Set(recipients.map((r) => r.party).filter(Boolean))].sort() as string[];
 const key = parties.map((p) => `${partyLetter(p)}: ${partyWord(p)}`).join(". ");
-const period = view.period.key === "all" ? "across all available history" : `in ${view.period.label.replace(" · Current", "")}`;
+const period = view.period.key === "all" ? "in all the history we have" : `in ${view.period.label.replace(" · Current", "")}`;
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 const uid = `${view.period.key}-${view.scope}`;
 ---
@@ -28,16 +31,21 @@ const uid = `${view.period.key}-${view.scope}`;
     <h2 id={`gave-${uid}`} class="t-section">What it gave</h2>
     <p class="sm:text-lead">
       {committee.n > 0
-        ? <>It gave <span class="figure">{fmtMoney(committee.total)}</span> to {plural(committee.recipients, "of today's legislators", "of today's legislators")} {period}{view.scope === "office" ? " while they were in office" : ""}, across {plural(committee.n, "receipt", "receipts")}.</>
+        ? <>It gave <span class="figure">{fmtMoney(committee.total)}</span> to {committee.recipients.toLocaleString()} of today's {sitting.toLocaleString()} legislators {period}{view.scope === "office" ? " while they were in office" : ""}, across {plural(committee.n, "receipt", "receipts")}.</>
         : <>No gifts to today's legislators are recorded {period}.</>}
     </p>
-    {fullCoverage && byParty.length > 0 && (
+    {committee.n > 0 && (fullCoverage ? partySplit.length > 0 && (
       <p>
-        By the legislator's party: {byParty.map((p, i) => (
-          <>{i > 0 && (i === byParty.length - 1 ? ", and " : ", ")}<span class="figure">{fmtMoney(p.total)}</span> to {p.party ? partyPlural(p.party) : "legislators with no party recorded"}</>
+        By the legislator's party: {partySplit.map((p, i) => (
+          <>{joiner(i, partySplit.length)}<span class="figure">{fmtMoney(p.total)}</span> to {p.party ? partyPlural(p.party) : "legislators with no party recorded"}</>
         ))}.
       </p>
-    )}
+    ) : (
+      <p class="text-small text-granite">
+        Totals by party appear once we have receipts for all {sitting.toLocaleString()} sitting legislators;
+        we have {covered.toLocaleString()} so far.
+      </p>
+    ))}
     <MoneyCoverage period={view.period} first={committee.first} last={committee.last} scope={view.scope} />
   </section>
 

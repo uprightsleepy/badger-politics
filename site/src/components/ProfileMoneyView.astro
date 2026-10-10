@@ -18,7 +18,12 @@ const TYPE_LABELS: Record<string, string> = {
   Business: "Businesses and other entities",
   Self: "The candidate themselves",
 };
-const period = view.period.key === "all" ? "across all available history" : `in ${view.period.label.replace(" · Current", "")}`;
+// a fixed order so each source keeps its tone from page to page
+// (Individuals in Spruce, committees in Lake, as on the overview)
+const TYPE_ORDER = ["Individual", "Registrant", "Business", "Self"];
+const rank = (t: string) => (TYPE_ORDER.indexOf(t) + 1 || TYPE_ORDER.length + 1);
+const byType = [...(money?.byType ?? [])].sort((a, b) => rank(a.type) - rank(b.type));
+const period = view.period.key === "all" ? "in all the history we have" : `in ${view.period.label.replace(" · Current", "")}`;
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 ---
 {!money ? (
@@ -44,7 +49,7 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} 
       <div class="flex flex-col gap-3">
         <h3 class="t-question">Where it came from</h3>
         <MoneyMix
-          parts={money.byType.map((t) => ({ label: TYPE_LABELS[t.type] ?? t.type, amount: t.total }))}
+          parts={byType.map((t) => ({ label: TYPE_LABELS[t.type] ?? t.type, amount: t.total, tone: rank(t.type) - 1 }))}
           total={money.total}
         />
         <p class="text-fine text-granite">Source types exactly as the committee reported each receipt.</p>

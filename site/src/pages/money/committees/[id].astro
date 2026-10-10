@@ -4,7 +4,8 @@ import OrgLogo from "../../../components/OrgLogo.astro";
 import MoneyFilters from "../../../components/MoneyFilters.astro";
 import DonorMoneyView from "../../../components/DonorMoneyView.astro";
 import { moneyViews } from "../../../lib/money-periods";
-import { donorCommittees, cfTypeOf } from "../../../lib/db";
+import { donorCommittees, cfTypeOf, meta } from "../../../lib/db";
+import { fmtDate } from "../../../lib/format";
 
 export function getStaticPaths() {
   return donorCommittees().map((c) => ({
@@ -14,6 +15,7 @@ export function getStaticPaths() {
 }
 const { committee } = Astro.props;
 const kind = cfTypeOf(committee.entityId);
+const pulledOn = meta().imported_at?.slice(0, 10);
 ---
 
 <Base
@@ -28,11 +30,11 @@ const kind = cfTypeOf(committee.entityId);
 >
   <header class="flex max-w-[47.5rem] flex-col gap-2.5">
     <a href="/money/committees/" class="self-start text-small underline" data-money-link>Committees that give to lawmakers</a>
-    {kind && <p class="t-label text-granite">{kind}</p>}
     <div class="flex flex-wrap items-center gap-3">
       <OrgLogo entityId={committee.entityId} name={committee.name} />
       <h1 class="t-display min-w-0 [overflow-wrap:anywhere]">{committee.name}</h1>
     </div>
+    {kind && <p class="t-label text-granite">{kind}</p>}
     <p class="sm:text-lead">
       What this committee gave today's legislators, from campaign finance filings with the Wisconsin
       Ethics Commission. A contribution isn't an endorsement of any particular vote.
@@ -52,7 +54,7 @@ const kind = cfTypeOf(committee.entityId);
 
   <p class="mt-12 max-w-[47.5rem] text-fine text-granite">
     From the <a href="https://cfis.wi.gov" class="underline">Wisconsin Ethics Commission's campaign finance system</a>,
-    where this committee is filer ID {committee.entityId}.
+    where this committee is filer ID {committee.entityId}{pulledOn && `; checked ${fmtDate(pulledOn)}`}.
     {" "}<a href="/about/#money" class="underline">Full methodology</a>
   </p>
 </Base>
