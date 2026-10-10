@@ -85,6 +85,9 @@ const facets = [
               {empty.length === 1 ? " is vacant." : " are vacant."}
             </>
           )}
+          {empty.length === 0 && c.rows.some((m) => m.district == null) && c.seats > c.rows.length && (
+            ` ${c.seats - c.rows.length === 1 ? "1 seat is" : `${(c.seats - c.rows.length).toLocaleString()} seats are`} vacant; a member's district is missing from our records, so we can't say which.`
+          )}
         </p>
         <ul class="mt-4 grid gap-x-8 border-b border-rule sm:grid-cols-2 lg:grid-cols-3" role="list" data-no-rep-highlight>
           {c.rows.map((m) => (
