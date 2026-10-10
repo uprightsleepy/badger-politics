@@ -4,10 +4,10 @@
  * path. Excluded from site search: fifteen years of motion text would
  * drown every other result for a senator's name. */
 import Base from "../../../../layouts/Base.astro";
-import PartyChip from "../../../../components/PartyChip.astro";
 import Pager from "../../../../components/Pager.astro";
 import FederalVoteRow from "../../../../components/FederalVoteRow.astro";
 import { federalMembers, federalVoteKey, federalVotesFor } from "../../../../lib/db";
+import { partyWord } from "../../../../lib/format";
 import { FEDERAL_VOTES_PER_PAGE as PER_PAGE, pageCount } from "../../../../lib/paging";
 
 export function getStaticPaths() {
@@ -26,33 +26,33 @@ const { member, page, pages } = Astro.props;
 const all = federalVotesFor(federalVoteKey(member));
 const votes = all.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 const base = `/federal/${member.slug}/votes/`;
+const chamber = member.chamber === "senate" ? "Senate" : "House";
+const first = (page - 1) * PER_PAGE + 1;
+const last = Math.min(page * PER_PAGE, all.length);
 ---
 
 <Base
-  title={`${member.name}: every Senate roll call${page > 1 ? `, page ${page}` : ""}`}
-  description={`Every U.S. Senate roll call cast by ${member.name} of Wisconsin, from the Senate's official records. Page ${page} of ${pages}.`}
+  title={`${member.name}: every ${chamber} roll call${page > 1 ? `, page ${page}` : ""}`}
+  description={`Every U.S. ${chamber} roll call cast by ${member.name} of Wisconsin, from the ${chamber === "Senate" ? "Senate's" : "House Clerk's"} official records. Page ${page} of ${pages}.`}
   searchable={false}
   breadcrumbs={[
     { name: "Federal delegation", url: "/federal/" },
     { name: member.name, url: `/federal/${member.slug}/` },
   ]}
+  layout="wide"
 >
-  <p class="text-sm text-navy-600">
-    <a href={`/federal/${member.slug}/`} class="underline">&larr; {member.name}</a>
-  </p>
-  <h1 class="mt-2 flex flex-wrap items-center gap-3 text-2xl font-bold">
-    Every Roll Call
-    <PartyChip party={member.party} />
-  </h1>
-  <p class="mt-1 text-sm text-navy-700">
-    {all.length.toLocaleString()} votes, newest first. Each links to the
-    chamber's official record; bills link to congress.gov.
-  </p>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <a href={`/federal/${member.slug}/`} class="self-start text-small underline">{member.name}</a>
+    <h1 class="t-display">Every {chamber} roll call</h1>
+    <p class="sm:text-lead">
+      {member.name}, {partyWord(member.party)}: {all.length.toLocaleString()} votes, newest first.
+      {pages > 1 && ` This page has ${first.toLocaleString()} to ${last.toLocaleString()}.`}
+    </p>
+    <p class="text-small text-granite">Each links to the chamber's official record, and bills link to congress.gov.</p>
+  </header>
 
-  <ul class="mt-3 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm">
-    {votes.map((v) => (
-      <FederalVoteRow v={v} />
-    ))}
+  <ul class="mt-6 max-w-[60rem] border-b border-rule" role="list">
+    {votes.map((v) => <FederalVoteRow v={v} />)}
   </ul>
 
   <Pager

@@ -1,61 +1,77 @@
 ---
+/** A member of Congress's campaign money by reporting period: the FEC's
+ * two-year summary for their federal committees, and any Wisconsin
+ * campaign they run, kept apart because the two are different systems. */
 import MoneyFilters from "./MoneyFilters.astro";
 import { moneyPeriods, currentMoneyCycle } from "../lib/money-periods";
 import StateCampaignMoney from "./StateCampaignMoney.astro";
 import { federalMoneyFor, stateCampaignsFor } from "../lib/db";
-import { fmtCents, fmtDate } from "../lib/format";
+import { fmtDate, fmtMoney, fmtMoneyShort } from "../lib/format";
 
 interface Props { bioguide: string; }
 const { bioguide } = Astro.props;
 const federal = federalMoneyFor(bioguide);
 const state = stateCampaignsFor(bioguide);
-const dollars = (cents: number | null) => cents === null ? "Not reported" : fmtCents(cents / 100);
+// the FEC reports cents
+const dollars = (cents: number | null) => (cents === null ? "Not reported" : fmtMoney(cents / 100));
+const short = (cents: number | null) => (cents === null ? null : fmtMoneyShort(cents / 100));
+const current = String(currentMoneyCycle());
 ---
-<section class="mt-8 max-w-3xl" aria-labelledby="money">
-  <h2 id="money" class="scroll-mt-4 text-xl font-bold">Campaign money</h2>
+<section class="flex flex-col gap-4" aria-labelledby="money">
+  <h2 id="money" class="t-section scroll-mt-4">Campaign money</h2>
   <MoneyFilters office={false} />
   {moneyPeriods().map((period) => {
     const selectedFederal = federal.filter((f) => period.key === "all" || String(f.cycle) === period.key);
     const selectedState = state.filter((c) => period.key === "all" || String(c.cycle) === period.key);
-    return <div data-money-period={period.key} hidden={period.key !== String(currentMoneyCycle())} data-pagefind-ignore={period.key !== String(currentMoneyCycle()) ? "all" : undefined}>
-  {selectedFederal.length === 0 && selectedState.length === 0 && <p class="mt-2 text-sm text-navy-700">
-    Campaign finance has not been collected for this reporting period. Missing data does not mean zero fundraising.
-  </p>}
-  {selectedFederal.map((f) => (
-    <article class="mt-3 rounded-lg border border-navy-100 bg-white p-4">
-      <h3 class="text-lg font-bold">Federal campaign · {f.cycle - 1}–{f.cycle}</h3>
-      <p class="mt-1 text-sm text-navy-600">
-        {f.coverage_end ? `Reported through ${fmtDate(f.coverage_end)}.` : "No dated summary in the collected FEC file."}
-        {" "}Retrieved {fmtDate(f.fetched_at.slice(0, 10))}.
-      </p>
-      <dl class="mt-3 grid grid-cols-1 gap-4 min-[400px]:grid-cols-2 sm:grid-cols-4">
-        {[["Receipts", f.receipts], ["Disbursements", f.disbursements],
-          ["Cash on hand", f.cash_end], ["Debts owed", f.debts]].map(([label, value]) => (
-          <div><dt class="text-sm text-navy-600">{label}</dt>
-            <dd class="mt-1 break-words text-lg font-bold tabular-nums">{dollars(value as number | null)}</dd></div>
-        ))}
-      </dl>
-      <details class="mt-4 text-sm">
-        <summary class="cursor-pointer py-1 font-semibold">Contribution sources and transfers</summary>
-        <dl class="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2">
-          {[["Individuals", f.individual_contributions], ["Other political committees", f.committee_contributions],
-            ["Party committees", f.party_contributions], ["Candidate contributions", f.candidate_contributions],
-            ["Transfers from authorized committees", f.transfers_in],
-            ["Transfers to authorized committees", f.transfers_out],
-            ["Refunds to individuals", f.individual_refunds], ["Refunds to committees", f.committee_refunds]]
-            .map(([label, value]) => <><dt>{label}</dt><dd class="text-right tabular-nums">{dollars(value as number | null)}</dd></>)}
-        </dl>
-      </details>
-      <p class="mt-3 text-sm text-navy-600">
-        These are the FEC's reported two-year totals across authorized committees. Receipts include more than donations.
-        Transfers between authorized committees can count the same money twice; they are shown separately above.
-        Outside spending and state campaigns are excluded. Donor-level federal records are available at the FEC.
-      </p>
-      <p class="mt-2 text-sm"><a class="inline-block min-h-6 leading-6 underline"
-        href={`https://www.fec.gov/data/candidate/${f.candidate_id}/?cycle=${f.cycle}&election_full=false`}>FEC summary and itemized records · {f.candidate_id} ↗</a></p>
-    </article>
-  ))}
-  {selectedState.map((c) => <div class="mt-4"><StateCampaignMoney campaign={c} /></div>)}    </div>;
+    return <div data-money-period={period.key} hidden={period.key !== current} data-pagefind-ignore={period.key !== current ? "all" : undefined} class="flex flex-col gap-8">
+      {selectedFederal.length === 0 && selectedState.length === 0 && (
+        <p>
+          Campaign money isn't collected for this period. That's a gap in our records, not a sign of no
+          fundraising.
+        </p>
+      )}
+      {selectedFederal.map((f) => (
+        <article class="flex flex-col gap-3 border-t border-rule pt-4" aria-labelledby={`fec-${f.cycle}`}>
+          <h3 id={`fec-${f.cycle}`} class="t-question text-[1.1875rem]">Federal campaign, {f.cycle - 1}–{f.cycle}</h3>
+          {f.receipts === null ? (
+            <p>The FEC file we collected has no summary for this cycle yet.</p>
+          ) : (
+            <p>
+              Reported <span class="figure">{short(f.receipts)}</span> in receipts and
+              {" "}<span class="figure">{short(f.disbursements) ?? "an unreported amount"}</span> in spending
+              {f.coverage_end && ` through ${fmtDate(f.coverage_end)}`}{f.cash_end !== null && <>, with <span class="figure">{short(f.cash_end)}</span> in cash on hand</>}.
+            </p>
+          )}
+          <dl class="grid grid-cols-1 gap-x-8 gap-y-3 min-[400px]:grid-cols-2 sm:grid-cols-4">
+            {[["Receipts", f.receipts], ["Spending", f.disbursements],
+              ["Cash on hand", f.cash_end], ["Debts owed", f.debts]].map(([label, value]) => (
+              <div>
+                <dt class="text-small text-granite">{label}</dt>
+                <dd class="whitespace-nowrap font-display text-[1.25rem] font-bold tabular-nums">{dollars(value as number | null)}</dd>
+              </div>
+            ))}
+          </dl>
+          <details>
+            <summary class="inline-flex min-h-11 cursor-pointer items-center font-display font-bold text-lake underline">Where the receipts came from, and transfers</summary>
+            <dl class="mt-2 grid max-w-[36rem] grid-cols-[minmax(0,1fr)_auto] gap-x-4 border-b border-rule">
+              {[["Individuals", f.individual_contributions], ["Other political committees", f.committee_contributions],
+                ["Party committees", f.party_contributions], ["The candidate", f.candidate_contributions],
+                ["Transfers from their other committees", f.transfers_in],
+                ["Transfers to their other committees", f.transfers_out],
+                ["Refunds to individuals", f.individual_refunds], ["Refunds to committees", f.committee_refunds]]
+                .map(([label, value]) => <><dt class="border-t border-rule py-2">{label}</dt><dd class="border-t border-rule py-2 text-right tabular-nums">{dollars(value as number | null)}</dd></>)}
+            </dl>
+          </details>
+          <p class="text-small text-granite">
+            The FEC's two-year totals across the member's own committees. Receipts include more than
+            donations, and a transfer between their committees can count the same money twice, so transfers
+            are listed apart. Outside spending and state campaigns aren't included. Retrieved
+            {" "}{fmtDate(f.fetched_at.slice(0, 10))}.
+            {" "}<a class="underline" href={`https://www.fec.gov/data/candidate/${f.candidate_id}/?cycle=${f.cycle}&election_full=false`}>Every itemized record at the FEC ({f.candidate_id})</a>
+          </p>
+        </article>
+      ))}
+      {selectedState.map((c) => <StateCampaignMoney campaign={c} />)}
+    </div>;
   })}
-
 </section>
