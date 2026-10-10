@@ -35,7 +35,7 @@ const CHIP = "min-h-11 max-w-full rounded-full border px-3 py-2 text-sm font-sem
         ? "min-h-12 min-w-0 max-w-full flex-1 rounded-[0.625rem] border-2 border-edge bg-white px-3 text-body focus:border-lake sm:max-w-[min(28rem,100%)] sm:flex-none sm:basis-96 lg:min-h-11"
         : "min-h-11 min-w-0 flex-1 rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm sm:max-w-md sm:flex-none sm:basis-96"}
     />
-    <p id={statusId} role="status" class={wide ? "shrink-0 text-small text-granite" : "shrink-0 text-sm text-navy-600"}></p>
+    <p id={statusId} role="status" class={wide ? "min-w-0 max-w-full text-small text-granite" : "shrink-0 text-sm text-navy-600"}></p>
     <button type="button" data-filter-clear={id} class={wide ? "hidden min-h-11 px-2 text-small font-bold text-lake underline" : "hidden min-h-11 px-2 text-sm font-semibold underline"}>Clear filters</button>
   </div>
   {chips.length > 1 && (

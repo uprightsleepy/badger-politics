@@ -45,8 +45,12 @@ try {
       for (const scope of scopes) {
         await choose(period, scope);
         const text = await page.$eval(visible(scope), (e)=>e.innerText);
-        assert.ok(text.includes(dollar(expected(period,scope))), `Overview ${period}/${scope} amount`);
-        assert.ok(text.includes("reported receipts"));
+        const total = expected(period,scope);
+        if (total === 0) assert.ok(text.includes("No receipts collected"), `Overview ${period}/${scope} empty state`);
+        else {
+          assert.ok(text.includes(dollar(total)), `Overview ${period}/${scope} amount`);
+          assert.ok(/reported \$[\d,]+ in receipts/.test(text), `Overview ${period}/${scope} summary sentence`);
+        }
         await assertLayout();
       }
     }

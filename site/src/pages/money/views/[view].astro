@@ -14,5 +14,5 @@ export function getStaticPaths() {
 const { view } = Astro.props;
 ---
 <MoneyFragment view={view}>
-  <MoneyView m={moneyOverview(view.bounds)} view={view} />
+  <MoneyView m={moneyOverview(view.bounds)} view={view} level="h3" />
 </MoneyFragment>

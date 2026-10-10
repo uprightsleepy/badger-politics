@@ -1,0 +1,31 @@
+---
+/** One row of a money list: rank, name (a link when there is a page),
+ * a note under it, and the amount. */
+import OrgLogo from "./OrgLogo.astro";
+import { fmtMoney } from "../lib/format";
+export interface MoneyRowData {
+  name: string;
+  href?: string | null;
+  /** Appended to the name, e.g. " (R)" in a list keyed on screen. */
+  suffix?: string;
+  meta?: string;
+  amount: number;
+  /** Show the organization's logo or monogram beside the name. */
+  logoId?: number | null;
+}
+interface Props { r: MoneyRowData; n: number; ranked: boolean }
+const { r, n, ranked } = Astro.props;
+---
+<li class="flex items-start gap-3 border-t border-rule py-2.5">
+  {ranked && <span class="w-6 shrink-0 pt-0.5 text-right text-small tabular-nums text-granite">{n}<span class="sr-only">.</span></span>}
+  {r.logoId !== undefined && <span class="pt-1"><OrgLogo entityId={r.logoId} name={r.name} /></span>}
+  {/* the amount drops under the name only when both can't share a line,
+      e.g. a 320px screen with text at 200% */}
+  <span class="flex min-w-0 flex-1 flex-wrap items-start gap-x-3">
+    <span class="min-w-0 grow basis-32 [overflow-wrap:anywhere]">
+      {r.href ? <a href={r.href} class="underline">{r.name}</a> : r.name}{r.suffix ?? ""}
+      {r.meta && <span class="block text-small text-granite">{r.meta}</span>}
+    </span>
+    <span class="ml-auto shrink-0 font-display font-bold tabular-nums">{fmtMoney(r.amount)}</span>
+  </span>
+</li>

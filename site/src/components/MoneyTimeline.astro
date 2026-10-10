@@ -54,11 +54,11 @@ const label = `Reported receipts by quarter from ${monthYear(entry)}: ${series.l
       role="img"
       aria-label={label}
     >
-      <line x1="0" y1={baseline} x2={width} y2={baseline} stroke="#d9e2ee" stroke-width="1" />
+      <line x1="0" y1={baseline} x2={width} y2={baseline} stroke="#D6DCD7" stroke-width="1" />
       {series.map((d, i) => (
         <>
           {!quarterServed(d.year, d.qn) ? (
-            <rect x={x(i)} y={PAD_TOP} width={BAR + GAP} height={H} fill="#eef2f7" />
+            <rect x={x(i)} y={PAD_TOP} width={BAR + GAP} height={H} fill="#E6EBE7" />
           ) : (
             <>
               <rect
@@ -66,10 +66,10 @@ const label = `Reported receipts by quarter from ${monthYear(entry)}: ${series.l
                 y={d.total >= 0 ? baseline - barH(d.total) : baseline}
                 width={BAR}
                 height={barH(d.total)}
-                fill={isElectionQ(d) ? "#a87a1e" : "#2d4a73"}
+                fill={isElectionQ(d) ? "#18241F" : "#0D5C63"}
               />
               {isElectionQ(d) && (
-                <rect x={x(i)} y={PAD_TOP + H + 2} width={BAR} height="3" fill="#a87a1e" />
+                <rect x={x(i)} y={PAD_TOP + H + 2} width={BAR} height="3" fill="#18241F" />
               )}
             </>
           )}
@@ -77,17 +77,17 @@ const label = `Reported receipts by quarter from ${monthYear(entry)}: ${series.l
       ))}
       {series.map((d, i) =>
         d.qn === 1 && d.year % 2 === 1 ? (
-          <text x={x(i)} y={height - 4} font-size="9" fill="#2d4a73">{d.year}</text>
+          <text x={x(i)} y={height - 4} font-size="9" fill="#55605A">{d.year}</text>
         ) : null,
       )}
     </svg>
-    <figcaption class="mt-1 text-xs text-navy-600">
-      Receipts by quarter in the selected period. Gold bars with a tick under
-      them are election quarters{series.some((d) => !quarterServed(d.year, d.qn)) ? "; shaded stretches are time out of office" : ""};
-      peak {fmtMoney(peak.total)} in {peak.q.replace("-", " ")}.
+    <figcaption class="mt-2 text-fine text-granite">
+      Receipts by quarter in the selected period. A tick under a bar marks an election
+      quarter{series.some((d) => !quarterServed(d.year, d.qn)) ? "; shaded stretches are time out of office" : ""}.
+      The most was {fmtMoney(peak.total)}, in {peak.q.replace("-", " ")}.
     </figcaption>
-    <details class="mt-1 text-xs text-navy-700">
-      <summary class="cursor-pointer text-navy-600">Quarter by quarter</summary>
+    <details class="mt-1 text-small">
+      <summary class="inline-flex min-h-11 cursor-pointer items-center font-bold text-lake underline">Quarter by quarter</summary>
       <ul class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
         {quarters.map((d) => (
           <li>{d.q.replace("-", " ")}: {fmtMoney(d.total)}</li>

@@ -1,14 +1,11 @@
 ---
 /** A filing's stance toward a campaign, exactly as the filer recorded it
- * (FOR or AGAINST in the Commission's data), in the site's plain words. */
+ * (FOR or AGAINST in the Commission's data), in the site's plain words.
+ * Told apart by the word, never by color (docs/brand.md). */
 interface Props { stance: string }
 const { stance } = Astro.props;
 const supporting = stance === "FOR";
 ---
-<span
-  class={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
-    supporting ? "bg-moss-50 text-moss-600" : "bg-badger-50 text-badger-700"
-  }`}
->
+<span class="inline-flex shrink-0 items-center rounded-full border-2 border-edge bg-white px-2.5 text-small font-bold text-spruce">
   {supporting ? "Supporting" : "Opposing"}
 </span>

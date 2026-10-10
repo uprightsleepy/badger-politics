@@ -1,0 +1,56 @@
+---
+/** Where money came from, as one bar and a labeled list. The bar uses
+ * Spruce, Lake, Lake tint, Edge and Fog, told apart by lightness, with gaps;
+ * the list names every part, so the bar is never the only way to read
+ * it. Refunds can make a part negative; then there is no bar, only the
+ * list, because shares of a total stop meaning anything. */
+import { fmtMoney } from "../lib/format";
+interface Props {
+  /** `tone` pins a part to one color (an index into TONES) so a source
+   * keeps its color across pages; by default parts take tones in order. */
+  parts: { label: string; amount: number; tone?: number }[];
+  /** The whole the shares are of. */
+  total: number;
+}
+const { parts, total } = Astro.props;
+const TONES = ["#18241F", "#0D5C63", "#B9D3D2", "#848E88", "#E6EBE7"];
+const shown = parts
+  .map((p, i) => ({ ...p, color: TONES[(p.tone ?? i) % TONES.length] }))
+  .filter((p) => p.amount !== 0);
+// Lake tint and Fog are too close to the page to stand alone as dots
+const outline = (color: string) => (color === "#B9D3D2" || color === "#E6EBE7" ? ";box-shadow:inset 0 0 0 1px #848E88" : "");
+const showShares = total > 0 && shown.every((p) => p.amount >= 0);
+const share = (n: number) => (total ? (n / total) * 100 : 0);
+const pct = (n: number) => (share(n) > 0 && share(n) < 1 ? "under 1%" : `${Math.round(share(n))}%`);
+---
+{shown.length > 0 && (
+  <div class="flex flex-col gap-3">
+    {showShares && (
+      <div class="mix flex h-3.5 w-full gap-[2px] overflow-hidden rounded-full" aria-hidden="true">
+        {shown.map((p) => (
+          <span class="block h-full" style={`width:${share(p.amount).toFixed(2)}%;background:${p.color}`}></span>
+        ))}
+      </div>
+    )}
+    <ul class="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3" role="list">
+      {shown.map((p) => (
+        <li class="flex items-start gap-2">
+          {showShares && <span class="mt-1.5 h-3 w-3 shrink-0 rounded-full" style={`background:${p.color}${outline(p.color)}`} aria-hidden="true"></span>}
+          <span>
+            <span class="font-bold">{p.label}</span>
+            <span class="block text-small text-granite">{fmtMoney(p.amount)}{showShares ? `, ${pct(p.amount)}` : ""}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
+
+<style>
+  @media (forced-colors: active) {
+    .mix {
+      forced-color-adjust: none;
+      border: 1px solid CanvasText;
+    }
+  }
+</style>

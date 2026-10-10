@@ -22,34 +22,42 @@ const typeFacets = [...typeCounts]
 ---
 
 <Base
-  title="Contributing Committees"
+  title="Committees that give to lawmakers"
   description="Every PAC, party and political committee that has given at least $1,000 to sitting Wisconsin legislators, with their full recipient lists."
+  breadcrumbs={[{ name: "Money", url: "/money/" }]}
+  layout="wide"
 >
-  <p class="text-sm text-navy-600"><a href="/money/" class="underline">Campaign money</a></p>
-  <h1 class="mt-1 text-2xl font-bold">Contributing Committees</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Every political committee that has given at least $1,000 to sitting
-    legislators in the collected history, plus retained historical profiles.
-    Amounts and recipient counts follow the selected reporting period.
-  </p>
-  <MoneyFilters fragmentBase="/money/committees/views/" />
-  <FilterBar
-    id="committee-filter"
-    statusId="committee-filter-status"
-    label="Filter committees by name"
-    placeholder="Filter by name…"
-    facetAttr="ctype"
-    facetLabel="Filter by the kind of committee"
-    facets={typeFacets}
-  />
-  <div data-money-views>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <a href="/money/" class="self-start text-small underline" data-money-link>Campaign money</a>
+    <h1 class="t-display">Committees that give to lawmakers</h1>
+    <p class="sm:text-lead">
+      Every political committee that has given at least $1,000 to today's legislators in our
+      records, plus older profiles we keep. Amounts and recipient counts follow the period you choose.
+    </p>
+  </header>
+  <div class="mt-7">
+    <MoneyFilters fragmentBase="/money/committees/views/" />
+  </div>
+  <div class="mt-4 max-w-[47.5rem]">
+    <FilterBar
+      wide
+      id="committee-filter"
+      statusId="committee-filter-status"
+      label="Find a committee"
+      placeholder="Part of its name"
+      facetAttr="ctype"
+      facetLabel="Show committees of this kind"
+      facets={typeFacets}
+    />
+  </div>
+  <div data-money-views class="max-w-[60rem]">
     {moneyViews().filter((view) => view.isDefault).map((view) => (
       <div data-money-period={view.period.key} data-money-scope={view.scope}>
         <CommitteeList view={view} unknownType={UNKNOWN} />
       </div>
     ))}
   </div>
-  <p id="committee-no-match" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600"></p>
+  <p id="committee-no-match" class="mt-4 hidden text-granite"></p>
 
   <script>
     import { initRowFilter } from "../../../scripts/rowFilter";
@@ -67,7 +75,11 @@ const typeFacets = [...typeCounts]
       document.querySelectorAll<HTMLButtonElement>('[data-facet-for="ctype"]').forEach((chip) => {
         const kind = chip.dataset.facet;
         const count = kind ? rows.filter((r) => r.dataset.ctype === kind).length : rows.length;
-        chip.textContent = `${kind || "All"} ${count.toLocaleString()}`;
+        // the label, then its count, as the chip was built (FilterBar)
+        const figure = document.createElement("span");
+        figure.className = "figure";
+        figure.textContent = count.toLocaleString();
+        chip.replaceChildren(`${kind || "All"} `, figure);
       });
       apply();
     };

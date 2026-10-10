@@ -1,0 +1,34 @@
+---
+/** A ranked money list: the first rows in view, the rest one tap away in
+ * the same order. Every row stays in the page and the search index. */
+import MoneyRow, { type MoneyRowData } from "./MoneyRow.astro";
+interface Props {
+  rows: MoneyRowData[];
+  /** Names the list for the "show more" control. */
+  label: string;
+  initial?: number;
+  ranked?: boolean;
+}
+const { rows, label, initial = 10, ranked = true } = Astro.props;
+const first = rows.slice(0, initial);
+const rest = rows.slice(initial);
+const ListTag = ranked ? "ol" : "ul";
+---
+{rows.length > 0 && (
+  <div>
+    <ListTag class="border-b border-rule" role="list">
+      {first.map((r, i) => <MoneyRow r={r} n={i + 1} ranked={ranked} />)}
+    </ListTag>
+    {rest.length > 0 && (
+      <details class="group">
+        <summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">
+          <span class="group-open:hidden">Show {rest.length} more<span class="sr-only"> in {label}</span></span>
+          <span class="hidden group-open:inline">Show fewer<span class="sr-only"> in {label}</span></span>
+        </summary>
+        <ListTag class="border-b border-rule" role="list" start={ranked ? initial + 1 : undefined}>
+          {rest.map((r, i) => <MoneyRow r={r} n={initial + i + 1} ranked={ranked} />)}
+        </ListTag>
+      </details>
+    )}
+  </div>
+)}

@@ -13,21 +13,21 @@ const periods = moneyPeriods();
   data-money-filters
   data-current-period={currentMoneyCycle()}
   data-fragment-base={fragmentBase}
-  class="mt-4 flex flex-wrap items-end gap-4 rounded-xl border border-navy-100 bg-white p-4"
+  class="flex flex-wrap items-end gap-x-6 gap-y-3"
 >
-  <label class="flex min-w-0 flex-col gap-1 text-sm font-semibold">
+  <label class="flex min-w-0 max-w-full flex-col gap-1.5 text-small font-bold">
     Reporting period
-    <select data-money-period-select class="min-h-11 max-w-full rounded-lg border border-navy-600 bg-white px-3 py-2">
+    <select data-money-period-select class="min-h-12 max-w-full rounded-[0.625rem] border-2 border-edge bg-white px-3 font-sans text-body font-normal text-spruce focus:border-lake lg:min-h-11">
       {periods.map((p) => <option value={p.key}>{p.label}</option>)}
     </select>
   </label>
-  {office && <label class="flex min-h-11 items-center gap-2 text-sm">
-    <input data-money-office type="checkbox" class="h-4 w-4" />
+  {office && <label class="flex min-h-12 items-center gap-3 lg:min-h-11">
+    <input data-money-office type="checkbox" class="h-5 w-5 shrink-0 accent-lake" />
     Only receipts while in legislative office
   </label>}
   <p data-money-status role="status" class="sr-only"></p>
 </div>
-<noscript><p class="mt-2 text-sm text-navy-600">The current period is shown. Enable JavaScript to select earlier periods or all available history.</p></noscript>
+<noscript><p class="mt-2 text-small text-granite">The current period is shown. Turn on JavaScript to choose earlier periods or all available history.</p></noscript>
 <script>
   const filters = document.querySelector<HTMLElement>("[data-money-filters]");
   if (filters) {

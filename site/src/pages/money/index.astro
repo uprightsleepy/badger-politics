@@ -1,60 +1,80 @@
 ---
 import Base from "../../layouts/Base.astro";
-import SourceStrip from "../../components/SourceStrip.astro";
 import MoneyView from "../../components/MoneyView.astro";
 import MoneyFilters from "../../components/MoneyFilters.astro";
 import StateCampaignMoney from "../../components/StateCampaignMoney.astro";
 import campaigns from "../../../../pipeline/importer/state_campaigns.json";
-import { moneyOverview, stateCampaignMoney } from "../../lib/db";
+import { meta, moneyOverview, stateCampaignMoney } from "../../lib/db";
+import { fmtDate } from "../../lib/format";
 import { currentMoneyCycle, moneyPeriods, moneyViews } from "../../lib/money-periods";
 
 const all = moneyOverview({ inOffice: 0 });
 const governors = campaigns.filter((c) => c.office === "Wisconsin governor").map(stateCampaignMoney);
 const periods = moneyPeriods();
 const current = String(currentMoneyCycle());
+const pulledOn = meta().imported_at?.slice(0, 10);
+const missing = all.sitting - all.covered;
 ---
-<Base title="Campaign Money" description="Wisconsin campaign receipts and spending by reporting period, with available history and coverage gaps.">
-  <h1 class="text-2xl font-bold">Campaign Money</h1>
-  <SourceStrip sources={[{ label: "Wisconsin Ethics Commission", href: "https://campaignfinance.wi.gov" }]} through={null} />
-  <MoneyFilters fragmentBase="/money/views/" />
-  <section id="governor-campaigns" class="mt-6" aria-labelledby="governor-money">
-    <h2 id="governor-money" class="text-xl font-bold">Governor campaigns</h2>
-    <p class="mt-1 max-w-3xl text-sm text-navy-700">
-      Reported spending and receipts for the state campaign committees tracked here.
-      Federal campaigns and outside-group spending are separate. This is not a complete candidate list.
-      The legislative service filter does not apply to these committees.
+<Base
+  title="Campaign money"
+  description="Wisconsin campaign receipts and spending by reporting period, with available history and coverage gaps."
+  layout="wide"
+>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">Campaign money</h1>
+    <p class="sm:text-lead">
+      Who gives to Wisconsin's state lawmakers and governor candidates, from the campaign finance
+      reports filed with the Wisconsin Ethics Commission.
+    </p>
+    <p class="text-small text-granite">
+      {missing > 0
+        ? `We have receipts for ${all.covered.toLocaleString()} of the ${all.sitting.toLocaleString()} sitting legislators, so totals, rankings and party totals cover those ${all.covered.toLocaleString()}. A missing record doesn't mean no money was raised.`
+        : `We have receipts for all ${all.sitting.toLocaleString()} sitting legislators.`}
+      {" "}<a href="/about/#money" class="underline">How this data works</a>
+    </p>
+  </header>
+
+  <div class="mt-7">
+    <MoneyFilters fragmentBase="/money/views/" />
+  </div>
+
+  <section id="governor-campaigns" class="mt-10" aria-labelledby="governor-money">
+    <h2 id="governor-money" class="t-section">Governor campaigns</h2>
+    <p class="mt-2 max-w-[47.5rem] text-small text-granite">
+      Reported spending and receipts for the state campaign committees we track. This isn't every
+      candidate, and federal campaigns and outside spending are separate. The legislative-office filter
+      doesn't apply here.
     </p>
     {periods.map((period) => {
       const selected = governors.filter((c) => period.key === "all" || String(c.cycle) === period.key);
       return <div data-money-period={period.key} hidden={period.key !== current} data-pagefind-ignore={period.key !== current ? "all" : undefined}>
-        {selected.length ? <div class="mt-4 grid items-start gap-4 lg:grid-cols-2">
+        {selected.length ? <div class="mt-4 grid items-start gap-5 lg:grid-cols-2">
           {selected.map((c) => <StateCampaignMoney campaign={c} title={c.candidate} />)}
-        </div> : <p class="mt-3 text-sm text-navy-600">Governor campaign records have not been collected for {period.label}. This is a coverage gap.</p>}
+        </div> : <p class="mt-3">Governor campaign records aren't collected for {period.label.replace(" · Current", "")}. That's a gap in our records, not a sign of no money.</p>}
       </div>;
     })}
   </section>
-  <h2 class="mt-8 text-xl font-bold">Legislative campaigns</h2>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Receipts to verified campaign committees of today's legislators. The current two-year period is shown by default,
-    including collected receipts before taking office. Select earlier periods or all available history above.
-    <a href="/money/committees/" class="underline" data-money-link> Browse contributing committees</a> ·
-    <a href="/about/#money" class="underline"> How this data works</a>
-  </p>
-  <p class="mt-2 max-w-3xl rounded-lg border border-gold-500 bg-gold-100 px-3 py-2 text-sm">
-    Coverage note: {all.covered} of {all.sitting} sitting legislators have collected receipt history.
-    Totals and rankings cover that subset. Missing records do not mean zero fundraising.
-  </p>
-  <div data-money-views>
-    {moneyViews().filter((view) => view.isDefault).map((view) => (
-      <div data-money-period={view.period.key} data-money-scope={view.scope}>
-        <MoneyView m={moneyOverview(view.bounds)} view={view} />
-      </div>
-    ))}
-  </div>
-  <p class="mt-6 max-w-3xl text-xs text-navy-600">
-    Reported receipts include loans, transfers, refunds, and in-kind support; they do not establish cash on hand.
-    All available history begins no earlier than July 2008 and may have gaps.
-    Committee donors are grouped by official entity ID. Individual donors are aggregated here.
-    <a href="/about/#money" class="underline"> Full methodology</a>
+
+  <section class="mt-12" aria-labelledby="legislative-money">
+    <h2 id="legislative-money" class="t-section">Legislative campaigns</h2>
+    <p class="mb-6 mt-2 flex flex-wrap gap-x-6 gap-y-2">
+      <a href="/money/committees/" class="font-bold underline" data-money-link>Every committee that gives to lawmakers</a>
+      <a href="/money/independent/" class="font-bold underline">Outside spending, filing by filing</a>
+    </p>
+    <div data-money-views>
+      {moneyViews().filter((view) => view.isDefault).map((view) => (
+        <div data-money-period={view.period.key} data-money-scope={view.scope}>
+          <MoneyView m={moneyOverview(view.bounds)} view={view} level="h3" />
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <p class="mt-12 max-w-[47.5rem] text-fine text-granite">
+    Reported receipts include loans, transfers, refunds and in-kind support; they don't show cash on hand.
+    Our history starts no earlier than July 2008 and may have gaps. Committee donors are grouped by the
+    Commission's entity ID; individual donors are counted together. From the
+    {" "}<a href="https://campaignfinance.wi.gov" class="underline">Wisconsin Ethics Commission</a>{pulledOn && `, checked ${fmtDate(pulledOn)}`}.
+    {" "}<a href="/about/#money" class="underline">Full methodology</a>
   </p>
 </Base>

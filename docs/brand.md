@@ -261,6 +261,24 @@ Used on My reps and lawmaker pages:
 Two-sided tallies (Yes against No, two-candidate results) use one bar in Spruce and Fog with both
 numbers at its ends. The winner is named in words.
 
+### Money lists (`MoneyRows`)
+
+- **One row style** for every ranked money list: rank, name (a link when we have a page), a note
+  under it, and the amount at the end of the line. The amount drops under the name only when the two
+  can't share a line.
+- **First ten in view**, the rest behind "Show N more", in the same order. Every row stays in the page
+  and the search index.
+- **Party** appears as (R)/(D) only with its key above the list.
+- **Lead with a sentence** before any list: "Today's legislators reported $X in receipts in
+  2025–2026, across N collected records," then the coverage note in Granite.
+
+### Money mix (`MoneyMix`)
+
+Where money came from is one bar in Spruce, Lake, Lake tint, Edge and Fog, with gaps, and a list that
+names every part with its amount and share. The list carries the meaning; the bar is decoration and
+is hidden from screen readers. When refunds make any part negative, there is no bar and no shares,
+only amounts.
+
 ## Words
 
 ### Reading level and voice
@@ -313,8 +331,10 @@ Headlines are what the reader needs to know, not the clerk's state.
 - **Percentages:** always say the base: "90% of 239 votes in 2025".
 - **Dates:** "Mar 19, 2026" in lists and "March 19, 2026" in sentences. Use "Tomorrow" and "Next
   Tuesday" for what's coming up.
-- **Party totals:** never compare one party's totals with the other's unless both are fully covered.
-  Coverage gaps are stated in words, never shown as zero.
+- **Party totals:** shown side by side only with the gap named right beside them: how many sitting
+  members we don't have receipts for, by party ("These totals leave out 6 sitting legislators whose
+  receipts we haven't collected: 2 Democrats and 4 Republicans."). Parties are listed alphabetically,
+  never by size. Coverage gaps are stated in words, never shown as zero.
 
 ### Party and neutrality
 
