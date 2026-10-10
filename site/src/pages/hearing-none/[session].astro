@@ -35,8 +35,8 @@ const sessionName = (session.name ?? session.id).replace(/ Regular Session$/, " 
     <h1 class="t-display">Bills that never got a hearing, {sessionName}</h1>
     {total === 0 ? (
       <p class="sm:text-lead">
-        None are recorded yet. A bill is counted here once the session's last floorperiod ends without a
-        hearing on it.
+        None are recorded yet. Bills are counted once the Legislature records them as failed, after its last
+        voting days.
       </p>
     ) : (
       <p class="sm:text-lead">
@@ -81,8 +81,8 @@ const sessionName = (session.name ?? session.id).replace(/ Regular Session$/, " 
             )}
             <details class="group mt-1">
               <summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">
-                <span class="group-open:hidden">Show the {plural(bills.length, "proposal", "proposals")}<span class="sr-only"> that died in {name}</span></span>
-                <span class="hidden group-open:inline">Hide them<span class="sr-only">: {name}</span></span>
+                <span class="group-open:hidden">{bills.length === 1 ? "Show it" : `Show all ${bills.length.toLocaleString()}`}<span class="sr-only"> that died in {name}</span></span>
+                <span class="hidden group-open:inline">{bills.length === 1 ? "Hide it" : "Hide them"}<span class="sr-only">: {name}</span></span>
               </summary>
               <ul class="mb-2 border-b border-rule" role="list">
                 {bills.map((b) => (

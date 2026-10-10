@@ -42,19 +42,33 @@ const newest = bienniums[0];
   {bienniums.map((b) => (
     <section class="mt-12 max-w-[60rem]" aria-labelledby={`session-${b.biennium}`}>
       <h2 id={`session-${b.biennium}`} class="t-section">{b.biennium}–{b.biennium + 1} session</h2>
+      <p class="mt-2 text-granite">
+        {plural(b.fullVetoes.length, "bill", "bills")} vetoed, {b.partialVetoes.length.toLocaleString()} signed with a partial
+        veto, {plural(b.attempts.length, "override attempt", "override attempts")}.
+      </p>
 
       {b.attempts.length > 0 && (
         <section class="mt-6" aria-labelledby={`attempts-${b.biennium}`}>
           <h3 id={`attempts-${b.biennium}`} class="t-question text-[1.1875rem]">Override attempts: {b.attempts.length.toLocaleString()}</h3>
           <p class="mt-1 text-small text-granite">Each line is the official history's own wording.</p>
-          <ul class="mt-2 border-b border-rule" role="list">
-            {b.attempts.map((a) => (
-              <BillLine href={`/bills/${a.session_id}/${billSlug(a.identifier)}/`} identifier={a.identifier} title={a.title} date={fmtDate(a.date)}>
+          <div class="mt-2">
+            <MoreRows rest={Math.max(0, b.attempts.length - SHOWN)} label={`override attempts, ${b.biennium}–${b.biennium + 1}`}>
+              {b.attempts.slice(0, SHOWN).map((a) => (
+                <BillLine href={`/bills/${a.session_id}/${billSlug(a.identifier)}/`} identifier={a.identifier} title={a.title} date={fmtDate(a.date)}>
                 {a.description}.
                 {a.vote && <> <a href={`/votes/${a.vote.id}/`} class="underline">{chamberName(a.vote.chamber)} roll call, {a.vote.yes} to {a.vote.no}</a></>}
               </BillLine>
-            ))}
-          </ul>
+              ))}
+              <Fragment slot="rest">
+                {b.attempts.slice(SHOWN).map((a) => (
+                  <BillLine href={`/bills/${a.session_id}/${billSlug(a.identifier)}/`} identifier={a.identifier} title={a.title} date={fmtDate(a.date)}>
+                {a.description}.
+                {a.vote && <> <a href={`/votes/${a.vote.id}/`} class="underline">{chamberName(a.vote.chamber)} roll call, {a.vote.yes} to {a.vote.no}</a></>}
+              </BillLine>
+                ))}
+              </Fragment>
+            </MoreRows>
+          </div>
         </section>
       )}
 
@@ -91,16 +105,22 @@ const newest = bienniums[0];
         <section class="mt-8" aria-labelledby={`partial-${b.biennium}`}>
           <h3 id={`partial-${b.biennium}`} class="t-question text-[1.1875rem]">Signed with a partial veto: {b.partialVetoes.length.toLocaleString()}</h3>
           <p class="mt-1 text-small text-granite">In act order. The parts the governor struck are in the veto message.</p>
-          <ul class="mt-2 border-b border-rule" role="list">
-            {b.partialVetoes.map((l) => {
-              const msg = vetoMessageUrl(l.bill_id);
-              return (
+          <div class="mt-2">
+            <MoreRows rest={Math.max(0, b.partialVetoes.length - SHOWN)} label={`partial vetoes, ${b.biennium}–${b.biennium + 1}`}>
+              {b.partialVetoes.slice(0, SHOWN).map((l) => (
                 <BillLine href={`/bills/${l.session_id}/${billSlug(l.identifier)}/`} identifier={l.identifier} title={l.title} lead={`Act ${l.act}`} date={l.approved ? fmtDate(l.approved) : ""}>
-                  {msg && <a href={msg} class="underline">The governor's veto message</a>}
+                  {vetoMessageUrl(l.bill_id) && <a href={vetoMessageUrl(l.bill_id)!} class="underline">The governor's veto message</a>}
                 </BillLine>
-              );
-            })}
-          </ul>
+              ))}
+              <Fragment slot="rest">
+                {b.partialVetoes.slice(SHOWN).map((l) => (
+                  <BillLine href={`/bills/${l.session_id}/${billSlug(l.identifier)}/`} identifier={l.identifier} title={l.title} lead={`Act ${l.act}`} date={l.approved ? fmtDate(l.approved) : ""}>
+                  {vetoMessageUrl(l.bill_id) && <a href={vetoMessageUrl(l.bill_id)!} class="underline">The governor's veto message</a>}
+                </BillLine>
+                ))}
+              </Fragment>
+            </MoreRows>
+          </div>
         </section>
       )}
     </section>

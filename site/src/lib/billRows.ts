@@ -108,6 +108,9 @@ export interface SessionOutcomes {
   /** Of the bills that stopped in committee, those that died there with no
    * public hearing or committee session (the importer's died_without_hearing). */
   committeeNoHearing: number;
+  /** Of the bills that stopped in committee, those whose history records a
+   * public hearing. */
+  committeeHeard: number;
 }
 
 /** How far a session's bills got. Finished outcomes come from the stored
@@ -123,6 +126,7 @@ export const sessionOutcomes = memoBy((sessionId: string): SessionOutcomes => {
   let bills = 0;
   let resolutions = 0;
   let committeeNoHearing = 0;
+  let committeeHeard = 0;
   for (const b of billsFor(sessionId)) {
     if (b.classification !== "bill") {
       resolutions++;
@@ -146,16 +150,18 @@ export const sessionOutcomes = memoBy((sessionId: string): SessionOutcomes => {
         // the importer's definition, the one every "never got a hearing"
         // count on the site uses (see neverHeard)
         if (b.died_without_hearing === 1) committeeNoHearing++;
+        if (s.hearing) committeeHeard++;
       }
     }
   }
-  return { bills, resolutions, counts, committeeNoHearing };
+  return { bills, resolutions, counts, committeeNoHearing, committeeHeard };
 });
 
 /** Bills and resolutions that died in committee without a public hearing
  * or a committee session (the importer's died_without_hearing), counted
- * apart, with the totals they're out of. The homepage, the session lists
- * and /hearing-none/ all count from this one flag. */
+ * apart, with the totals they're out of. The session lists and
+ * /hearing-none/ count exactly this; the homepage counts the flagged bills
+ * among those that stopped in committee in their first chamber. */
 export const neverHeard = memoBy((sessionId: string) => {
   let bills = 0, resolutions = 0, totalBills = 0, totalResolutions = 0;
   for (const b of billsFor(sessionId)) {

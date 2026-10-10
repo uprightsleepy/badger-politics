@@ -26,9 +26,10 @@ const signedOn = new Map(lawsFor(desk.biennium).map((l) => [l.bill_id, l.approve
 const vetoedOn = new Map(
   (vetoTracker().find((b) => b.biennium === desk.biennium)?.fullVetoes ?? []).map((v) => [v.bill_id, v.date]),
 );
+// no date rather than a different action's date; undated bills go last
 const byDate = (when: Map<string, string | null>) => (rows: Row[]) =>
   rows
-    .map((b) => ({ ...b, when: when.get(b.id) ?? b.latest_action_date }))
+    .map((b) => ({ ...b, when: when.get(b.id) ?? null }))
     .sort((a, b) => (b.when ?? "").localeCompare(a.when ?? "") || a.identifier.localeCompare(b.identifier, "en", { numeric: true }));
 const vetoed = byDate(vetoedOn)(desk.vetoed);
 const enacted = byDate(signedOn)(desk.enacted);
@@ -46,7 +47,7 @@ const runnerUp = gov?.lastElection?.runnerUp;
     <p class="sm:text-lead">
       {reached > 0 ? (
         <>
-          Of the <span class="figure">{reached.toLocaleString()}</span> bills that passed both chambers in the {session} session,
+          Of the <span class="figure">{reached.toLocaleString()}</span> {reached === 1 ? "bill" : "bills"} that reached the governor in the {session} session,
           the governor signed <span class="figure">{desk.enacted.length.toLocaleString()}</span> into law and vetoed
           {" "}<span class="figure">{desk.vetoed.length.toLocaleString()}</span>.
           {desk.awaiting.length > 0 && ` ${plural(desk.awaiting.length, "is", "are")} still waiting for a decision.`}
@@ -66,7 +67,7 @@ const runnerUp = gov?.lastElection?.runnerUp;
       {gov.lastElection && (
         <p>
           Elected in November {gov.lastElection.year} with {pct(gov.lastElection.votes, gov.lastElection.total)} of the
-          {" "}{gov.lastElection.total.toLocaleString()} votes cast{runnerUp
+          vote ({gov.lastElection.votes.toLocaleString()} of {gov.lastElection.total.toLocaleString()} votes cast){runnerUp
             ? `, ahead of ${runnerUp.candidate.split(" / ")[0]} with ${pct(runnerUp.votes, gov.lastElection.total)}`
             : ""}, in the certified canvass.
         </p>
@@ -85,11 +86,18 @@ const runnerUp = gov?.lastElection?.runnerUp;
     <section class="mt-12 max-w-[60rem]" aria-labelledby="awaiting-heading">
       <h2 id="awaiting-heading" class="t-section">Waiting for the governor: {desk.awaiting.length.toLocaleString()}</h2>
       <p class="mt-2 text-small text-granite">Passed both chambers, and not yet signed or vetoed. Newest first.</p>
-      <ul class="mt-3 border-b border-rule" role="list">
-        {desk.awaiting.map((b) => (
-          <BillLine href={href(b)} identifier={b.identifier} title={b.title} date={b.latest_action_date ? fmtDate(b.latest_action_date) : ""}>{b.latest_action_desc}</BillLine>
-        ))}
-      </ul>
+      <div class="mt-3">
+        <MoreRows rest={Math.max(0, desk.awaiting.length - SHOWN)} label="bills waiting for the governor">
+          {desk.awaiting.slice(0, SHOWN).map((b) => (
+            <BillLine href={href(b)} identifier={b.identifier} title={b.title} date={b.latest_action_date ? fmtDate(b.latest_action_date) : ""}>{b.latest_action_desc}</BillLine>
+          ))}
+          <Fragment slot="rest">
+            {desk.awaiting.slice(SHOWN).map((b) => (
+              <BillLine href={href(b)} identifier={b.identifier} title={b.title} date={b.latest_action_date ? fmtDate(b.latest_action_date) : ""}>{b.latest_action_desc}</BillLine>
+            ))}
+          </Fragment>
+        </MoreRows>
+      </div>
     </section>
   )}
 
@@ -107,16 +115,14 @@ const runnerUp = gov?.lastElection?.runnerUp;
           {desk.overrides.slice(0, SHOWN).map((o) => (
             <BillLine href={`/bills/${o.session_id}/${billSlug(o.identifier)}/`} identifier={o.identifier} title={o.title} date={o.date ? fmtDate(o.date) : ""}>
               {chamberName(o.chamber)}: {o.result === "pass" ? "the override passed" : "the override failed"}, {o.yes_count} to {o.no_count}.
-              {" "}“{o.motion}”{" "}<a href={`/votes/${o.id}/`} class="underline">Roll call</a>
-              {safeHref(o.source_url) && <>{" "}<a href={safeHref(o.source_url)} class="underline">Official record</a></>}
+              {o.motion && ` The motion: “${o.motion}”${/[.?!]$/.test(o.motion) ? "" : "."}`} See <a href={`/votes/${o.id}/`} class="underline">the roll call</a>{safeHref(o.source_url) ? <> or <a href={safeHref(o.source_url)} class="underline">the official record</a>.</> : "."}
             </BillLine>
           ))}
           <Fragment slot="rest">
             {desk.overrides.slice(SHOWN).map((o) => (
               <BillLine href={`/bills/${o.session_id}/${billSlug(o.identifier)}/`} identifier={o.identifier} title={o.title} date={o.date ? fmtDate(o.date) : ""}>
-                {chamberName(o.chamber)}: {o.result === "pass" ? "the override passed" : "the override failed"}, {o.yes_count} to {o.no_count}.
-                {" "}“{o.motion}”{" "}<a href={`/votes/${o.id}/`} class="underline">Roll call</a>
-                {safeHref(o.source_url) && <>{" "}<a href={safeHref(o.source_url)} class="underline">Official record</a></>}
+              {chamberName(o.chamber)}: {o.result === "pass" ? "the override passed" : "the override failed"}, {o.yes_count} to {o.no_count}.
+                {o.motion && ` The motion: “${o.motion}”${/[.?!]$/.test(o.motion) ? "" : "."}`} See <a href={`/votes/${o.id}/`} class="underline">the roll call</a>{safeHref(o.source_url) ? <> or <a href={safeHref(o.source_url)} class="underline">the official record</a>.</> : "."}
               </BillLine>
             ))}
           </Fragment>

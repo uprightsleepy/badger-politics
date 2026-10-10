@@ -406,7 +406,7 @@ export const graveyardFor = (sessionId: string) =>
               SUM(CASE WHEN classification = 'bill' THEN 1 ELSE 0 END) AS bills
        FROM bills WHERE session_id = ? AND died_without_hearing = 1
        GROUP BY committee_at_death, committee_chamber_at_death, committee_chair_at_death
-       ORDER BY n DESC, committee_at_death`,
+       ORDER BY n DESC, committee_at_death, committee_chamber_at_death, committee_chair_at_death`,
     )
     .all(sessionId) as {
     committee_at_death: string | null;

@@ -14,7 +14,8 @@ interface Props extends HTMLAttributes<"li"> {
   lead?: string;
 }
 const { href, identifier, title, date = "", lead, class: className, ...attrs } = Astro.props;
-const extra = Astro.slots.has("default");
+// a slot that renders to nothing (a missing veto message) leaves no empty line
+const note = Astro.slots.has("default") ? (await Astro.slots.render("default")).trim() : "";
 ---
 <li class:list={["flex flex-col gap-0.5 border-t border-rule py-3 sm:flex-row sm:gap-5", className]} {...attrs}>
   {(date || lead) && (
@@ -25,6 +26,6 @@ const extra = Astro.slots.has("default");
   )}
   <div class="min-w-0 flex-1 [overflow-wrap:anywhere]">
     <a href={href} class="underline"><span class="font-bold">{identifier}</span>{title && <>: {shortTitle(title)}</>}</a>
-    {extra && <p class="mt-0.5 text-small text-granite"><slot /></p>}
+    {note && <p class="mt-0.5 text-small text-granite"><Fragment set:html={note} /></p>}
   </div>
 </li>

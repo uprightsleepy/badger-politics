@@ -23,12 +23,12 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} 
       return (
         <li class="flex flex-col gap-0.5 border-t border-rule py-3">
           <a href={`/hearing-none/${s.id}/`} class="inline-flex min-h-11 items-center self-start font-display text-[1.1875rem] font-bold underline">
-            {(s.name ?? s.id).replace(/(\d{4})-(\d{4})/, "$1–$2")}
+            {(s.name ?? s.id).replace(/ Regular Session$/, " session").replace(/(\d{4})-(\d{4})/, "$1–$2")}
           </a>
           <span class="text-granite">
             {h.bills + h.resolutions === 0
-              ? "None recorded yet. The count starts when the session's last floorperiod ends."
-              : `${plural(h.bills, "bill", "bills")} of ${h.totalBills.toLocaleString()}${h.resolutions ? ` and ${plural(h.resolutions, "resolution", "resolutions")}` : ""} never got a hearing.`}
+              ? "None recorded yet. Bills are counted once the Legislature records them as failed, after its last voting days."
+              : `${h.bills.toLocaleString()} of ${plural(h.totalBills, "bill", "bills")}${h.resolutions ? ` and ${h.resolutions.toLocaleString()} of ${plural(h.totalResolutions, "resolution", "resolutions")}` : ""} never got a hearing.`}
           </span>
         </li>
       );
