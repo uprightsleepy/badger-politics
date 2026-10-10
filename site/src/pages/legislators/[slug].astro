@@ -97,7 +97,7 @@ const lastSpan = serviceSpans.at(-1);
 const roleLine = sitting
   ? null
   : lastSpan
-    ? `Former ${lastSpan.chamber === "upper" ? "state senator" : "state representative"}. Served ${chamberName(lastSpan.chamber)}${lastSpan.district != null ? ` District ${lastSpan.district}` : ""} until ${lastSpan.end ? monthYear(lastSpan.end) : "recently"}.`
+    ? `Former ${lastSpan.chamber === "upper" ? "state senator" : "state representative"}. Served ${chamberName(lastSpan.chamber)}${lastSpan.district != null ? ` District ${lastSpan.district}` : ""}${lastSpan.end ? ` until ${monthYear(lastSpan.end)}` : ""}.`
     : "Former state lawmaker.";
 
 // Only link to sections this member actually has. Money renders for
@@ -140,7 +140,7 @@ const outcomes = [
   ...(authorship.noHearing > 0 ? [`${fig(authorship.noHearing)} never got a hearing`] : []),
 ];
 const ledSentence =
-  `They led ${fig(primarySponsored.length)} ${primarySponsored.length === 1 ? "bill" : "bills"} in all. ` +
+  `Our records show ${fig(primarySponsored.length)} ${primarySponsored.length === 1 ? "bill" : "bills"} they led. ` +
   (outcomes.length > 1 ? `${outcomes.slice(0, -1).join(", ")} and ${outcomes.at(-1)}.` : `${outcomes[0]}.`);
 ---
 
@@ -241,271 +241,6 @@ const ledSentence =
       </section>
     )}
 
-    <div class="p-body flex flex-col gap-10">
-      {/* these pages run long, and a reader arrives wanting one answer */}
-      <nav class="flex flex-wrap items-center gap-x-4 gap-y-1 text-small" aria-label="Jump to a section">
-        <span class="font-bold">On this page:</span>
-        {jumpLinks.map(([href, label]) => (
-          <a href={href} class="inline-flex min-h-11 items-center underline">{label}</a>
-        ))}
-      </nav>
-
-      <section class="flex flex-col gap-3" aria-labelledby="bills-led">
-        <h2 id="bills-led" class="t-section scroll-mt-4">Bills they led</h2>
-        <p class="max-w-[45rem]">
-          <PlainText text={`Bills where ${person.name} is the lead [[author|author]], the first name on the bill. The text itself is drafted by the [[lrb|Legislative Reference Bureau]], the Legislature's nonpartisan drafting office.`} />
-        </p>
-        {primarySponsored.length > 0 ? (
-          <p class="max-w-[45rem]" set:html={ledSentence} />
-        ) : (
-          <p>They haven't led a bill.</p>
-        )}
-        {tally.length > 0 && (
-          <div class="flex max-w-[47.5rem] flex-col border-b border-rule">
-            {tally.map((t) => (
-              <details id={`status-${t.status}`} class="group scroll-mt-4 border-t border-rule" open={t.status === "enacted"}>
-                <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-2 [&::-webkit-details-marker]:hidden">
-                  <span class="t-label">{STATUS_PLAIN[t.status] ?? t.status}</span>
-                  <span class="flex items-center gap-3 text-granite">
-                    <span class="figure">{t.bills.length.toLocaleString()}</span>
-                    <span aria-hidden="true" class="text-xl leading-none group-open:hidden">+</span>
-                    <span aria-hidden="true" class="hidden text-xl leading-none group-open:inline">–</span>
-                  </span>
-                </summary>
-                <ul class="flex flex-col pb-3">
-                  {t.bills.slice(0, PREVIEW).map((s) => (
-                    <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-rule/60 py-1.5 text-small">
-                      <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-[5.5rem] max-w-full shrink-0 font-bold underline">{s.identifier}</a>
-                      <span class="min-w-0 flex-[1_1_16rem] break-words">{shortTitle(s.title)}</span>
-                      <span class="ml-auto text-fine text-granite">{sessionLabel(s.session_id)}</span>
-                    </li>
-                  ))}
-                </ul>
-                {t.bills.length > PREVIEW && (
-                  <p class="pb-3 text-small">
-                    <a href={`${recordBase}/bills/1/`} class="underline">
-                      Showing {PREVIEW} of {t.bills.length.toLocaleString()}. See every bill they led or signed on to
-                    </a>
-                  </p>
-                )}
-              </details>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {coauthored.length + cosponsored.length > 0 && (
-        <section class="flex flex-col gap-3" aria-labelledby="signed-on">
-          <h2 id="signed-on" class="t-section scroll-mt-4">Bills they signed on to</h2>
-          <p class="max-w-[45rem]">
-            <PlainText text="[[cosponsor|Signing on]] adds their name in support of someone else's bill. It isn't the same as leading it." />
-          </p>
-          <div class="flex max-w-[47.5rem] flex-col border-b border-rule">
-            {signedOn.map(([label, bills, blurb]) => bills.length > 0 && (
-              <details class="group border-t border-rule">
-                <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-2 [&::-webkit-details-marker]:hidden">
-                  <span class="t-label">{label}</span>
-                  <span class="flex items-center gap-3 text-granite">
-                    <span class="figure">{bills.length.toLocaleString()}</span>
-                    <span aria-hidden="true" class="text-xl leading-none group-open:hidden">+</span>
-                    <span aria-hidden="true" class="hidden text-xl leading-none group-open:inline">–</span>
-                  </span>
-                </summary>
-                <p class="pb-2 text-small text-granite">{blurb}</p>
-                <ul class="flex flex-col pb-3">
-                  {bills.slice(0, PREVIEW).map((s) => (
-                    <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-rule/60 py-1.5 text-small">
-                      <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-[5.5rem] max-w-full shrink-0 font-bold underline">{s.identifier}</a>
-                      <span class="min-w-0 flex-[1_1_16rem] break-words">{shortTitle(s.title)}</span>
-                      <span class="ml-auto text-fine text-granite">{sessionLabel(s.session_id)}</span>
-                    </li>
-                  ))}
-                </ul>
-                {bills.length > PREVIEW && (
-                  <p class="pb-3 text-small">
-                    <a href={`${recordBase}/bills/1/`} class="underline">
-                      Showing {PREVIEW} of {bills.length.toLocaleString()}. See every bill they led or signed on to
-                    </a>
-                  </p>
-                )}
-              </details>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {sitting && (
-        <section class="flex flex-col gap-3" aria-labelledby="money">
-          <h2 id="money" class="t-section scroll-mt-4">Campaign money</h2>
-          <MoneyFilters fragmentBase={`/legislators/${slug}/money/`} />
-          <div data-money-views>
-            {moneyViews().filter((view) => view.isDefault).map((view) => (
-              <div data-money-period={view.period.key} data-money-scope={view.scope}>
-                <ProfileMoneyView personId={person.id} view={view} />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {keyVotes.length > 0 && (
-        <section class="flex flex-col gap-3" aria-labelledby="key-votes" data-pagefind-ignore>
-          <h2 id="key-votes" class="t-section scroll-mt-4">Key votes</h2>
-          <p class="max-w-[45rem]">
-            Picked by rule, not by us: the final vote on every bill that became
-            law, every floor vote decided by five or fewer, and every vote to
-            override a veto. <span class="figure">{keyVotes.length.toLocaleString()}</span> in all.
-          </p>
-          <ul class="flex max-w-[47.5rem] flex-col border-b border-rule">
-            {keyVotes.slice(0, 300).map((v) => (
-              <li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 border-t border-rule py-3">
-                <p class="min-w-0">
-                  <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="font-bold underline">{v.identifier}</a>
-                  {" "}<span>{v.motion ?? shortTitle(v.title)}</span>
-                </p>
-                <p class="text-right text-small">
-                  <strong>{voteWord(v.option)}</strong>
-                  {v.yes_count != null && <span class="text-granite"> · {v.yes_count} to {v.no_count ?? 0}</span>}
-                </p>
-                <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-fine text-granite">
-                  <span>{v.date ? fmtDate(v.date) : ""}</span>
-                  {v.kinds.map((k) => (
-                    <span class="rounded-full bg-fog px-2 py-0.5 font-semibold text-spruce">{keyVoteWords[k] ?? k}</span>
-                  ))}
-                </p>
-                <p class="text-right text-fine"><a href={`/votes/${v.vote_event_id}/`} class="underline">Roll call</a></p>
-              </li>
-            ))}
-          </ul>
-          {keyVotes.length > 300 && (
-            <p class="text-small text-granite">Showing the 300 most recent. Every vote is in the full record below.</p>
-          )}
-        </section>
-      )}
-
-      {breaks.length > 0 && (
-        <section class="flex flex-col gap-3" aria-labelledby="party-breaks" data-pagefind-ignore>
-          <h2 id="party-breaks" class="t-section scroll-mt-4">Votes against their party</h2>
-          <p class="max-w-[45rem]">
-            <span class="figure">{breaks.length.toLocaleString()}</span> roll calls where {person.name} voted
-            the opposite way from most {partyPlural} who voted yes or no. Ties
-            within the party aren't counted, and neither are absences.
-          </p>
-          <details class="group max-w-[47.5rem] border-y border-rule" open={breaks.length <= 12}>
-            <summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">
-              <span class="group-open:hidden">Show all {breaks.length.toLocaleString()}</span>
-              <span class="hidden group-open:inline">Hide them</span>
-            </summary>
-            <ul class="flex flex-col pb-2">
-              {breaks.map((v) => (
-                <li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-0.5 border-t border-rule py-2.5 text-small">
-                  <p class="min-w-0">
-                    <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="font-bold underline">{v.identifier}</a>
-                    {" "}{v.motion ?? shortTitle(v.title)}
-                  </p>
-                  <p class="text-right"><a href={`/votes/${v.vote_event_id}/`} class="underline">Roll call</a></p>
-                  <p class="col-span-2 text-fine text-granite">
-                    {v.date ? `${fmtDate(v.date)}. ` : ""}Voted {voteWord(v.option).toLowerCase()}; {partyPlural} split {v.split.yes} yes, {v.split.no} no.
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </details>
-        </section>
-      )}
-
-      {attendanceBlocks.length > 0 && (
-        <section class="flex flex-col gap-3" aria-labelledby="attendance">
-          <h2 id="attendance" class="t-section scroll-mt-4">Floor attendance</h2>
-          <p class="max-w-[45rem]">
-            One square for each day the {chamber} held recorded votes while they
-            served: <span class="figure">{votesTotal.toLocaleString()}</span> votes across
-            {" "}<span class="figure">{attendance.days.toLocaleString()}</span> voting days,
-            {" "}{missedTotal > 0 ? <><span class="figure">{missedTotal.toLocaleString()}</span> missed with no vote recorded.</> : "none missed with no vote recorded."}
-          </p>
-          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-fine text-granite">
-            <span class="flex items-center gap-1.5"><span class="hm-cell h-3.5 w-3.5 rounded-[3px] bg-lake"></span> Voted on every one</span>
-            <span class="flex items-center gap-1.5"><span class="hm-cell h-3.5 w-3.5 rounded-[3px] bg-edge"></span> Present, didn't vote on some</span>
-            <span class="flex items-center gap-1.5"><span class="hm-cell hm-miss h-3.5 w-3.5 rounded-[3px]"></span> Missed some (striped)</span>
-            {serviceSpans.length > 1 && (
-              <span class="flex items-center gap-1.5"><span class="hm-cell h-3.5 w-3.5 rounded-[3px] bg-fog ring-1 ring-inset ring-rule"></span> Not in office</span>
-            )}
-          </div>
-          <div class="flex max-w-[47.5rem] flex-col border-b border-rule">
-            {attendanceBlocks.map((b) =>
-              b.kind === "year" ? (
-                <details class="group border-t border-rule" open={openYears.has(b.year)}>
-                  <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between py-1.5 [&::-webkit-details-marker]:hidden">
-                    <span class="t-label">{b.year}</span>
-                    <span aria-hidden="true" class="text-xl leading-none text-granite group-open:hidden">+</span>
-                    <span aria-hidden="true" class="hidden text-xl leading-none text-granite group-open:inline">–</span>
-                  </summary>
-                  <div class="pb-3">
-                    <VoteHeatmap year={b.year} days={heatDays.filter((d) => d.date.startsWith(String(b.year)))} />
-                    {serviceSpans
-                      .filter((s) => s.end?.startsWith(String(b.year)) && s.end_label)
-                      .map((s) => (
-                        <p class="mt-2 text-fine text-granite">
-                          Out of office from {fmtDate(s.end!)},{" "}
-                          {s.end_url ? <a href={s.end_url} class="underline">{s.end_label}</a> : s.end_label}
-                        </p>
-                      ))}
-                  </div>
-                </details>
-              ) : (
-                <p class="border-t border-rule py-2.5 text-small text-granite">
-                  <span class="t-label text-spruce">{b.from === b.to ? b.from : `${b.from}–${b.to}`}</span>
-                  {" "}Not in office
-                  {b.label && (
-                    <>
-                      {", "}
-                      {b.url ? <a href={b.url} class="underline">{b.label}</a> : b.label}
-                    </>
-                  )}
-                </p>
-              ),
-            )}
-          </div>
-        </section>
-      )}
-
-      <section class="flex flex-col gap-3" aria-labelledby="vote-history" data-pagefind-ignore>
-        <h2 id="vote-history" class="t-section scroll-mt-4">Every vote</h2>
-        <p class="max-w-[45rem]">
-          <PlainText text={voteTotal > 0
-            ? `Their [[roll-call|roll call]] votes, newest first: ${voteTotal.toLocaleString()} in all.`
-            : "No [[roll-call|roll call]] votes are on record for them."} />
-        </p>
-        {voteTotal > 0 && <div
-          class="max-h-[32rem] max-w-[47.5rem] overflow-y-auto border-y border-rule scroll-body scroll-on-paper"
-          role="region"
-          tabindex="0"
-          aria-label="Recent votes"
-        >
-          <ul class="flex flex-col py-1">
-            {votes.slice(0, 200).map((v) => <VoteRow v={v} />)}
-          </ul>
-        </div>}
-        {voteTotal > votes.length && (
-          <p>
-            <a href={`${recordBase}/votes/1/`} class="inline-flex min-h-11 items-center font-bold underline">
-              See all {voteTotal.toLocaleString()} votes
-            </a>
-          </p>
-        )}
-      </section>
-
-      <div class="lg:hidden">
-        <TermsOnPage terms={terms} />
-      </div>
-
-      <p class="text-fine text-granite">
-        From the official records of the
-        {" "}<a href="https://docs.legis.wisconsin.gov" class="underline">Wisconsin Legislature</a> and the
-        {" "}<a href="https://ethics.wi.gov" class="underline">Wisconsin Ethics Commission</a>{pulledOn && `, checked ${fmtDate(pulledOn)}`}.
-      </p>
-    </div>
-
     <aside class="p-details flex flex-col gap-8" aria-label={`More about ${person.name}`}>
       {sitting && person.email && (
         <section class="flex flex-col gap-1.5" aria-labelledby="contact">
@@ -525,7 +260,13 @@ const ledSentence =
         </section>
       )}
 
-      {sitting && election && (
+      {sitting && election && ballot.kind === "future" && (
+        <section class="flex flex-col gap-1.5" aria-labelledby="ballot-heading">
+          <h2 id="ballot-heading" class="t-label text-[1.1875rem]">Next election</h2>
+          <p>This seat is next on the ballot in November {election.cycle_year}.</p>
+        </section>
+      )}
+      {sitting && election && ballot.kind !== "future" && (
         <section class="flex flex-col gap-1.5" aria-labelledby="ballot-heading">
           <h2 id="ballot-heading" class="t-label text-[1.1875rem]">November {election.cycle_year} ballot</h2>
           {ballot.kind === "on-ballot" && <p>They're on the ballot.</p>}
@@ -649,6 +390,302 @@ const ledSentence =
         <TermsOnPage terms={terms} headingId="terms-heading-rail" />
       </div>
     </aside>
+
+    <div class="p-body flex flex-col gap-10">
+      {/* these pages run long, and a reader arrives wanting one answer */}
+      <nav class="flex flex-wrap items-center gap-x-4 gap-y-1 text-small" aria-label="Jump to a section">
+        <span class="font-bold">On this page:</span>
+        {jumpLinks.map(([href, label]) => (
+          <a href={href} class="inline-flex min-h-11 items-center underline">{label}</a>
+        ))}
+      </nav>
+
+      <section class="flex flex-col gap-3" aria-labelledby="bills-led">
+        <h2 id="bills-led" class="t-section scroll-mt-4">Bills they led</h2>
+        <p class="max-w-[45rem]">
+          <PlainText text={`Bills where ${person.name} is the lead [[author|author]], the first name on the bill. The text itself is drafted by the [[lrb|Legislative Reference Bureau]], the Legislature's nonpartisan drafting office.`} />
+        </p>
+        {primarySponsored.length > 0 ? (
+          <p class="max-w-[45rem]" set:html={ledSentence} />
+        ) : (
+          <p>No bills they led are in our records.</p>
+        )}
+        {tally.length > 0 && (
+          <div class="flex max-w-[47.5rem] flex-col border-b border-rule">
+            {tally.map((t) => (
+              <details id={`status-${t.status}`} class="group scroll-mt-4 border-t border-rule" open={t.status === "enacted"}>
+                <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-2 [&::-webkit-details-marker]:hidden">
+                  <span class="t-label">{STATUS_PLAIN[t.status] ?? t.status}</span>
+                  <span class="flex items-center gap-3 text-granite">
+                    <span class="figure">{t.bills.length.toLocaleString()}</span>
+                    <span aria-hidden="true" class="text-xl leading-none group-open:hidden">+</span>
+                    <span aria-hidden="true" class="hidden text-xl leading-none group-open:inline">–</span>
+                  </span>
+                </summary>
+                <ul class="flex flex-col pb-3">
+                  {t.bills.slice(0, PREVIEW).map((s) => (
+                    <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-rule/60 py-1.5 text-small">
+                      <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-[5.5rem] max-w-full shrink-0 font-bold underline">{s.identifier}</a>
+                      <span class="min-w-0 flex-[1_1_16rem] break-words">{shortTitle(s.title)}</span>
+                      <span class="ml-auto text-fine text-granite">{sessionLabel(s.session_id)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {t.bills.length > PREVIEW && (
+                  <p class="pb-3 text-small">
+                    <a href={`${recordBase}/bills/1/`} class="underline">
+                      Showing {PREVIEW} of {t.bills.length.toLocaleString()}. See every bill they led or signed on to
+                    </a>
+                  </p>
+                )}
+              </details>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {coauthored.length + cosponsored.length > 0 && (
+        <section class="flex flex-col gap-3" aria-labelledby="signed-on">
+          <h2 id="signed-on" class="t-section scroll-mt-4">Bills they signed on to</h2>
+          <p class="max-w-[45rem]">
+            <PlainText text="[[cosponsor|Signing on]] adds their name in support of someone else's bill. It isn't the same as leading it." />
+          </p>
+          <div class="flex max-w-[47.5rem] flex-col border-b border-rule">
+            {signedOn.map(([label, bills, blurb]) => bills.length > 0 && (
+              <details class="group border-t border-rule">
+                <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-2 [&::-webkit-details-marker]:hidden">
+                  <span class="t-label">{label}</span>
+                  <span class="flex items-center gap-3 text-granite">
+                    <span class="figure">{bills.length.toLocaleString()}</span>
+                    <span aria-hidden="true" class="text-xl leading-none group-open:hidden">+</span>
+                    <span aria-hidden="true" class="hidden text-xl leading-none group-open:inline">–</span>
+                  </span>
+                </summary>
+                <p class="pb-2 text-small text-granite">{blurb}</p>
+                <ul class="flex flex-col pb-3">
+                  {bills.slice(0, PREVIEW).map((s) => (
+                    <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-rule/60 py-1.5 text-small">
+                      <a href={`/bills/${s.session_id}/${billSlug(s.identifier)}/`} class="w-[5.5rem] max-w-full shrink-0 font-bold underline">{s.identifier}</a>
+                      <span class="min-w-0 flex-[1_1_16rem] break-words">{shortTitle(s.title)}</span>
+                      <span class="ml-auto text-fine text-granite">{sessionLabel(s.session_id)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {bills.length > PREVIEW && (
+                  <p class="pb-3 text-small">
+                    <a href={`${recordBase}/bills/1/`} class="underline">
+                      Showing {PREVIEW} of {bills.length.toLocaleString()}. See every bill they led or signed on to
+                    </a>
+                  </p>
+                )}
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {sitting && (
+        <section class="flex flex-col gap-3" aria-labelledby="money">
+          <h2 id="money" class="t-section scroll-mt-4">Campaign money</h2>
+          <MoneyFilters fragmentBase={`/legislators/${slug}/money/`} />
+          <div data-money-views>
+            {moneyViews().filter((view) => view.isDefault).map((view) => (
+              <div data-money-period={view.period.key} data-money-scope={view.scope}>
+                <ProfileMoneyView personId={person.id} view={view} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {keyVotes.length > 0 && (
+        <section class="flex flex-col gap-3" aria-labelledby="key-votes">
+          <h2 id="key-votes" class="t-section scroll-mt-4">Key votes</h2>
+          <p class="max-w-[45rem]">
+            Picked by rule, not by us: each chamber's final recorded passage
+            vote on bills that became law, every recorded floor vote decided by
+            five or fewer, and every vote to override a veto.
+            {" "}<span class="figure">{keyVotes.length.toLocaleString()}</span> of their votes fit.
+          </p>
+          <ul class="flex max-w-[47.5rem] flex-col border-b border-rule">
+            {keyVotes.slice(0, 10).map((v) => (
+              <li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 border-t border-rule py-3">
+                <p class="min-w-0">
+                  <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="font-bold underline">{v.identifier}</a>
+                  {" "}<span>{v.motion ?? shortTitle(v.title)}</span>
+                </p>
+                <p class="text-right text-small">
+                  <strong>{voteWord(v.option)}</strong>
+                  {v.yes_count != null && <span class="text-granite"> · {v.yes_count} to {v.no_count ?? 0}</span>}
+                </p>
+                <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-fine text-granite">
+                  <span>{v.date ? fmtDate(v.date) : ""}</span>
+                  {v.kinds.map((k) => (
+                    <span class="rounded-full bg-fog px-2 py-0.5 font-semibold text-spruce">{keyVoteWords[k] ?? k}</span>
+                  ))}
+                </p>
+                <p class="text-right text-fine"><a href={`/votes/${v.vote_event_id}/`} class="underline">Roll call</a></p>
+              </li>
+            ))}
+          </ul>
+          {keyVotes.length > 10 && (
+            <details class="group max-w-[47.5rem]">
+              <summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">
+                <span class="group-open:hidden">Show {Math.min(keyVotes.length, 300) - 10} more key votes</span>
+                <span class="hidden group-open:inline">Show fewer</span>
+              </summary>
+              <ul class="flex flex-col border-b border-rule">
+                {keyVotes.slice(10, 300).map((v) => (
+              <li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 border-t border-rule py-3">
+                <p class="min-w-0">
+                  <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="font-bold underline">{v.identifier}</a>
+                  {" "}<span>{v.motion ?? shortTitle(v.title)}</span>
+                </p>
+                <p class="text-right text-small">
+                  <strong>{voteWord(v.option)}</strong>
+                  {v.yes_count != null && <span class="text-granite"> · {v.yes_count} to {v.no_count ?? 0}</span>}
+                </p>
+                <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-fine text-granite">
+                  <span>{v.date ? fmtDate(v.date) : ""}</span>
+                  {v.kinds.map((k) => (
+                    <span class="rounded-full bg-fog px-2 py-0.5 font-semibold text-spruce">{keyVoteWords[k] ?? k}</span>
+                  ))}
+                </p>
+                <p class="text-right text-fine"><a href={`/votes/${v.vote_event_id}/`} class="underline">Roll call</a></p>
+              </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {keyVotes.length > 300 && (
+            <p class="text-small text-granite">Showing the 300 most recent. Every vote is in the full record below.</p>
+          )}
+        </section>
+      )}
+
+      {breaks.length > 0 && (
+        <section class="flex flex-col gap-3" aria-labelledby="party-breaks">
+          <h2 id="party-breaks" class="t-section scroll-mt-4">Votes against their party</h2>
+          <p class="max-w-[45rem]">
+            <span class="figure">{breaks.length.toLocaleString()}</span> roll calls where {person.name} voted
+            the opposite way from most {partyPlural} who voted yes or no. Ties
+            within the party aren't counted, and neither are absences.
+          </p>
+          <details class="group max-w-[47.5rem] border-y border-rule" open={breaks.length <= 12}>
+            <summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">
+              <span class="group-open:hidden">Show all {breaks.length.toLocaleString()}</span>
+              <span class="hidden group-open:inline">Hide them</span>
+            </summary>
+            <ul class="flex flex-col pb-2">
+              {breaks.map((v) => (
+                <li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-0.5 border-t border-rule py-2.5 text-small">
+                  <p class="min-w-0">
+                    <a href={`/bills/${v.session_id}/${billSlug(v.identifier)}/`} class="font-bold underline">{v.identifier}</a>
+                    {" "}{v.motion ?? shortTitle(v.title)}
+                  </p>
+                  <p class="text-right"><a href={`/votes/${v.vote_event_id}/`} class="underline">Roll call</a></p>
+                  <p class="col-span-2 text-fine text-granite">
+                    {v.date ? `${fmtDate(v.date)}. ` : ""}Voted {voteWord(v.option).toLowerCase()}; {partyPlural} split {v.split.yes} yes, {v.split.no} no.
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </section>
+      )}
+
+      {attendanceBlocks.length > 0 && (
+        <section class="flex flex-col gap-3" aria-labelledby="attendance">
+          <h2 id="attendance" class="t-section scroll-mt-4">Floor attendance</h2>
+          <p class="max-w-[45rem]">
+            One square for each day of recorded floor votes in their chamber.
+            While in office: <span class="figure">{votesTotal.toLocaleString()}</span> votes across
+            {" "}<span class="figure">{attendance.days.toLocaleString()}</span> voting days,
+            {" "}{missedTotal > 0 ? <><span class="figure">{missedTotal.toLocaleString()}</span> with no vote recorded for them at all.</> : "with a vote recorded for them every time."}
+          </p>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-fine text-granite">
+            <span class="flex items-center gap-1.5"><span class="hm-cell h-3.5 w-3.5 rounded-[3px] bg-lake"></span> Voted on every one</span>
+            <span class="flex items-center gap-1.5"><span class="hm-cell h-3.5 w-3.5 rounded-[3px] bg-edge"></span> Recorded as not voting on some</span>
+            <span class="flex items-center gap-1.5"><span class="hm-cell hm-miss h-3.5 w-3.5 rounded-[3px]"></span> No vote recorded on some (striped)</span>
+            {serviceSpans.length > 1 && (
+              <span class="flex items-center gap-1.5"><span class="hm-cell h-3.5 w-3.5 rounded-[3px] bg-fog ring-1 ring-inset ring-rule"></span> Not in office</span>
+            )}
+          </div>
+          <div class="flex max-w-[47.5rem] flex-col border-b border-rule">
+            {attendanceBlocks.map((b) =>
+              b.kind === "year" ? (
+                <details class="group border-t border-rule" open={openYears.has(b.year)}>
+                  <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between py-1.5 [&::-webkit-details-marker]:hidden">
+                    <span class="t-label">{b.year}</span>
+                    <span aria-hidden="true" class="text-xl leading-none text-granite group-open:hidden">+</span>
+                    <span aria-hidden="true" class="hidden text-xl leading-none text-granite group-open:inline">–</span>
+                  </summary>
+                  <div class="pb-3">
+                    <VoteHeatmap year={b.year} days={heatDays.filter((d) => d.date.startsWith(String(b.year)))} />
+                    {serviceSpans
+                      .filter((s) => s.end?.startsWith(String(b.year)) && s.end_label)
+                      .map((s) => (
+                        <p class="mt-2 text-fine text-granite">
+                          Out of office from {fmtDate(s.end!)},{" "}
+                          {s.end_url ? <a href={s.end_url} class="underline">{s.end_label}</a> : s.end_label}
+                        </p>
+                      ))}
+                  </div>
+                </details>
+              ) : (
+                <p class="border-t border-rule py-2.5 text-small text-granite">
+                  <span class="t-label text-spruce">{b.from === b.to ? b.from : `${b.from}–${b.to}`}</span>
+                  {" "}Not in office
+                  {b.label && (
+                    <>
+                      {", "}
+                      {b.url ? <a href={b.url} class="underline">{b.label}</a> : b.label}
+                    </>
+                  )}
+                </p>
+              ),
+            )}
+          </div>
+        </section>
+      )}
+
+      <section class="flex flex-col gap-3" aria-labelledby="vote-history">
+        <h2 id="vote-history" class="t-section scroll-mt-4">Every vote</h2>
+        <p class="max-w-[45rem]">
+          <PlainText text={voteTotal > 0
+            ? `Their [[roll-call|roll call]] votes, newest first: ${voteTotal.toLocaleString()} in all.`
+            : "No [[roll-call|roll call]] votes are on record for them."} />
+        </p>
+        {voteTotal > 0 && <div
+          class="max-h-[32rem] max-w-[47.5rem] overflow-y-auto border-y border-rule scroll-body scroll-on-paper"
+          role="region"
+          tabindex="0"
+          aria-label="Recent votes"
+        >
+          <ul class="flex flex-col py-1">
+            {votes.slice(0, 200).map((v) => <VoteRow v={v} />)}
+          </ul>
+        </div>}
+        {voteTotal > votes.length && (
+          <p>
+            <a href={`${recordBase}/votes/1/`} class="inline-flex min-h-11 items-center font-bold underline">
+              See all {voteTotal.toLocaleString()} votes
+            </a>
+          </p>
+        )}
+      </section>
+
+      <div class="lg:hidden">
+        <TermsOnPage terms={terms} />
+      </div>
+
+      <p class="text-fine text-granite">
+        From the official records of the
+        {" "}<a href="https://docs.legis.wisconsin.gov" class="underline">Wisconsin Legislature</a> and the
+        {" "}<a href="https://ethics.wi.gov" class="underline">Wisconsin Ethics Commission</a>{pulledOn && `, checked ${fmtDate(pulledOn)}`}.
+      </p>
+    </div>
+
     <TermPopovers terms={terms} />
   </article>
 
@@ -664,8 +701,8 @@ const ledSentence =
 </Base>
 
 <style>
-  /* Phones read in order: who, how to reach them, at a glance, the record,
-     then the details. From 1024px the actions and details sit in a rail. */
+  /* Phones read in order: who, how to reach them, at a glance, the details,
+     then the long record. From 1024px the actions and details sit in a rail. */
   .profile {
     display: flex;
     flex-direction: column;

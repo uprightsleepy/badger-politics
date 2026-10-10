@@ -25,13 +25,16 @@ const missedList = ordered
   .filter((d) => d.served !== false && d.total - d.cast - d.nv > 0)
   .map((d) => ({ label: prettyDate(d.date), missed: d.total - d.cast - d.nv, total: d.total }));
 const servedDays = ordered.filter((d) => d.served !== false).length;
+// days with a recorded non-vote (absent or abstaining) but no missing record
+const nvDays = ordered.filter((d) => d.served !== false && d.nv > 0 && d.total - d.cast - d.nv <= 0).length;
 const summaryLabel =
   `${year} floor attendance: ${servedDays} voting days in office` +
   (servedDays < ordered.length ? `, out of office for ${ordered.length - servedDays}` : "") +
   ", " +
   (missedList.length
-    ? `missed votes on ${missedList.length} day${missedList.length > 1 ? "s" : ""}, listed below`
-    : "no missed votes");
+    ? `no vote recorded on some votes on ${missedList.length} day${missedList.length > 1 ? "s" : ""}, listed below`
+    : "a vote recorded every day") +
+  (nvDays ? `, recorded as not voting on some votes on ${nvDays} day${nvDays > 1 ? "s" : ""}` : "");
 
 function cellFor(day: Day) {
   const pretty = prettyDate(day.date);
@@ -42,12 +45,12 @@ function cellFor(day: Day) {
   if (missed > 0)
     return {
       cls: "hm-miss text-white",
-      title: `${pretty}: missed ${missed} of ${day.total} floor vote${day.total > 1 ? "s" : ""}`,
+      title: `${pretty}: no vote recorded on ${missed} of ${day.total} floor vote${day.total > 1 ? "s" : ""}`,
     };
   if (day.nv > 0)
     return {
       cls: "bg-edge text-spruce",
-      title: `${pretty}: present, not voting on ${day.nv} of ${day.total}`,
+      title: `${pretty}: recorded as not voting on ${day.nv} of ${day.total}`,
     };
   return {
     cls: "bg-lake text-white",
@@ -81,13 +84,14 @@ for (const d of ordered) {
   </div>
 </div>
 {missedList.length > 0 && (
-  <details class="mt-2 text-fine text-granite">
-    <summary class="inline-flex min-h-11 cursor-pointer items-center">
-      Days with missed votes in {year}: {missedList.length}
+  <details class="group mt-2 text-fine text-granite">
+    <summary class="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">
+      <span aria-hidden="true" class="no-underline group-open:hidden">+</span><span aria-hidden="true" class="hidden no-underline group-open:inline">–</span>
+      Days in {year} with no vote recorded on some votes: {missedList.length}
     </summary>
     <ul class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
       {missedList.map((d) => (
-        <li>{d.label}: missed {d.missed} of {d.total}</li>
+        <li>{d.label}: {d.missed} of {d.total} with no vote recorded</li>
       ))}
     </ul>
   </details>
