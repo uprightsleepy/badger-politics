@@ -1,5 +1,6 @@
 ---
-/** One row of a legislator's vote history. */
+/** One row of a legislator's vote history: how they voted, on which bill,
+ * on what motion, and when. The vote is a word, never a color. */
 import { fmtDate } from "../lib/format";
 interface Props {
   v: {
@@ -8,18 +9,13 @@ interface Props {
   };
 }
 const { v } = Astro.props;
+const word = v.option === "yes" ? "Yes" : v.option === "no" ? "No" : "Didn't vote";
 ---
-<li class="flex items-baseline gap-2">
-  <span
-    class={`w-14 shrink-0 text-xs font-bold uppercase ${
-      v.option === "yes" ? "text-moss-600" : v.option === "no" ? "text-badger-700" : "text-navy-600"
-    }`}
-  >
-    {v.option === "yes" ? "Aye" : v.option === "no" ? "Nay" : "NV"}
+<li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-rule/60 px-1 py-1.5 text-small first:border-t-0">
+  <span class="w-[6.5rem] max-w-full shrink-0 font-display font-bold">{word}</span>
+  <span class="min-w-0 flex-[1_1_14rem] truncate">
+    <a href={`/votes/${v.vote_event_id}/`} class="font-semibold underline">{v.identifier}</a>
+    {" "}<span class="text-granite">{v.motion ?? v.title}</span>
   </span>
-  <a href={`/votes/${v.vote_event_id}/`} class="shrink-0 py-1 font-semibold underline">
-    {v.identifier}
-  </a>
-  <span class="truncate">{v.motion ?? v.title}</span>
-  <span class="ml-auto shrink-0 text-xs text-navy-600">{fmtDate(v.date)}</span>
+  <span class="ml-auto shrink-0 text-fine tabular-nums text-granite">{fmtDate(v.date)}</span>
 </li>

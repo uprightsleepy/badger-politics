@@ -1,9 +1,10 @@
 ---
 /** One legislator-year of floor attendance, voting days only: every cell
  * is a day the chamber held recorded floor votes (empty days don't
- * render, so the strip stays dense). Navy-green = voted on everything;
- * gold = present but not voting on some; badger red = missed votes;
- * pale = out of office that day. Pure static HTML — details via title
+ * render, so the strip stays dense). Lake = voted on everything;
+ * Edge gray = present but not voting on some; striped Spruce = missed
+ * votes; Fog = out of office that day. Separated by lightness and pattern,
+ * never by hue alone. Pure static HTML — details via title
  * attributes and the screen-reader summary. */
 interface Day {
   date: string;
@@ -35,7 +36,7 @@ const summaryLabel =
 function cellFor(day: Day) {
   const pretty = prettyDate(day.date);
   if (day.served === false) {
-    return { cls: "bg-navy-100 text-navy-600", title: `${pretty}: not in office` };
+    return { cls: "bg-fog text-granite ring-1 ring-inset ring-rule", title: `${pretty}: not in office` };
   }
   const missed = day.total - day.cast - day.nv;
   if (missed > 0)
@@ -45,11 +46,11 @@ function cellFor(day: Day) {
     };
   if (day.nv > 0)
     return {
-      cls: "bg-gold-600 text-navy-900",
+      cls: "bg-edge text-spruce",
       title: `${pretty}: present, not voting on ${day.nv} of ${day.total}`,
     };
   return {
-    cls: "bg-moss-600 text-white",
+    cls: "bg-lake text-white",
     title: `${pretty}: voted in all ${day.total} floor vote${day.total > 1 ? "s" : ""}`,
   };
 }
@@ -69,7 +70,7 @@ for (const d of ordered) {
   <div class="flex flex-wrap gap-x-4 gap-y-2" aria-hidden="true">
     {byMonth.map((m) => (
       <div>
-        <div class="text-[0.625rem] font-semibold uppercase tracking-wide text-navy-600">{m.label}</div>
+        <div class="text-[0.75rem] font-semibold text-granite">{m.label}</div>
         <div class="mt-0.5 flex flex-wrap gap-[3px]">
           {m.cells.map((c) => (
             <div class={`hm-cell flex h-5 w-5 items-center justify-center rounded-[3px] text-[0.5625rem] font-semibold tabular-nums ${c.cls}`} title={c.title}>{c.dayNum}</div>
@@ -80,9 +81,9 @@ for (const d of ordered) {
   </div>
 </div>
 {missedList.length > 0 && (
-  <details class="mt-2 text-xs text-navy-700">
-    <summary class="cursor-pointer">
-      Missed-vote days in {year} · {missedList.length}
+  <details class="mt-2 text-fine text-granite">
+    <summary class="inline-flex min-h-11 cursor-pointer items-center">
+      Days with missed votes in {year}: {missedList.length}
     </summary>
     <ul class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
       {missedList.map((d) => (

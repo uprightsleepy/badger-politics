@@ -34,21 +34,22 @@ const { first, last } = pageBounds(page, total);
   description={`Votes ${first.toLocaleString()}–${last.toLocaleString()} of ${total.toLocaleString()} cast by ${person.name} in the Wisconsin ${chamberName(person.chamber)}, from the official roll calls.`}
   noindex
   searchable={false}
+  layout="wide"
   breadcrumbs={[
     { name: "Legislators", url: "/legislators/" },
     { name: person.name, url: `${base}/` },
   ]}
 >
-  <p class="text-sm text-navy-600">
-    <a href={`${base}/`} class="underline">← {person.name}</a>
-  </p>
-  <h1 class="mt-1 text-2xl font-bold">Every Recorded Vote</h1>
-  <p class="mt-1 text-sm text-navy-600">
-    {total.toLocaleString()} roll calls, oldest sessions last. Showing
-    {" "}{first.toLocaleString()}–{last.toLocaleString()}.
-  </p>
+  <div class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <a href={`${base}/`} class="self-start text-small underline">{person.name}</a>
+    <h1 class="t-display">Every vote</h1>
+    <p class="sm:text-lead">
+      {total.toLocaleString()} roll call votes, newest first. Showing
+      {" "}{first.toLocaleString()} to {last.toLocaleString()}.
+    </p>
+  </div>
 
-  <ul class="mt-4 space-y-1 rounded-lg border border-navy-100 bg-white p-3 text-sm">
+  <ul class="mt-6 flex max-w-[47.5rem] flex-col border-y border-rule py-1">
     {rows.map((v) => <VoteRow v={v} />)}
   </ul>
 

@@ -130,6 +130,12 @@ export const TERMS = {
     official: "Fiscal estimate",
     glossary: "fiscal-estimate",
   },
+  "with-party": {
+    label: "Voting with their party",
+    short: "How often a lawmaker's yes or no matched what most of their own party voted on the same roll call.",
+    official: "Party-line vote",
+    glossary: "party-line",
+  },
   "joint-resolution": {
     label: "Joint resolution",
     short: "A measure both chambers pass that doesn't go to the governor, such as a schedule or an honor.",

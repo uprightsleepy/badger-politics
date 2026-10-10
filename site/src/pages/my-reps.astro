@@ -128,11 +128,11 @@ const general =
     import { attachSuggest } from "../scripts/addressSuggest";
     import { isFollowing, toggleFollow } from "../scripts/follows";
     import { esc } from "../lib/html";
-    import { ballotStatus } from "../lib/ballot";
-    import { clip, fmtDate, partyPlural, partyWord } from "../lib/format";
+    import { partyWord } from "../lib/format";
+    import { answers } from "../lib/repAnswers";
     import { districtForAddress, districtForBrowser } from "../lib/lookup";
     import { forgetPollingPlace, savePollingPlace, savedPollingPlace } from "../lib/pollingPlace";
-    import type { LocalReps, RepSlim, RepSummaries, RepSummary, Reps, Typical } from "../lib/wire";
+    import type { LocalReps, RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
 
     const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
     const statusEl = $("status");
@@ -162,68 +162,19 @@ const general =
     }
 
     // ---- small pieces ----
-    const fig = (n: number | string) => `<span class="figure">${esc(String(n))}</span>`;
     const link = (href: string, text: string) => `<a href="${esc(href)}" class="underline">${esc(text)}</a>`;
-    const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
-    const a = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
-    const round = (n: number) => Math.round(n);
-    // sentences spell the month out: "November 3, 2026"
-    const longDate = (iso: string) => {
-      const [y, m, d] = iso.split("-").map(Number);
-      return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
-        month: "long", day: "numeric", year: "numeric", timeZone: "UTC",
-      });
-    };
-    // "Avery Lund, a Republican, and Jordan Pike, a Democrat"
-    const people = (list: { name: string; party: string | null }[]) => {
-      const each = list.map((p) =>
-        p.party ? `${esc(p.name)}, ${a(partyWord(p.party))} ${esc(partyWord(p.party))}` : esc(p.name),
-      );
-      if (each.length < 2) return each.join("");
-      if (each.length === 2) return `${each[0]}, and ${each[1]}`;
-      return `${each.slice(0, -1).join("; ")}; and ${each.at(-1)}`;
-    };
     const question = (q: string, body: string) =>
       `<div class="flex flex-col gap-1.5 border-t border-rule pt-4"><h3 class="t-question">${esc(q)}</h3>${body}</div>`;
-
-    /** One value against the middle half of the chamber. Text says it all;
-     * the bar is the same fact drawn. */
-    function rangeBar(opts: {
-      value: number; min: number; max: number; typical: Typical;
-      left: string; right: string;
-    }) {
-      const span = Math.max(opts.max - opts.min, 1);
-      const pos = (n: number) => Math.min(100, Math.max(0, ((n - opts.min) / span) * 100));
-      const lo = pos(opts.typical.low);
-      const width = Math.max(pos(opts.typical.high) - lo, 2);
-      return (
-        // the sentence beside the bar carries the same facts, so the bar
-        // itself is hidden from assistive tech
-        '<div class="range mt-1" aria-hidden="true">' +
-        '<div class="relative mx-2.5 h-2.5 rounded-full bg-fog">' +
-        `<span class="absolute inset-y-0 rounded-full bg-lake-tint" style="left:${lo.toFixed(1)}%;width:${width.toFixed(1)}%"></span>` +
-        `<span class="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-spruce" style="left:${pos(opts.value).toFixed(1)}%"></span>` +
-        '</div>' +
-        `<div class="mt-1.5 flex justify-between text-fine text-granite"><span>${esc(opts.left)}</span><span>${esc(opts.right)}</span></div>` +
-        '</div>'
-      );
-    }
 
     const PORTRAIT_FALLBACK =
       '<svg width="72" height="72" viewBox="0 0 48 48" aria-hidden="true" class="shrink-0 rounded-full">' +
       '<circle cx="24" cy="24" r="24" fill="#E6EBE7"/><circle cx="24" cy="19" r="7.5" fill="#848E88"/>' +
       '<rect x="10" y="30.5" width="28" height="24" rx="12" fill="#848E88"/></svg>';
 
-    const ROLE_RANK = (role: string) =>
-      /^chair/i.test(role) ? 0 : /^co-chair/i.test(role) ? 1 : /^vice/i.test(role) ? 2 : 3;
-    const ROLE_LABEL = (role: string) =>
-      /^chair/i.test(role) ? "Chair" : /^co-chair/i.test(role) ? "Co-chair" : /^vice/i.test(role) ? "Vice-chair" : "Member";
-
     // ---- one lawmaker ----
     function personCard(house: "assembly" | "senate", district: number, slim: RepSlim | undefined, full: RepSummary | undefined): string {
       const chamber = house === "assembly" ? "Assembly" : "Senate";
       const title = house === "assembly" ? "representative" : "state senator";
-      const members = house === "assembly" ? "representatives" : "senators";
       const districtHref = `/districts/${house}-${district}/`;
       if (!slim) {
         return (
@@ -257,142 +208,11 @@ const general =
       }
 
       if (full) {
-        const typical = summaries?.typical?.[house];
-        // 1. how often they vote: yes or no, out of every roll call held
-        // while they served, against the rest of their chamber
-        const v = full.voted;
-        if (v && v.total > 0) {
-          const skipped = v.total - v.cast;
-          let body = skipped === 0
-            ? `<p>Voted on all ${fig(v.total.toLocaleString())} roll call votes this session.</p>`
-            : `<p>Voted on ${fig(v.cast.toLocaleString())} of ${fig(v.total.toLocaleString())} roll call votes this session. Didn't vote on ${fig(skipped.toLocaleString())}.</p>`;
-          const t = typical?.notVoting;
-          if (t) {
-            const rate = (skipped / v.total) * 100;
-            const pct = (n: number) => (n > 0 && n < 1 ? "under 1%" : `${round(n)}%`);
-            const words = round(t.high) === 0 && t.high < 0.5
-              ? `The middle half of ${members} voted on every one, or nearly.`
-              : `The middle half of ${members} didn't vote on ${pct(t.low)} to ${pct(t.high)} of them.`;
-            const top = Math.max(5, Math.ceil(Math.max(t.max, rate)));
-            body += rangeBar({
-              value: rate, min: 0, max: top, typical: t,
-              left: "Voted on all", right: `Didn't vote on ${top}%`,
-            }) + `<p class="text-fine text-granite">${esc(words)} Not voting counts being away and choosing not to vote alike.</p>`;
-          }
-          blocks.push(question("How often do they vote?", body));
-        } else {
-          blocks.push(question("How often do they vote?", "<p>No roll call votes are recorded for them yet this session.</p>"));
-        }
-
-        // 2. party agreement, Democrats and Republicans only
-        if (slim.party === "Democratic" || slim.party === "Republican") {
-          const l = full.loyalty;
-          let body: string;
-          if (l) {
-            const pct = round(l.pct);
-            body = `<p>Voted with most ${esc(partyPlural(slim.party))} on ${fig(`${pct}%`)} of ${fig(l.n.toLocaleString())} votes in the ${esc(l.label)}.</p>`;
-            const t = typical?.loyalty;
-            if (t && t.session === l.session) {
-              const words = `The middle half of ${members} voted with their party ${round(t.low)}% to ${round(t.high)}% of the time.`;
-              body += rangeBar({
-                value: l.pct, min: 50, max: 100, typical: t,
-                left: "50%", right: "100%",
-              }) + `<p class="text-fine text-granite">${esc(words)}</p>`;
-            }
-          } else {
-            body = "<p>Not enough recorded votes yet this session to measure.</p>";
-          }
-          blocks.push(question("How often do they vote with their party?", body));
-        }
-
-        // 3. bills
-        const au = full.authored;
-        const bills = [
-          au.total > 0
-            ? `Led ${fig(au.total)} ${plural(au.total, "bill", "bills")} this session.` +
-              (au.enacted === 0 ? " None became law." : ` ${fig(au.enacted)} became law.`) +
-              (au.vetoed ? ` ${fig(au.vetoed)} ${plural(au.vetoed, "was", "were")} vetoed.` : "") +
-              (au.noHearing ? ` ${fig(au.noHearing)} never got a hearing.` : "")
-            : "They haven't led a bill this session.",
-          au.signedOn ? ` Signed on in support of ${fig(au.signedOn)} more.` : "",
-        ].join("");
-        blocks.push(question("What have they tried to pass?",
-          `<p>${bills} ${link(`/legislators/${slim.slug}/#bills-led`, "See their bills")}</p>`));
-
-        // 4. committees, leaders first
-        const cs = (full.committees ?? []).slice().sort((x, y) => ROLE_RANK(x.role) - ROLE_RANK(y.role));
-        if (cs.length) {
-          const byRole = new Map<string, string[]>();
-          for (const c of cs) {
-            const role = ROLE_LABEL(c.role);
-            byRole.set(role, [...(byRole.get(role) ?? []), link(`/committees/${c.slug}/`, c.name)]);
-          }
-          blocks.push(question("Which committees are they on?",
-            '<ul class="flex flex-col gap-1">' +
-            [...byRole.entries()].map(([role, list]) => `<li><span class="font-bold">${role}:</span> ${list.join(", ")}</li>`).join("") +
-            '</ul>'));
-        }
-
-        // 5. the ballot
-        const status = ballotStatus(full.election);
-        const seat = `/elections/${status.kind !== "none" ? status.year : ""}/${house}-${district}/`;
-        const opponents = full.opponents ?? [];
-        const when = general ? longDate(general) : "";
-        const raceLink = status.kind !== "none" && status.kind !== "future" ? ` ${link(seat, "See the race")}` : "";
-        const writeIns = full.writeInPending ?? [];
-        // a write-in nominee may exist that the certified results don't name
-        const writeInLine = writeIns.length
-          ? ` The ${esc(writeIns.join(" and "))} primary had no printed candidate, so a write-in nominee may also be on the ballot.`
-          : "";
-        let ballot = "";
-        if (status.kind === "on-ballot") {
-          ballot = summaries?.phase === "general"
-            ? opponents.length
-              ? `Yes. ${when ? `On ${esc(when)}, they` : "They"} face ${people(opponents)}.`
-              : writeIns.length
-                ? `Yes. No other candidate's name is on the ballot for this seat${when ? ` on ${esc(when)}` : ""}.`
-                : `Yes. They're running unopposed${when ? ` on ${esc(when)}` : ""}.`
-            : `Yes, they're on the ${status.year} ballot.` + (opponents.length ? ` Others approved for this seat: ${people(opponents)}.` : "");
-          ballot += writeInLine;
-        } else if (status.kind === "not-running") {
-          // not on the November ballot: retired, lost a primary, or not
-          // approved; the report doesn't say which, so neither do we
-          ballot = `No. They're not on the November ${status.year} ballot.` +
-            (opponents.length ? ` On the ballot for this seat: ${people(opponents)}.` : "") + writeInLine;
-        } else if (status.kind === "pending") {
-          ballot = `The Elections Commission hasn't posted yet whether they're running in ${status.year}.`;
-        } else if (status.kind === "future") {
-          ballot = `Not this year. This seat is next on the ballot in ${status.year}.`;
-        }
-        if (ballot) {
-          blocks.push(question("Are they on your ballot?",
-            `<p>${ballot}${raceLink}</p>` +
-            (status.kind !== "future"
-              ? '<p class="text-fine text-granite">From the Elections Commission\'s ballot report. Check MyVote Wisconsin for your own ballot.</p>'
-              : "")));
-        }
-
-        // 6. the latest vote, then the few before it
-        const votes = full.recentVotes ?? [];
-        const voteLine = (v: RepSummary["recentVotes"][number], long: boolean) => {
-          const how = v.option === "yes" ? "Voted yes" : v.option === "no" ? "Voted no" : "Didn't vote";
-          // the official title, as written, after its "Relating to:"
-          const about = (v.title ?? "").replace(/^\s*relating to:\s*/i, "").replace(/\.\s*$/, "");
-          const subject = about ? `, relating to ${esc(clip(about, long ? 90 : 60))}` : "";
-          return `${how} on ${link(`/bills/${v.session}/${v.slug}/`, v.identifier)}${subject}. ${esc(fmtDate(v.date))}. ${link(`/votes/${v.event}/`, long ? "See the vote" : "Vote")}` +
-            (v.motion ? `<span class="block text-fine text-granite">Official motion: “${esc(v.motion)}”</span>` : "");
-        };
-        if (votes.length) {
-          let body = `<p>${voteLine(votes[0], true)}</p>`;
-          if (votes.length > 1) {
-            body +=
-              '<details class="group"><summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">' +
-              `<span class="group-open:hidden">See ${votes.length - 1} earlier ${plural(votes.length - 1, "vote", "votes")}</span><span class="hidden group-open:inline">Hide earlier votes</span></summary>` +
-              '<ul class="flex flex-col">' +
-              votes.slice(1).map((v) => `<li class="border-t border-rule py-2 text-small">${voteLine(v, false)}</li>`).join("") +
-              '</ul></details>';
-          }
-          blocks.push(question("How did they vote most recently?", body));
+        // the same questions, in the same words, as each lawmaker's own page
+        for (const answer of answers(full, {
+          house, district, typical: summaries?.typical?.[house], phase: summaries?.phase, general, mine: true,
+        })) {
+          blocks.push(question(answer.q, answer.html));
         }
       }
 

@@ -406,6 +406,10 @@ const mainClass =
                 note.hidden = false;
               }
             }
+            // a lawmaker's own page says so when they represent the reader
+            document.querySelectorAll<HTMLElement>("[data-mine-person]").forEach((el) => {
+              if (slugs.includes(el.dataset.minePerson)) el.hidden = false;
+            });
             for (const slug of slugs) {
               document.querySelectorAll<HTMLAnchorElement>(`a[href="/legislators/${slug}/"]`).forEach((a) => {
                 if (
