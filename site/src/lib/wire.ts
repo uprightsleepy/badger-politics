@@ -25,6 +25,11 @@ export type RepSummary = {
   attendance: { total: number; missed: number };
   authored: { total: number; signedOn: number; enacted: number; vetoed: number; noHearing: number };
   election: { cycle_year: number; on_ballot: number | null } | null;
+  /** Approved filings for this seat's 2026 race, the member excluded. */
+  opponents: { name: string; party: string | null }[];
+  /** Share of votes cast with their party's majority, newest session with
+   * at least 20 such votes; null for members outside the two caucuses. */
+  loyalty: { pct: number; n: number; session: string } | null;
   recentVotes: {
     date: string | null;
     option: string;
@@ -36,9 +41,15 @@ export type RepSummary = {
     event: string;
   }[];
 };
+/** The middle half of a chamber's sitting members on one measure: the
+ * yardstick a single member's number is read against. */
+export type Typical = { low: number; high: number; max: number; members: number; session?: string };
 export type RepSummaries = {
   assembly: Record<string, RepSummary>;
   senate: Record<string, RepSummary>;
+  /** "general" once certified primary results name the November field. */
+  phase?: "general" | "primary";
+  typical?: Record<"assembly" | "senate", { missed: Typical | null; loyalty: Typical | null }>;
 };
 
 /** /data/ballot-2026.json: what is on one district's ballot. */
