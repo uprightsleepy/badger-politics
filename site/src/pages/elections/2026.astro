@@ -94,7 +94,8 @@ const statewide = STATEWIDE_OFFICES.map(([key, label]) => {
     incumbent,
     // after the primary the question is the November ballot, not a filing
     retiring: general ? rows[0]?.incumbent_on_ballot === 0 : rows[0]?.incumbent_noncandidacy === 1,
-    incumbentRunning: !!incumbent && approved.some((r) => r.candidate === incumbent),
+    // after the primary the Commission says so; before it, a filing by name
+    incumbentRunning: !!incumbent && (general ? rows[0]?.incumbent_on_ballot === 1 : approved.some((r) => r.candidate === incumbent)),
     writeIn: writeInSentence(writeInPending(key)),
     approved,
     otherFilings: rows.length - approved.length,
@@ -113,7 +114,10 @@ const raceRow = ({ person, election, margin }: (typeof seats)[number]) => {
     .filter((o) => o.ballot_status !== "Deny")
     .map((o) => {
       const pid = personIdByName(o.name);
-      return { name: o.name, party: o.party, href: pid ? `/legislators/${personSlug(pid)}/` : null };
+      return {
+        name: o.name, party: o.party, href: pid ? `/legislators/${personSlug(pid)}/` : null,
+        challenged: o.ballot_status === "Challenged",
+      };
     });
   const writeIn = writeInPending(seatOffice(person.chamber, person.district));
   return {
@@ -126,6 +130,7 @@ const raceRow = ({ person, election, margin }: (typeof seats)[number]) => {
         status,
         others,
         phase,
+        unsettled: writeIn.length > 0,
       }) + (writeIn.length ? ` ${esc(writeInSentence(writeIn))}` : ""),
     note: margin
       ? margin.margin == null
@@ -150,8 +155,8 @@ const chambers = [
     <h1 class="t-display">On the ballot: November 3, 2026</h1>
     <p class="sm:text-lead">
       Every Wisconsin voter will choose a governor and four other statewide officers and a member of the
-      U.S. House{measures.length > 0 && <>, and answer {plural(measures.length, "constitutional amendment question", "constitutional amendment questions")}</>}.
-      {plural(seats.length, "legislative seat is", "legislative seats are")} on the ballot too.
+      U.S. House{measures.length > 0 && <>, and answer {(["", "one", "two", "three", "four", "five", "six"][measures.length] || measures.length.toLocaleString())} constitutional amendment {measures.length === 1 ? "question" : "questions"}</>}.
+      Every Assembly seat is on the ballot too, and 17 of the 33 Senate seats.
     </p>
     <p class="text-small text-granite">
       {general
@@ -296,7 +301,7 @@ const chambers = [
                 <p class="text-small"><strong>Open seat.</strong> The member who holds it now {general ? "isn't on the November ballot" : "isn't seeking reelection"}.</p>
               ) : null}
               <ul class="flex flex-col gap-0.5" role="list">
-                {h.candidates.map((c) => (
+                {[...h.candidates].sort((a, b) => a.candidate.localeCompare(b.candidate)).map((c) => (
                   <li><span class="font-bold">{c.candidate}</span>{c.party && `, ${partyWord(c.party)}`}</li>
                 ))}
               </ul>
@@ -335,7 +340,7 @@ const chambers = [
   <section class="mt-12" aria-labelledby="legislature-heading">
     <h2 id="legislature-heading" class="t-section">The Legislature</h2>
     <p class="mt-2 max-w-[47.5rem]">
-      Of the {plural(seats.length, "legislative seat", "legislative seats")} on the ballot,
+      Of the {plural(seats.length, "race", "races")} below,
       {" "}<span class="figure">{openSeats.toLocaleString()}</span> {openSeats === 1 ? "is" : "are"} open (the incumbent isn't on the ballot),
       {" "}<span class="figure">{closeSeats.toLocaleString()}</span> {closeSeats === 1 ? "was" : "were"} decided by under 5 points last time, and
       {" "}<span class="figure">{singleCandidate.toLocaleString()}</span> {singleCandidate === 1 ? "has" : "have"} {general ? "only one candidate on the November ballot" : "only one approved candidate so far"}.
@@ -423,7 +428,9 @@ const chambers = [
                   status: r.incumbentStatus,
                   others: r.candidates,
                   phase: data.phase,
+                  unsettled: !!r.writeIn,
                 }) +
+                (r.writeIn ? ` ${esc(r.writeIn)}` : "") +
                 ` <a class="underline" href="/elections/2026/${chamber}-${district}/">See the race</a>`;
             }
             return `<section class="flex flex-col gap-1.5"><h3 class="t-question">${esc(label)}</h3><p>${text}</p></section>`;

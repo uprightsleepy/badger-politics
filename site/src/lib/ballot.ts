@@ -3,7 +3,7 @@
  * status posted yet is "pending", never read as a retirement or as a
  * candidacy. Client scripts import this too, so it reads no database. */
 import { partyWord } from "./format.ts";
-import { esc } from "./html.ts";
+import { esc, safeHref } from "./html.ts";
 
 export const ELECTION_CYCLE = 2026;
 
@@ -69,7 +69,8 @@ export const subject = (name: string, party: string | null): string =>
 export const nameList = (xs: string[]): string => {
   if (xs.length < 2) return xs.join("");
   const commas = xs.some((x) => x.includes(","));
-  if (xs.length === 2) return `${xs[0]}${commas ? "," : ""} and ${xs[1]}`;
+  // only the first name's own commas call for one before "and"
+  if (xs.length === 2) return `${xs[0]}${xs[0].includes(",") ? "," : ""} and ${xs[1]}`;
   const sep = commas ? "; " : ", ";
   return `${xs.slice(0, -1).join(sep)}${sep}and ${xs.at(-1)}`;
 };
@@ -90,7 +91,7 @@ export const resultSentence = (
   candidates: { candidate: string; party: string | null; votes: number }[],
   total: number,
 ): string => {
-  const [first, second] = candidates;
+  const [first] = candidates;
   if (!first) return "";
   const cast = total ? ` of ${total.toLocaleString()} votes cast` : "";
   const firstTicket = ticket(first.candidate, first.party);
@@ -98,8 +99,12 @@ export const resultSentence = (
   if (candidates.length === 1) {
     return `${lead} ran unopposed and got ${first.votes.toLocaleString()}${cast || " votes"}.`;
   }
-  if (second && second.votes === first.votes) {
-    return `${nameList([withParty(first.candidate, first.party), withParty(second.candidate, second.party)])}${second.party ? "," : ""} tied with ${first.votes.toLocaleString()} votes each.`;
+  const tied = candidates.filter((c) => c.votes === first.votes);
+  if (tied.length > 1) {
+    const names = tied.map((c) => ticket(c.candidate, c.party) ?? withParty(c.candidate, c.party));
+    const tail = names.at(-1)!.includes(",") ? "," : "";
+    const sentence = `${nameList(names)}${tail} tied with ${first.votes.toLocaleString()} votes each.`;
+    return `${sentence[0].toUpperCase()}${sentence.slice(1)}`;
   }
   return total
     ? `${lead} won with ${pctOf(first.votes, total)}${cast}.`
@@ -113,10 +118,15 @@ export interface RaceFacts {
   /** Everyone else on (or approved for) the ballot. */
   others: { name: string; party: string | null; href?: string | null; challenged?: boolean }[];
   phase: "general" | "primary";
+  /** A party primary for this seat whose nominee isn't settled yet: the
+   * incumbent may not be unopposed after all. */
+  unsettled?: boolean;
 }
 
-const personHtml = (p: { name: string; href?: string | null }): string =>
-  p.href ? `<a href="${esc(p.href)}" class="underline">${esc(p.name)}</a>` : esc(p.name);
+const personHtml = (p: { name: string; href?: string | null }): string => {
+  const href = safeHref(p.href);
+  return href ? `<a href="${esc(href)}" class="underline">${esc(p.name)}</a>` : esc(p.name);
+};
 
 /** A legislative race in a sentence or two, as HTML (names escaped, linked
  * when they have a page). One wording for the race lists, race pages and
@@ -135,15 +145,18 @@ export const raceSentenceHtml = (r: RaceFacts): string => {
   const holderHtml = h ? `${personHtml(h)}, the ${h.party ? `${esc(h.party)} ` : ""}incumbent,` : "";
   if (r.status === "on-ballot" && h) {
     if (r.others.length) return `${holderHtml} faces ${others}.`;
+    if (r.unsettled) return `${holderHtml} is on the ballot. No other nominee for this seat is settled yet.`;
     return r.phase === "general"
       ? `${holderHtml} is running unopposed.`
       : `${holderHtml} is the only approved candidate so far.`;
   }
   const field = r.others.length
     ? ` ${others}${close} ${verb} ${r.phase === "general" ? "on the ballot" : "approved for the ballot"}.`
-    : r.phase === "general"
-      ? " No candidate is on the ballot for this seat."
-      : " No candidates are approved for the ballot yet.";
+    : r.status === "pending"
+      ? " No other candidates are listed yet."
+      : r.phase === "general"
+        ? " No candidate is on the ballot for this seat."
+        : " No candidates are approved for the ballot yet.";
   if (r.status === "not-running" && h) return `${holderHtml} isn't on the ballot.${field}`;
   if (r.status === "pending" && h) {
     return `The Elections Commission hasn't posted whether ${personHtml(h)} is running.${field}`;

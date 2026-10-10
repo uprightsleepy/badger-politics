@@ -133,7 +133,9 @@ const count = ["no", "one", "two", "three", "four", "five", "six"][measures.leng
               {floorVotes(p.billId).map((v) => (
                 <li>
                   <span class="font-bold">{chamberName(v.chamber)}</span>, {fmtDate(v.date)}.
-                  {" "}{v.result === "pass" ? (v.motion ?? "Passed") : `${v.motion ?? "Vote"}: failed`}{v.yes_count != null && `, ${v.yes_count} to ${v.no_count ?? 0}`}.
+                  {" "}{v.result === "pass"
+                    ? (v.motion && /pass|adopt|concur/i.test(v.motion) ? v.motion : `${v.motion ?? "Vote"}: passed`)
+                    : `${v.motion ?? "Vote"}: failed`}{v.yes_count != null && `, ${v.yes_count} to ${v.no_count ?? 0}`}.
                   {" "}<a href={`/votes/${v.id}/`} class="underline">
                     {(v.source_url ?? "").includes("/votes/") ? "How each member voted" : "The vote record"}
                   </a>

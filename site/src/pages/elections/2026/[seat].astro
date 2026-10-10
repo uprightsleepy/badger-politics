@@ -61,6 +61,7 @@ const lead = raceSentenceHtml({
   status,
   others,
   phase,
+  unsettled: openPrimaries.length > 0,
 });
 
 // certified 2026 rows appear here after the canvass; until then the
@@ -134,7 +135,7 @@ const howOn = (party: string | null) =>
         <section aria-labelledby="results-2026-heading">
           <h2 id="results-2026-heading" class="t-section">Official results</h2>
           <ElectionResult id="results-2026" title="November 2026" candidates={results2026.candidates} total={results2026.total} />
-          <p class="text-fine text-granite">Certified canvass, {results2026.total?.toLocaleString()} votes cast.</p>
+          <p class="text-fine text-granite">From the Elections Commission's certified canvass.</p>
         </section>
       )}
 
@@ -149,7 +150,7 @@ const howOn = (party: string | null) =>
                   <h3 class="t-question text-[1.1875rem] [overflow-wrap:anywhere]">
                     <a href={holderHref} class="underline">{person.name}</a>
                   </h3>
-                  <p class="text-granite">{person.party ? partyWord(person.party) : "Party not stated"}. Holds this seat now.</p>
+                  <p class="text-granite">{person.party ? partyWord(person.party) : "Party not recorded"}. Holds this seat now.</p>
                 </div>
               </div>
               <p class="text-small"><a href={holderHref} class="underline">Their record: votes, bills, committees and campaign money</a></p>
@@ -163,7 +164,7 @@ const howOn = (party: string | null) =>
                   <h3 class="t-question text-[1.1875rem] [overflow-wrap:anywhere]">
                     {o.href ? <a href={o.href} class="underline">{o.name}</a> : o.name}
                   </h3>
-                  <p class="text-granite">{o.party ? partyWord(o.party) : "Party not stated"}.</p>
+                  <p class="text-granite">{o.party ? partyWord(o.party) : "Party not recorded"}.</p>
                 </div>
               </div>
               <p class="text-small">

@@ -22,7 +22,7 @@ const H = level;
 const [first, second] = candidates;
 ---
 <section class="flex flex-col gap-3 border-t border-rule py-5" aria-labelledby={id}>
-  <H id={id} class="t-question">{title}{context && <span class="sr-only"> {context}</span>}{note && <span class="ml-2 font-body text-small font-normal text-granite">{note}</span>}</H>
+  <H id={id} class="t-question">{title}{context && <span class="sr-only"> {context}</span>}{note && <> <span class="ml-1 font-body text-small font-normal text-granite">{note}</span></>}</H>
   <p>{resultSentence(candidates, total)}</p>
   {candidates.length === 2 && (
     <div class="flex flex-col gap-1.5">

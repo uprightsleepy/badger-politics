@@ -9,6 +9,7 @@ test("names with parties join with commas, and semicolons from three on", () => 
   assert.equal(withParty("Jordan Pike", "Republican"), "Jordan Pike, a Republican");
   assert.equal(withParty("Sol Weber", "Independent"), "Sol Weber, an Independent");
   assert.equal(nameList(["A", "B"]), "A and B");
+  assert.equal(nameList(["A", "B, a Republican"]), "A and B, a Republican");
   assert.equal(nameList(["A, a Democrat", "B, a Republican"]), "A, a Democrat, and B, a Republican");
   assert.equal(nameList(["A, a Democrat", "B, a Republican", "C, an Independent"]), "A, a Democrat; B, a Republican; and C, an Independent");
 });
@@ -47,6 +48,31 @@ test("a pending status is never read as a retirement", () => {
     raceSentenceHtml({ holder, status: "pending", phase: "primary", others: [{ name: "Jo Moe", party: null }] }),
     `The Elections Commission hasn't posted whether ${link} is running. Jo Moe is approved for the ballot.`,
   );
+  assert.equal(
+    raceSentenceHtml({ holder, status: "pending", phase: "general", others: [] }),
+    `The Elections Commission hasn't posted whether ${link} is running. No other candidates are listed yet.`,
+  );
+});
+
+test("an unsettled primary keeps an incumbent from reading as unopposed", () => {
+  assert.equal(
+    raceSentenceHtml({ holder, status: "on-ballot", others: [], phase: "general", unsettled: true }),
+    `${link}, the Democratic incumbent, is on the ballot. No other nominee for this seat is settled yet.`,
+  );
+});
+
+test("challenged filings say so", () => {
+  assert.equal(
+    raceSentenceHtml({ holder, status: "on-ballot", phase: "primary", others: [{ name: "Jo Moe", party: "Republican", challenged: true }] }),
+    `${link}, the Democratic incumbent, faces Jo Moe, a Republican (ballot access challenged).`,
+  );
+});
+
+test("only site and web links are linked", () => {
+  assert.equal(
+    raceSentenceHtml({ holder: { name: "X", party: null, href: "javascript:alert(1)" }, status: "on-ballot", others: [], phase: "general" }),
+    "X, the incumbent, is running unopposed.",
+  );
 });
 
 test("names are escaped", () => {
@@ -68,6 +94,10 @@ test("results: winners, tickets, ties and unopposed races", () => {
   assert.equal(
     resultSentence([{ candidate: "A B", party: "Democratic", votes: 10 }, { candidate: "C D", party: "Republican", votes: 10 }], 20),
     "A B, a Democrat, and C D, a Republican, tied with 10 votes each.",
+  );
+  assert.equal(
+    resultSentence([{ candidate: "A / B", party: "Democratic", votes: 5 }, { candidate: "C / D", party: "Republican", votes: 5 }, { candidate: "E F", party: null, votes: 5 }], 15),
+    "The Democratic ticket of A and B, the Republican ticket of C and D, and E F tied with 5 votes each.",
   );
   assert.equal(
     resultSentence([{ candidate: "Gerald Okafor", party: "Republican", votes: 21007 }], 21212),

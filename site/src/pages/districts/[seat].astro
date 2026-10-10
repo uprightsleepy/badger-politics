@@ -222,7 +222,7 @@ const pulledOn = meta().imported_at?.slice(0, 10);
           </p>
           <div class="mt-4 flex flex-col">
             {history.map((h) => (
-              <ElectionResult id={`results-${h.year}`} title={`November ${h.year}`} candidates={h.candidates} total={h.total} />
+              <ElectionResult id={`results-${h.year}`} title={`November ${h.year}`} note={h.year < 2024 ? "previous maps" : undefined} candidates={h.candidates} total={h.total} />
             ))}
           </div>
         </section>
