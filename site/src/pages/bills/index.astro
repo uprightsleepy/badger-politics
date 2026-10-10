@@ -1,36 +1,54 @@
 ---
 import Base from "../../layouts/Base.astro";
 import { allSessions, builtSessions, sessionStats } from "../../lib/db";
+import { sessionPlainName } from "../../lib/format";
+import { leadSentence } from "../../lib/billRows";
 const built = new Set(builtSessions().map((s) => s.id));
 const sessions = allSessions();
 ---
 
 <Base
-  description="Every bill and resolution before the Wisconsin Legislature, by session, with status, sponsors and roll-call votes from the official record."
-  title="Bills by Session">
-  <h1 class="text-2xl font-bold">Bills by Session</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Every bill and resolution introduced in each two-year session, and how far it got. Pick a session to browse or search its bills.
-  </p>
-  <ul class="mt-4 space-y-2">
-    {sessions.map((s) => {
+  description="Every bill and resolution before the Wisconsin Legislature, by session: where each one stands, who wrote it, and how lawmakers voted, from the official record."
+  title="All bills"
+  layout="wide"
+>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">All bills</h1>
+    <p class="sm:text-lead">
+      Every bill and resolution introduced in the Wisconsin Legislature, by two-year session. Pick a
+      session to see where each one stands.
+    </p>
+  </header>
+
+  <ul class="mt-8 max-w-[47.5rem] border-y border-rule" role="list">
+    {sessions.map((s, i) => {
       const stats = sessionStats(s.id);
+      const plain = sessionPlainName(s.id, s.name ?? s.id);
+      const heading = plain[0].toUpperCase() + plain.slice(1);
       return (
-        <li class="flex flex-wrap items-baseline gap-3 rounded-lg border border-navy-100 bg-white px-4 py-3">
-          {built.has(s.id) ? (
-            <a href={`/bills/${s.id}/`} class="font-bold underline">{s.name ?? s.id}</a>
-          ) : (
-            <span class="font-bold text-navy-600">{s.name ?? s.id}</span>
-          )}
-          <span class="text-sm text-navy-600">
-            {stats.bills.toLocaleString()} proposals · {stats.enacted} became law ·
-            {" "}{stats.graveyard} died without a hearing
-          </span>
+        <li class:list={["flex flex-col gap-1 py-5", i > 0 && "border-t border-rule"]}>
+          <h2 class="t-question text-[1.1875rem]">
+            {built.has(s.id) ? (
+              <a href={`/bills/${s.id}/`} class="underline">{heading}</a>
+            ) : (
+              heading
+            )}
+          </h2>
+          <p>
+            {leadSentence({
+              total: stats.bills,
+              enacted: stats.enacted ?? 0,
+              vetoed: stats.vetoed ?? 0,
+              noHearing: stats.graveyard ?? 0,
+            })}
+          </p>
           {s.data_quality === "partial" && (
-            <span class="rounded-full bg-gold-100 px-2 py-0.5 text-xs font-semibold">partial</span>
+            <p class="text-small text-granite">
+              Partial records: individual roll call votes aren't available for this session.
+            </p>
           )}
           {!built.has(s.id) && (
-            <span class="text-xs text-navy-600">(pages coming with the full history build)</span>
+            <p class="text-small text-granite">Pages for this session come with the full history build.</p>
           )}
         </li>
       );

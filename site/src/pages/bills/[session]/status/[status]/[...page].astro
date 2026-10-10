@@ -5,9 +5,11 @@
  * crawled. A rest param keeps page 1 at the bare path. */
 import Base from "../../../../../layouts/Base.astro";
 import BillList from "../../../../../components/BillList.astro";
+import BillViews from "../../../../../components/BillViews.astro";
 import Pager from "../../../../../components/Pager.astro";
 import { builtSessions, billsFor } from "../../../../../lib/db";
-import { STATUS_LABELS } from "../../../../../lib/format";
+import { STATUS_PLAIN, sessionPlainName } from "../../../../../lib/format";
+import { sessionCounts } from "../../../../../lib/billRows";
 import { PER_PAGE, pageBounds, pageCount } from "../../../../../lib/paging";
 
 export function getStaticPaths() {
@@ -37,35 +39,64 @@ const bills = billsFor(session.id)
   .slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
 const name = session.name ?? session.id;
-const label = STATUS_LABELS[status] ?? status;
+const plain = sessionPlainName(session.id, name);
+const label = STATUS_PLAIN[status] ?? status;
 const base = `/bills/${session.id}/status/${status}/`;
 const { first, last } = pageBounds(page, total);
+const all = sessionCounts(session.id).total;
+
+// what the stored status means, in a sentence; the route on each row says
+// exactly where that bill stopped
+const MEANS: Record<string, string> = {
+  introduced: "Introduced, with no committee recorded yet.",
+  in_committee: "Sent to a committee, and not passed by either chamber.",
+  passed_chamber:
+    "Passed one chamber but not the other. A resolution only one chamber votes on is adopted by that vote.",
+  passed: "Passed both chambers, with no decision by the governor recorded yet.",
+  enacted: "Passed both chambers and became law.",
+  vetoed: "Passed both chambers, then vetoed by the governor.",
+  adopted: "Resolutions adopted by both chambers. Resolutions don't go to the governor.",
+  failed_sjr1: "Not finished when the session's last voting day passed, so stopped there.",
+};
+const n = (x: number) => x.toLocaleString();
 ---
 
 <Base
-  title={`${label} · ${name}${page > 1 ? ` · page ${page}` : ""}`}
-  description={`The ${total.toLocaleString()} bills of the ${name} with the status "${label}", from each bill's official history.`}
+  title={`${label} · ${plain}${page > 1 ? ` · page ${page}` : ""}`}
+  description={`The ${n(total)} bills and resolutions of the ${name} with the status "${label}", from each bill's official history.`}
   breadcrumbs={[
     { name: "Bills", url: "/bills/" },
     { name, url: `/bills/${session.id}/` },
   ]}
+  layout="wide"
 >
-  <p class="text-sm text-navy-600">
-    <a href={`/bills/${session.id}/`} class="underline">← {name}</a>
-  </p>
-  <h1 class="mt-1 text-2xl font-bold">{label} · {name}</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-600">
-    {total.toLocaleString()} of this session's proposals.
-    {pages > 1 && ` Showing ${first.toLocaleString()}–${last.toLocaleString()}.`}
-    {" "}<a href={`/bills/${session.id}/`} class="underline">All proposals</a>
-  </p>
+  {/* search results name the session: the heading alone doesn't */}
+  <meta data-pagefind-meta="title[content]" content={`${label} · ${plain}`} />
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <a href={`/bills/${session.id}/`} class="self-start text-small underline">All bills in the {plain}</a>
+    <p class="t-label text-granite">{plain[0].toUpperCase() + plain.slice(1)}</p>
+    <h1 class="t-display">{label}</h1>
+    <p class="sm:text-lead">
+      {n(total)} of the session's {n(all)} {all === 1 ? "bill or resolution" : "bills and resolutions"}.
+      {" "}{MEANS[status] ?? ""}
+    </p>
+    {pages > 1 && (
+      <p class="text-small text-granite">
+        Page {page} of {pages}: {n(first)} to {n(last)}.
+      </p>
+    )}
+  </header>
 
-  <BillList bills={bills} sessionId={session.id} />
+  <div class="mt-7">
+    <BillViews sessionId={session.id} current={status} firstPage={page === 1} />
+  </div>
+
+  <BillList bills={bills} class="mt-6" />
 
   <Pager
     page={page}
     pages={pages}
-    href={(n) => (n === 1 ? base : `${base}${n}/`)}
-    label={`${label} pages`}
+    href={(p) => (p === 1 ? base : `${base}${p}/`)}
+    label="Pages of this list"
   />
 </Base>

@@ -1,0 +1,82 @@
+---
+/** How far a session's bills got, as one list: each bill counted once, at
+ * the furthest point it reached, with its share of all bills. Finished
+ * outcomes link to their status view, whose count is the same. Bills that
+ * stopped are placed where their own page's route places them (see
+ * lib/billRows sessionOutcomes), so this list and the bill rows agree.
+ * Plain text and CSS bars: nothing to describe, nothing that needs a
+ * script. */
+import { sessionOutcomes, type OutcomeKey } from "../lib/billRows";
+interface Props {
+  session: string;
+}
+const { session } = Astro.props;
+const o = sessionOutcomes(session);
+const num = (n: number) => n.toLocaleString();
+const share = (n: number) => (o.bills ? (n / o.bills) * 100 : 0);
+const pct = (n: number) =>
+  n > 0 && share(n) < 1
+    ? "under 1%"
+    : `${share(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}%`;
+const k = o.committeeNoHearing;
+const inCommittee = o.counts["stopped-committee"];
+const committeeNote =
+  k === 0
+    ? "Each had a public hearing."
+    : k === inCommittee
+      ? "None of them got a public hearing."
+      : `${num(k)} of them never got a public hearing.`;
+const ROWS: { key: OutcomeKey; label: string; note: string; href?: string }[] = [
+  { key: "law", label: "Became law", note: "Passed both chambers and became law.", href: `/bills/${session}/status/enacted/` },
+  { key: "vetoed", label: "Vetoed by the governor", note: "Passed both chambers, then vetoed.", href: `/bills/${session}/status/vetoed/` },
+  { key: "governor", label: "Passed both chambers", note: "No decision by the governor is recorded yet.", href: `/bills/${session}/status/passed/` },
+  { key: "moving", label: "Still moving", note: "The session is still open, so these can still move." },
+  { key: "stopped-governor", label: "Passed both chambers, then stopped", note: "Never sent to the governor." },
+  { key: "stopped-other", label: "Passed one chamber, then stopped", note: "Not passed by the second chamber." },
+  { key: "stopped-origin", label: "Stopped before a full chamber vote", note: "Recommended by a committee, but never voted on by the full chamber." },
+  { key: "stopped-committee", label: "Stopped in committee", note: committeeNote },
+  { key: "stopped-introduced", label: "Stopped before reaching a committee", note: "Never sent to a committee." },
+];
+const rows = ROWS.map((r) => ({ ...r, n: o.counts[r.key] })).filter((r) => r.n > 0);
+---
+{o.bills > 0 ? (
+  <ul class="border-b border-rule" role="list">
+    {rows.map((r) => (
+      <li class="flex flex-col gap-2 border-t border-rule py-4">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h3 class="t-question">
+            {r.href ? <a href={r.href} class="underline">{r.label}</a> : r.label}
+          </h3>
+          <p class="flex items-baseline gap-2">
+            <span class="font-display text-[1.375rem] font-bold tabular-nums leading-none">{num(r.n)}</span>
+            <span class="text-small text-granite">{pct(r.n)} of all bills</span>
+          </p>
+        </div>
+        <div class="outcome-track h-2.5 rounded-full bg-fog" aria-hidden="true">
+          <span class="block h-full rounded-full bg-lake" style={`width:${Math.max(share(r.n), 0.6).toFixed(1)}%`}></span>
+        </div>
+        <p class="text-small text-granite">
+          {r.note}
+          {r.key === "stopped-committee" && k > 0 && (
+            <> <a href={`/hearing-none/${session}/`} class="underline">Which committees held no hearings</a></>
+          )}
+        </p>
+      </li>
+    ))}
+  </ul>
+) : (
+  <p class="text-granite">No bills are recorded for this session yet.</p>
+)}
+
+<style>
+  @media (forced-colors: active) {
+    .outcome-track {
+      forced-color-adjust: none;
+      border: 1px solid CanvasText;
+      background: Canvas;
+    }
+    .outcome-track span {
+      background: CanvasText;
+    }
+  }
+</style>

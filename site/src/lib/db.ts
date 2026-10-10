@@ -463,7 +463,8 @@ export const personIdByName = (name: string | null): string | null =>
 export const recentlyActedBills = (sessionIds: string[], limit = 8) =>
   prep(
       `SELECT * FROM bills WHERE session_id IN (${sessionIds.map(() => "?").join(",")})
-       AND classification = 'bill' ORDER BY latest_action_date DESC LIMIT ?`,
+       AND classification = 'bill' AND source != 'legiscan'
+       ORDER BY latest_action_date DESC LIMIT ?`,
     )
     .all(...sessionIds, limit) as Bill[];
 
@@ -1604,52 +1605,6 @@ export const sessionStats = (sessionId: string) =>
        FROM bills WHERE session_id = ?`,
     )
     .get(sessionId) as { bills: number; enacted: number; vetoed: number; graveyard: number };
-
-/** What became of a session's bills, as a flow that balances.
- *
- * Bills only. Joint and simple resolutions are counted separately, because
- * they never reach the governor and cannot become law: a joint resolution
- * needs both chambers, a simple one needs only its own, and folding all
- * three together is what made the old cumulative funnel's middle stage
- * mean two different things at once.
- *
- * Every bill lands in exactly one terminal bucket, so the branches sum to
- * the total at each split and the diagram cannot quietly lose any. Nothing
- * is modelled: `died` is the explicit "failed pursuant to Senate Joint
- * Resolution 1" status recorded in the official history, not an inference
- * drawn from silence, and anything neither finished nor explicitly failed
- * is counted as still moving rather than called dead.
- */
-export const sessionBillFlow = (sessionId: string) => {
-  const r = prep(
-      `SELECT COUNT(*) AS introduced,
-              SUM(CASE WHEN status = 'enacted' THEN 1 ELSE 0 END) AS enacted,
-              SUM(CASE WHEN status = 'vetoed' THEN 1 ELSE 0 END) AS vetoed,
-              SUM(CASE WHEN status = 'failed_sjr1' THEN 1 ELSE 0 END) AS died,
-              SUM(CASE WHEN status = 'failed_sjr1' AND died_without_hearing = 1
-                       THEN 1 ELSE 0 END) AS noHearing
-       FROM bills
-       WHERE session_id = ? AND source != 'legiscan' AND classification = 'bill'`,
-    )
-    .get(sessionId) as {
-    introduced: number; enacted: number; vetoed: number;
-    died: number; noHearing: number;
-  };
-  const resolutions = (
-    prep(
-      `SELECT COUNT(*) AS n FROM bills
-       WHERE session_id = ? AND source != 'legiscan' AND classification != 'bill'`,
-    ).get(sessionId) as { n: number }
-  ).n;
-  const passedBoth = r.enacted + r.vetoed;
-  return {
-    ...r,
-    passedBoth,
-    heard: r.died - r.noHearing,
-    moving: r.introduced - passedBoth - r.died,
-    resolutions,
-  };
-};
 
 
 /** Local council votes from reviewed municipal sources. */

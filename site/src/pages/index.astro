@@ -2,20 +2,37 @@
 import Base from "../layouts/Base.astro";
 import { PLACES_KEY } from "../lib/placesKey";
 import JsonLd from "../components/JsonLd.astro";
-import StatusBadge from "../components/StatusBadge.astro";
-import BillFlow from "../components/BillFlow.astro";
-import { builtSessions, sessionBillFlow, recentlyActedBills } from "../lib/db";
-import { billSlug, fmtDate, shortTitle } from "../lib/format";
+import BillList from "../components/BillList.astro";
+import SessionOutcomes from "../components/SessionOutcomes.astro";
+import { builtSessions, recentlyActedBills } from "../lib/db";
+import { sessionPlainName } from "../lib/format";
+import { sessionCounts, sessionOutcomes } from "../lib/billRows";
 const sessions = builtSessions();
 const current = sessions.find((s) => s.id === "2025") ?? sessions[0];
 const recent = recentlyActedBills(sessions.map((s) => s.id), 6);
-const flow = sessionBillFlow(current.id);
+const outcomes = sessionOutcomes(current.id);
+const everything = sessionCounts(current.id).total;
 const sessionName = current.name ?? current.id;
+const plain = sessionPlainName(current.id, sessionName);
+const n = (x: number) => x.toLocaleString();
+const SEARCH_TYPES: [string, string][] = [
+  // label, Pagefind type facet ("Bills" is two page types, split on |)
+  ["All", ""],
+  ["Bills", "Bill|Resolution"],
+  ["Lawmakers", "Legislator"],
+  ["Committees", "Committee"],
+  ["Topics", "Topic"],
+  ["Districts", "District"],
+  ["Money", "Campaign money"],
+];
+const FIELD =
+  "min-h-12 min-w-0 rounded-[0.625rem] border-2 border-edge bg-white px-3 text-body text-spruce placeholder:text-granite focus:border-lake lg:min-h-11";
 ---
 
 <Base
-  title="Wisconsin Politics, in Plain Language"
+  title="Wisconsin politics in plain words"
   description="Track every Wisconsin bill, vote, veto and campaign contribution. Free, independent, and built entirely from official public records."
+  layout="wide"
 >
   <JsonLd
     data={{
@@ -23,7 +40,7 @@ const sessionName = current.name ?? current.id;
       name: "Badger Politics",
       url: "https://badgerpolitics.org/",
       description:
-        "Free, independent tracking of the Wisconsin Legislature: every bill, every vote, and every committee graveyard.",
+        "Free, independent tracking of the Wisconsin Legislature: every bill, every vote, and every bill that never got a hearing.",
       inLanguage: "en-US",
       isAccessibleForFree: true,
       publisher: {
@@ -41,213 +58,175 @@ const sessionName = current.name ?? current.id;
       },
     }}
   />
-  <section class="py-8">
-    <h1 class="max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
-      Wisconsin politics, without the Capitol jargon.
-    </h1>
-    <p class="mt-3 max-w-2xl text-lg text-navy-700">
-      Bills, votes, lawmakers, money and elections, built from official state
-      records and explained in plain language.
-    </p>
 
-    <div class="mt-6 grid gap-4 lg:grid-cols-2">
-      <div class="rounded-lg border border-navy-100 bg-white p-4">
-        <h2 id="home-addr-heading" class="font-bold">Start with your address</h2>
-        <p id="home-addr-intro" class="mt-1 text-sm text-navy-700">
-          See your two legislators, how they voted, what they sponsored, and who
-          funds them. After that, every page marks them for you.
-        </p>
-        <div id="home-addr-saved" class="hidden">
-          <p id="home-addr-districts" class="mt-1 text-sm text-navy-700"></p>
-          <div class="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              id="home-addr-change"
-              class="rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm font-semibold hover:bg-navy-50"
-            >
-              Change address
-            </button>
-            <button
-              type="button"
-              id="home-addr-forget"
-              class="rounded-lg border border-navy-100 bg-white px-4 py-2 text-sm text-navy-700 hover:bg-navy-50"
-            >
-              Forget
-            </button>
-          </div>
-          <p class="mt-2 text-xs text-navy-600">
-            Saved in this browser only. Every page marks your two legislators.
-          </p>
+  <div class="flex max-w-[47.5rem] flex-col gap-3">
+    <h1 class="t-display">Wisconsin's Legislature, in plain words</h1>
+    <p class="sm:text-lead">
+      Where every bill stands, how your lawmakers vote, and who pays for their campaigns. Built
+      from official state records, free, with no ads.
+    </p>
+  </div>
+
+  <div class="mt-8 grid items-start gap-5 lg:grid-cols-2">
+    <section class="sheet flex min-w-0 flex-col gap-3 p-5 sm:p-7" aria-labelledby="home-addr-heading">
+      <h2 id="home-addr-heading" class="t-section">Find your lawmakers</h2>
+      <p id="home-addr-intro">
+        See your representative and state senator: how they vote and what they've tried to pass.
+        After that, every page marks them for you.
+      </p>
+      <div id="home-addr-saved" class="hidden">
+        <p id="home-addr-districts"></p>
+        <div class="mt-4 flex flex-wrap gap-2.5">
+          <button type="button" id="home-addr-change" class="btn btn-secondary">Change address</button>
+          <button type="button" id="home-addr-forget" class="btn btn-secondary">Forget</button>
         </div>
-        <form id="home-addr-form" class="mt-3 flex flex-wrap gap-2">
-          <label class="sr-only" for="home-addr">Your Wisconsin address</label>
-          <input
-            id="home-addr"
-            type="text"
-            required
-            autocomplete="street-address"
-            placeholder="e.g. 7525 W Greenfield Ave, West Allis"
-            class="min-w-0 flex-1 basis-full rounded-lg border border-navy-100 bg-white px-3 py-2.5 sm:basis-64"
-          />
-          <button
-            type="submit"
-            class="rounded-lg bg-navy-800 px-4 py-2.5 font-semibold text-white hover:bg-navy-700"
-          >
-            Find
-          </button>
-          <button
-            type="button"
-            id="home-geo"
-            class="rounded-lg border border-navy-100 bg-white px-4 py-2.5 hover:bg-navy-50"
-          >
-            Use my location
-          </button>
-        </form>
-        <p id="home-addr-status" role="status" class="mt-2 text-sm text-navy-700"></p>
-        <p id="home-addr-privacy" class="mt-2 flex items-start gap-1.5 text-xs text-navy-600">
-          <svg class="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 1.5 3.5 4v5.2c0 4 2.8 7.7 6.5 8.8 3.7-1.1 6.5-4.8 6.5-8.8V4L10 1.5Zm0 2.1 4.5 1.7v4.9c0 3-2 5.9-4.5 6.8-2.5-.9-4.5-3.8-4.5-6.8V5.3L10 3.6Z"/></svg>
-          <span>
-            <strong>Private by design.</strong> Your address goes to the U.S.
-            Census geocoder to identify your district and is never stored. The
-            district stays in this browser.{PLACES_KEY && (
-              <> Suggestions as you type come from Google Places, so what you
-              type while typing is sent to Google.</>
-            )}
-          </span>
+        <p class="mt-3 text-small text-granite">
+          Saved on this device only. Every page marks your two lawmakers.
         </p>
       </div>
+      <form id="home-addr-form" class="flex flex-col gap-2">
+        <label class="text-small font-bold" for="home-addr">Your Wisconsin address</label>
+        <input
+          id="home-addr"
+          type="text"
+          required
+          autocomplete="street-address"
+          placeholder="Street address and city"
+          class={`${FIELD} w-full`}
+        />
+        <div class="mt-1 flex flex-wrap gap-2.5">
+          <button type="submit" class="btn btn-primary">Find my lawmakers</button>
+          <button type="button" id="home-geo" class="btn btn-secondary">Use my location instead</button>
+        </div>
+      </form>
+      <p id="home-addr-status" role="status" class="text-small"></p>
+      <p id="home-addr-privacy" class="flex items-start gap-2 text-small text-granite">
+        <svg class="mt-0.5 h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <span>
+          Your address goes only to the U.S. Census geocoder to find your districts, and is never
+          stored. Your districts stay on this device.{PLACES_KEY && (
+            <> Suggestions as you type come from Google Places, so what you type is sent to
+            Google.</>
+          )}
+        </span>
+      </p>
+    </section>
 
-      <div id="search" class="scroll-mt-4 rounded-lg border border-navy-100 bg-white p-4">
-        <h2 class="font-bold">Or look something up</h2>
-        <p class="mt-1 text-sm text-navy-700">
-          Search every bill, legislator, committee and campaign donor.
-        </p>
-        <form id="search-form" action="/#search" method="get" class="mt-3">
-          <div class="flex flex-wrap gap-2">
-          <label class="sr-only" for="q">Search bills, people and committees</label>
+    <section id="search" class="sheet flex min-w-0 scroll-mt-4 flex-col gap-3 p-5 sm:p-7">
+      <h2 id="search-heading" class="t-section">Look something up</h2>
+      <p>Search every bill, lawmaker, committee and campaign donor.</p>
+      <form id="search-form" action="/#search" method="get" class="flex flex-col gap-2" role="search" aria-labelledby="search-heading">
+        <label class="text-small font-bold" for="q">Search bills, people and committees</label>
+        <div class="flex flex-wrap gap-2.5">
           <input
             id="q"
             name="q"
             type="search"
-            placeholder="Try child care, property tax, or AB 656"
-            class="min-w-0 flex-1 basis-48 rounded-lg border border-navy-100 bg-white px-4 py-2.5"
+            placeholder="Try child care or AB 656"
+            class={`${FIELD} flex-1 basis-48`}
             autocomplete="off"
           />
-          <button type="submit" class="min-h-11 rounded-lg bg-navy-800 px-4 py-2 font-semibold text-white hover:bg-navy-700">Search</button>
-          </div>
-          {/* facets baked into the index at build time; "All" is no filter */}
-          <div id="search-filters" class="mt-2 flex flex-wrap items-center gap-1.5" data-pagefind-ignore>
-            {["All", "Bills", "Legislators", "Committees", "Topics", "Districts", "Campaign money"].map((t, i) => (
-              <button
-                type="button"
-                data-type-chip={t === "All" ? "" : t === "Bills" ? "Bill|Resolution" : t === "Campaign money" ? "Campaign money" : t.slice(0, -1)}
-                aria-pressed={i === 0 ? "true" : "false"}
-                class="min-h-11 rounded-full border border-navy-100 px-3 py-2 text-sm font-semibold text-navy-700 transition-colors hover:border-navy-600 aria-pressed:border-navy-800 aria-pressed:bg-navy-800 aria-pressed:text-white"
-              >
-                {t === "Campaign money" ? "Money" : t}
-              </button>
-            ))}
-            <span id="bill-filters" class="hidden w-full flex-wrap items-center gap-2">
-              <label class="sr-only" for="f-session">Session</label>
-              <select id="f-session" class="min-h-11 min-w-0 max-w-full rounded-lg border border-navy-100 bg-white px-2 py-2 text-sm text-navy-700">
-                <option value="">All sessions</option>
-                {sessions.map((se) => (
-                  <option value={se.name ?? se.id}>{se.name ?? se.id}</option>
-                ))}
-              </select>
-              <label class="sr-only" for="f-outcome">Outcome</label>
-              <select id="f-outcome" class="min-h-11 min-w-0 max-w-full rounded-lg border border-navy-100 bg-white px-2 py-2 text-sm text-navy-700">
-                <option value="">Any outcome</option>
-                <option>Became law</option>
-                <option>Vetoed</option>
-                <option>Died at session end</option>
-                <option>Passed one chamber</option>
-                <option>Adopted</option>
-              </select>
-            </span>
-          </div>
-          <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
-            <p id="search-status" role="status" class="text-sm text-navy-600"></p>
-            <button id="search-clear" type="button" class="hidden min-h-11 px-2 text-sm font-semibold underline">Clear filters</button>
-          </div>
-          <div
-            id="search-results"
-            class="mt-2 hidden space-y-2"
-          >
-          </div>
-          <button id="search-more" type="button" class="mt-3 hidden min-h-11 rounded-lg border border-navy-600 px-4 py-2 font-semibold hover:bg-navy-50">Show more results</button>
-        </form>
-      </div>
-    </div>
-  </section>
+          <button type="submit" class="btn btn-secondary">Search</button>
+        </div>
+        {/* facets baked into the index at build time; "All" is no filter */}
+        <div id="search-filters" class="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Show only" data-pagefind-ignore>
+          {SEARCH_TYPES.map(([label, type], i) => (
+            <button type="button" data-type-chip={type} aria-pressed={i === 0 ? "true" : "false"} class="chip">
+              {label}
+            </button>
+          ))}
+          <span id="bill-filters" class="hidden w-full flex-wrap items-center gap-2">
+            <label class="sr-only" for="f-session">Session</label>
+            <select id="f-session" class={`${FIELD} max-w-full text-small`}>
+              <option value="">All sessions</option>
+              {sessions.map((se) => (
+                <option value={se.name ?? se.id}>{se.name ?? se.id}</option>
+              ))}
+            </select>
+            <label class="sr-only" for="f-outcome">Where it ended up</label>
+            <select id="f-outcome" class={`${FIELD} max-w-full text-small`}>
+              <option value="">Any outcome</option>
+              <option value="Became law">Became law</option>
+              <option value="Vetoed">Vetoed</option>
+              <option value="Died at session end">Stopped when the session ended</option>
+              <option value="Passed one chamber">Passed one chamber</option>
+              <option value="Adopted">Adopted</option>
+            </select>
+          </span>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <p id="search-status" role="status" class="text-small text-granite"></p>
+          <button id="search-clear" type="button" class="hidden min-h-11 px-1 text-small font-bold text-lake underline">Clear filters</button>
+        </div>
+        <div id="search-results" class="hidden divide-y divide-rule border-y border-rule"></div>
+        <button id="search-more" type="button" class="btn btn-secondary mt-2 hidden self-start">Show more results</button>
+      </form>
+    </section>
+  </div>
 
-  <section id="my-reps-home" class="mt-2 hidden">
-    <h2 class="text-xl font-bold">Your representatives</h2>
-    <div id="my-reps-cards" class="mt-2 grid gap-3 sm:grid-cols-2" data-no-rep-highlight></div>
-    <p class="mt-2 text-sm">
-      <a href="/my-reps/" class="underline">Full profiles and recent votes &rarr;</a>
+  <section id="my-reps-home" class="mt-12 hidden" aria-labelledby="my-reps-home-heading">
+    <h2 id="my-reps-home-heading" class="t-section">Your lawmakers</h2>
+    <div id="my-reps-cards" class="mt-4 grid items-start gap-5 lg:grid-cols-2" data-no-rep-highlight></div>
+    <p class="mt-4">
+      <a href="/my-reps/" class="font-bold underline">See their committees, ballot and contact details on My reps</a>
     </p>
   </section>
 
-  <section class="mt-10">
-    <h2 class="text-xl font-bold">
-      What happened to {flow.introduced.toLocaleString()} bills?
+  <section class="mt-14 max-w-[47.5rem]" aria-labelledby="outcomes-heading">
+    <h2 id="outcomes-heading" class="t-section">
+      How far the {plain}'s {n(outcomes.bills)} bills got
     </h2>
-    <p class="mt-1 max-w-3xl text-sm text-navy-600">
-      Follow every bill of the {sessionName} from introduction to its outcome.
-      Ribbon widths show bill counts, and each split adds up to its source total.
+    <p class="mt-2">
+      Each bill is counted once, at the furthest point on its route.
     </p>
-    <BillFlow flow={flow} session={current.id} />
-    <p class="mt-3 max-w-3xl text-xs text-navy-600">
-      Bills only. The {flow.resolutions.toLocaleString()} resolutions this
-      session are counted separately, because they never go to the governor
-      and cannot become law.
-      <a href={`/bills/${current.id}/`} class="inline-block underline">Browse them all &rarr;</a>
+    <div class="mt-5">
+      <SessionOutcomes session={current.id} />
+    </div>
+    <p class="mt-3 text-small text-granite">
+      Bills only. Resolutions never go to the governor and can't become law{outcomes.resolutions > 0
+        ? `, so the session's ${n(outcomes.resolutions)} ${outcomes.resolutions === 1 ? "resolution is" : "resolutions are"} left out`
+        : ""}.
+    </p>
+    <p class="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+      <a href={`/bills/${current.id}/`} class="underline">Every bill and resolution</a>
+      <a href="/governors-desk/" class="underline">The governor's decisions</a>
     </p>
   </section>
 
-  <section class="mt-10">
-    <h2 class="text-xl font-bold">Latest activity</h2>
-    <p class="mt-1 text-sm text-navy-600">
-      The most recent action on any bill, from the official histories.
-    </p>
-    <ul class="mt-3 grid gap-2 sm:grid-cols-2">
-      {recent.map((b) => (
-        <li>
-          <a
-            href={`/bills/${b.session_id}/${billSlug(b.identifier)}/`}
-            class="flex h-full flex-col gap-1.5 rounded-lg border border-navy-100 bg-white p-3 hover:border-navy-600"
-          >
-            <span class="flex items-center gap-2">
-              <span class="font-bold underline">{b.identifier}</span>
-              <StatusBadge status={b.status} short />
-              <span class="ml-auto text-xs text-navy-600">{fmtDate(b.latest_action_date)}</span>
-            </span>
-            <span class="line-clamp-2 text-sm leading-snug text-navy-700">{shortTitle(b.title)}</span>
-          </a>
-        </li>
-      ))}
-    </ul>
-    <p class="mt-3 text-sm">
-      <a href={`/bills/${current.id}/`} class="underline">
-        All {(flow.introduced + flow.resolutions).toLocaleString()} proposals this session &rarr;
+  <section class="mt-14" aria-labelledby="latest-heading">
+    <h2 id="latest-heading" class="t-section">Latest activity</h2>
+    <p class="mt-2">Bills with the most recent action in the official record, newest first.</p>
+    <BillList bills={recent} class="mt-4" />
+    <p class="mt-4">
+      <a href={`/bills/${current.id}/`} class="font-bold underline">
+        All {n(everything)} bills and resolutions this session
       </a>
     </p>
   </section>
 
-  <section class="mt-10 rounded-lg border border-navy-100 bg-white p-4">
-    <h2 class="font-bold">Official records. No ads. No tracking.</h2>
-    <ul class="mt-2 grid gap-x-6 gap-y-1 text-sm text-navy-700 sm:grid-cols-2">
-      <li>Rebuilt nightly from Wisconsin state sources</li>
-      <li>Every page links to the official record</li>
-      <li>Your address is never stored</li>
-      <li>Corrections are public; the data is free to reuse</li>
+  <section class="mt-14 border-t border-rule pt-8" aria-labelledby="trust-heading">
+    <h2 id="trust-heading" class="t-section">Where this comes from</h2>
+    <ul class="mt-4 grid max-w-[60rem] gap-x-10 gap-y-3 sm:grid-cols-2" role="list">
+      <li>Rebuilt every night from Wisconsin's official state records.</li>
+      <li>Every page links to the official record it came from.</li>
+      <li>Your address is never stored. No ads and no tracking cookies.</li>
+      <li>Corrections are public, and the data is free to reuse.</li>
     </ul>
-    <p class="mt-2 text-sm">
-      <a href="/about/" class="underline">How Badger Politics works</a> &middot;
-      <a href="/data/" class="underline">Data &amp; API</a>
+    <p class="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+      <a href="/about/" class="underline">How Badger Politics works</a>
+      <a href="/data/" class="underline">Data and API</a>
     </p>
   </section>
+
+  <style is:global>
+    /* Pagefind marks matched words; bold reads as "here's your word"
+       without spending the one Prairie highlight. */
+    #search-results mark {
+      background: transparent;
+      color: inherit;
+      font-weight: 700;
+    }
+  </style>
 
   <script is:inline type="module">
     // Thin custom UI over the Pagefind API.
@@ -346,8 +325,8 @@ const sessionName = current.name ?? current.id;
       const list = recents();
       if (!list.length || input.value.trim().length >= 2) return;
       box.innerHTML =
-        `<p class="flex items-baseline justify-between px-1 text-xs text-navy-600"><span class="font-semibold uppercase tracking-wide">Recent searches</span><button type="button" data-clear-recents class="underline">Clear</button></p>` +
-        list.map((q) => `<button type="button" data-recent="${esc(q)}" class="block w-full rounded-lg border border-navy-100 bg-white px-3 py-2 text-left text-sm hover:border-navy-600">${esc(q)}</button>`).join("");
+        `<p class="flex items-center justify-between gap-2 py-1 text-small text-granite"><span class="font-bold">Recent searches</span><button type="button" data-clear-recents class="min-h-11 px-1 font-bold text-lake underline">Clear</button></p>` +
+        list.map((q) => `<button type="button" data-recent="${esc(q)}" class="block min-h-11 w-full px-1 py-2.5 text-left hover:bg-fog">${esc(q)}</button>`).join("");
       box.classList.remove("hidden");
     };
     box.addEventListener("click", (e) => {
@@ -371,7 +350,7 @@ const sessionName = current.name ?? current.id;
       const parts = [first("type"), first("session") ?? first("party"),
                      first("outcome") ?? first("chamber")].filter(Boolean);
       return parts.length
-        ? `<span class="mb-0.5 block text-xs text-navy-600">${esc(parts.join(" · "))}</span>`
+        ? `<span class="mb-0.5 block text-fine text-granite">${esc(parts.join(" · "))}</span>`
         : "";
     };
 
@@ -417,7 +396,7 @@ const sessionName = current.name ?? current.id;
         if (mySeq !== seq) return;
         const seat = q.match(SEAT);
         if (seat && (!filters.type || filters.type.any.includes("District"))) {
-          box.innerHTML = `<a href="/districts/${seat[1].toLowerCase()}-${Number(seat[2])}/" class="block rounded-lg border border-navy-600 bg-white p-3 hover:bg-navy-50"><span class="mb-0.5 block text-xs text-navy-600">District</span><span class="font-bold">${seat[1][0].toUpperCase()}${seat[1].slice(1).toLowerCase()} District ${Number(seat[2])}</span></a>`;
+          box.innerHTML = `<a href="/districts/${seat[1].toLowerCase()}-${Number(seat[2])}/" class="group block px-1 py-3 text-spruce no-underline hover:bg-fog"><span class="mb-0.5 block text-fine text-granite">District</span><span class="font-display font-bold text-lake underline">${seat[1][0].toUpperCase()}${seat[1].slice(1).toLowerCase()} District ${Number(seat[2])}</span></a>`;
         }
         results = { seq: mySeq, q, filters, candidates: search.results, offset: 0, count: 0, filter: resultFilter(q, pagefind, filters) };
         await loadMore(results);
@@ -463,18 +442,18 @@ const sessionName = current.name ?? current.id;
       box.insertAdjacentHTML("beforeend", good
             .map(
               (r) => `
-        <a href="${esc(r.url)}" class="block rounded-lg border border-navy-100 bg-white p-3 hover:border-navy-600">
-          ${metaLine(r.filters)}<span class="font-bold">${esc(r.meta?.title ?? r.url)}</span>
-          <span class="mt-0.5 block text-sm text-navy-700">…${r.excerpt}…</span>
+        <a href="${esc(r.url)}" class="block px-1 py-3 text-spruce no-underline hover:bg-fog">
+          ${metaLine(r.filters)}<span class="font-display font-bold text-lake underline">${esc(r.meta?.title ?? r.url)}</span>
+          <span class="mt-0.5 block text-small">…${r.excerpt}…</span>
         </a>`,
             )
             .join(""));
       state.count += good.length;
-      if (!box.children.length) box.innerHTML = `<div class="rounded-lg border border-navy-100 bg-white p-3 text-sm text-navy-600">
+      if (!box.children.length) box.innerHTML = `<div class="px-1 py-3">
              <p>Nothing matches “${q.replace(/[<>&]/g, "")}”${anyFilter ? " with these filters" : ""}.</p>
-             <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-               ${anyFilter ? '<button type="button" data-clear-filters class="font-semibold underline">Clear filters</button>' : ""}
-               <a href="/my-reps/" class="underline">Find my legislators</a>
+             <p class="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+               ${anyFilter ? '<button type="button" data-clear-filters class="min-h-11 font-bold text-lake underline">Clear filters</button>' : ""}
+               <a href="/my-reps/" class="underline">Find your lawmakers</a>
                <a href="https://docs.legis.wisconsin.gov/search?q=${encodeURIComponent(q)}" class="underline">Search the official record</a>
              </p>
            </div>`;
@@ -518,8 +497,9 @@ const sessionName = current.name ?? current.id;
   import { districtForAddress, districtForBrowser } from "../lib/lookup";
   import { esc } from "../lib/html";
   import { attachSuggest } from "../scripts/addressSuggest";
-  import { partyChipHtml } from "../lib/format";
+  import { partyWord } from "../lib/format";
   import type { RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
+  import type { answers as Answers } from "../lib/repAnswers";
 
   // Show saved representatives inline using browser storage and static JSON.
   const form = document.getElementById("home-addr-form") as HTMLFormElement | null;
@@ -540,7 +520,7 @@ const sessionName = current.name ?? current.id;
     if (districtsLine) {
       const c = savedCityDistrict();
       const city = c && (c.t === "milwaukee" ? "Milwaukee" : c.t === "westalliswi" ? "West Allis" : null);
-      districtsLine.textContent = `Assembly District ${d.ad}, Senate District ${d.sd}.`
+      districtsLine.textContent = `Assembly District ${d.ad} and Senate District ${d.sd}.`
         + (city ? ` ${city} Common Council District ${c.d}.` : "");
     }
     for (const el of promptEls) el?.classList.add("hidden");
@@ -548,7 +528,7 @@ const sessionName = current.name ?? current.id;
     if (addrStatus) addrStatus.textContent = "";
   };
   const showPrompt = () => {
-    if (heading) heading.textContent = "Start with your address";
+    if (heading) heading.textContent = "Find your lawmakers";
     for (const el of promptEls) el?.classList.remove("hidden");
     cardSaved?.classList.add("hidden");
     addr?.focus();
@@ -606,61 +586,57 @@ const sessionName = current.name ?? current.id;
     render(saved);
   }
 
+  // the same questions, in the same words, as My reps and each lawmaker's
+  // page; the homepage asks the two that say the most at a glance
+  const GLANCE = new Set(["voting", "recent"]);
+  const PORTRAIT_FALLBACK =
+    '<svg width="56" height="56" viewBox="0 0 48 48" aria-hidden="true" class="shrink-0 rounded-full">' +
+    '<circle cx="24" cy="24" r="24" fill="#E6EBE7"/><circle cx="24" cy="19" r="7.5" fill="#848E88"/>' +
+    '<rect x="10" y="30.5" width="28" height="24" rx="12" fill="#848E88"/></svg>';
+
+  function card(answers: typeof Answers, house: "assembly" | "senate", district: number, slim: RepSlim | undefined, full: RepSummary | undefined, summaries: RepSummaries | null): string {
+    if (!slim) return "";
+    const chamber = house === "assembly" ? "Assembly" : "Senate";
+    const title = house === "assembly" ? "representative" : "state senator";
+    const headingId = `home-rep-${house}`;
+    const portrait = slim.image
+      ? `<img src="${esc(slim.image)}" alt="" width="56" height="56" loading="lazy" decoding="async" class="h-14 w-14 shrink-0 rounded-full bg-fog object-cover object-[50%_20%]">`
+      : PORTRAIT_FALLBACK;
+    const questions = full
+      ? answers(full, {
+          house, district, typical: summaries?.typical?.[house], phase: summaries?.phase, general: "", mine: false,
+        })
+          .filter((a) => GLANCE.has(a.id))
+          .map((a) => `<div class="flex flex-col gap-1.5 border-t border-rule pt-4"><h4 class="t-question">${esc(a.q)}</h4>${a.html}</div>`)
+          .join("")
+      : "";
+    return (
+      `<section class="sheet flex min-w-0 flex-col gap-4 break-words p-5 sm:p-6" aria-labelledby="${headingId}">` +
+      '<div class="flex flex-wrap items-center gap-4">' + portrait +
+      '<div class="min-w-0 flex-[1_1_12rem]">' +
+      `<h3 id="${headingId}" class="t-section text-[1.375rem]"><a href="/legislators/${esc(slim.slug)}/" class="text-spruce no-underline hover:underline">${esc(slim.name)}</a></h3>` +
+      `<p class="text-granite">Your ${title} for <a href="/districts/${house}-${district}/" class="underline">${chamber} District ${district}</a>.` +
+      `${slim.party ? ` ${esc(partyWord(slim.party))}.` : ""}</p>` +
+      '</div></div>' +
+      questions +
+      `<p class="border-t border-rule pt-4"><a href="/legislators/${esc(slim.slug)}/" class="font-bold underline">Full record</a></p>` +
+      '</section>'
+    );
+  }
+
   function render(saved: { ad: number; sd: number }) {
     const section = document.getElementById("my-reps-home")!;
     const cards = document.getElementById("my-reps-cards")!;
+    // the answer wording loads only for readers with a saved district
     Promise.all([
       fetch("/data/reps.json").then((r) => r.json()),
       fetch("/data/rep-summaries.json").then((r) => r.json()).catch(() => null),
+      import("../lib/repAnswers"),
     ])
-      .then(([reps, summaries]: [Reps, RepSummaries | null]) => {
-        const seats: [string, string, RepSlim | undefined, RepSummary | undefined][] = [
-          [`Assembly District ${saved.ad}`, `/districts/assembly-${saved.ad}/`,
-           reps.assembly?.[saved.ad], summaries?.assembly?.[saved.ad]],
-          [`Senate District ${saved.sd}`, `/districts/senate-${saved.sd}/`,
-           reps.senate?.[saved.sd], summaries?.senate?.[saved.sd]],
-        ];
-        const html = seats
-          .map(([seat, districtHref, slim, full]) => {
-            if (!slim) return "";
-            const uid = `pc-${slim.slug.replace(/[^a-z0-9]/gi, "")}`;
-            const photo = slim.image
-              ? `<img src="${esc(slim.image)}" alt="" width="56" height="56" loading="lazy" decoding="async" class="h-14 w-14 shrink-0 rounded-full border border-navy-100 bg-navy-50 object-cover object-[50%_25%]">`
-              : `<svg viewBox="0 0 48 48" width="56" height="56" class="h-14 w-14 shrink-0 rounded-full border border-navy-100" role="img" aria-label="No official portrait on file for ${esc(slim.name)}">` +
-                `<circle cx="24" cy="24" r="24" fill="var(--color-navy-50)"></circle>` +
-                `<clipPath id="${uid}"><circle cx="24" cy="24" r="24"></circle></clipPath>` +
-                `<g clip-path="url(#${uid})" fill="var(--color-navy-300)">` +
-                `<circle cx="24" cy="19" r="7.5"></circle>` +
-                `<rect x="10" y="30.5" width="28" height="24" rx="12"></rect></g></svg>`;
-            const stat = (value: number, label: string) =>
-              `<div><p class="text-lg font-bold tabular-nums">${value.toLocaleString()}</p>` +
-              `<p class="text-xs leading-tight text-navy-600">${esc(label)}</p></div>`;
-            const stats = full
-              ? `<div class="mt-3 grid grid-cols-3 gap-2">` +
-                stat(full.attendance?.missed ?? 0, "Floor votes missed") +
-                stat(full.authored?.total ?? 0, "Bills led") +
-                stat(full.authored?.signedOn ?? 0, "Bills cosigned") +
-                `</div>`
-              : "";
-            const latest = full?.recentVotes?.[0];
-            const lastVote = latest
-              ? `<p class="mt-3 border-t border-navy-100 pt-2 text-sm text-navy-700">Most recent vote: ` +
-                `<strong>${latest.option === "yes" ? "Aye" : latest.option === "no" ? "Nay" : "No vote"}</strong> on ` +
-                `<a class="underline" href="/bills/${esc(latest.session)}/${esc(latest.slug)}/">${esc(latest.identifier)}</a></p>`
-              : "";
-            return (
-              `<div class="rounded-lg border border-navy-100 bg-white p-4">` +
-              `<div class="flex items-start gap-3">` +
-              photo +
-              `<div class="min-w-0 flex-1">` +
-              `<a class="inline-block py-1 text-xs font-semibold uppercase tracking-wide text-navy-600 hover:underline" href="${esc(districtHref)}">${esc(seat)}</a>` +
-              `<p class="mt-0.5"><a class="text-lg font-bold leading-tight hover:underline" href="/legislators/${esc(slim.slug)}/">${esc(slim.name)}</a></p>` +
-              `</div>` +
-              partyChipHtml(slim.party, { dims: "h-6 w-6 text-xs" }) +
-              `</div>${stats}${lastVote}</div>`
-            );
-          })
-          .join("");
+      .then(([reps, summaries, { answers }]: [Reps, RepSummaries | null, { answers: typeof Answers }]) => {
+        const html =
+          card(answers, "assembly", saved.ad, reps.assembly?.[saved.ad], summaries?.assembly?.[saved.ad], summaries) +
+          card(answers, "senate", saved.sd, reps.senate?.[saved.sd], summaries?.senate?.[saved.sd], summaries);
         if (html) {
           cards.innerHTML = html;
           section.classList.remove("hidden");
