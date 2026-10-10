@@ -261,6 +261,17 @@ Used on My reps and lawmaker pages:
 Two-sided tallies (Yes against No, two-candidate results) use one bar in Spruce and Fog with both
 numbers at its ends. The winner is named in words.
 
+### Seats and party splits (`seatsSentence`, `partySplitSentence`)
+
+- **Who holds a chamber** is a sentence, never a colored bar: "Of the Senate's 33 seats, Democrats hold
+  15 and Republicans hold 18, a Republican majority." Parties go alphabetically. A majority is named
+  only past half of all seats, vacancies included. Vacant seats are named and linked.
+- **How each party voted** on a roll call is a sentence with both tallies: "Most of both parties voted
+  yes: Democrats 14 yes and 1 no, Republicans 24 yes and 0 no." Opposite majorities read "A party-line
+  vote: …". There is no tag or pill for either.
+- **The reader's own lawmakers** in a directory get a Prairie label on their row ("Your state
+  senator"), not the sitewide link tint, so the row reads the same with the color gone.
+
 ### Bill lines (`BillLine`, `MoreRows`)
 
 Where a section already says what happened to its bills (signed, vetoed, waiting for the governor,

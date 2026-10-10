@@ -86,15 +86,19 @@ check(
   JSON.stringify(pinned),
 );
 
-// 3b. saved reps are highlighted anywhere they appear (legislators index)
+// 3b. saved reps are marked on the legislators index: each one's row says
+// "Your state senator" or "Your representative" (the list labels its own
+// rows instead of the sitewide link tint).
 // domcontentloaded, not networkidle2: this page loads 131 member
 // portraits from third-party hosts and the check below reads the DOM.
 await page.goto("http://127.0.0.1:8931/legislators/", { waitUntil: "domcontentloaded" });
 await page.waitForFunction(
-  () => [...document.querySelectorAll("a")].some((a) => a.classList.contains("mine")),
+  () => document.querySelectorAll("[data-member] [data-mine]:not([hidden])").length > 0,
   { timeout: 30000 },
 ).catch(() => {});
-const highlighted = await page.$$eval("a.mine", (as) => as.map((a) => a.textContent.trim()));
+const highlighted = await page.$$eval("[data-member] [data-mine]:not([hidden])", (els) =>
+  els.map((el) => el.closest("a").textContent.replace(/\s+/g, " ").trim()),
+);
 check(
   "saved reps highlighted on legislators index",
   highlighted.some((t) => t.includes("Tenorio")) && highlighted.some((t) => t.includes("Hutton")),
