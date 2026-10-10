@@ -307,6 +307,9 @@ const LIST = "flex list-disc flex-col gap-2 pl-5 marker:text-granite";
       /* a short window scrolls the list rather than hiding its end */
       max-height: calc(100vh - 3rem);
       overflow-y: auto;
+      /* room inside the scroll box for the 5px focus ring */
+      padding: 0.375rem;
+      margin: -0.375rem;
     }
   }
 </style>
