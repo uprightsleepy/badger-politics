@@ -1,13 +1,12 @@
 ---
 /** Every seat, the way Wisconsin draws them: each Senate district holds
  * three Assembly districts (3n-2, 3n-1 and 3n inside Senate District n),
- * so the list is 33 groups of four seats. Party is a letter in this dense
- * list, with its key on the same screen (docs/brand.md). */
+ * so the list is 33 groups of four seats. Each seat is one link, to its
+ * page; the holder and party are written out inside it. */
 import Base from "../../layouts/Base.astro";
 import FilterBar from "../../components/FilterBar.astro";
-import SeatHolder from "../../components/SeatHolder.astro";
-import { sittingPeople, type Person } from "../../lib/db";
-import { partyLetter } from "../../lib/format";
+import { meta, sittingPeople, type Person } from "../../lib/db";
+import { partyWord } from "../../lib/format";
 
 const holders = new Map(sittingPeople().map((p) => [`${p.chamber}-${p.district}`, p]));
 const SENATE = Array.from({ length: 33 }, (_, i) => i + 1);
@@ -23,12 +22,12 @@ const groups = SENATE.map((sd) => ({
   senate: seat("upper", sd),
   assembly: assemblyIn(sd).map((ad) => seat("lower", ad)),
 }));
-// the key lists only the parties this list shows
-const parties = [...new Set(sittingPeople().map((p) => p.party).filter(Boolean))] as string[];
-const key = parties
-  .sort()
-  .map((p) => `${partyLetter(p)}: ${p === "Democratic" ? "Democrat" : p}`)
-  .join(". ");
+const holderText = (h: Person | undefined) =>
+  h ? `${h.name}${h.party ? `, ${partyWord(h.party)}` : ""}` : "Vacant";
+// senators in odd-numbered districts serve the pre-2024 lines until the
+// new Senate is sworn in on January 4, 2027
+const asOf = (meta().imported_at ?? new Date().toISOString()).slice(0, 10);
+const oldLines = asOf < "2027-01-04";
 ---
 
 <Base
@@ -42,6 +41,12 @@ const key = parties
       Wisconsin has 33 Senate districts, and each one holds three Assembly districts. So every
       address has one state senator and one representative.
     </p>
+    {oldLines && (
+      <p class="text-small text-granite">
+        Until January 2027, senators in odd-numbered districts represent the lines in place when they
+        were elected, before the 2024 maps.
+      </p>
+    )}
     <p data-district-finder>
       Not sure which are yours? <a href="/my-reps/" class="underline">Find your lawmakers</a>.
     </p>
@@ -56,12 +61,11 @@ const key = parties
       placeholder="District number or name"
     />
   </div>
-  <p class="text-small text-granite">{key ? `${key}.` : ""}</p>
 
-  <ol class="district-groups mt-4 border-t border-rule" role="list">
+  <ol class="district-groups mt-3 border-t border-rule" role="list">
     {groups.map((g) => (
       <li
-        class="district-group border-b border-rule py-4"
+        class="district-group border-b border-rule py-3"
         data-district-row
         data-text={[g.senate, ...g.assembly]
           .map((s) => `${s.name} ${s.holder?.name ?? "vacant"}`)
@@ -69,16 +73,18 @@ const key = parties
           .toLowerCase()}
       >
         <h2 class="t-question">
-          <a href={g.senate.href} class="inline-flex min-h-8 items-center underline">{g.senate.name}</a>
+          <a href={g.senate.href} class="seat-link">
+            <span class="underline">{g.senate.name}</span>
+            <span class="seat-holder">{holderText(g.senate.holder)}</span>
+          </a>
         </h2>
-        <p class="flex min-h-8 flex-wrap items-center text-small">
-          <span><SeatHolder holder={g.senate.holder} /></span>
-        </p>
-        <ul class="mt-2 flex flex-col gap-1 border-l-2 border-rule pl-3" role="list">
+        <ul class="ml-1 border-l-2 border-rule pl-3" role="list">
           {g.assembly.map((s) => (
-            <li class="flex min-h-8 flex-wrap items-center gap-x-2 text-small">
-              <a href={s.href} class="inline-flex min-h-8 items-center font-display font-bold underline">{s.name}</a>
-              <span><SeatHolder holder={s.holder} /></span>
+            <li>
+              <a href={s.href} class="seat-link">
+                <span class="font-display font-bold underline">{s.name}</span>
+                <span class="seat-holder">{holderText(s.holder)}</span>
+              </a>
             </li>
           ))}
         </ul>
@@ -112,6 +118,23 @@ const key = parties
 </Base>
 
 <style>
+  /* one target per seat: the district's name, then who holds it */
+  .seat-link {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0.25rem 0;
+    color: var(--color-lake);
+    text-decoration: none;
+  }
+  .seat-holder {
+    font: 400 var(--text-small) / var(--text-small--line-height) var(--font-sans);
+    color: var(--color-spruce);
+  }
+  .seat-link:hover .seat-holder {
+    text-decoration: underline;
+  }
   @media (min-width: 48rem) {
     .district-groups {
       display: grid;

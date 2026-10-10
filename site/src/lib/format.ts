@@ -148,11 +148,12 @@ export const chamberName = (chamber: string | null): string =>
   chamber === "lower" ? "Assembly" : chamber === "upper" ? "Senate" : "Legislature";
 
 /** A committee's full name, the way the Legislature writes it: "Assembly
- * Committee on Education". Joint committees already carry theirs. */
+ * Committee on Education". Joint committees, and bodies that name
+ * themselves (a task force, a council, a board), keep their own name. */
 export const committeeTitle = (name: string, chamber: string | null): string => {
   if (!chamber) return name;
+  if (/\b(task force|council|commission|board|committee)\b/i.test(name) && !/^committee on /i.test(name)) return name;
   const house = chamberName(chamber);
-  if (name.toLowerCase().startsWith(`${house.toLowerCase()} `)) return name;
   return /^committee on /i.test(name) ? `${house} ${name}` : `${house} Committee on ${name}`;
 };
 

@@ -90,9 +90,23 @@ export const seatMapSvg = (seat: string, fill: string, attrs = ""): string => {
   );
 };
 
-/** The whole state with one district filled: where the close-up is. */
+/** Focus colors on a district's own page: an Assembly district shaded
+ * Lake tint so the Senate outline around it stays visible, a Senate
+ * district filled Lake. */
+export const SEAT_MAP_FILL = { assembly: "#B9D3D2", senate: "#0D5C63" };
+
+export const STATE_VIEWBOX = shapes._viewBox;
+
+/** Wisconsin's outline, for /data/maps/wisconsin.svg. */
+export const stateOutlineSvg = (): string =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${shapes._viewBox}">` +
+  `<path d="${shapes._state}" fill="#E6EBE7" stroke="#848E88" stroke-width="0.8"/></svg>`;
+
+/** One district on the state outline: where the close-up is. The outline
+ * is the shared, cached file; only the district travels with the page. */
 export const stateLocatorSvg = (seat: string, fill: string, attrs = ""): string => {
   if (!shapes[seat]) return "";
+  const [, , w, h] = shapes._viewBox.split(/\s+/);
   const b = bbox(shapes[seat]);
   const r = (v: number) => Math.round(v * 10) / 10;
   // a city district is a speck at this size: ring it so it can be found
@@ -101,7 +115,7 @@ export const stateLocatorSvg = (seat: string, fill: string, attrs = ""): string 
     : "";
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${shapes._viewBox}"${attrs}>` +
-    `<path d="${shapes._state}" fill="#E6EBE7" stroke="#848E88" stroke-width="0.8"/>` +
+    `<image href="/data/maps/wisconsin.svg" x="0" y="0" width="${w}" height="${h}"/>` +
     `<path d="${shapes[seat]}" fill="${fill}" stroke="${fill}" stroke-width="1.5"/>` +
     ring +
     `</svg>`

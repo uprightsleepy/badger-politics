@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import FilterBar from "../../components/FilterBar.astro";
-import { allCommittees, meta } from "../../lib/db";
+import { allCommittees, committeeFor, hearingsBegin, meta } from "../../lib/db";
 import { committeeChamber, committeeSlug, committeeTitle, personSlug, fmtDate } from "../../lib/format";
 
 const committees = allCommittees();
@@ -14,6 +14,13 @@ const facets = [
 const n = (x: number) => x.toLocaleString();
 const plural = (x: number, one: string, many: string) => `${n(x)} ${x === 1 ? one : many}`;
 const pulledOn = meta().imported_at?.slice(0, 10);
+// hearing records begin later than the bill records: say from when
+const since = hearingsBegin();
+const sinceText = since
+  ? new Date(`${since}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })
+  : null;
+// co-chaired committees name both
+const chairsOf = (id: string) => committeeFor(id).members.filter((m) => /^(co-)?chair$/i.test(m.role));
 ---
 
 <Base
@@ -28,6 +35,12 @@ const pulledOn = meta().imported_at?.slice(0, 10);
       Most bills are sent to a committee first. The committee's chair decides whether a bill gets a
       public hearing, and a bill that never gets one rarely moves.
     </p>
+    {sinceText && (
+      <p class="text-small text-granite">
+        Hearing counts start in {sinceText}, when our hearing records begin. Bills that never got a
+        hearing are counted across every session on record.
+      </p>
+    )}
   </header>
 
   <div class="mt-4 max-w-[47.5rem]">
@@ -47,20 +60,25 @@ const pulledOn = meta().imported_at?.slice(0, 10);
     {committees.map((c) => (
       <li
         data-cmte-row
-        data-text={`${c.name} ${c.chair_name ?? ""} ${committeeChamber(c.chamber)}`.toLowerCase()}
+        data-text={`${committeeTitle(c.name, c.chamber)} ${chairsOf(c.id).map((m) => m.name).join(" ")} ${committeeChamber(c.chamber)}`.toLowerCase()}
         data-chamber={chamberKey(c.chamber)}
         class="cmte-row flex flex-col gap-1 border-b border-rule py-4"
       >
         <h2 class="t-question">
-          <a href={`/committees/${committeeSlug(c.id)}/`} class="underline">{committeeTitle(c.name, c.chamber)}</a>
+          <a href={`/committees/${committeeSlug(c.id)}/`} class="inline-flex min-h-11 items-center underline">{committeeTitle(c.name, c.chamber)}</a>
         </h2>
         <p class="text-small">
-          {c.chair_name && (
-            <>Chair: {c.chair_person_id ? (
-              <a href={`/legislators/${personSlug(c.chair_person_id)}/`} class="underline">{c.chair_name}</a>
-            ) : c.chair_name}. </>
-          )}
-          {plural(c.member_count, "member", "members")}. {plural(c.hearings_held, "public hearing", "public hearings")} on record.
+          {(() => {
+            const chairs = chairsOf(c.id);
+            if (!chairs.length) return null;
+            const label = chairs.some((m) => /^co-/i.test(m.role)) ? (chairs.length > 1 ? "Co-chairs" : "Co-chair") : "Chair";
+            return (
+              <>{label}: {chairs.map((m, i) => (
+                <>{i > 0 && (i === chairs.length - 1 ? " and " : ", ")}<a href={`/legislators/${personSlug(m.id)}/`} class="underline">{m.name}</a></>
+              ))}. </>
+            );
+          })()}
+          {plural(c.member_count, "member", "members")}. {plural(c.hearings_past, "public hearing", "public hearings")}{sinceText ? ` since ${sinceText}` : ""}.
         </p>
         {c.next_hearing ? (
           <p class="text-small font-bold">Next hearing: {fmtDate(c.next_hearing)}</p>

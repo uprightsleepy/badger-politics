@@ -658,6 +658,17 @@ export const governorInfo = () => {
 
 /** Everyone who has held one seat, newest first: term rows joined to
  * people, straight from the Legislature's service records. */
+/** The first day the service records cover (the 2009 session): a stint
+ * that starts here may have started earlier. */
+export const serviceRecordsBegin = once((): string | null =>
+  (prep("SELECT MIN(start) AS d FROM person_terms").get() as { d: string | null }).d,
+);
+
+/** The first hearing on record: hearing counts cover only from here. */
+export const hearingsBegin = once((): string | null =>
+  (prep("SELECT MIN(date) AS d FROM hearings").get() as { d: string | null }).d,
+);
+
 export const seatTerms = (chamber: string, district: number) =>
   prep(
       `SELECT t.person_id, p.name, p.party, p.current_role, t.start, t.end,
@@ -1144,6 +1155,8 @@ export const allCommittees = once(() =>
       `SELECT c.id, c.name, c.chamber, c.chair_person_id, p.name AS chair_name,
               COUNT(m.person_id) AS member_count,
               (SELECT COUNT(*) FROM hearings h WHERE h.committee_id = c.id) AS hearings_held,
+              (SELECT COUNT(*) FROM hearings h
+                WHERE h.committee_id = c.id AND h.date < date('now')) AS hearings_past,
               (SELECT MIN(h.date) FROM hearings h
                 WHERE h.committee_id = c.id AND h.date >= date('now')) AS next_hearing,
               (SELECT COUNT(*) FROM bills b
@@ -1159,7 +1172,11 @@ export const allCommittees = once(() =>
     .all() as {
       id: string; name: string; chamber: string | null;
       chair_person_id: string | null; chair_name: string | null; member_count: number;
-      hearings_held: number; next_hearing: string | null; died_here: number;
+      /** every hearing on record, scheduled ones included */
+      hearings_held: number;
+      /** hearings dated before the build */
+      hearings_past: number;
+      next_hearing: string | null; died_here: number;
     }[],
 );
 

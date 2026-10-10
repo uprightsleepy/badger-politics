@@ -95,6 +95,10 @@ const build = (p: Person): RepSummary => {
       election?.cycle_year === 2026
         ? writeInPending(seatOffice(p.chamber, p.district)).map((w) => w.party)
         : [],
+    writeInReasons:
+      election?.cycle_year === 2026
+        ? writeInPending(seatOffice(p.chamber, p.district)).map((w) => ({ party: w.party, reason: w.reason }))
+        : [],
     loyalty: agreement
       ? {
           pct: agreement.pct,

@@ -7,13 +7,13 @@ import FollowButton from "../../components/FollowButton.astro";
 import Portrait from "../../components/Portrait.astro";
 import {
   seatTerms, sittingPeople, electionFor, electionHistoryFor, lastMarginFor, ballotPhase,
-  writeInPending, meta,
+  writeInPending, meta, serviceRecordsBegin,
 } from "../../lib/db";
 import { personSlug, monthYear, chamberName, partyWord, fmtDate } from "../../lib/format";
 import { safeHref } from "../../lib/html";
 import { mergeServiceSpans } from "../../lib/service";
-import { ballotStatus, seatOffice } from "../../lib/ballot";
-import { hasSeatMap, seatMapSvg, stateLocatorSvg } from "../../lib/seatMap";
+import { ballotStatus, seatOffice, writeInSentence } from "../../lib/ballot";
+import { hasSeatMap, stateLocatorSvg, SEAT_MAP_FILL } from "../../lib/seatMap";
 
 export function getStaticPaths() {
   const seats = [
@@ -39,7 +39,7 @@ const election = holder ? electionFor(holder.id) : undefined;
 const opponents = election?.opponents.filter((o) => o.ballot_status !== "Deny") ?? [];
 const ballot = ballotStatus(election);
 const phase = ballotPhase();
-const openPrimaries = writeInPending(seatOffice(chamber, district)).map((p) => p.party);
+const openPrimaries = writeInPending(seatOffice(chamber, district));
 const history = electionHistoryFor(chamber, district);
 const lastMargin = lastMarginFor(chamber, district);
 
@@ -68,6 +68,10 @@ const lineage = [...byPerson.entries()]
   .sort((a, b) => (a.start < b.start ? 1 : -1));
 // when the current holder's present stint began, for the lead
 const since = holder ? lineage.find((s) => s.person_id === holder.id && !s.end)?.start : undefined;
+// the records begin with the 2009 session: a stint that starts there may
+// have started earlier
+const recordsBegin = serviceRecordsBegin();
+const sinceAtLeast = !!since && !!recordsBegin && since <= recordsBegin;
 
 // ---- words ----
 const article = (w: string) => (/^[aeiou]/i.test(w) ? "an" : "a");
@@ -81,10 +85,10 @@ const monthLong = (iso: string) =>
 // names carry ", a Republican", so two of them need a comma before "and"
 const list = (xs: string[]) =>
   xs.length < 2 ? xs.join("") : xs.length === 2 ? `${xs[0]}, and ${xs[1]}` : `${xs.slice(0, -1).join("; ")}; and ${xs.at(-1)}`;
-const others = list(opponents.map((o) => who(o.name, o.party)));
-const writeInLine = openPrimaries.length
-  ? ` The ${openPrimaries.join(" and ")} primary had no printed candidate, so a write-in nominee may also be on the ballot.`
-  : "";
+const others = list(
+  opponents.map((o) => who(o.name, o.party) + (o.ballot_status === "Challenged" ? " (ballot access challenged)" : "")),
+);
+const writeInLine = openPrimaries.length ? ` ${writeInSentence(openPrimaries)}` : "";
 let ballotLine = "";
 if (holder && ballot.kind === "on-ballot") {
   ballotLine =
@@ -92,7 +96,7 @@ if (holder && ballot.kind === "on-ballot") {
       ? opponents.length
         ? `${holder.name} is on the November ${ballot.year} ballot, running against ${others}.`
         : openPrimaries.length
-          ? `${holder.name} is on the November ${ballot.year} ballot. No other candidate's name is printed for this seat.`
+          ? `${holder.name} is on the November ${ballot.year} ballot. No other nominee for this seat is settled yet.`
           : `${holder.name} is on the November ${ballot.year} ballot, running unopposed.`
       : `${holder.name} is on the ${ballot.year} ballot.` + (opponents.length ? ` Also running for this seat: ${others}.` : "");
   ballotLine += writeInLine;
@@ -110,13 +114,32 @@ const marginLine = lastMargin
     : `In ${lastMargin.year}, the race was decided by ${lastMargin.margin.toFixed(1)} points.`
   : "";
 const pct = (votes: number, total: number) => (total ? `${((votes / total) * 100).toFixed(1)}%` : "");
+/** One sentence on who won, honest about ties and missing totals. */
+const resultLine = (h: (typeof history)[number]) => {
+  const [first, second] = h.candidates;
+  const cast = h.total ? ` of ${h.total.toLocaleString()} votes cast` : "";
+  if (h.candidates.length === 1) {
+    return `${subject(first.candidate, first.party)} ran unopposed and got ${first.votes.toLocaleString()}${cast ? cast : " votes"}.`;
+  }
+  if (second && second.votes === first.votes) {
+    return `${who(first.candidate, first.party)}, and ${who(second.candidate, second.party)}, tied with ${first.votes.toLocaleString()} votes each.`;
+  }
+  return h.total
+    ? `${subject(first.candidate, first.party)} won with ${pct(first.votes, h.total)}${cast}.`
+    : `${subject(first.candidate, first.party)} won with ${first.votes.toLocaleString()} votes.`;
+};
+// Senators in odd-numbered districts were elected under the lines in use
+// before the 2024 maps, and represent those until the new Senate is sworn
+// in on January 4, 2027.
+const asOf = (meta().imported_at ?? new Date().toISOString()).slice(0, 10);
+const oldLinesSenate = asOf < "2027-01-04" && (isSenate ? district : senateOf) % 2 === 1;
 const pulledOn = meta().imported_at?.slice(0, 10);
 const mapLabel = isSenate
   ? `Map of ${seatName} and its three Assembly districts`
   : `Map of ${seatName} inside Senate District ${senateOf}`;
 const mapCaption = isSenate
   ? `${seatName} is filled, with white lines between its three Assembly districts. The small map shows where it is in Wisconsin.`
-  : `${seatName} is filled, inside Senate District ${senateOf}, outlined. The small map shows where it is in Wisconsin.`;
+  : `${seatName} is shaded, inside Senate District ${senateOf}, outlined. The small map shows where it is in Wisconsin.`;
 ---
 
 <Base
@@ -126,13 +149,13 @@ const mapCaption = isSenate
   description={`${seatName}: the current member, everyone who has held the seat since 2009, and official election results.`}
   layout="wide"
 >
-  <div class="seat" data-no-rep-highlight>
+  <div class="seat">
     <header class="s-head flex max-w-[47.5rem] flex-col gap-2.5">
       <a href="/districts/" class="self-start text-small underline">All districts</a>
       <h1 class="t-display">{seatName}</h1>
       <p class="sm:text-lead">
         {holder ? (
-          <>Represented by <a href={`/legislators/${personSlug(holder.id)}/`} class="underline">{holder.name}</a>{holder.party ? `, ${article(partyWord(holder.party))} ${partyWord(holder.party)},` : ""}{since ? ` since ${monthLong(since)}.` : "."}</>
+          <>Represented by <a href={`/legislators/${personSlug(holder.id)}/`} class="underline">{holder.name}</a>{holder.party ? `, ${article(partyWord(holder.party))} ${partyWord(holder.party)},` : ""}{since ? (sinceAtLeast ? ` since at least ${monthLong(since)}.` : ` since ${monthLong(since)}.`) : "."}</>
         ) : (
           "This seat is empty right now."
         )}
@@ -151,7 +174,14 @@ const mapCaption = isSenate
           </>
         )}
       </p>
-      <p data-mine-seat={seatKey} hidden>
+      {oldLinesSenate && (
+        <p class="text-small text-granite">
+          {isSenate
+            ? "Until January 2027, this seat's senator represents the district lines in place when they were elected, not the 2024 lines on this page's map. The November 2026 election uses the 2024 lines."
+            : `Until January 2027, the senator for Senate District ${senateOf} represents the district lines in place when they were elected, which may not include all of this Assembly district.`}
+        </p>
+      )}
+      <p data-mine-seat={seatKey} data-pagefind-ignore hidden>
         <span class="mine">This is your district</span>
       </p>
     </header>
@@ -163,9 +193,9 @@ const mapCaption = isSenate
       </div>
       {hasSeatMap(seatKey) && (
         <figure class="flex flex-col gap-3 rounded-[0.75rem] bg-white p-4">
-          <Fragment set:html={seatMapSvg(seatKey, "#0D5C63", ` class="h-auto w-full rounded-[0.5rem]" role="img" aria-label="${mapLabel}"`)} />
+          <img src={`/data/maps/seats/${seatKey}.svg`} alt={mapLabel} width="700" height="490" class="h-auto w-full rounded-[0.5rem]" />
           <figcaption class="flex flex-wrap items-start gap-3 text-fine text-granite">
-            <Fragment set:html={stateLocatorSvg(seatKey, "#0D5C63", ' class="h-auto w-14 shrink-0" aria-hidden="true"')} />
+            <Fragment set:html={stateLocatorSvg(seatKey, SEAT_MAP_FILL.senate, ' class="h-auto w-14 shrink-0" aria-hidden="true"')} />
             <span class="min-w-0 flex-[1_1_8rem] [overflow-wrap:anywhere]">{mapCaption} Boundaries are the Legislature's 2024 maps.</span>
           </figcaption>
         </figure>
@@ -174,7 +204,7 @@ const mapCaption = isSenate
 
     <div class="s-body flex max-w-[47.5rem] flex-col gap-10">
       {holder && (
-        <section class="sheet flex flex-col gap-4 p-5 sm:p-7" aria-labelledby="member-heading">
+        <section class="sheet flex flex-col gap-4 p-5 sm:p-7" aria-labelledby="member-heading" data-no-rep-highlight>
           <div class="flex flex-wrap items-center gap-4">
             <Portrait src={holder.image_url} name={holder.name} size={64} />
             <div class="min-w-0 flex-[1_1_12rem]">
@@ -212,7 +242,7 @@ const mapCaption = isSenate
           From the Legislature's service records, which begin with the 2009 session. District lines
           were redrawn in 2011, 2022 and 2024, so the area this seat covers has changed over time.
         </p>
-        <ol class="mt-4 border-y border-rule" role="list">
+        <ol class="mt-4 border-y border-rule" role="list" data-no-rep-highlight>
           {lineage.map((s, i) => (
             <li class:list={["flex flex-col gap-0.5 py-3", i > 0 && "border-t border-rule"]}>
               <p class="flex flex-wrap items-baseline gap-x-2">
@@ -244,19 +274,15 @@ const mapCaption = isSenate
               return (
                 <section class="flex flex-col gap-3 border-t border-rule py-5" aria-labelledby={`results-${h.year}`}>
                   <h3 id={`results-${h.year}`} class="t-question">November {h.year}</h3>
-                  <p>
-                    {h.candidates.length === 1
-                      ? `${subject(first.candidate, first.party)} ran unopposed and got ${first.votes.toLocaleString()} of ${h.total.toLocaleString()} votes cast.`
-                      : `${subject(first.candidate, first.party)} won with ${pct(first.votes, h.total)} of ${h.total.toLocaleString()} votes cast.`}
-                  </p>
+                  <p>{resultLine(h)}</p>
                   {h.candidates.length === 2 && (
                     <div class="flex flex-col gap-1.5">
                       <div class="split flex h-3 overflow-hidden rounded-full bg-fog" aria-hidden="true">
                         <span class="block h-full bg-spruce" style={`width:${((first.votes / (first.votes + second.votes)) * 100).toFixed(1)}%`}></span>
                       </div>
                       <div class="flex flex-wrap justify-between gap-x-4 text-small">
-                        <span><span class="font-bold">{first.candidate}</span> {first.votes.toLocaleString()}</span>
-                        <span class="text-right"><span class="font-bold">{second.candidate}</span> {second.votes.toLocaleString()}</span>
+                        <span><span class="font-bold">{first.candidate}</span>{first.party && `, ${partyWord(first.party)}`}: {first.votes.toLocaleString()} <span class="text-granite">{pct(first.votes, h.total)}</span></span>
+                        <span class="text-right"><span class="font-bold">{second.candidate}</span>{second.party && `, ${partyWord(second.party)}`}: {second.votes.toLocaleString()} <span class="text-granite">{pct(second.votes, h.total)}</span></span>
                       </div>
                     </div>
                   )}

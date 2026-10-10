@@ -33,6 +33,8 @@ export type RepSummary = {
   /** Parties whose primary for this seat may have a write-in nominee the
    * certified results don't name. */
   writeInPending: string[];
+  /** The same primaries with the reason each nominee isn't settled. */
+  writeInReasons?: { party: string; reason: string }[];
   /** Share of votes cast with their party's majority, newest regular
    * session with at least 20 such votes; null for members outside the two
    * caucuses. `label` is the session's plain name ("2025–26 session"). */

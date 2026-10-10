@@ -4,7 +4,7 @@
  * own page (built at build time), so the two never word the same fact two
  * ways. Pure and browser-safe: it reads only the summary it is handed.
  * Every value that reaches the HTML goes through esc(). */
-import { ballotStatus } from "./ballot.ts";
+import { ballotStatus, writeInSentence } from "./ballot.ts";
 import { clip, fmtDate, partyPlural, partyWord } from "./format.ts";
 import { esc } from "./html.ts";
 import type { RepSummary, Typical } from "./wire.ts";
@@ -163,17 +163,18 @@ export function answers(full: RepSummary, ctx: AnswerContext): Answer[] {
   const when = ctx.general ? longDate(ctx.general) : "";
   const seat = status.kind !== "none" ? `/elections/${status.year}/${ctx.house}-${ctx.district}/` : "";
   const raceLink = status.kind !== "none" && status.kind !== "future" ? ` ${link(seat, "See the race")}` : "";
-  // a write-in nominee may exist that the certified results don't name
-  const writeInLine = writeIns.length
-    ? ` The ${esc(writeIns.join(" and "))} primary had no printed candidate, so a write-in nominee may also be on the ballot.`
-    : "";
+  // a nominee the certified results don't settle yet: say why
+  const reasons = full.writeInReasons?.length
+    ? full.writeInReasons
+    : writeIns.map((party) => ({ party, reason: "" }));
+  const writeInLine = reasons.length ? ` ${esc(writeInSentence(reasons))}` : "";
   let ballot = "";
   if (status.kind === "on-ballot") {
     ballot = ctx.phase === "general"
       ? opponents.length
         ? `Yes. ${when ? `On ${esc(when)}, they` : "They"} face ${people(opponents)}.`
         : writeIns.length
-          ? `Yes. No other candidate's name is on the ballot for this seat${when ? ` on ${esc(when)}` : ""}.`
+          ? `Yes. No other nominee for this seat is settled yet${when ? ` for ${esc(when)}` : ""}.`
           : `Yes. They're running unopposed${when ? ` on ${esc(when)}` : ""}.`
       : `Yes, they're on the ${status.year} ballot.` + (opponents.length ? ` Others approved for this seat: ${people(opponents)}.` : "");
     ballot += writeInLine;
