@@ -1,5 +1,8 @@
 ---
-import PartyChip from "./PartyChip.astro";
+/** One roll call, told plainly: what the vote was for, how it came out,
+ * a single Yes/No bar, and every member's vote one tap away. Party is a
+ * letter in dense name lists, with its key beside the list, never a color.
+ * The reader's own lawmakers are pinned by the script below. */
 import { chamberName, fmtDate, personSlug } from "../lib/format";
 import { safeHref } from "../lib/html";
 import type { VoteEvent } from "../lib/db";
@@ -11,72 +14,119 @@ const SubHeading = headingLevel === "h2" ? "h3" : "h4";
 const records = voteRecordsFor(event.id);
 const byOption = (opt: string) => records.filter((r) => r.option === opt);
 const groups = [
-  { key: "yes", label: "Aye", rows: byOption("yes"), style: "text-moss-600" },
-  { key: "no", label: "Nay", rows: byOption("no"), style: "text-badger-700" },
-  {
-    key: "other",
-    label: "Not voting",
-    rows: records.filter((r) => r.option !== "yes" && r.option !== "no"),
-    style: "text-navy-600",
-  },
+  { key: "yes", label: "Yes", rows: byOption("yes") },
+  { key: "no", label: "No", rows: byOption("no") },
+  { key: "other", label: "Didn't vote", rows: records.filter((r) => r.option !== "yes" && r.option !== "no") },
 ];
+const chamber = chamberName(event.chamber);
+const motion = event.motion ?? "";
+// what the vote was for, in plain words; the official motion stays below
+const committeeVote = /recommended by (?:the )?((?:joint )?committee on [^,]+)/i.exec(motion);
+const PURPOSES: [RegExp, string][] = [
+  [/notwithstanding the objections/i, "to override the governor's veto"],
+  [/amendment/i, "on an amendment"],
+  [/recommended by/i, "to recommend it"],
+  [/suspend/i, "to take it up right away"],
+  [/table/i, "to set it aside"],
+  [/nonconcur/i, ""],
+  [/third time and passed|^passage|passed|concur/i, "to pass it"],
+  [/adopt/i, "to adopt it"],
+];
+const purpose = PURPOSES.find(([re]) => re.test(motion))?.[1] ?? "";
+// committee roll calls say which committee voted
+const who = committeeVote
+  ? /^joint/i.test(committeeVote[1])
+    ? committeeVote[1].replace(/^joint committee/i, "Joint Committee")
+    : `${chamberName(event.chamber)} ${committeeVote[1].replace(/^committee/i, "Committee")}`
+  : chamberName(event.chamber);
+const yes = event.yes_count ?? groups[0].rows.length;
+const no = event.no_count ?? groups[1].rows.length;
+const notVoting = event.nv_count ?? groups[2].rows.length;
+const passed = event.result === "pass";
+const total = yes + no;
+const members = event.chamber === "upper" ? "senators" : event.chamber === "lower" ? "representatives" : "members";
+const parties = [...new Set(records.map((r) => r.party).filter(Boolean))].sort() as string[];
+const abbr = (party: string | null) => (party ? party[0] : "?");
 ---
-<div class="rounded-lg border border-navy-100 bg-white p-4" data-rollcall data-chamber={event.chamber}>
-  <div class="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-    <Heading class="font-semibold">
-      {chamberName(event.chamber)}: {event.motion ?? "Vote"}
-    </Heading>
-    <span class={`text-sm font-bold ${event.result === "pass" ? "text-moss-600" : "text-badger-700"}`}>
-      {event.result === "pass" ? "Passed" : "Failed"}
-      {event.yes_count != null && ` ${event.yes_count}–${event.no_count ?? 0}`}
-    </span>
-    <span class="text-sm text-navy-600">{fmtDate(event.date)}</span>
-    {safeHref(event.source_url) && (
-      <a href={safeHref(event.source_url)} class="text-sm underline">official source</a>
-    )}
-    {!compact && <a href={`/votes/${event.id}/`} class="text-sm underline">full page</a>}
-  </div>
-  <p class="mb-3 hidden rounded border-l-4 border-gold-600 bg-gold-100 px-3 py-2 text-sm font-medium" data-your-reps-note></p>
+<div class="border-t border-rule py-5" data-rollcall data-chamber={event.chamber}>
+  <Heading class="t-question">
+    {who} vote{purpose ? ` ${purpose}` : ""}
+  </Heading>
+  <p class="mt-1">
+    <strong class="figure">{passed ? "Passed" : "Failed"}{event.yes_count != null && `, ${yes} to ${no}`}</strong>
+    <span class="text-granite"> · {fmtDate(event.date)}{notVoting > 0 && ` · ${notVoting} didn't vote`}</span>
+  </p>
+  {total > 0 && (
+    <div class="mt-2 max-w-md" aria-hidden="true">
+      <div class="flex h-3 overflow-hidden rounded-full bg-fog">
+        <div class="bg-spruce" style={`width: ${(yes / total) * 100}%`}></div>
+      </div>
+      <div class="mt-1 flex justify-between text-fine text-granite">
+        <span>Yes {yes}</span><span>No {no}</span>
+      </div>
+    </div>
+  )}
+  <p class="mt-3 hidden rounded-[0.625rem] bg-prairie-tint px-3 py-2 text-small font-semibold" data-your-reps-note></p>
   {records.length === 0 ? (
-    <p class="text-sm text-navy-600">
-      No individual roll call was recorded for this vote. Committee votes and
+    <p class="mt-2 text-small text-granite">
+      No member-by-member record exists for this vote. Committee votes and
       some older sessions record totals only.
     </p>
   ) : (
-    <div
-      class="max-h-96 overflow-y-auto scroll-body scroll-on-paper"
-      role="region"
-      tabindex="0"
-      aria-label={`${chamberName(event.chamber)} roll call, every member`}
-    >
-    <div class="grid gap-3 sm:grid-cols-3">
-      {groups.filter((g) => g.rows.length).map((group) => (
-        <div>
-          <SubHeading class={`mb-1 text-xs font-bold uppercase tracking-wide ${group.style}`}>
-            {group.label} · {group.rows.length}
-          </SubHeading>
-          <ul class="text-sm">
-            {group.rows.map((r) => (
-              <li
-                class="flex min-h-6 items-center gap-1.5 rounded border-l-4 border-transparent px-1"
-                data-vote-row
-                data-chamber={r.chamber}
-                data-district={r.district}
-                data-option={group.label}
-              >
-                <PartyChip party={r.party} size="sm" />
-                <a href={`/legislators/${personSlug(r.person_id)}/`} class="truncate py-1 hover:underline">
-                  {r.name}
-                </a>
-                {r.district != null && <span class="text-xs text-navy-600">({r.district})</span>}
-              </li>
-            ))}
-          </ul>
+    <details class="group mt-3" open={compact}>
+      <summary class="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">
+        <span class="group-open:hidden">See how each of the {records.length} {members} voted</span>
+        <span class="hidden group-open:inline">Hide the names</span>
+      </summary>
+      <p class="mt-1 text-fine text-granite">
+        {parties.map((p, i) => <>{i > 0 && ", "}{abbr(p)}: {p === "Democratic" ? "Democrat" : p}</>)}
+      </p>
+      <div
+        class="mt-2 max-h-96 overflow-y-auto scroll-body scroll-on-paper"
+        role="region"
+        tabindex="0"
+        aria-label={`${chamber} roll call, every member`}
+      >
+        <div class="grid gap-4 sm:grid-cols-3">
+          {groups.filter((g) => g.rows.length).map((group) => (
+            <div>
+              <SubHeading class="t-label mb-1">
+                {`${group.label} `}<span class="font-semibold text-granite">({group.rows.length})</span>
+              </SubHeading>
+              <ul class="text-small">
+                {group.rows.map((r) => (
+                  <li
+                    class="flex min-h-6 items-center gap-1.5 rounded border-l-4 border-transparent px-1"
+                    data-vote-row
+                    data-chamber={r.chamber}
+                    data-district={r.district}
+                    data-option={group.label}
+                  >
+                    <a href={`/legislators/${personSlug(r.person_id)}/`} class="min-w-0 truncate py-1 text-spruce hover:underline">
+                      {r.name}
+                    </a>
+                    <span class="shrink-0 text-granite">
+                      ({abbr(r.party)}{r.district != null && `, ${r.district}`})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
-    </div>
+      </div>
+    </details>
   )}
+  <p class="mt-2 text-fine text-granite">
+    {motion && <>Official motion: “{motion}”. </>}
+    {safeHref(event.source_url) && <a href={safeHref(event.source_url)} class="underline">Official record</a>}
+    {!compact && (
+      <>
+        {safeHref(event.source_url) && " · "}
+        <a href={`/votes/${event.id}/`} class="underline">This vote on its own page</a>
+      </>
+    )}
+  </p>
 </div>
 
 <script>
@@ -88,25 +138,26 @@ const groups = [
   if (saved) {
     const { ad, sd } = saved;
     document.querySelectorAll("[data-rollcall]").forEach((block) => {
-      const wanted =
-        block.getAttribute("data-chamber") === "upper" ? String(sd) : String(ad);
+      const upper = block.getAttribute("data-chamber") === "upper";
+      const wanted = upper ? String(sd) : String(ad);
       const names: string[] = [];
       block.querySelectorAll("[data-vote-row]").forEach((row) => {
         if (row.getAttribute("data-district") === wanted) {
           row.classList.remove("border-transparent");
-          row.classList.add("bg-gold-100", "font-semibold", "border-gold-600");
+          row.classList.add("bg-prairie-tint", "font-bold", "border-prairie");
           const a = row.querySelector("a");
           if (a) {
             const option = row.getAttribute("data-option");
             const name = a.textContent!.trim();
-            names.push(option === "Not voting" ? `${name} did not vote` : `${name} voted ${option}`);
+            const who = `Your ${upper ? "state senator" : "representative"}, ${name},`;
+            names.push(option === "Didn't vote" ? `${who} didn't vote.` : `${who} voted ${option!.toLowerCase()}.`);
             srPrefix(a, "Your representative: ");
           }
         }
       });
       const note = block.querySelector("[data-your-reps-note]");
       if (note && names.length) {
-        note.textContent = `Your rep: ${names.join("; ")}`;
+        note.textContent = names.join(" ");
         note.classList.remove("hidden");
       }
     });

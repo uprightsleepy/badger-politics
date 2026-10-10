@@ -1,21 +1,32 @@
 ---
-/** Device-only follow toggle; state lives in localStorage. */
+/** Device-only follow toggle; state lives in localStorage. The button keeps
+ * its name when pressed ("Follow this bill" becomes "Following"), and
+ * aria-pressed carries the state for assistive tech. `variant="primary"`
+ * is the redesigned full-width action; the default chip is for pages not
+ * redesigned yet. */
 interface Props {
   kind: "bills" | "legislators" | "committees" | "districts" | "races" | "council";
   id: string;
+  /** Label while not following. */
+  label?: string;
+  variant?: "chip" | "primary";
 }
-const { kind, id } = Astro.props;
+const { kind, id, label = "Follow", variant = "chip" } = Astro.props;
+const chip =
+  "rounded-full border border-navy-600 bg-white px-3 py-1.5 text-sm font-semibold hover:ring-2 hover:ring-navy-600 focus-visible:ring-2 focus-visible:ring-navy-600 aria-pressed:border-navy-800 aria-pressed:bg-navy-800 aria-pressed:text-white";
 ---
 <button
   type="button"
   data-follow-kind={kind}
   data-follow-id={id}
+  data-follow-label={label}
   aria-pressed="false"
-  class="rounded-full border border-navy-600 bg-white px-3 py-1.5 text-sm font-semibold
-         hover:ring-2 hover:ring-navy-600 focus-visible:ring-2 focus-visible:ring-navy-600
-         aria-pressed:border-navy-800 aria-pressed:bg-navy-800 aria-pressed:text-white"
+  class={variant === "primary" ? "btn btn-primary w-full" : chip}
 >
-  Follow
+  {variant === "primary" && (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
+  )}
+  <span data-follow-text>{label}</span>
 </button>
 
 <script>
@@ -23,9 +34,10 @@ const { kind, id } = Astro.props;
   document.querySelectorAll<HTMLButtonElement>("[data-follow-kind]").forEach((btn) => {
     const kind = btn.dataset.followKind as keyof import("../scripts/follows").Follows;
     const id = btn.dataset.followId!;
+    const text = btn.querySelector<HTMLElement>("[data-follow-text]") ?? btn;
     const paint = (on: boolean) => {
       btn.setAttribute("aria-pressed", String(on));
-      btn.textContent = on ? "Following" : "Follow";
+      text.textContent = on ? "Following" : (btn.dataset.followLabel ?? "Follow");
     };
     paint(isFollowing(kind, id));
     btn.addEventListener("click", () => paint(toggleFollow(kind, id)));

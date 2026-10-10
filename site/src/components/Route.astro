@@ -1,0 +1,175 @@
+---
+/** The route: how far a bill has traveled. Lake road behind it, a dashed
+ * road ahead, and a Prairie "you are here" ring on the current stop.
+ * Vertical in narrow containers, horizontal once there is room for every
+ * stop's label. Each stop says its state in words for screen readers and
+ * keeps its shape in forced-colors mode. See docs/brand.md ("Route"). */
+import type { Stop } from "../lib/billStory";
+interface Props {
+  stops: Stop[];
+  /** True when the bill stopped at the current stop for good. */
+  stopped: boolean;
+  label?: string;
+}
+const { stops, stopped, label = "How far this bill got" } = Astro.props;
+const spoken = (s: Stop) =>
+  s.state === "done" ? "passed" : s.state === "todo" ? "not reached" : stopped ? "stopped here" : "here now";
+---
+<div class="route-frame">
+  <ol class="route" aria-label={label} style={`--stops: ${stops.length}`}>
+    {stops.map((s) => (
+      <li class="stop" data-state={s.state} aria-current={s.state === "here" ? "step" : undefined}>
+        <span class="dot" aria-hidden="true"></span>
+        <p class="lbl">{s.label}<span class="sr-only">, {spoken(s)}</span></p>
+        {(s.note ?? s.detail) && <p class="sub">{s.note ?? s.detail}</p>}
+      </li>
+    ))}
+  </ol>
+</div>
+
+<style>
+  .route-frame {
+    container-type: inline-size;
+  }
+  .route {
+    display: flex;
+    flex-direction: column;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .stop {
+    position: relative;
+    min-height: 1.75rem;
+    padding: 0 0 1.375rem 2.75rem;
+  }
+  .stop:last-child {
+    padding-bottom: 0;
+  }
+  /* the road from this stop to the next */
+  .stop::before {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: 18px;
+    bottom: -4px;
+    border-left: 4px dashed var(--color-edge);
+  }
+  .stop[data-state="done"]::before {
+    border-left-style: solid;
+    border-color: var(--color-lake);
+  }
+  .stop:last-child::before {
+    display: none;
+  }
+  .dot {
+    position: absolute;
+    top: 3px;
+    left: 6px;
+    width: 18px;
+    height: 18px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid var(--color-edge);
+  }
+  [data-state="done"] .dot {
+    background: var(--color-lake);
+    border-color: var(--color-lake);
+  }
+  [data-state="here"] .dot {
+    top: -3px;
+    left: 0;
+    width: 30px;
+    height: 30px;
+    background: var(--color-prairie);
+    border-color: var(--color-spruce);
+  }
+  .lbl,
+  .sub {
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+  .lbl {
+    margin: 0;
+    font: 700 1.0625rem/1.3 var(--font-display);
+  }
+  [data-state="todo"] .lbl {
+    color: var(--color-granite);
+    font-weight: 600;
+  }
+  .sub {
+    margin: 0.125rem 0 0;
+    font-size: 0.9375rem;
+    line-height: 1.45;
+    color: var(--color-granite);
+  }
+  [data-state="here"] .sub {
+    color: var(--color-spruce);
+  }
+
+  /* horizontal once each of six stops has about 5.5rem */
+  @container (min-width: 34rem) {
+    .route {
+      display: grid;
+      grid-template-columns: repeat(var(--stops), minmax(0, 1fr));
+    }
+    .stop {
+      padding: 2.5rem 0.75rem 0 0;
+    }
+    .stop::before {
+      top: 13px;
+      left: 9px;
+      right: -9px;
+      bottom: auto;
+      border-left: 0;
+      border-top: 4px dashed var(--color-edge);
+    }
+    .stop[data-state="done"]::before {
+      border-top-style: solid;
+      border-color: var(--color-lake);
+    }
+    .dot {
+      top: 6px;
+      left: 0;
+    }
+    [data-state="here"] .dot {
+      top: 0;
+      left: -6px;
+    }
+    .lbl,
+    .sub {
+      overflow-wrap: normal;
+      hyphens: manual;
+    }
+    .lbl {
+      font-size: 0.9375rem;
+      line-height: 1.25;
+    }
+    .sub {
+      font-size: 0.875rem;
+      line-height: 1.4;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .stop::before,
+    .stop[data-state="done"]::before {
+      border-color: CanvasText;
+    }
+    .dot {
+      border-color: CanvasText;
+      background: Canvas;
+    }
+    [data-state="done"] .dot {
+      forced-color-adjust: none;
+      background: CanvasText;
+      border-color: CanvasText;
+    }
+    [data-state="here"] .dot {
+      forced-color-adjust: none;
+      background: Highlight;
+      border-color: CanvasText;
+    }
+  }
+</style>
