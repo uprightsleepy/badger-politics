@@ -115,6 +115,14 @@
 
 /* Type styles from docs/brand.md: phone size first, desktop from 640px. */
 @layer components {
+  /* Big type breaks a word that can't fit rather than widening the page
+     when a reader enlarges text. */
+  .t-display,
+  .t-status,
+  .t-section {
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
   .t-display {
     font: 800 1.9375rem/1.16 var(--font-display); /* 31/36 */
     letter-spacing: -0.01em;
@@ -208,6 +216,7 @@
   }
   button.term {
     display: inline;
+    white-space: normal;
     padding: 0;
     border: 0;
     background: none;
@@ -261,6 +270,16 @@
     font-weight: 700;
     box-shadow: inset 0 -2px 0 var(--color-prairie);
   }
+}
+
+/* Seat bars on older pages: one party's segment is hatched so the two
+   neutral fills differ by more than lightness. */
+.seat-hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.6) 0 2px,
+    transparent 2px 5px
+  );
 }
 
 /* missed-vote heatmap cells carry stripes so the state survives without color */

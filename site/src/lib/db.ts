@@ -25,6 +25,7 @@ export interface Bill {
   lrb_analysis: string | null;
   died_without_hearing: number;
   committee_at_death: string | null;
+  committee_chamber_at_death: string | null;
   committee_chair_at_death: string | null;
 }
 export interface Person {

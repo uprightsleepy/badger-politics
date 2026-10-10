@@ -1,0 +1,25 @@
+---
+/** Each term's definition, once per page, as a native popover that the
+ * dotted terms in the text open (`popovertarget="term-<id>"`). A bottom
+ * sheet on phones, a small card on wider screens; no script. Render it
+ * outside anything that can be display: none, or the popovers can't show. */
+import { TERMS, type TermId } from "../lib/glossary";
+interface Props {
+  terms: TermId[];
+}
+const unique = [...new Set(Astro.props.terms)];
+---
+{unique.map((id) => {
+  const t = TERMS[id];
+  return (
+    <div id={`term-${id}`} popover class="term-pop" data-pagefind-ignore>
+      <p class="t-question">{t.label}</p>
+      <p class="mt-1.5">{t.short}</p>
+      {"official" in t && t.official && <p class="mt-1.5 text-small text-granite">Official term: {t.official}</p>}
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <a href={`/glossary/#${t.glossary}`} class="underline">More in the glossary</a>
+        <button type="button" class="btn btn-secondary" popovertarget={`term-${id}`} popovertargetaction="hide">Close</button>
+      </div>
+    </div>
+  );
+})}

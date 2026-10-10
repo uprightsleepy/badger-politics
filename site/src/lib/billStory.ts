@@ -59,10 +59,13 @@ export const committeeFromReferral = (description: string, chamber: string | nul
   return `${chamberName(chamber)} Committee on ${name}`;
 };
 
-/** The schedule only covers the current biennium. */
+/** The schedule only covers one biennium. Sessions before it are over;
+ * sessions after it are ones we have no calendar for yet, so we never call
+ * them over. */
 const scheduledSession = (sessionId: string) => sessionId === SCHEDULE.session.slice(0, 4);
-const isCurrentBiennium = (sessionId: string) =>
-  Number(sessionId.slice(0, 4)) >= Number(SCHEDULE.session_start.slice(0, 4));
+const scheduleYear = Number(SCHEDULE.session_start.slice(0, 4));
+const before = (sessionId: string) => Number(sessionId.slice(0, 4)) < scheduleYear;
+const after = (sessionId: string) => Number(sessionId.slice(0, 4)) > scheduleYear + 1;
 
 /** The last day of the session's final general-business floorperiod, when
  * the schedule records it. */
@@ -77,9 +80,22 @@ export const lastVotingDay = (sessionId: string): string | null => {
  * special session of the current biennium can meet any time until the
  * biennium ends. */
 export const sessionClosed = (sessionId: string, today: string): boolean => {
-  if (!isCurrentBiennium(sessionId)) return true;
+  if (before(sessionId)) return true;
+  if (after(sessionId)) return false;
   if (scheduledSession(sessionId)) {
     const last = lastVotingDay(sessionId);
+    return last != null && today > last;
+  }
+  return today > SCHEDULE.session_end;
+};
+
+/** Can lawmakers still take up a veto? Overrides get their own floorperiod
+ * after general business ends, so this window closes later. */
+export const vetoWindowClosed = (sessionId: string, today: string): boolean => {
+  if (before(sessionId)) return true;
+  if (after(sessionId)) return false;
+  if (scheduledSession(sessionId)) {
+    const last = SCHEDULE.floorperiods.map((f) => f.end).sort().at(-1);
     return last != null && today > last;
   }
   return today > SCHEDULE.session_end;
@@ -103,7 +119,9 @@ export interface Progress {
   act: string | null;
   vetoed: string | null;
   partialVeto: boolean;
-  override: { date: string; passed: boolean } | null;
+  /** `voted` is false for the automatic "failed ... pursuant to Joint
+   * Rule 82" entry, which records no vote. */
+  override: { date: string; passed: boolean; voted: boolean } | null;
   sessionEnd: string | null;
 }
 
@@ -125,7 +143,9 @@ export function progress(bill: StoryBill, actions: StoryAction[]): Progress {
     const d = a.description ?? "";
     const inOrigin = (a.chamber ?? origin) === origin;
     if (!p.passedOrigin && inOrigin) {
-      if (!p.committee && has(a, "referral-committee")) {
+      // a bill withdrawn and re-referred moves to the new committee; once a
+      // committee recommends it, later referrals (Rules) are scheduling
+      if (!p.committeeRecommended && has(a, "referral-committee")) {
         const name = committeeFromReferral(d, a.chamber ?? origin);
         if (name) {
           p.committee = name;
@@ -154,7 +174,9 @@ export function progress(bill: StoryBill, actions: StoryAction[]): Progress {
     const act = ACT_RE.exec(d);
     if (act) p.act = `${act[1]} Wisconsin Act ${act[2]}`;
     if ((VETOED_RE.test(d) && !SIGNED_RE.test(d)) || has(a, "executive-veto")) p.vetoed ??= a.date;
-    if (OVERRIDE_RE.test(d)) p.override = { date: a.date, passed: !/^failed/i.test(d) };
+    if (OVERRIDE_RE.test(d)) {
+      p.override = { date: a.date, passed: !/^failed/i.test(d), voted: tally(d) != null || !/^failed/i.test(d) };
+    }
     if (SJR1_RE.test(d)) p.sessionEnd ??= a.date;
   }
   return p;
@@ -179,6 +201,9 @@ export interface Story {
   stopped: boolean;
   terms: TermId[];
   progress: Progress;
+  /** The status the story tells: a one-house resolution that passed its
+   * chamber is adopted. */
+  status: string;
 }
 
 const article = (word: string) => (/^[AEIOU]/i.test(word) ? "an" : "a");
@@ -188,7 +213,8 @@ const passedText = (v: { date: string; tally: { yes: number; no: number } | null
 
 export function tellStory(bill: StoryBill, actions: StoryAction[], today: string): Story {
   const p = progress(bill, actions);
-  const status = bill.status ?? "introduced";
+  const raw = bill.status ?? "introduced";
+  const status = p.oneHouse && raw === "passed_chamber" ? "adopted" : raw;
   const originName = chamberName(p.origin);
   const otherName = chamberName(p.other);
   const closed = sessionClosed(bill.session_id, today) || status === "failed_sjr1";
@@ -233,7 +259,10 @@ export function tellStory(bill: StoryBill, actions: StoryAction[], today: string
   const arrived = here === -1;
   if (arrived) here = keys.length - 1;
   const hereKey = keys[here];
-  const stopped = !arrived && (status === "vetoed" || (closed && status !== "passed"));
+  const vetoFinal = vetoWindowClosed(bill.session_id, today);
+  // a veto can still be overridden until the veto-review days pass
+  const stopped = !arrived && (status === "vetoed" ? vetoFinal : closed && status !== "passed");
+  const overridden = !!p.override?.passed && !p.signed;
 
   const stopNote = (): string => {
     switch (hereKey) {
@@ -252,11 +281,11 @@ export function tellStory(bill: StoryBill, actions: StoryAction[], today: string
       case "other":
         return stopped ? `Stopped here. The ${otherName} never voted on it.` : `Waiting for the ${otherName}.`;
       case "governor":
-        return p.vetoed || status === "vetoed"
-          ? `Vetoed${p.vetoed ? ` ${fmtDate(p.vetoed)}` : ""}.`
-          : "Waiting for a decision.";
+        if (p.vetoed || status === "vetoed") return `Vetoed${p.vetoed ? ` ${fmtDate(p.vetoed)}` : ""}.`;
+        return stopped ? "Stopped here. It never went to the governor." : "Waiting for a decision.";
       case "law":
-        return p.act ?? "Signed into law.";
+        // keep "Act 1" together in a narrow route column
+        return p.act?.replace(/ (\d+)$/, "\u00a0$1") ?? "Became law.";
       case "adopted":
         return "Resolutions end here.";
     }
@@ -266,13 +295,13 @@ export function tellStory(bill: StoryBill, actions: StoryAction[], today: string
       case "introduced":
         return p.introduced ? fmtDate(p.introduced) : undefined;
       case "committee":
-        return p.committeeRecommended ? "Recommended" : undefined;
+        return p.committeeRecommended ? "Approved" : undefined;
       case "origin":
         return p.passedOrigin ? passedText(p.passedOrigin) : undefined;
       case "other":
         return p.passedOther ? passedText(p.passedOther) : undefined;
       case "governor":
-        return p.signed ? "Signed" : undefined;
+        return p.signed ? "Signed" : overridden ? "Veto overridden" : undefined;
       default:
         return undefined;
     }
@@ -295,9 +324,13 @@ export function tellStory(bill: StoryBill, actions: StoryAction[], today: string
   if (status === "enacted") {
     headline = "Became law";
     terms.add("act");
-    body = [
-      `The governor signed it${p.signed ? ` on ${fmtDate(p.signed)}` : ""}.${p.act ? ` It's [[act|${p.act}]].` : ""}`,
-    ];
+    const actLine = p.act ? ` It's [[act|${p.act}]].` : "";
+    if (overridden) {
+      terms.add("veto-override");
+      body = [`The governor vetoed it, and lawmakers [[veto-override|overrode the veto]] on ${fmtDate(p.override!.date)}, so it became law.${actLine}`];
+    } else {
+      body = [`The governor signed it${p.signed ? ` on ${fmtDate(p.signed)}` : ""}.${actLine}`];
+    }
     if (p.partialVeto) {
       terms.add("partial-veto");
       body.push("Before signing, the governor struck some parts using Wisconsin's [[partial-veto|partial veto]].");
@@ -315,16 +348,27 @@ export function tellStory(bill: StoryBill, actions: StoryAction[], today: string
     headline = "Vetoed by the governor";
     body = [`Both chambers passed it, and the governor vetoed it${p.vetoed ? ` on ${fmtDate(p.vetoed)}` : ""}.`];
     terms.add("veto-override");
-    if (p.override && !p.override.passed) {
+    if (p.override && !p.override.passed && p.override.voted) {
       body.push(`Lawmakers tried to [[veto-override|override the veto]] on ${fmtDate(p.override.date)}, but fell short of the two-thirds it takes.`);
-    } else if (!closed) {
+    } else if (!vetoFinal) {
       body.push("Lawmakers can still [[veto-override|override the veto]] with a two-thirds vote in each chamber.");
     } else {
-      body.push("Lawmakers did not [[veto-override|override the veto]] before the session ended.");
+      body.push("Lawmakers did not [[veto-override|override the veto]], so it stands.");
     }
   } else if (status === "passed") {
     headline = "Waiting for the governor";
     body = ["Both chambers passed it. The governor can sign it into law or veto it."];
+  } else if (hereKey === "governor") {
+    // both chambers passed it, but it never reached the governor
+    terms.add("second-chamber");
+    headline = stopped ? "Passed both chambers, then stopped" : "Passed both chambers";
+    body = stopped
+      ? [
+          `The ${originName} and the ${otherName} both voted to pass it, but it never went to the governor. A bill goes to the governor only after both chambers [[second-chamber|pass the same version]].`,
+          lastDayLine,
+          tryAgain,
+        ]
+      : [`Both chambers voted to pass it. It goes to the governor once both have [[second-chamber|passed the same version]].`];
   } else if (hereKey === "other") {
     terms.add("second-chamber");
     if (stopped) {
@@ -387,7 +431,7 @@ export function tellStory(bill: StoryBill, actions: StoryAction[], today: string
     }
   }
   if (p.sessionEnd || SJR1_RE.test(actions.at(-1)?.description ?? "")) terms.add("sjr1");
-  return { headline, body: body.filter(Boolean), stops, stopped, terms: [...terms], progress: p };
+  return { headline, body: body.filter(Boolean), stops, stopped, terms: [...terms], progress: p, status };
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -464,15 +508,19 @@ function plainAction(a: StoryAction, origin: string, thing: string, hasReport: b
   if (SJR1_RE.test(d)) return { text: `The session ended, and the ${thing} died with it.` };
   if (OVERRIDE_RE.test(d)) {
     const t = tally(d);
-    return /^failed/i.test(d)
-      ? { text: `The ${ch} tried to override the veto${t ? `, ${t.yes} to ${t.no}` : ""}, short of the two-thirds it takes.` }
-      : { text: `The ${ch} voted to override the veto${t ? `, ${t.yes} to ${t.no}` : ""}.` };
+    if (/^failed/i.test(d)) {
+      // with no tally this is the automatic end of the override window
+      return t
+        ? { text: `The ${ch} tried to override the veto, ${t.yes} to ${t.no}, short of the two-thirds it takes.` }
+        : { text: "The veto stood. Lawmakers didn't override it." };
+    }
+    return { text: `The ${ch} voted to override the veto${t ? `, ${t.yes} to ${t.no}` : ""}.` };
   }
   if (/^read a third time and passed|^passed\b/i.test(d) || (has(a, "passage") && /passed/i.test(d))) {
     const t = tally(d);
     return { text: `The ${ch} passed it${t ? `, ${t.yes} to ${t.no}` : ""}.` };
   }
-  if (/concurred in/i.test(d) && (a.chamber ?? origin) !== origin) {
+  if (/(?<!non)concurred in/i.test(d) && (a.chamber ?? origin) !== origin) {
     const t = tally(d);
     const verb = thing === "proposal" ? "adopted" : "passed";
     return { text: `The ${ch} ${verb} it too${t ? `, ${t.yes} to ${t.no}` : ""}.` };

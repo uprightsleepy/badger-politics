@@ -22,21 +22,17 @@ const chamber = chamberName(event.chamber);
 const motion = event.motion ?? "";
 // what the vote was for, in plain words; the official motion stays below
 const committeeVote = /recommended by (?:the )?((?:joint )?committee on [^,]+)/i.exec(motion);
-const purpose = /notwithstanding the objections/i.test(motion)
-  ? "to override the governor's veto"
-  : committeeVote
-    ? "to recommend it"
-    : /amendment/i.test(motion)
-      ? "on an amendment"
-      : /suspend/i.test(motion)
-        ? "to take it up right away"
-        : /table/i.test(motion)
-          ? "to set it aside"
-          : /third time and passed|^passage|passed|concur/i.test(motion)
-            ? "to pass it"
-            : /adopt/i.test(motion)
-              ? "to adopt it"
-              : "";
+const PURPOSES: [RegExp, string][] = [
+  [/notwithstanding the objections/i, "to override the governor's veto"],
+  [/amendment/i, "on an amendment"],
+  [/recommended by/i, "to recommend it"],
+  [/suspend/i, "to take it up right away"],
+  [/table/i, "to set it aside"],
+  [/nonconcur/i, ""],
+  [/third time and passed|^passage|passed|concur/i, "to pass it"],
+  [/adopt/i, "to adopt it"],
+];
+const purpose = PURPOSES.find(([re]) => re.test(motion))?.[1] ?? "";
 // committee roll calls say which committee voted
 const who = committeeVote
   ? /^joint/i.test(committeeVote[1])
@@ -106,7 +102,7 @@ const abbr = (party: string | null) => (party ? party[0] : "?");
                     data-district={r.district}
                     data-option={group.label}
                   >
-                    <a href={`/legislators/${personSlug(r.person_id)}/`} class="truncate py-1 text-spruce hover:underline">
+                    <a href={`/legislators/${personSlug(r.person_id)}/`} class="min-w-0 truncate py-1 text-spruce hover:underline">
                       {r.name}
                     </a>
                     <span class="shrink-0 text-granite">

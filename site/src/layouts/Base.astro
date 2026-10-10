@@ -154,9 +154,11 @@ const mainClass =
     <header class="border-b border-rule bg-white">
       <nav aria-label="Main" class="mx-auto max-w-[72.5rem] px-2 py-2 lg:px-8 lg:py-3">
         <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-          <a href="/" class="flex min-h-11 shrink-0 items-center gap-2.5 whitespace-nowrap pl-2 text-spruce no-underline lg:pl-0">
-            <img src="/mark.svg" alt="" width="26" height="27" class="h-[27px] w-[26px] lg:h-8 lg:w-[30px]" />
-            <span class="font-display text-[1.1875rem] font-extrabold lg:text-[1.3125rem]">Badger Politics</span>
+          <!-- the wordmark may wrap at very large text sizes rather than push
+               the page sideways -->
+          <a href="/" class="flex min-h-11 min-w-0 items-center gap-2.5 pl-2 text-spruce no-underline lg:shrink-0 lg:whitespace-nowrap lg:pl-0">
+            <img src="/mark.svg" alt="" width="26" height="27" class="h-[27px] w-[26px] shrink-0 lg:h-8 lg:w-[30px]" />
+            <span class="font-display text-[1.1875rem] font-extrabold leading-tight lg:text-[1.3125rem]">Badger Politics</span>
           </a>
           <!-- phones and small tablets: a search shortcut and a native
                disclosure menu. This menu comes first in the DOM on purpose:

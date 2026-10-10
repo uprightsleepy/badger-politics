@@ -5,6 +5,7 @@ import RollCall from "../../../components/RollCall.astro";
 import Route from "../../../components/Route.astro";
 import PlainText from "../../../components/PlainText.astro";
 import TermsOnPage from "../../../components/TermsOnPage.astro";
+import TermPopovers from "../../../components/TermPopovers.astro";
 import { companionsFor,
   builtSessions,
   billsFor,
@@ -21,7 +22,7 @@ import {
   billSlug, clip, fmtDate, lrbParagraphs, personSlug, chamberName, sessionYear, shortTitle,
   subjectDisplay, subjectSlug, STATUS_LABELS, identifierLong, sessionPlainName, partyWord, partyPlural,
 } from "../../../lib/format";
-import { tellStory, plainHistory } from "../../../lib/billStory";
+import { tellStory, plainHistory, sessionClosed } from "../../../lib/billStory";
 import type { TermId } from "../../../lib/glossary";
 import JsonLd from "../../../components/JsonLd.astro";
 import { linkifyAction } from "../../../lib/actionLinks";
@@ -53,7 +54,6 @@ const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
 const vetoMsg = bill.status === "vetoed" || bill.status === "enacted"
   ? vetoMessageUrl(bill.id) : null;
 const isBill = bill.classification === "bill";
-const status = bill.status ?? "introduced";
 
 // The story is judged as of the snapshot, not the build clock, so the same
 // data always tells the same story.
@@ -61,6 +61,8 @@ const asOf = (meta().imported_at ?? new Date().toISOString()).slice(0, 10);
 const story = tellStory(bill, actions, asOf);
 const history = plainHistory(bill, actions);
 const p = story.progress;
+// a one-house resolution that passed its chamber is adopted
+const status = story.status;
 
 // "AB 656 (2025)" alone tells a searcher nothing; almost nobody searches a
 // bill number. Lead with the identifier for those who do, then the subject
@@ -142,15 +144,17 @@ const sponsorLabel = (s: (typeof sponsors)[number]) =>
   [s.party ? partyWord(s.party) : null, s.chamber ? chamberName(s.chamber) : null].filter(Boolean).join(", ");
 
 // ---- the companion bill, in one sentence ----
-const companionFate = (s: string | null): string => {
-  switch (s) {
+// what happened to the companion, judged on its own record
+const companionFate = (c: (typeof companions)[number]): string => {
+  const over = sessionClosed(c.session_id, asOf);
+  switch (c.status) {
     case "enacted": return "That version became law.";
     case "vetoed": return "That version was vetoed.";
     case "passed": return "That version passed both chambers.";
-    case "passed_chamber": return story.stopped ? "That version passed one chamber, then stopped." : "That version has passed one chamber.";
-    case "failed_sjr1": return "It stopped when the session ended, too.";
+    case "passed_chamber": return over ? "That version passed one chamber, then stopped." : "That version has passed one chamber.";
+    case "failed_sjr1": return "That version died when the session ended.";
     case "adopted": return "That version was adopted.";
-    default: return story.stopped ? "It stopped in committee, too." : "That version is in committee.";
+    default: return over ? "That version stopped in committee." : "That version is in committee.";
   }
 };
 
@@ -162,6 +166,13 @@ const officialMarked = officialLatest
   ? officialLatest.replace(/Senate Joint Resolution 1\b/, "[[sjr1|Senate Joint Resolution 1]]")
   : null;
 const inCommittee = story.stops.find((s) => s.state === "here")?.key === "committee";
+// the importer's record of where a bill died unheard; it may be the second
+// chamber's committee, so it carries its own chamber
+const deathCommittee = bill.committee_at_death
+  ? /^joint/i.test(bill.committee_at_death)
+    ? bill.committee_at_death
+    : `${chamberName(bill.committee_chamber_at_death ?? bill.chamber)} Committee on ${bill.committee_at_death}`
+  : null;
 
 // ---- terms this page uses, in the order a reader meets them ----
 const terms: TermId[] = [...story.terms];
@@ -246,9 +257,9 @@ const pulledOn = meta().imported_at?.slice(0, 10);
             Latest entry in the official record{officialDate && `, ${fmtDate(officialDate)}`}: <PlainText text={`“${officialMarked}”`} />
           </p>
         )}
-        {inCommittee && story.stopped && p.committee && (
+        {bill.died_without_hearing === 1 && deathCommittee ? (
           <p>
-            It sat with the {p.committee}.
+            It never got a hearing in the {deathCommittee}.
             {bill.committee_chair_at_death && (
               <>
                 {" "}The committee's chair at the time was{" "}
@@ -259,18 +270,16 @@ const pulledOn = meta().imported_at?.slice(0, 10);
                 )}. Chairs decide which bills get a hearing.
               </>
             )}
-            {bill.died_without_hearing === 1 && (
-              <>
-                {" "}<a href={`/hearing-none/${bill.session_id}/`} class="underline">See every bill that never got a hearing this session</a>.
-              </>
-            )}
+            {" "}<a href={`/hearing-none/${bill.session_id}/`} class="underline">See every bill that never got a hearing this session</a>.
           </p>
+        ) : inCommittee && story.stopped && p.committee && (
+          <p>It sat with the {p.committee}.</p>
         )}
-        {vetoMsg && (status === "vetoed" || p.partialVeto) && (
+        {(status === "vetoed" || p.partialVeto) && (
           <p>
-            <a href={vetoMsg} class="underline">Read the governor's veto message</a>
-            {" · "}<a href={status === "vetoed" ? "/vetoes/" : "/partial-veto/"} class="underline">
-              {status === "vetoed" ? "All vetoes" : "How the partial veto works"}
+            {vetoMsg && <><a href={vetoMsg} class="underline">Read the governor's veto message</a>{" · "}</>}
+            <a href={status === "vetoed" ? "/vetoes/" : "/partial-veto/"} class="underline">
+              {status === "vetoed" ? "All vetoes this session" : "How the partial veto works"}
             </a>
           </p>
         )}
@@ -305,14 +314,14 @@ const pulledOn = meta().imported_at?.slice(0, 10);
                 {i > 0 && " "}
                 The same {isBill ? "bill" : "proposal"} was also filed in the {c.identifier.startsWith("S") ? "Senate" : "Assembly"} as{" "}
                 <a href={`/bills/${c.session_id}/${billSlug(c.identifier)}/`} class="underline">{c.identifier}</a>.{" "}
-                {companionFate(c.status)}
+                {companionFate(c)}
               </>
             ))}
           </p>
         )}
       </div>
-      <div class="b-terms">
-        <TermsOnPage terms={usedTerms} />
+      <div class="hidden lg:block">
+        <TermsOnPage terms={usedTerms} headingId="terms-heading-rail" />
       </div>
     </div>
 
@@ -443,28 +452,29 @@ const pulledOn = meta().imported_at?.slice(0, 10);
         </details>
       </section>
 
+      <div class="lg:hidden">
+        <TermsOnPage terms={usedTerms} />
+      </div>
+
       <p class="text-fine text-granite">
         From the Wisconsin Legislature's official record{pulledOn && `, checked ${fmtDate(pulledOn)}`}.{" "}
         <a href={bill.text_url ?? "https://docs.legis.wisconsin.gov"} class="underline">See the source</a>
       </p>
     </div>
+    <TermPopovers terms={usedTerms} />
   </article>
 </Base>
 
 <style>
+  /* One column in reading order on phones. From 1024px the rail (actions,
+     then terms) sits beside the whole page; the terms list is rendered in
+     the rail there and after the body on phones, so tab order always
+     follows what's on screen. */
   .bill {
     display: flex;
     flex-direction: column;
     gap: 2rem;
   }
-  .rail {
-    display: contents;
-  }
-  .b-head { order: 1; }
-  .b-status { order: 2; }
-  .b-actions { order: 3; }
-  .b-body { order: 4; }
-  .b-terms { order: 5; }
   @media (min-width: 64rem) {
     .bill {
       display: grid;

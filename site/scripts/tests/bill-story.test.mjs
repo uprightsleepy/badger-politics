@@ -119,7 +119,7 @@ test("a law signed with a partial veto names its act", () => {
   assert.ok(story.progress.partialVeto);
   assert.equal(story.progress.act, "2025 Wisconsin Act 15");
   assert.equal(here(story).key, "law");
-  assert.equal(here(story).note, "2025 Wisconsin Act 15");
+  assert.equal(here(story).note, "2025 Wisconsin Act\u00a015");
   assert.ok(story.stops.every((s) => s.state !== "todo"));
 });
 
@@ -169,4 +169,81 @@ test("past sessions are closed; the current one closes after its last voting day
   assert.equal(sessionClosed("2023", "2024-01-10"), true);
   assert.equal(sessionClosed("2025", "2026-03-19"), false);
   assert.equal(sessionClosed("2025", "2026-03-20"), true);
+});
+
+test("a one-house resolution that passed its chamber is adopted, not stuck in committee", () => {
+  const story = tellStory(bill("passed_chamber", { classification: "resolution" }), [
+    a("2025-03-01", "lower", "Introduced by Representative Smith", "introduction"),
+    a("2025-03-01", "lower", "Read first time and referred to Committee on Rules", "reading-1,referral-committee"),
+    a("2025-03-20", "lower", "Adopted", "passage"),
+  ], AFTER);
+  assert.equal(story.status, "adopted");
+  assert.equal(story.headline, "Adopted");
+  assert.equal(here(story).key, "adopted");
+  assert.equal(story.stopped, false);
+});
+
+test("passing both chambers without reaching the governor says so", () => {
+  const story = tellStory(bill("failed_sjr1"), [
+    ...introduced,
+    a("2025-10-14", "lower", "Read a third time and passed, Ayes 60, Noes 35", "passage"),
+    a("2026-02-18", "upper", "Read a third time and concurred in as amended, Ayes 18, Noes 15", "passage"),
+    a("2026-03-23", "lower", "Senate Amendment 1 nonconcurred in"),
+    a("2026-03-23", "lower", "Failed to concur in pursuant to Senate Joint Resolution 1"),
+  ], AFTER);
+  assert.equal(story.headline, "Passed both chambers, then stopped");
+  assert.equal(here(story).key, "governor");
+  assert.equal(here(story).note, "Stopped here. It never went to the governor.");
+  assert.match(story.body[0], /never went to the governor/);
+});
+
+test("nonconcurrence never reads as passage", () => {
+  const history = plainHistory(bill("failed_sjr1"), [
+    ...introduced,
+    a("2026-01-10", "upper", "Nonconcurred in, Ayes 15, Noes 18"),
+  ]).map((e) => e.text);
+  assert.ok(!history.some((t) => /passed it too/.test(t)), JSON.stringify(history));
+});
+
+test("a session newer than the schedule is never called over", () => {
+  assert.equal(sessionClosed("2027", "2027-06-01"), false);
+  const story = tellStory(bill("in_committee", { session_id: "2027" }), introduced, "2027-06-01");
+  assert.equal(story.headline, "Waiting in committee");
+});
+
+test("vetoes: still open to override, the automatic Joint Rule 82 entry, and an override that became law", () => {
+  const vetoed = [
+    ...introduced,
+    a("2025-06-03", "lower", "Read a third time and passed, Ayes 54, Noes 44", "passage"),
+    a("2025-06-24", "upper", "Read a third time and concurred in, Ayes 18, Noes 14", "passage"),
+    a("2025-07-08", "lower", "Report vetoed by the Governor on 7-8-2025", "executive-veto"),
+  ];
+  // between the last general-business day and the veto-review days
+  const open = tellStory(bill("vetoed"), vetoed, "2026-04-01");
+  assert.match(open.body.join(" "), /can still \[\[veto-override/);
+  assert.equal(open.stopped, false);
+
+  const lapsed = [...vetoed, a("2026-05-14", "lower", "Failed to pass notwithstanding the objections of the Governor pursuant to Joint Rule 82")];
+  const story = tellStory(bill("vetoed"), lapsed, AFTER);
+  assert.ok(!/tried to/.test(story.body.join(" ")));
+  assert.match(story.body.join(" "), /did not \[\[veto-override\|override the veto\]\]/);
+  assert.ok(plainHistory(bill("vetoed"), lapsed).some((e) => e.text === "The veto stood. Lawmakers didn't override it."));
+
+  const law = tellStory(bill("enacted"), [
+    ...vetoed,
+    a("2025-09-10", "lower", "Passed notwithstanding the objections of the Governor, Ayes 70, Noes 29"),
+    a("2025-09-24", "upper", "Passed notwithstanding the objections of the Governor, Ayes 23, Noes 10", "became-law"),
+  ], AFTER);
+  assert.match(law.body[0], /overrode the veto/);
+  assert.ok(!/signed/.test(law.body[0]));
+});
+
+test("a bill re-referred to a new committee belongs to the new one", () => {
+  const story = tellStory(bill("failed_sjr1", { chamber: "upper" }), [
+    a("2025-04-01", "upper", "Introduced by Senator Smith", "introduction"),
+    a("2025-04-01", "upper", "Read first time and referred to committee on Senate Organization", "reading-1,referral-committee"),
+    a("2025-05-01", "upper", "Withdrawn from committee on Senate Organization and rereferred to committee on Education pursuant to Senate Rule 46(2)(c)", "referral-committee"),
+    a("2026-03-23", "upper", "Failed to pass pursuant to Senate Joint Resolution 1"),
+  ], AFTER);
+  assert.equal(story.progress.committee, "Senate Committee on Education");
 });

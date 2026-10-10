@@ -2,7 +2,9 @@
 /** One plain sentence (or a few) where [[term-id|words]] marks a term of
  * art. Each marked term becomes a dotted-underlined button that opens its
  * definition; the definitions themselves are rendered once per page by
- * TermsOnPage. Punctuation right after a term stays on its line. */
+ * TermPopovers. Punctuation right after a term stays on its line (a word
+ * joiner forbids the break), while a long term can still wrap inside its
+ * own box at large text sizes. */
 import { termRuns } from "../lib/billStory";
 interface Props {
   text: string;
@@ -26,7 +28,7 @@ for (let i = 0; i < runs.length; i++) {
 ---
 {parts.map((part) =>
   part.term ? (
-    <span class="whitespace-nowrap"><button type="button" class="term" popovertarget={`term-${part.term}`}>{part.text}</button>{part.tail}</span>
+    <><button type="button" class="term" popovertarget={`term-${part.term}`}>{part.text}</button>{part.tail && `\u2060${part.tail}`}</>
   ) : (
     part.text
   ),
