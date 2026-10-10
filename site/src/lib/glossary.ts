@@ -34,7 +34,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   { id: "enrolled", term: "Enrolled", definition: "The final, authoritative copy of a measure after passage, as sent to the governor or secretary of state." },
   { id: "act", term: "Act", definition: "What a bill becomes when the governor signs it (or a veto is overridden): a numbered Wisconsin Act, part of state law." },
   { id: "partial-veto", term: "Partial veto", definition: "Wisconsin's unusually strong line-item veto: the governor can strike words and numbers within appropriation bills, changing their meaning. Subject to override like a full veto." },
-  { id: "veto-override", term: "Veto override", definition: "The Legislature's power to enact a bill over the governor's veto. It takes a two-thirds vote in each chamber. The governor's decisions page lists every attempt." },
+  { id: "veto-override", term: "Veto override", definition: "The Legislature's power to enact a bill over the governor's veto. It takes a two-thirds vote in each chamber. The vetoes page lists every attempt." },
   { id: "roll-call-vote", term: "Roll call vote", definition: "A vote where each member's Aye or Nay is recorded by name. Only roll calls appear in attendance and vote records here; voice votes record no names." },
   { id: "voice-vote", term: "Voice vote", definition: "A vote by collective shout, recorded only as the outcome. No individual positions exist, so none are shown here." },
   { id: "votes-with-party", term: "Votes with party majority", definition: "How often a member's Aye or Nay matched the position most of their own party took on the same roll call, shown on member pages here. Roll calls where their party split evenly, and votes they didn't cast, aren't counted." },

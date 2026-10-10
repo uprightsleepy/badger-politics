@@ -3,7 +3,7 @@
  * it leaves out, and how the records are collected and checked. The paths
  * match pipeline/dataproducts (api.py, feeds.py, ical.py). */
 import Base from "../layouts/Base.astro";
-import { meta } from "../lib/db";
+import { meta, usesLegiscan } from "../lib/db";
 import { fmtDate } from "../lib/format";
 const m = meta();
 const pulledOn = m.imported_at?.slice(0, 10);
@@ -22,7 +22,7 @@ const api: [string, string][] = [
 ];
 const feeds: [string, string][] = [
   ["/feeds/bills/{id}.xml", "Each step in one bill's history. Linked from the bill's page."],
-  ["/feeds/legislators/{name}.xml", "A state lawmaker's votes and the bills they sign on to."],
+  ["/feeds/legislators/{name}.xml", "A state lawmaker's roll-call votes."],
   ["/feeds/committees/{id}.xml", "A committee's hearings."],
   ["/feeds/local/{city}/{member}.xml", "A city council member's votes."],
 ];
@@ -86,8 +86,9 @@ const feeds: [string, string][] = [
     <section aria-labelledby="bulk-heading">
       <h2 id="bulk-heading" class="t-section">Bulk downloads</h2>
       <p class="mt-2">
-        Not published yet. The nightly build already writes a CSV file for each session and a filtered
-        copy of the database, and they're planned for GitHub, beside the
+        Not published yet. Each update of the site already writes CSV files for every session (bills,
+        their actions, sponsors, roll calls and each member's vote) and a filtered copy of the database,
+        and they're planned for GitHub, beside the
         {" "}<a href="https://github.com/uprightsleepy/badger-politics" class="underline">source code</a>.
         Until then, the JSON API above has the bills, roll calls and lawmakers.
       </p>
@@ -97,9 +98,13 @@ const feeds: [string, string][] = [
       <h2 id="left-out-heading" class="t-section">What's left out</h2>
       <ul class="mt-3 flex list-disc flex-col gap-2 pl-5 marker:text-granite">
         <li>
-          Bills and roll calls that came from LegiScan appear on the site, credited and linked under its
-          {" "}<a href="https://creativecommons.org/licenses/by/4.0/" class="underline">CC BY 4.0 license</a>,
-          but they're left out of every API file, feed and download.
+          {usesLegiscan()
+            ? <>Bills and roll calls that came from LegiScan appear on the site, credited and linked under its
+              {" "}<a href="https://creativecommons.org/licenses/by/4.0/" class="underline">CC BY 4.0 license</a>,
+              but they're left out of every API file, feed and download.</>
+            : <>No records on the site come from LegiScan. If any ever do, they'll be credited and linked under
+              its <a href="https://creativecommons.org/licenses/by/4.0/" class="underline">CC BY 4.0 license</a>
+              {" "}and left out of every API file, feed and download.</>}
         </li>
         <li>Eye on Lobbying registrations are withheld from the site and from everything published here.</li>
       </ul>

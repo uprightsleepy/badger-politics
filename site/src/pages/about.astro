@@ -4,6 +4,7 @@
  * anchors #districts, #money and #contact are linked from other pages. */
 import Base from "../layouts/Base.astro";
 import { localBodies, meta } from "../lib/db";
+import { PLACES_KEY } from "../lib/placesKey";
 import { fmtDate } from "../lib/format";
 const dataThrough = meta().data_through;
 const pulledOn = meta().imported_at?.slice(0, 10);
@@ -111,8 +112,10 @@ const LIST = "flex list-disc flex-col gap-2 pl-5 marker:text-granite";
           Candidate lists come from the <a href="https://elections.wi.gov" class="underline">Wisconsin Elections Commission</a>'s
           ballot access report, and past results from its certified canvass reports. District boundaries
           are the Legislative Technology Services Bureau's official 2024 files. When you look up your
-          address, it goes to the U.S. Census geocoder once, only to get coordinates, and is never stored or
-          sent anywhere else.
+          address, it goes to the U.S. Census geocoder once, only to get coordinates, and is never stored.
+          {PLACES_KEY
+            ? " While you type, suggestions come from Google Places, so the letters you type are sent to Google."
+            : " It isn't sent anywhere else."}
         </p>
         <p>
           Automated election-report updates were paused on September 7, 2026. Candidate information reflects
@@ -186,8 +189,8 @@ const LIST = "flex list-disc flex-col gap-2 pl-5 marker:text-granite";
           <>
             <h3 id="councils" class="t-question">City councils</h3>
             <p>
-              Votes for {cityList} come from each city's own legislative system, and every item links to the
-              clerk's page for it. Members are matched by the system's own member IDs or by verified full
+              Votes for {cityList} come from each city's own legislative system, and each one links to the
+              city's own record of the meeting where it was cast. Members are matched by the system's own member IDs or by verified full
               names. Only votes the clerk recorded member by member appear; a voice
               vote names no one, so it isn't counted for anyone. Each council's page says what its records
               cover.
@@ -301,6 +304,9 @@ const LIST = "flex list-disc flex-col gap-2 pl-5 marker:text-granite";
       align-self: start;
       position: sticky;
       top: 1.5rem;
+      /* a short window scrolls the list rather than hiding its end */
+      max-height: calc(100vh - 3rem);
+      overflow-y: auto;
     }
   }
 </style>
