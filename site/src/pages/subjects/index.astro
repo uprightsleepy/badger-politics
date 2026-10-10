@@ -1,65 +1,54 @@
 ---
+/** The Legislature's own subject index, every heading as it prints it,
+ * grouped by first letter as the index is. Filtering hides rows in place,
+ * so every heading stays in the page and the search index. */
 import Base from "../../layouts/Base.astro";
+import FilterBar from "../../components/FilterBar.astro";
 import { subjectIndex } from "../../lib/db";
 
 const subjects = subjectIndex();
-// grouped by first letter, as the Legislature's own index is
 const groups = Map.groupBy(subjects, (s) => (/[a-z]/i.test(s.title[0]) ? s.title[0].toUpperCase() : "#"));
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 ---
 
 <Base
-  title="Subjects"
-  description="Browse Wisconsin legislation by the Legislature's own subject index: every topic, every session since 2009."
+  title="Bills by subject"
+  description="Browse Wisconsin legislation by the Legislature's own subject index: every heading, every session since 2009."
+  layout="wide"
 >
-  <h1 class="text-2xl font-bold">Browse Bills by Subject</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    The Legislature's own subject index, covering every session since 2009,
-    with each term as the index prints it. {subjects.length.toLocaleString()} subjects,
-    grouped by letter.
-  </p>
-  <div class="mt-4">
-    <label class="mb-1 block text-sm font-semibold" for="subject-filter">Filter subjects</label>
-    <input
-      type="search"
-      id="subject-filter"
-      placeholder="e.g. housing, elections, taxation…"
-      class="w-full max-w-md rounded-lg border border-navy-100 bg-white px-3 py-2 text-sm"
-    />
-    <p id="subject-filter-status" role="status" class="mt-2 text-sm text-navy-600"></p>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">Bills by subject</h1>
+    <p class="sm:text-lead">
+      The Legislature's own subject index, covering every session since 2009, with each heading as the
+      index prints it: {plural(subjects.length, "heading", "headings")}, grouped by first letter.
+    </p>
+  </header>
+
+  <div class="mt-4 max-w-[47.5rem]">
+    <FilterBar wide id="subject-filter" statusId="subject-filter-status" label="Find a subject" placeholder="Housing, elections, taxation" />
   </div>
-  <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+
+  <div class="mt-3 border-b border-rule">
     {[...groups.entries()].map(([letter, group]) => (
-      <details class="self-start rounded-lg border border-navy-100 bg-white" data-subject-group>
-        <summary class="flex cursor-pointer items-baseline gap-2 px-3 py-2">
-          <span class="text-lg font-bold">{letter}</span>
-          <span class="text-sm text-navy-600" data-group-count>
-            {group.length} subject{group.length === 1 ? "" : "s"}
+      <details class="subject-group border-t border-rule" data-subject-group>
+        <summary class="flex min-h-12 cursor-pointer items-baseline gap-3 py-2">
+          <span class="t-section w-8">{letter === "#" ? <><span aria-hidden="true">#</span><span class="sr-only">Numbers</span></> : letter}</span>
+          <span class="text-small text-granite" data-group-count data-all={plural(group.length, "subject", "subjects")}>
+            {plural(group.length, "subject", "subjects")}
           </span>
         </summary>
-        <div
-          class="max-h-96 overflow-y-auto border-t border-navy-100 scroll-body scroll-on-paper"
-          role="region"
-          tabindex="0"
-          aria-label={`Subjects starting with ${letter}`}
-        >
-          <ul class="p-2">
-            {group.map((s) => (
-              <li data-subject-row data-text={s.title.toLowerCase()}>
-                <a
-                  href={`/subjects/${s.slug}/`}
-                  class="flex items-baseline gap-2 rounded px-1 py-1 text-sm hover:bg-navy-50"
-                >
-                  <span class="min-w-0 flex-1 underline">{s.title}</span>
-                  <span class="shrink-0 text-xs text-navy-600">{s.n}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <ul class="subject-cols pb-4" role="list" aria-label={letter === "#" ? "Subjects starting with a number" : `Subjects starting with ${letter}`}>
+          {group.map((s) => (
+            <li data-subject-row data-text={s.title.toLowerCase()}>
+              <a href={`/subjects/${s.slug}/`} class="inline-flex min-h-11 items-center underline">{s.title}</a>
+              <span class="text-small text-granite">{plural(s.n, "bill", "bills")}</span>
+            </li>
+          ))}
+        </ul>
       </details>
     ))}
   </div>
-  <p id="subject-no-match" class="mt-4 hidden rounded-lg border border-navy-100 bg-white p-4 text-sm text-navy-600"></p>
+  <p id="subject-no-match" class="mt-4 hidden text-granite"></p>
 
   <script>
     import { initRowFilter } from "../../scripts/rowFilter";
@@ -73,10 +62,9 @@ const groups = Map.groupBy(subjects, (s) => (/[a-z]/i.test(s.title[0]) ? s.title
         const rows = group.querySelectorAll("[data-subject-row]");
         const shown = group.querySelectorAll("[data-subject-row]:not(.sorted-hidden)").length;
         const count = group.querySelector<HTMLElement>("[data-group-count]")!;
-        count.dataset.all ??= count.textContent!;
         group.hidden = filtering && shown === 0;
         group.open = filtering && shown > 0;
-        count.textContent = filtering ? `${shown} of ${rows.length}` : count.dataset.all;
+        count.textContent = filtering ? `${shown.toLocaleString()} of ${rows.length.toLocaleString()} shown` : count.dataset.all!;
       }
     };
     initRowFilter({
@@ -88,5 +76,44 @@ const groups = Map.groupBy(subjects, (s) => (/[a-z]/i.test(s.title[0]) ? s.title
     });
     input.addEventListener("input", regroup);
     window.addEventListener("pageshow", regroup);
+    regroup();
   </script>
 </Base>
+
+<style>
+  .subject-group > summary {
+    list-style: none;
+  }
+  .subject-group > summary::-webkit-details-marker {
+    display: none;
+  }
+  .subject-group > summary .t-section {
+    color: var(--color-lake);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .subject-cols {
+    display: grid;
+    column-gap: 2rem;
+  }
+  .subject-cols li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.5rem;
+    min-width: 0;
+  }
+  .subject-cols a {
+    overflow-wrap: anywhere;
+  }
+  @media (min-width: 40rem) {
+    .subject-cols {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 64rem) {
+    .subject-cols {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+</style>

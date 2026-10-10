@@ -1303,19 +1303,15 @@ export const subjectIndex = once(() => {
     .sort((a, b) => a.title.localeCompare(b.title));
 });
 
-export const billsForSubject = (subject: string) =>
+/** Every bill filed under one subject heading, whole rows so lists can
+ * tell where each stands (BillList, rowStory). */
+export const billsForSubject = (subject: string): Bill[] =>
   prep(
-      `SELECT b.id, b.session_id, b.identifier, b.title, b.status,
-              b.died_without_hearing, b.latest_action_date
-       FROM bill_subjects s JOIN bills b ON b.id = s.bill_id
+      `SELECT b.* FROM bill_subjects s JOIN bills b ON b.id = s.bill_id
        WHERE s.subject = ?
        ORDER BY b.session_id DESC, LENGTH(b.identifier), b.identifier`,
     )
-    .all(subject) as {
-      id: string; session_id: string; identifier: string;
-      title: string | null; status: string | null;
-      died_without_hearing: number; latest_action_date: string | null;
-    }[];
+    .all(subject) as Bill[];
 
 export const subjectsForBill = (billId: string) =>
   prep("SELECT subject FROM bill_subjects WHERE bill_id = ? ORDER BY subject")
