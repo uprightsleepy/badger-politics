@@ -28,7 +28,7 @@ const missing = all.sitting - all.covered;
     </p>
     <p class="text-small text-granite">
       {missing > 0
-        ? `We have receipts for ${all.covered.toLocaleString()} of the ${all.sitting.toLocaleString()} sitting legislators, so totals and rankings cover those ${all.covered.toLocaleString()}. A missing record doesn't mean no money was raised, and party totals aren't compared until every member is covered.`
+        ? `We have receipts for ${all.covered.toLocaleString()} of the ${all.sitting.toLocaleString()} sitting legislators, so totals, rankings and party totals cover those ${all.covered.toLocaleString()}. A missing record doesn't mean no money was raised.`
         : `We have receipts for all ${all.sitting.toLocaleString()} sitting legislators.`}
       {" "}<a href="/about/#money" class="underline">How this data works</a>
     </p>

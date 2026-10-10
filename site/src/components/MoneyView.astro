@@ -7,8 +7,8 @@ import MoneyCoverage from "./MoneyCoverage.astro";
 import MoneyMix from "./MoneyMix.astro";
 import MoneyRows from "./MoneyRows.astro";
 import type { moneyViews } from "../lib/money-periods";
-import { fmtMoney, partyLetter, partyPlural, partyWord, personSlug, chamberName } from "../lib/format";
-import { hasDonorPage } from "../lib/db";
+import { byPartyName, fmtMoney, partyGapSentence, partyLetter, partyPlural, partyWord, personSlug, chamberName } from "../lib/format";
+import { hasDonorPage, moneyCoverageByParty } from "../lib/db";
 import type { moneyOverview } from "../lib/db";
 
 interface Props {
@@ -42,9 +42,8 @@ const pct = (part: number, whole: number) => {
 // net small gifts can include refunds, so show their share only when it
 // lands between none and all of what individuals gave
 const smallOk = m.individualTotal > 0 && m.smallDollarTotal >= 0 && m.smallDollarTotal <= m.individualTotal;
-// party totals are only compared when every sitting member's receipts
-// are collected (docs/brand.md, "Party totals")
-const fullCoverage = m.covered >= m.sitting;
+// party totals always say who they leave out (docs/brand.md, "Party totals")
+const partyGap = partyGapSentence(moneyCoverageByParty());
 const parties = [...new Set(m.topLegislators.map((p) => p.party).filter(Boolean))].sort() as string[];
 const key = parties.map((p) => `${partyLetter(p)}: ${partyWord(p)}`).join(". ");
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
@@ -137,18 +136,19 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} 
         </div>
       </section>
 
-      {fullCoverage && m.byParty.length > 0 && (
+      {m.byParty.length > 0 && (
         <section class="min-w-0" aria-labelledby={`party-${view.period.key}-${view.scope}`}>
           <H id={`party-${view.period.key}-${view.scope}`} class={headClass}>Receipts by the legislator's party</H>
           <p class="mt-2 text-small text-granite">
             Totals follow the person, so a few members running for statewide or federal office can
             dominate their party's number. This isn't a measure of party strength in legislative races.
           </p>
+          {partyGap && <p class="mt-2 text-small font-bold">{partyGap}</p>}
           <div class="mt-4">
             <MoneyRows
               label="receipts by party"
               ranked={false}
-              rows={[...m.byParty].sort((a, b) => (a.party ?? "~").localeCompare(b.party ?? "~")).map((p) => ({
+              rows={[...m.byParty].sort(byPartyName).map((p) => ({
                 name: p.party ? partyPlural(p.party) : "Party not recorded",
                 meta: plural(p.legislators, "legislator", "legislators"), amount: p.total,
               }))}

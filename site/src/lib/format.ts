@@ -81,6 +81,30 @@ export const sessionPlainName = (sessionId: string, name: string): string =>
     ? `${sessionId}–${String((Number(sessionId) + 1) % 100).padStart(2, "0")} session`
     : name;
 
+/** Party order for lists: alphabetical, with no party recorded last. */
+export const byPartyName = (a: { party: string | null }, b: { party: string | null }): number =>
+  a.party == null ? (b.party == null ? 0 : 1) : b.party == null ? -1 : a.party.localeCompare(b.party);
+
+/** Who party totals leave out: sitting members whose receipts we haven't
+ * collected, counted by party ("…: 2 Democrats and 4 Republicans."). Null
+ * when every sitting member is covered. Parties in alphabetical order,
+ * never by size. */
+export const partyGapSentence = (
+  rows: { party: string | null; sitting: number; covered: number }[],
+): string | null => {
+  const gaps = rows
+    .map((r) => ({ party: r.party, n: r.sitting - r.covered }))
+    .filter((g) => g.n > 0)
+    .sort(byPartyName);
+  const total = gaps.reduce((sum, g) => sum + g.n, 0);
+  if (!total) return null;
+  const parts = gaps.map((g) =>
+    g.party ? `${g.n} ${g.n === 1 ? partyWord(g.party) : partyPlural(g.party)}` : `${g.n} with no party recorded`,
+  );
+  const list = parts.length <= 2 ? parts.join(" and ") : `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}`;
+  return `These totals leave out ${total} sitting ${total === 1 ? "legislator" : "legislators"} whose receipts we haven't collected: ${list}.`;
+};
+
 export const partyLetter = (party: string | null): string =>
   party ? party[0] : "?";
 

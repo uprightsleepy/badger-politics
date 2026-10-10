@@ -5,20 +5,19 @@
 import MoneyCoverage from "./MoneyCoverage.astro";
 import MoneyRows from "./MoneyRows.astro";
 import StanceChip from "./StanceChip.astro";
-import { donorCommitteeFor, cfCommitteeFor, moneyCoverage } from "../lib/db";
-import { chamberName, fmtMoney, fmtDate, partyLetter, partyPlural, partyWord, personSlug } from "../lib/format";
+import { donorCommitteeFor, cfCommitteeFor, moneyCoverage, moneyCoverageByParty } from "../lib/db";
+import { byPartyName, chamberName, fmtMoney, fmtDate, partyGapSentence, partyLetter, partyPlural, partyWord, personSlug } from "../lib/format";
 import type { moneyViews } from "../lib/money-periods";
 interface Props { entityId: number; name: string; view: ReturnType<typeof moneyViews>[number]; }
 const { entityId, name, view } = Astro.props;
 const { recipients, byParty, summary } = donorCommitteeFor(entityId, view.bounds);
 const committee = { entityId, name, total: 0, n: 0, recipients: 0, first: null, last: null, ...summary };
 const own = cfCommitteeFor(entityId, view.bounds);
-// party totals only when every sitting member's receipts are collected
-// (docs/brand.md, "Party totals")
-const { covered, sitting } = moneyCoverage();
-const fullCoverage = covered >= sitting;
+// party totals always say who they leave out (docs/brand.md, "Party totals")
+const { sitting } = moneyCoverage();
+const partyGap = partyGapSentence(moneyCoverageByParty());
 // party never orders a list: alphabetical, with no party recorded last
-const partySplit = [...byParty].sort((a, b) => (a.party ?? "~").localeCompare(b.party ?? "~"));
+const partySplit = [...byParty].sort(byPartyName);
 const joiner = (i: number, n: number) => (i === 0 ? "" : i < n - 1 ? ", " : n === 2 ? " and " : ", and ");
 const parties = [...new Set(recipients.map((r) => r.party).filter(Boolean))].sort() as string[];
 const key = parties.map((p) => `${partyLetter(p)}: ${partyWord(p)}`).join(". ");
@@ -34,18 +33,13 @@ const uid = `${view.period.key}-${view.scope}`;
         ? <>It gave <span class="figure">{fmtMoney(committee.total)}</span> to {committee.recipients.toLocaleString()} of today's {sitting.toLocaleString()} legislators {period}{view.scope === "office" ? " while they were in office" : ""}, across {plural(committee.n, "receipt", "receipts")}.</>
         : <>No gifts to today's legislators are recorded {period}.</>}
     </p>
-    {committee.n > 0 && (fullCoverage ? partySplit.length > 0 && (
+    {committee.n > 0 && partySplit.length > 0 && (
       <p>
         By the legislator's party: {partySplit.map((p, i) => (
           <>{joiner(i, partySplit.length)}<span class="figure">{fmtMoney(p.total)}</span> to {p.party ? partyPlural(p.party) : "legislators with no party recorded"}</>
-        ))}.
+        ))}.{partyGap && <span class="mt-1 block text-small font-bold"> {partyGap}</span>}
       </p>
-    ) : (
-      <p class="text-small text-granite">
-        Totals by party appear once we have receipts for all {sitting.toLocaleString()} sitting legislators;
-        we have {covered.toLocaleString()} so far.
-      </p>
-    ))}
+    )}
     <MoneyCoverage period={view.period} first={committee.first} last={committee.last} scope={view.scope} />
   </section>
 

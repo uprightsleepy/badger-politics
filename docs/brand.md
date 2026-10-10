@@ -331,8 +331,10 @@ Headlines are what the reader needs to know, not the clerk's state.
 - **Percentages:** always say the base: "90% of 239 votes in 2025".
 - **Dates:** "Mar 19, 2026" in lists and "March 19, 2026" in sentences. Use "Tomorrow" and "Next
   Tuesday" for what's coming up.
-- **Party totals:** never compare one party's totals with the other's unless both are fully covered.
-  Coverage gaps are stated in words, never shown as zero.
+- **Party totals:** shown side by side only with the gap named right beside them: how many sitting
+  members we don't have receipts for, by party ("These totals leave out 6 sitting legislators whose
+  receipts we haven't collected: 2 Democrats and 4 Republicans."). Parties are listed alphabetically,
+  never by size. Coverage gaps are stated in words, never shown as zero.
 
 ### Party and neutrality
 
