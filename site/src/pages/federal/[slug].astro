@@ -1,20 +1,25 @@
 ---
-/** Federal votes and separately attributed campaign finance. */
+/** One member of Congress from Wisconsin: who they are, whether they're on
+ * the next ballot, how often they vote, their latest roll calls, and their
+ * campaign money, each from the official source. */
 import Base from "../../layouts/Base.astro";
-import SourceStrip from "../../components/SourceStrip.astro";
-import PartyChip from "../../components/PartyChip.astro";
 import FederalMoney from "../../components/FederalMoney.astro";
 import FederalVoteRow from "../../components/FederalVoteRow.astro";
+import MoreRows from "../../components/MoreRows.astro";
 import {
-  federalMembers, federalVoteKey, federalVotesFor, federalCongressStats, houseRaces, ballotPhase,
+  federalMembers, federalVoteKey, federalVotesFor, federalCongressStats, houseRaces, ballotPhase, meta,
+  writeInPending,
 } from "../../lib/db";
-import { congressLabel } from "../../lib/federal";
+import { fmtDate, partyWord } from "../../lib/format";
+import { congressLabel, longDate, ordinal } from "../../lib/federal";
+import { nameList, withParty, writeInSentence } from "../../lib/ballot";
 
 export function getStaticPaths() {
   return federalMembers().map((m) => ({ params: { slug: m.slug }, props: { member: m } }));
 }
 
 const { member } = Astro.props;
+const senate = member.chamber === "senate";
 const voteKey = federalVoteKey(member);
 const votes = federalVotesFor(voteKey);
 const byCongress = federalCongressStats(voteKey);
@@ -22,131 +27,150 @@ const missed = byCongress.reduce((s, c) => s + c.missed, 0);
 const latest = votes[0]?.date ?? null;
 const sinceYear = byCongress.at(-1)?.first.slice(0, 4);
 const recent = votes.slice(0, 25);
-const race = member.chamber === "house" ? houseRaces().find((h) => h.district === member.district) : undefined;
+const SHOWN = 10;
+const now = byCongress[0];
+const race = !senate ? houseRaces().find((h) => h.district === member.district) : undefined;
 const general = ballotPhase() === "general";
+const writeIn = race ? writeInSentence(writeInPending(`REPRESENTATIVE IN CONGRESS DISTRICT ${member.district}`)) : "";
+const office = senate ? "U.S. senator for Wisconsin" : `U.S. representative for Wisconsin's ${ordinal(member.district ?? 0)} District`;
+// a term ends in early January, so its election is the November before
+const nextElection = Number(member.term_end.slice(0, 4)) - 1;
+const pct = (n: number, of: number) => (of ? `${((n / of) * 100).toFixed(1)}%` : "0%");
+const pulledOn = meta().imported_at?.slice(0, 10);
+const source = senate
+  ? { label: "U.S. Senate", href: "https://www.senate.gov/legislative/votes_new.htm" }
+  : { label: "U.S. House Clerk", href: "https://clerk.house.gov/Votes" };
 ---
 
 <Base
-  title={`${member.name}, ${member.chamber === "senate" ? "U.S. Senator" : `U.S. Representative, WI-${member.district}`}`}
-  description={`${member.name}'s ${member.chamber === "senate" ? "Senate" : "House"} voting record since ${sinceYear}, from official roll calls: ${votes.length.toLocaleString()} votes, ${missed} missed.`}
-  breadcrumbs={[{ name: "Federal delegation", url: "/federal/" }]}
-  filters={{ type: "Legislator", chamber: member.chamber === "senate" ? "U.S. Senate" : "U.S. House", party: member.party }}
+  title={`${member.name}, ${senate ? "U.S. Senator" : `U.S. Representative, WI-${member.district}`}`}
+  description={`${member.name}'s ${senate ? "Senate" : "House"} voting record since ${sinceYear}, from official roll calls: ${votes.length.toLocaleString()} votes, ${missed} missed.`}
+  breadcrumbs={[{ name: "Members of Congress", url: "/federal/" }]}
+  filters={{ type: "Legislator", chamber: senate ? "U.S. Senate" : "U.S. House", party: member.party }}
+  layout="wide"
 >
-  <p class="text-sm text-navy-600">
-    <a href="/federal/" class="underline">&larr; Federal delegation</a>
-  </p>
-  <h1 class="mt-2 flex flex-wrap items-center gap-3 text-2xl font-bold">
-    {member.name}
-    <PartyChip party={member.party} />
-  </h1>
-  <p class="mt-1 text-sm text-navy-700">
-    {member.chamber === "senate"
-      ? "U.S. Senator for Wisconsin"
-      : `U.S. Representative for WI-${member.district}`} since {sinceYear} &middot; term ends {member.term_end.slice(0, 4)} &middot;
-    <a href={`https://www.congress.gov/member/${member.slug}/${member.bioguide}`} class="underline">
-      official profile &#8599;
-    </a>
-  </p>
-  <SourceStrip
-    sources={[
-      member.chamber === "senate"
-        ? { label: "U.S. Senate", href: "https://www.senate.gov/legislative/votes_new.htm" }
-        : { label: "U.S. House Clerk", href: "https://clerk.house.gov/Votes" },
-    ]}
-    through={latest}
-  />
+  <div class="fed">
+    <header class="f-head flex max-w-[47.5rem] flex-col gap-2.5">
+      <a href="/federal/" class="self-start text-small underline">Members of Congress</a>
+      <h1 class="t-display">{member.name}</h1>
+      <p class="sm:text-lead">
+        {office[0].toUpperCase() + office.slice(1)}. {partyWord(member.party)}. The current term ends
+        {" "}{longDate(member.term_end)}.
+      </p>
+    </header>
 
-  <dl class="mt-4 grid max-w-md grid-cols-2 gap-x-6 gap-y-3 rounded-lg border border-navy-100 bg-white p-4 text-sm">
-    <div>
-      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Roll calls since {sinceYear}</dt>
-      <dd class="mt-0.5 text-xl font-bold tabular-nums">{votes.length.toLocaleString()}</dd>
-    </div>
-    <div>
-      <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600">Recorded Not Voting</dt>
-      <dd class={`mt-0.5 text-xl font-bold tabular-nums ${missed > 0 ? "text-badger-700" : "text-moss-600"}`}>
-        {missed.toLocaleString()}
-        <span class="text-sm font-normal text-navy-600">
-          {" "}({((missed / Math.max(votes.length, 1)) * 100).toFixed(1)}%)
-        </span>
-      </dd>
-    </div>
-  </dl>
-
-  {race && (
-    <div class="mt-3 max-w-md rounded bg-navy-50 p-3 text-sm">
-      <h2 class="font-bold">Seat up for election: Nov 2026</h2>
-      {race.retiring ? (
-        <p class="mt-1 font-semibold text-badger-700">
-          {general ? "Not on the November ballot for this seat" : "Not seeking reelection"}
+    <aside class="f-rail flex flex-col gap-4" data-pagefind-ignore>
+      <section class="sheet flex flex-col gap-3 p-5" aria-labelledby="glance-heading">
+        <h2 id="glance-heading" class="t-question text-[1.1875rem]">At a glance</h2>
+        {now && (
+          <p>
+            Missed <span class="figure">{now.missed.toLocaleString()}</span> of {now.total.toLocaleString()} roll calls
+            {" "}({pct(now.missed, now.total)}) in the {congressLabel(now.congress)}.
+          </p>
+        )}
+        <p class="text-small">
+          {race
+            ? race.retiring
+              ? `Their seat is on the November 3, 2026 ballot, and they ${general ? "aren't on it" : "aren't seeking reelection"}.`
+              : "Their seat is on the November 3, 2026 ballot."
+            : `Their seat is next up in November ${nextElection}.`}
+          {" "}<a href={`https://www.congress.gov/member/${member.slug}/${member.bioguide}`} class="underline">Their official profile on congress.gov</a>
         </p>
-      ) : general && <p class="mt-1">On the ballot ✓</p>}
-      {race.candidates.length > 0 && (
-        <p class="mt-1">
-          {general ? "Candidates on the November ballot" : "Candidates approved so far"}:{" "}
-          {race.candidates.map((c) => `${c.candidate} (${c.party?.[0] ?? "?"})`).join(", ")}
-        </p>
+      </section>
+    </aside>
+
+    <div class="f-body flex max-w-[47.5rem] flex-col gap-12">
+      {race && (
+        <section class="flex flex-col gap-2" aria-labelledby="ballot-heading">
+          <h2 id="ballot-heading" class="t-section">On the ballot November 3, 2026</h2>
+          <p>
+            {race.retiring && <><strong>Open seat.</strong> {member.name} {general ? "isn't on the November ballot" : "isn't seeking reelection"}. </>}
+            {race.candidates.length > 0
+              ? `${general ? "On the November ballot" : "Approved for the ballot so far"}: ${nameList([...race.candidates].sort((a, b) => a.candidate.localeCompare(b.candidate)).map((c) => withParty(c.candidate, c.party)))}.`
+              : general ? "No candidates are on the November ballot yet in our records." : "No candidates are approved for the ballot yet."}
+            {writeIn && ` ${writeIn}`}
+          </p>
+          <p class="text-small"><a href="/elections/2026/" class="underline">Everything on the 2026 ballot</a></p>
+        </section>
       )}
-      {race.pending.length > 0 && (
-        <p class="mt-1">{race.pending.join(" and ")} primary: a write-in nominee may have qualified; the certified results do not name one.</p>
+
+      <section class="flex flex-col gap-3" aria-labelledby="votes-heading">
+        <h2 id="votes-heading" class="t-section">How they vote</h2>
+        {votes.length === 0 ? <p>No roll calls are recorded for {member.name} yet.</p> : <p>
+          Our records cover {votes.length.toLocaleString()} {senate ? "Senate" : "House"} roll calls since
+          {" "}{sinceYear}. {member.name} didn't vote in <span class="figure">{missed.toLocaleString()}</span> of them
+          {" "}({pct(missed, votes.length)}).
+        </p>}
+        <div class="overflow-x-auto" role="region" tabindex="0" aria-labelledby="by-congress-caption">
+          <table class="w-full max-w-[36rem] text-left tabular-nums">
+            <caption id="by-congress-caption" class="pb-2 text-left text-small text-granite">Roll calls and missed votes, by Congress</caption>
+            <thead>
+              <tr class="border-b border-edge text-small">
+                <th scope="col" class="py-2 pr-4 font-bold">Congress</th>
+                <th scope="col" class="py-2 pr-4 text-right font-bold">Roll calls</th>
+                <th scope="col" class="py-2 text-right font-bold">Didn't vote</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byCongress.map((c) => (
+                <tr class="border-b border-rule">
+                  <th scope="row" class="py-2 pr-4 font-normal">{congressLabel(c.congress)}</th>
+                  <td class="py-2 pr-4 text-right">{c.total.toLocaleString()}</td>
+                  <td class="py-2 text-right">{c.missed.toLocaleString()} <span class="text-granite">({pct(c.missed, c.total)})</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {recent.length > 0 && (
+        <section aria-labelledby="latest-heading">
+          <h2 id="latest-heading" class="t-section">Latest roll calls</h2>
+          <p class="mt-2 text-small text-granite">Newest first. Each links to the chamber's official record.</p>
+          <div class="mt-3">
+            <MoreRows rest={Math.max(0, recent.length - SHOWN)} label="latest roll calls">
+              {recent.slice(0, SHOWN).map((v) => <FederalVoteRow v={v} />)}
+              <Fragment slot="rest">{recent.slice(SHOWN).map((v) => <FederalVoteRow v={v} />)}</Fragment>
+            </MoreRows>
+          </div>
+          <p class="mt-3">
+            <a href={`/federal/${member.slug}/votes/`} class="font-bold underline">
+              All {votes.length.toLocaleString()} roll calls since {sinceYear}
+            </a>
+          </p>
+        </section>
       )}
-      <p class="mt-1"><a href="/elections/2026/" class="underline">Everything on the 2026 ballot</a></p>
+
+      <FederalMoney bioguide={member.bioguide} />
+
+      <p class="text-fine text-granite">
+        Roll calls from the <a href={source.href} class="underline">{source.label}</a>{latest && `, the latest from ${fmtDate(latest)}`}{pulledOn && `; checked ${fmtDate(pulledOn)}`}.
+        Campaign money from the <a href="https://www.fec.gov" class="underline">Federal Election Commission</a>, with the date it was retrieved.
+      </p>
     </div>
-  )}
-
-  <FederalMoney bioguide={member.bioguide} />
-
-  <section class="mt-6">
-    <h2 class="text-xl font-bold">Congress by Congress</h2>
-    <div
-      class="mt-2 max-w-xl overflow-x-auto"
-      role="region"
-      tabindex="0"
-      aria-label={`${member.name}'s votes per Congress, scrollable`}
-    >
-      <table class="w-full rounded-lg border border-navy-100 bg-white text-sm">
-        <caption class="sr-only">{member.name}'s roll calls and missed votes per Congress</caption>
-        <thead>
-          <tr class="text-left text-xs font-semibold uppercase tracking-wide text-navy-600">
-            <th scope="col" class="px-4 py-2">Congress</th>
-            <th scope="col" class="px-4 py-2 text-right">Roll calls</th>
-            <th scope="col" class="px-4 py-2 text-right">Missed</th>
-          </tr>
-        </thead>
-        <tbody>
-          {byCongress.map((c) => (
-            <tr class="border-t border-navy-100">
-              <td class="px-4 py-1.5">{congressLabel(c.congress)}</td>
-              <td class="px-4 py-1.5 text-right tabular-nums">{c.total.toLocaleString()}</td>
-              <td class={`px-4 py-1.5 text-right tabular-nums ${c.missed > 0 ? "text-badger-700" : "text-navy-600"}`}>
-                {c.missed.toLocaleString()}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-
-
-  <section class="mt-6">
-    <h2 class="text-xl font-bold">Latest roll calls</h2>
-    <div
-      class="scroll-body mt-2 max-h-[26rem] overflow-y-auto rounded-lg border border-navy-100 bg-white"
-      role="region"
-      tabindex="0"
-      aria-label={`${member.name}'s latest roll calls, scrollable`}
-    >
-    <ul class="divide-y divide-navy-100 text-sm">
-      {recent.map((v) => (
-        <FederalVoteRow v={v} />
-      ))}
-    </ul>
-    </div>
-    <p class="mt-2 text-sm">
-      <a href={`/federal/${member.slug}/votes/`} class="font-semibold underline">
-        All {votes.length.toLocaleString()} roll calls since {sinceYear} &rarr;
-      </a>
-    </p>
-  </section>
+  </div>
 </Base>
+
+<style>
+  .fed {
+    display: grid;
+    gap: 2rem;
+    grid-template-areas: "head" "rail" "body";
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .f-head { grid-area: head; }
+  .f-rail { grid-area: rail; }
+  .f-body { grid-area: body; }
+  @media (min-width: 64rem) {
+    .fed {
+      grid-template-areas: "head rail" "body rail";
+      grid-template-columns: minmax(0, 1fr) 20rem;
+      grid-template-rows: auto 1fr;
+      column-gap: 3.5rem;
+    }
+    .f-rail {
+      align-self: start;
+    }
+  }
+</style>

@@ -210,8 +210,22 @@ export const fmtTime = (t: string | null): string => {
   return `${h12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"} CT`;
 };
 
-export const fmtMoney = (v: number): string =>
-  "$" + Math.round(v).toLocaleString("en-US");
+/** Whole dollars, sign first: "-$1,234" (refunds can make a total negative). */
+export const fmtMoney = (v: number): string => {
+  const r = Math.round(v);
+  return (r < 0 ? "-$" : "$") + Math.abs(r).toLocaleString("en-US");
+};
+
+/** Money in a sentence: whole dollars, rounded once it's large
+ * ("$4.8 million"); exact figures go in the table beneath (docs/brand.md,
+ * "Numbers"). */
+export const fmtMoneyShort = (v: number): string => {
+  const abs = Math.abs(v);
+  const sign = v < 0 ? "-" : "";
+  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(1).replace(/\.0$/, "")} billion`;
+  if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(1).replace(/\.0$/, "")} million`;
+  return fmtMoney(v);
+};
 
 /** Dollars to the cent, for figures reported to the cent. */
 export const fmtCents = (v: number): string =>
