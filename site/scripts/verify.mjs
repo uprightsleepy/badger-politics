@@ -86,20 +86,36 @@ check(
   JSON.stringify(pinned),
 );
 
-// 3b. saved reps are highlighted anywhere they appear (legislators index)
+// 3b. saved reps are marked on the legislators index: each one's row says
+// "Your state senator" or "Your representative" (the list labels its own
+// rows instead of the sitewide link tint).
 // domcontentloaded, not networkidle2: this page loads 131 member
 // portraits from third-party hosts and the check below reads the DOM.
 await page.goto("http://127.0.0.1:8931/legislators/", { waitUntil: "domcontentloaded" });
 await page.waitForFunction(
-  () => [...document.querySelectorAll("a")].some((a) => a.classList.contains("mine")),
+  () => document.querySelectorAll("[data-member] [data-mine]:not([hidden])").length > 0,
   { timeout: 30000 },
 ).catch(() => {});
-const highlighted = await page.$$eval("a.mine", (as) => as.map((a) => a.textContent.trim()));
+const highlighted = await page.$$eval("[data-member] [data-mine]:not([hidden])", (els) =>
+  els.map((el) => el.closest("a").textContent.replace(/\s+/g, " ").trim()),
+);
 check(
   "saved reps highlighted on legislators index",
   highlighted.some((t) => t.includes("Tenorio")) && highlighted.some((t) => t.includes("Hutton")),
   JSON.stringify(highlighted.slice(0, 4)),
 );
+
+// 3c. the sitewide marking (Base.astro, from /data/reps.json) still tints
+// links to the reader's own lawmakers: each district page names its holder
+for (const [path, name] of [["/districts/assembly-14/", "Tenorio"], ["/districts/senate-5/", "Hutton"]]) {
+  await page.goto(`http://127.0.0.1:8931${path}`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(
+    () => document.querySelectorAll('main a.mine[href^="/legislators/"]').length > 0,
+    { timeout: 30000 },
+  ).catch(() => {});
+  const marked = await page.$$eval('main a.mine[href^="/legislators/"]', (as) => as.map((a) => a.textContent.trim()));
+  check(`saved rep marked sitewide on ${path}`, marked.some((t) => t.includes(name)), JSON.stringify(marked));
+}
 
 // 4. AB 656 page says plainly it stopped without a hearing + LRB analysis
 await page.goto("http://127.0.0.1:8931/bills/2025/ab656/", { waitUntil: "networkidle2" });

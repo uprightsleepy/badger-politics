@@ -105,6 +105,46 @@ export const partyGapSentence = (
   return `These totals leave out ${total} sitting ${total === 1 ? "legislator" : "legislators"} whose receipts we haven't collected: ${list}.`;
 };
 
+/** Who holds a chamber's seats, parties in alphabetical order, never by
+ * size: "Of the Senate's 33 seats, Democrats hold 15 and Republicans hold
+ * 18, a Republican majority." A majority is named only when one party
+ * holds more than half of all the seats, vacancies included. */
+export const seatsSentence = (chamber: string, seats: number, parties: (string | null)[]): string => {
+  const counts = new Map<string | null, number>();
+  for (const p of parties) counts.set(p, (counts.get(p) ?? 0) + 1);
+  const rows = [...counts].map(([party, n]) => ({ party, n })).sort(byPartyName);
+  const subject = ({ party, n }: { party: string | null; n: number }) => {
+    if (!party) return n === 1 ? "a member with no party recorded" : "members with no party recorded";
+    if (n > 1) return partyPlural(party);
+    const word = /^independent$/i.test(party) ? "independent" : partyWord(party);
+    return `${/^[aeiou]/i.test(word) ? "an" : "a"} ${word}`;
+  };
+  const parts = rows.map((r) => `${subject(r)} ${r.n === 1 ? "holds" : "hold"} ${r.n.toLocaleString()}`);
+  const list = parts.length <= 2 ? parts.join(" and ") : `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}`;
+  const major = rows.find((r) => r.party && r.n * 2 > seats);
+  const majority = major ? `, a ${major.party} majority` : "";
+  if (!parts.length) return `None of the ${chamber}'s ${seats} seats has a sitting member in our records.`;
+  return `Of the ${chamber}'s ${seats} seats, ${list}${majority}.`;
+};
+
+/** A roll call's party split in words, Democrats before Republicans (the
+ * alphabet, not size), from members who voted yes or no (db voteSplit). */
+export const partySplitSentence = (split: {
+  dem: { yes: number; no: number };
+  rep: { yes: number; no: number };
+}): string => {
+  const side = (c: { yes: number; no: number }) => (c.yes > c.no ? "yes" : c.yes < c.no ? "no" : null);
+  const d = side(split.dem);
+  const r = side(split.rep);
+  const tally = (c: { yes: number; no: number }) => `${c.yes.toLocaleString()} yes and ${c.no.toLocaleString()} no`;
+  const tallies = `Democrats ${tally(split.dem)}, Republicans ${tally(split.rep)}`;
+  const among = "Of members who voted yes or no";
+  if (d && r && d === r) return `${among}, most of both parties voted ${d}: ${tallies}.`;
+  if (d && r) return `A party-line vote. ${among}, most Democrats voted ${d} and most Republicans voted ${r}: ${tallies}.`;
+  const tied = d === null && r === null ? "Both parties" : d === null ? "Democrats" : "Republicans";
+  return `${among}: ${tallies}. ${tied} split evenly.`;
+};
+
 export const partyLetter = (party: string | null): string =>
   party ? party[0] : "?";
 
