@@ -1,7 +1,10 @@
 ---
+/** One session's bills that died in committee without a public hearing
+ * or a committee session, grouped where they died, with the chair. */
 import Base from "../../layouts/Base.astro";
-import { builtSessions, graveyardFor, graveyardBills, sessionStats, personIdByName } from "../../lib/db";
-import { billSlug, personSlug, shortTitle } from "../../lib/format";
+import { allCommittees, builtSessions, graveyardFor, graveyardBills, personIdByName, meta } from "../../lib/db";
+import { neverHeard } from "../../lib/billRows";
+import { billSlug, committeeSlug, committeeTitle, fmtDate, personSlug, shortTitle } from "../../lib/format";
 
 export function getStaticPaths() {
   return builtSessions().map((session) => ({
@@ -11,58 +14,93 @@ export function getStaticPaths() {
 }
 const { session } = Astro.props;
 const committees = graveyardFor(session.id);
-const stats = sessionStats(session.id);
+const h = neverHeard(session.id);
+const total = h.bills + h.resolutions;
+const pulledOn = meta().imported_at?.slice(0, 10);
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+const pct = (n: number, of: number) => (of ? Math.round((n / of) * 100) : 0);
+// committee pages, by name and chamber, for linking where one exists
+const pages = new Map(allCommittees().map((c) => [`${c.chamber}|${c.name}`, c.id]));
+const sessionName = (session.name ?? session.id).replace(/ Regular Session$/, " session").replace(/(\d{4})-(\d{4})/, "$1–$2");
 ---
 
 <Base
-  title={`Hearing None · ${session.name ?? session.id}`}
-  description={`${stats.graveyard} Wisconsin bills died without ever getting a public hearing in the ${session.name}.`}
+  title={`Bills that never got a hearing, ${sessionName}`}
+  breadcrumbs={[{ name: "Bills that never got a hearing", url: "/hearing-none/" }]}
+  description={`${total} Wisconsin bills and resolutions died without ever getting a public hearing in the ${session.name}.`}
+  layout="wide"
 >
-  <h1 class="text-3xl font-bold tracking-tight">Hearing: None</h1>
-  <p class="mt-2 max-w-3xl text-lg text-navy-700">
-    <strong class="text-badger-700">{stats.graveyard.toLocaleString()}</strong> of the
-    {" "}{stats.bills.toLocaleString()} proposals in the {session.name ?? session.id}
-    died without ever receiving a public hearing. They are grouped below by the
-    committee where they sat, with its chair. A committee chair alone decides
-    whether a bill gets heard.
-  </p>
-  <div class="mt-6 space-y-4">
-    {committees.map((c) => {
-      const bills = graveyardBills(session.id, c.committee_at_death);
-      return (
-        <details class="rounded-lg border border-navy-100 bg-white">
-          <summary class="flex cursor-pointer flex-wrap items-baseline gap-x-3 px-4 py-3">
-            <span class="font-bold">{c.committee_at_death ?? "(no committee recorded)"}</span>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <a href="/hearing-none/" class="self-start text-small underline">Bills that never got a hearing</a>
+    <h1 class="t-display">Bills that never got a hearing, {sessionName}</h1>
+    {total === 0 ? (
+      <p class="sm:text-lead">
+        None are recorded yet. A bill is counted here once the session's last floorperiod ends without a
+        hearing on it.
+      </p>
+    ) : (
+      <p class="sm:text-lead">
+        <span class="figure">{h.bills.toLocaleString()}</span> of the {h.totalBills.toLocaleString()} bills in the
+        {" "}{sessionName} ({pct(h.bills, h.totalBills)}%) died in committee without a public hearing{h.resolutions > 0
+          ? `, and so did ${plural(h.resolutions, "resolution", "resolutions")} of ${h.totalResolutions.toLocaleString()}`
+          : ""}.
+      </p>
+    )}
+    <p class="text-small text-granite">
+      A committee's chair decides whether a bill gets a hearing. Below, each committee where bills died,
+      with its chair at the time. A bill is counted when it was sent to a committee and had no public
+      hearing or committee session before the session ended.
+    </p>
+  </header>
+
+  {committees.length > 0 && (
+    <ul class="mt-8 max-w-[60rem] border-b border-rule" role="list">
+      {committees.map((c) => {
+        const bills = graveyardBills(session.id, c.committee_at_death, c.committee_chamber_at_death, c.committee_chair_at_death)
+          .sort((a, b) => a.identifier.localeCompare(b.identifier, "en", { numeric: true }));
+        const name = c.committee_at_death ? committeeTitle(c.committee_at_death, c.committee_chamber_at_death) : "Committee not recorded";
+        const page = c.committee_at_death && c.committee_chamber_at_death
+          ? pages.get(`${c.committee_chamber_at_death}|${c.committee_at_death}`)
+          : undefined;
+        const chairId = c.committee_chair_at_death ? personIdByName(c.committee_chair_at_death) : null;
+        const res = c.n - c.bills;
+        return (
+          <li class="border-t border-rule py-3">
+            <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h2 class="t-question text-[1.1875rem]">
+                {page ? <a href={`/committees/${committeeSlug(page)}/`} class="underline">{name}</a> : name}
+              </h2>
+              <span class="font-display font-bold tabular-nums">
+                {plural(c.bills, "bill", "bills")}{res > 0 && `, ${plural(res, "resolution", "resolutions")}`}
+              </span>
+            </div>
             {c.committee_chair_at_death && (
-              <span class="text-sm text-navy-600">Chair: {c.committee_chair_at_death}</span>
+              <p class="text-small text-granite">
+                Chair: {chairId ? <a href={`/legislators/${personSlug(chairId)}/`} class="underline">{c.committee_chair_at_death}</a> : c.committee_chair_at_death}
+              </p>
             )}
-            <span class="ml-auto rounded-full bg-badger-50 px-2.5 py-0.5 text-sm font-bold text-badger-700">
-              {c.n} bills, 0 hearings
-            </span>
-          </summary>
-          {c.committee_chair_at_death && personIdByName(c.committee_chair_at_death) && (
-            <p class="border-t border-navy-100 px-4 py-2 text-sm text-navy-600">
-              Chair:{" "}
-              <a
-                href={`/legislators/${personSlug(personIdByName(c.committee_chair_at_death)!)}/`}
-                class="underline"
-              >
-                {c.committee_chair_at_death}
-              </a>
-            </p>
-          )}
-          <ul class="space-y-1 border-t border-navy-100 px-4 py-3 text-sm">
-            {bills.map((b) => (
-              <li class="flex items-baseline gap-2">
-                <a href={`/bills/${session.id}/${billSlug(b.identifier)}/`} class="shrink-0 font-semibold underline">
-                  {b.identifier}
-                </a>
-                <span class="truncate">{shortTitle(b.title)}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      );
-    })}
-  </div>
+            <details class="group mt-1">
+              <summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">
+                <span class="group-open:hidden">Show the {plural(bills.length, "proposal", "proposals")}<span class="sr-only"> that died in {name}</span></span>
+                <span class="hidden group-open:inline">Hide them<span class="sr-only">: {name}</span></span>
+              </summary>
+              <ul class="mb-2 border-b border-rule" role="list">
+                {bills.map((b) => (
+                  <li class="border-t border-rule py-2">
+                    <a href={`/bills/${session.id}/${billSlug(b.identifier)}/`} class="underline"><span class="font-bold">{b.identifier}</span>{b.title && <>: {shortTitle(b.title)}</>}</a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </li>
+        );
+      })}
+    </ul>
+  )}
+
+  <p class="mt-10 max-w-[47.5rem] text-fine text-granite">
+    From each bill's official history at the
+    {" "}<a href="https://docs.legis.wisconsin.gov" class="underline">Wisconsin Legislature</a>{pulledOn && `, checked ${fmtDate(pulledOn)}`}.
+    The committee and chair are where the bill sat when the session ended.
+  </p>
 </Base>

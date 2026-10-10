@@ -395,25 +395,42 @@ export const electionFor = memoBy((personId: string) => {
   };
 });
 
+/** Where a session's never-heard bills died: one group per committee,
+ * chamber and chair at death, so same-named committees in the two
+ * chambers, and a committee that changed chairs, stay apart. Counts bills
+ * and resolutions separately. */
 export const graveyardFor = (sessionId: string) =>
   prep(
-      `SELECT committee_at_death, committee_chair_at_death, COUNT(*) AS n
+      `SELECT committee_at_death, committee_chamber_at_death, committee_chair_at_death,
+              COUNT(*) AS n,
+              SUM(CASE WHEN classification = 'bill' THEN 1 ELSE 0 END) AS bills
        FROM bills WHERE session_id = ? AND died_without_hearing = 1
-       GROUP BY committee_at_death, committee_chair_at_death ORDER BY n DESC`,
+       GROUP BY committee_at_death, committee_chamber_at_death, committee_chair_at_death
+       ORDER BY n DESC, committee_at_death`,
     )
     .all(sessionId) as {
     committee_at_death: string | null;
+    committee_chamber_at_death: string | null;
     committee_chair_at_death: string | null;
     n: number;
+    bills: number;
   }[];
 
-export const graveyardBills = (sessionId: string, committee: string | null) =>
+export const graveyardBills = (
+  sessionId: string,
+  committee: string | null,
+  chamber: string | null = null,
+  chair: string | null = null,
+) =>
   prep(
-      `SELECT id, identifier, title FROM bills
+      `SELECT id, identifier, title, classification FROM bills
        WHERE session_id = ? AND died_without_hearing = 1
-       AND committee_at_death IS ? ORDER BY id`,
+       AND committee_at_death IS ? AND committee_chamber_at_death IS ?
+       AND committee_chair_at_death IS ? ORDER BY id`,
     )
-    .all(sessionId, committee) as { id: string; identifier: string; title: string | null }[];
+    .all(sessionId, committee, chamber, chair) as {
+    id: string; identifier: string; title: string | null; classification: string | null;
+  }[];
 
 const HEARING_SELECT = `SELECT h.*, c.name AS committee_name, c.chamber AS committee_chamber,
        p.name AS chair_name, c.chair_person_id AS chair_person_id,
@@ -612,6 +629,7 @@ export const governorsDesk = () => {
       identifier: string; title: string | null; session_id: string;
     }[];
   return {
+    biennium: bienniumOf(ids[0]),
     awaiting: byStatus("passed"),
     enacted: byStatus("enacted"),
     vetoed: byStatus("vetoed"),

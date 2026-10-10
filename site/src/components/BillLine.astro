@@ -1,0 +1,30 @@
+---
+/** One bill in a compact list where the section already says what
+ * happened to it: the date, then the bill number and title as one link,
+ * then anything else in the slot (votes, a veto message). */
+import type { HTMLAttributes } from "astro/types";
+import { shortTitle } from "../lib/format";
+interface Props extends HTMLAttributes<"li"> {
+  href: string;
+  identifier: string;
+  title: string | null;
+  /** The date this list is about, already formatted; "" for none. */
+  date?: string;
+  /** A label before the link, e.g. "Act 12". */
+  lead?: string;
+}
+const { href, identifier, title, date = "", lead, class: className, ...attrs } = Astro.props;
+const extra = Astro.slots.has("default");
+---
+<li class:list={["flex flex-col gap-0.5 border-t border-rule py-3 sm:flex-row sm:gap-5", className]} {...attrs}>
+  {(date || lead) && (
+    <span class="flex shrink-0 flex-wrap gap-x-2 text-small tabular-nums text-granite sm:w-32 sm:flex-col sm:pt-0.5">
+      {lead && <span class="font-display font-bold text-spruce">{lead}</span>}
+      {date && <span>{date}</span>}
+    </span>
+  )}
+  <div class="min-w-0 flex-1 [overflow-wrap:anywhere]">
+    <a href={href} class="underline"><span class="font-bold">{identifier}</span>{title && <>: {shortTitle(title)}</>}</a>
+    {extra && <p class="mt-0.5 text-small text-granite"><slot /></p>}
+  </div>
+</li>

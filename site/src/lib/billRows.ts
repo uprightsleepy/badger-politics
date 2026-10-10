@@ -105,7 +105,8 @@ export interface SessionOutcomes {
   resolutions: number;
   /** Each bill counted once, at the furthest point it reached. */
   counts: Record<OutcomeKey, number>;
-  /** Of the bills that stopped in committee, those with no public hearing. */
+  /** Of the bills that stopped in committee, those that died there with no
+   * public hearing or committee session (the importer's died_without_hearing). */
   committeeNoHearing: number;
 }
 
@@ -142,9 +143,30 @@ export const sessionOutcomes = memoBy((sessionId: string): SessionOutcomes => {
         // the committee stop; a bill in these statuses can't have reached
         // the law stop, which needs the governor's signature
         counts["stopped-committee"]++;
-        if (!s.hearing) committeeNoHearing++;
+        // the importer's definition, the one every "never got a hearing"
+        // count on the site uses (see neverHeard)
+        if (b.died_without_hearing === 1) committeeNoHearing++;
       }
     }
   }
   return { bills, resolutions, counts, committeeNoHearing };
+});
+
+/** Bills and resolutions that died in committee without a public hearing
+ * or a committee session (the importer's died_without_hearing), counted
+ * apart, with the totals they're out of. The homepage, the session lists
+ * and /hearing-none/ all count from this one flag. */
+export const neverHeard = memoBy((sessionId: string) => {
+  let bills = 0, resolutions = 0, totalBills = 0, totalResolutions = 0;
+  for (const b of billsFor(sessionId)) {
+    const heardNone = b.died_without_hearing === 1;
+    if (b.classification === "bill") {
+      totalBills++;
+      if (heardNone) bills++;
+    } else {
+      totalResolutions++;
+      if (heardNone) resolutions++;
+    }
+  }
+  return { bills, resolutions, totalBills, totalResolutions };
 });
