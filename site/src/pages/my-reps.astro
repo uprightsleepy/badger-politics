@@ -20,7 +20,7 @@ const general =
        wider screens put the map or the preview beside them -->
   <div class="grid grid-cols-[minmax(0,1fr)] gap-x-12 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] lg:items-center">
     <div class="flex max-w-[37.5rem] flex-col gap-3">
-      <h1 id="page-title" class="t-display">Find your state lawmakers</h1>
+      <h1 id="page-title" tabindex="-1" class="t-display">Find your state lawmakers</h1>
       <p id="intro-start" class="sm:text-lead">
         Everyone in Wisconsin has two: a representative in the Assembly and a
         senator in the Senate. Enter your address to see yours.
@@ -80,10 +80,10 @@ const general =
     </aside>
   </div>
 
-  <p id="status" class="mt-3 max-w-[35rem] text-small text-granite empty:hidden" role="status"></p>
+  <p id="status" class="mt-3 max-w-[35rem] text-small text-granite" role="status"></p>
 
   <section id="result" class="mt-8 hidden" aria-labelledby="result-heading">
-    <h2 id="result-heading" tabindex="-1" class="sr-only focus:outline-none">Your lawmakers</h2>
+    <h2 id="result-heading" class="sr-only">Your lawmakers</h2>
     <div id="reps" class="flex flex-wrap items-start gap-6" data-no-rep-highlight data-general={general}></div>
     <p class="mt-6 flex max-w-[45rem] items-start gap-2.5 rounded-[0.75rem] bg-prairie-tint px-4 py-3.5">
       <span class="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-spruce" aria-hidden="true"></span>
@@ -129,7 +129,7 @@ const general =
     import { isFollowing, toggleFollow } from "../scripts/follows";
     import { esc } from "../lib/html";
     import { ballotStatus } from "../lib/ballot";
-    import { clip, fmtDate, partyPlural, partyWord, sessionPlainName, shortTitle } from "../lib/format";
+    import { clip, fmtDate, partyPlural, partyWord } from "../lib/format";
     import { districtForAddress, districtForBrowser } from "../lib/lookup";
     import { forgetPollingPlace, savePollingPlace, savedPollingPlace } from "../lib/pollingPlace";
     import type { LocalReps, RepSlim, RepSummaries, RepSummary, Reps, Typical } from "../lib/wire";
@@ -148,13 +148,16 @@ const general =
     // needs to draw the cards.
     async function loadData() {
       if (!reps) {
-        statusEl.textContent = "Loading your districts…";
+        // only speak up when nothing else is in progress, and only clear
+        // our own message
+        const loading = "Loading your districts…";
+        if (!statusEl.textContent) statusEl.textContent = loading;
         [reps, summaries, localReps] = await Promise.all([
           fetch("/data/reps.json").then((r) => r.json()),
           fetch("/data/rep-summaries.json").then((r) => r.json()).catch(() => null),
           fetch("/data/local-reps.json").then((r) => r.json()).catch(() => null),
         ]);
-        statusEl.textContent = "";
+        if (statusEl.textContent === loading) statusEl.textContent = "";
       }
     }
 
@@ -187,19 +190,21 @@ const general =
      * the bar is the same fact drawn. */
     function rangeBar(opts: {
       value: number; min: number; max: number; typical: Typical;
-      left: string; right: string; label: string;
+      left: string; right: string;
     }) {
       const span = Math.max(opts.max - opts.min, 1);
       const pos = (n: number) => Math.min(100, Math.max(0, ((n - opts.min) / span) * 100));
       const lo = pos(opts.typical.low);
       const width = Math.max(pos(opts.typical.high) - lo, 2);
       return (
-        `<div class="range mt-1" role="img" aria-label="${esc(opts.label)}">` +
+        // the sentence beside the bar carries the same facts, so the bar
+        // itself is hidden from assistive tech
+        '<div class="range mt-1" aria-hidden="true">' +
         '<div class="relative mx-2.5 h-2.5 rounded-full bg-fog">' +
         `<span class="absolute inset-y-0 rounded-full bg-lake-tint" style="left:${lo.toFixed(1)}%;width:${width.toFixed(1)}%"></span>` +
         `<span class="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-spruce" style="left:${pos(opts.value).toFixed(1)}%"></span>` +
         '</div>' +
-        `<div class="mt-1.5 flex justify-between text-fine text-granite" aria-hidden="true"><span>${esc(opts.left)}</span><span>${esc(opts.right)}</span></div>` +
+        `<div class="mt-1.5 flex justify-between text-fine text-granite"><span>${esc(opts.left)}</span><span>${esc(opts.right)}</span></div>` +
         '</div>'
       );
     }
@@ -223,7 +228,7 @@ const general =
       if (!slim) {
         return (
           '<section class="sheet flex min-w-0 flex-[1_1_26rem] flex-col gap-2 p-5 sm:p-7">' +
-          `<h2 class="t-section">${chamber} District ${district}</h2>` +
+          `<h2 class="t-section">${chamber} District ${esc(String(district))}</h2>` +
           `<p>This seat is empty right now. ${link(districtHref, `See ${chamber} District ${district}`)}</p></section>`
         );
       }
@@ -253,24 +258,30 @@ const general =
 
       if (full) {
         const typical = summaries?.typical?.[house];
-        // 1. attendance, against the chamber
-        const att = full.attendance;
-        if (att.total > 0) {
-          const t = typical?.missed;
-          let body = `<p>Missed ${fig(att.missed.toLocaleString())} of ${fig(att.total.toLocaleString())} votes this session.</p>`;
+        // 1. how often they vote: yes or no, out of every roll call held
+        // while they served, against the rest of their chamber
+        const v = full.voted;
+        if (v && v.total > 0) {
+          const skipped = v.total - v.cast;
+          let body = skipped === 0
+            ? `<p>Voted on all ${fig(v.total.toLocaleString())} roll call votes this session.</p>`
+            : `<p>Voted on ${fig(v.cast.toLocaleString())} of ${fig(v.total.toLocaleString())} roll call votes this session. Didn't vote on ${fig(skipped.toLocaleString())}.</p>`;
+          const t = typical?.notVoting;
           if (t) {
-            const words = round(t.high) === 0
-              ? `The middle half of ${members} missed none.`
-              : `The middle half of ${members} missed ${round(t.low)} to ${round(t.high)}.`;
+            const rate = (skipped / v.total) * 100;
+            const pct = (n: number) => (n > 0 && n < 1 ? "under 1%" : `${round(n)}%`);
+            const words = round(t.high) === 0 && t.high < 0.5
+              ? `The middle half of ${members} voted on every one, or nearly.`
+              : `The middle half of ${members} didn't vote on ${pct(t.low)} to ${pct(t.high)} of them.`;
+            const top = Math.max(5, Math.ceil(Math.max(t.max, rate)));
             body += rangeBar({
-              value: att.missed, min: 0, max: Math.max(t.max, att.missed, 1), typical: t,
-              left: "None missed", right: `${Math.max(t.max, att.missed)} missed`,
-              label: `Missed ${att.missed} votes. ${words}`,
-            }) + `<p class="text-fine text-granite">${esc(words)}</p>`;
+              value: rate, min: 0, max: top, typical: t,
+              left: "Voted on all", right: `Didn't vote on ${top}%`,
+            }) + `<p class="text-fine text-granite">${esc(words)} Not voting counts being away and choosing not to vote alike.</p>`;
           }
-          blocks.push(question("Do they show up to vote?", body));
+          blocks.push(question("How often do they vote?", body));
         } else {
-          blocks.push(question("Do they show up to vote?", "<p>No floor votes are recorded for them yet this session.</p>"));
+          blocks.push(question("How often do they vote?", "<p>No roll call votes are recorded for them yet this session.</p>"));
         }
 
         // 2. party agreement, Democrats and Republicans only
@@ -279,14 +290,13 @@ const general =
           let body: string;
           if (l) {
             const pct = round(l.pct);
-            body = `<p>Voted with most ${esc(partyPlural(slim.party))} on ${fig(`${pct}%`)} of ${fig(l.n.toLocaleString())} votes in the ${esc(sessionPlainName(l.session, l.session))}.</p>`;
+            body = `<p>Voted with most ${esc(partyPlural(slim.party))} on ${fig(`${pct}%`)} of ${fig(l.n.toLocaleString())} votes in the ${esc(l.label)}.</p>`;
             const t = typical?.loyalty;
             if (t && t.session === l.session) {
               const words = `The middle half of ${members} voted with their party ${round(t.low)}% to ${round(t.high)}% of the time.`;
               body += rangeBar({
                 value: l.pct, min: 50, max: 100, typical: t,
                 left: "50%", right: "100%",
-                label: `${pct} percent. ${words}`,
               }) + `<p class="text-fine text-granite">${esc(words)}</p>`;
             }
           } else {
@@ -329,16 +339,26 @@ const general =
         const opponents = full.opponents ?? [];
         const when = general ? longDate(general) : "";
         const raceLink = status.kind !== "none" && status.kind !== "future" ? ` ${link(seat, "See the race")}` : "";
+        const writeIns = full.writeInPending ?? [];
+        // a write-in nominee may exist that the certified results don't name
+        const writeInLine = writeIns.length
+          ? ` The ${esc(writeIns.join(" and "))} primary had no printed candidate, so a write-in nominee may also be on the ballot.`
+          : "";
         let ballot = "";
         if (status.kind === "on-ballot") {
           ballot = summaries?.phase === "general"
             ? opponents.length
               ? `Yes. ${when ? `On ${esc(when)}, they` : "They"} face ${people(opponents)}.`
-              : `Yes. They're running unopposed${when ? ` on ${esc(when)}` : ""}.`
-            : `Yes, they're running in ${status.year}.` + (opponents.length ? ` Others who filed for this seat: ${people(opponents)}.` : "");
+              : writeIns.length
+                ? `Yes. No other candidate's name is on the ballot for this seat${when ? ` on ${esc(when)}` : ""}.`
+                : `Yes. They're running unopposed${when ? ` on ${esc(when)}` : ""}.`
+            : `Yes, they're on the ${status.year} ballot.` + (opponents.length ? ` Others approved for this seat: ${people(opponents)}.` : "");
+          ballot += writeInLine;
         } else if (status.kind === "not-running") {
-          ballot = `No. ${esc(slim.name)} isn't running in ${status.year}.` +
-            (opponents.length ? ` Running for this seat: ${people(opponents)}.` : "");
+          // not on the November ballot: retired, lost a primary, or not
+          // approved; the report doesn't say which, so neither do we
+          ballot = `No. They're not on the November ${status.year} ballot.` +
+            (opponents.length ? ` On the ballot for this seat: ${people(opponents)}.` : "") + writeInLine;
         } else if (status.kind === "pending") {
           ballot = `The Elections Commission hasn't posted yet whether they're running in ${status.year}.`;
         } else if (status.kind === "future") {
@@ -347,8 +367,8 @@ const general =
         if (ballot) {
           blocks.push(question("Are they on your ballot?",
             `<p>${ballot}${raceLink}</p>` +
-            (opponents.length && status.kind !== "future"
-              ? '<p class="text-fine text-granite">Candidates come from the Elections Commission\'s ballot report. Check MyVote Wisconsin for any later changes.</p>'
+            (status.kind !== "future"
+              ? '<p class="text-fine text-granite">From the Elections Commission\'s ballot report. Check MyVote Wisconsin for your own ballot.</p>'
               : "")));
         }
 
@@ -356,9 +376,11 @@ const general =
         const votes = full.recentVotes ?? [];
         const voteLine = (v: RepSummary["recentVotes"][number], long: boolean) => {
           const how = v.option === "yes" ? "Voted yes" : v.option === "no" ? "Voted no" : "Didn't vote";
-          const about = shortTitle(v.title).replace(/\.$/, "");
-          const subject = about ? `, about ${esc(clip(about.charAt(0).toLowerCase() + about.slice(1), long ? 90 : 60))}` : "";
-          return `${how} on ${link(`/bills/${v.session}/${v.slug}/`, v.identifier)}${subject}. ${esc(fmtDate(v.date))}. ${link(`/votes/${v.event}/`, long ? "See the vote" : "Vote")}`;
+          // the official title, as written, after its "Relating to:"
+          const about = (v.title ?? "").replace(/^\s*relating to:\s*/i, "").replace(/\.\s*$/, "");
+          const subject = about ? `, relating to ${esc(clip(about, long ? 90 : 60))}` : "";
+          return `${how} on ${link(`/bills/${v.session}/${v.slug}/`, v.identifier)}${subject}. ${esc(fmtDate(v.date))}. ${link(`/votes/${v.event}/`, long ? "See the vote" : "Vote")}` +
+            (v.motion ? `<span class="block text-fine text-granite">Official motion: “${esc(v.motion)}”</span>` : "");
         };
         if (votes.length) {
           let body = `<p>${voteLine(votes[0], true)}</p>`;
@@ -367,10 +389,7 @@ const general =
               '<details class="group"><summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">' +
               `<span class="group-open:hidden">See ${votes.length - 1} earlier ${plural(votes.length - 1, "vote", "votes")}</span><span class="hidden group-open:inline">Hide earlier votes</span></summary>` +
               '<ul class="flex flex-col">' +
-              votes.slice(1).map((v) =>
-                `<li class="border-t border-rule py-2 text-small">${voteLine(v, false)}` +
-                (v.motion ? `<span class="block text-fine text-granite">Official motion: “${esc(v.motion)}”</span>` : "") +
-                '</li>').join("") +
+              votes.slice(1).map((v) => `<li class="border-t border-rule py-2 text-small">${voteLine(v, false)}</li>`).join("") +
               '</ul></details>';
           }
           blocks.push(question("How did they vote most recently?", body));
@@ -474,7 +493,7 @@ const general =
       resultEl.classList.remove("hidden");
       if (announce) {
         statusEl.textContent = `Found: Assembly District ${ad}, Senate District ${sd}.`;
-        $("result-heading").focus();
+        titleEl.focus();
       }
     }
 
@@ -565,9 +584,10 @@ const general =
 </Base>
 
 <style is:global>
-  /* the range bar keeps its marks in Windows High Contrast */
+  /* the range bar keeps its track and marks in Windows High Contrast */
   @media (forced-colors: active) {
-    .range span {
+    .range,
+    .range * {
       forced-color-adjust: none;
     }
   }

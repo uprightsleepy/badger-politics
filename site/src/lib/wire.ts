@@ -23,13 +23,20 @@ export type RepSummary = {
   contact: { email: string; phone: string | null } | null;
   committees: { name: string; role: string; slug: string }[];
   attendance: { total: number; missed: number };
+  /** Yes-or-no votes cast out of every roll call held while serving this
+   * biennium; the rest are absences and recorded non-votes. */
+  voted: { cast: number; total: number };
   authored: { total: number; signedOn: number; enacted: number; vetoed: number; noHearing: number };
   election: { cycle_year: number; on_ballot: number | null } | null;
   /** Approved filings for this seat's 2026 race, the member excluded. */
   opponents: { name: string; party: string | null }[];
-  /** Share of votes cast with their party's majority, newest session with
-   * at least 20 such votes; null for members outside the two caucuses. */
-  loyalty: { pct: number; n: number; session: string } | null;
+  /** Parties whose primary for this seat may have a write-in nominee the
+   * certified results don't name. */
+  writeInPending: string[];
+  /** Share of votes cast with their party's majority, newest regular
+   * session with at least 20 such votes; null for members outside the two
+   * caucuses. `label` is the session's plain name ("2025–26 session"). */
+  loyalty: { pct: number; n: number; session: string; label: string } | null;
   recentVotes: {
     date: string | null;
     option: string;
@@ -49,7 +56,8 @@ export type RepSummaries = {
   senate: Record<string, RepSummary>;
   /** "general" once certified primary results name the November field. */
   phase?: "general" | "primary";
-  typical?: Record<"assembly" | "senate", { missed: Typical | null; loyalty: Typical | null }>;
+  /** Percent of votes not cast, and percent cast with the party. */
+  typical?: Record<"assembly" | "senate", { notVoting: Typical | null; loyalty: Typical | null }>;
 };
 
 /** /data/ballot-2026.json: what is on one district's ballot. */
