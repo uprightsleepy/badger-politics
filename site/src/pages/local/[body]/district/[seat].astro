@@ -45,9 +45,11 @@ const list = names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", "
       <LocalCoverageNotice tenant={body.tenant} />
     </header>
 
-    <aside class="l-rail" data-pagefind-ignore>
-      <LocalDistrictMap body={body.slug} seat={seat} label={`District ${seat}`} city={body.city} />
-    </aside>
+    {hasBoundary && (
+      <aside class="l-rail" data-pagefind-ignore aria-label={`Map of District ${seat}`}>
+        <LocalDistrictMap body={body.slug} seat={seat} label={`District ${seat}`} city={body.city} />
+      </aside>
+    )}
 
     <div class="l-body flex max-w-[47.5rem] flex-col gap-8">
       {holders.length > 0 && (
@@ -55,9 +57,11 @@ const list = names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", "
           <h2 id="members-heading" class="t-section">{holders.length === 1 ? "Its member" : "Its members"}</h2>
           <ul class="mt-3 grid gap-4 sm:grid-cols-2" role="list">
             {holders.map((m) => (
-              <li class="sheet flex items-center gap-4 p-5">
-                <Portrait src={m.image_url} name={m.name} size={56} />
-                <a href={`/local/${body.slug}/${m.slug}/`} class="min-w-0 font-display text-[1.1875rem] font-bold underline [overflow-wrap:anywhere]">{m.name}</a>
+              <li class="sheet p-5">
+                <a href={`/local/${body.slug}/${m.slug}/`} class="flex min-h-11 items-center gap-4 font-display text-[1.1875rem] font-bold underline">
+                  <Portrait src={m.image_url} name={m.name} size={56} />
+                  <span class="min-w-0 [overflow-wrap:anywhere]">{m.name}</span>
+                </a>
               </li>
             ))}
           </ul>

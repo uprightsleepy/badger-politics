@@ -21,7 +21,8 @@ export function getStaticPaths() {
 const { body } = Astro.props;
 const members = localMembers(body.tenant);
 const stats = localTenantStats(body.tenant);
-const dissent = localActionsWithDissent(body.tenant, 25);
+const DISSENT_LIMIT = 25;
+const dissent = localActionsWithDissent(body.tenant, DISSENT_LIMIT);
 const nextMeetings = localUpcomingMeetings().filter((m) => m.tenant === body.tenant);
 const glossary = glossaryFor(dissent.map((a) => a.action));
 const current = members.filter((m) => m.is_current);
@@ -30,7 +31,8 @@ const presiding = current.filter((m) => m.seat == null);
 const former = members.filter((m) => !m.is_current && m.vote_count > 0);
 const districts = [...new Set(seated.map((m) => m.seat!))].sort((a, b) => a - b);
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
-const perDistrict = districts.length ? seated.length / districts.length : 0;
+const perSeat = Array.from({ length: body.seats }, (_, i) => seated.filter((m) => m.seat === i + 1).length);
+const perDistrict = perSeat.length > 0 && perSeat.every((n) => n === perSeat[0]) ? perSeat[0] : 0;
 const SHOWN = 10;
 const isMayor = (m: (typeof members)[number]) => localMemberTerms(body.tenant, m.person_id).some((t) => t.title === "Mayor");
 const mayor = presiding.find(isMayor);
@@ -48,9 +50,9 @@ const mayor = presiding.find(isMayor);
     <h1 class="t-display">{body.name}</h1>
     <p class="sm:text-lead">
       {seated.length > 0
-        ? `${plural(seated.length, "alderperson represents", "alderpersons represent")} ${body.city}'s ${plural(body.seats, "district", "districts")}${Number.isInteger(perDistrict) && perDistrict > 1 ? `, ${perDistrict} for each` : ""}`
+        ? `${plural(seated.length, "alderperson represents", "alderpersons represent")} ${body.city}'s ${plural(body.seats, "district", "districts")}${perDistrict > 1 ? `, ${perDistrict} for each` : ""}`
         : `The council represents ${body.city}'s ${plural(body.seats, "district", "districts")}`}{mayor ? `, and Mayor ${mayor.name} presides` : ""}.
-      {stats && stats.votes > 0 && ` Since ${longDate(stats.first!)}, it has recorded ${plural(stats.votes, "vote", "votes")} on ${plural(stats.actions, "item", "items")} at ${plural(stats.meetings, "meeting", "meetings")}.`}
+      {stats && stats.votes > 0 && ` Our records cover ${plural(stats.votes, "recorded vote", "recorded votes")} on ${plural(stats.actions, "item", "items")} at ${plural(stats.meetings, "meeting", "meetings")} since ${longDate(stats.first!)}.`}
     </p>
     <p class="text-small text-granite">
       Council seats are nonpartisan, so no party is shown. Every vote comes from the city's own legislative
@@ -118,8 +120,10 @@ const mayor = presiding.find(isMayor);
     <section class="mt-12 max-w-[60rem]" aria-labelledby="dissent-heading">
       <h2 id="dissent-heading" class="t-section">Recent votes where someone voted no</h2>
       <p class="mt-2 max-w-[47.5rem] text-small text-granite">
-        The {dissent.length.toLocaleString()} most recent items with at least one recorded no. The vote is on the action
-        named with each item: a motion to refer or postpone isn't the measure itself.
+        {dissent.length < DISSENT_LIMIT
+          ? dissent.length === 1 ? "The one item with a recorded no." : `All ${dissent.length.toLocaleString()} items with at least one recorded no, newest first.`
+          : `The ${DISSENT_LIMIT.toLocaleString()} most recent items with at least one recorded no.`}
+        {" "}The vote is on the action named with each item: a motion to refer or postpone isn't the measure itself.
       </p>
       <div class="mt-3">
         <MoreRows rest={Math.max(0, dissent.length - SHOWN)} label="recent split votes">

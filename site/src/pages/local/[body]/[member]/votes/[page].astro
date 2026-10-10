@@ -45,7 +45,7 @@ const yearPages = yearPageStarts(localMemberVoteYears(body.tenant, member.person
     <a href={`${base}/`} class="self-start text-small underline">{member.name}</a>
     <h1 class="t-display">Recorded votes</h1>
     <p class="sm:text-lead">
-      {total.toLocaleString()} recorded votes, newest first. This page has {first.toLocaleString()} to {last.toLocaleString()}.
+      {total === 1 ? "1 recorded vote." : `${total.toLocaleString()} recorded votes, newest first. This page has ${first.toLocaleString()} to ${last.toLocaleString()}.`}
     </p>
     <p class="text-small text-granite">
       The vote is on the action named with each item, which isn't always the measure itself. Each item links

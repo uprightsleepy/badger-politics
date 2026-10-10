@@ -37,7 +37,7 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} 
             </p>
           )}
           <LocalCoverageNotice tenant={b.tenant} />
-          <p class="text-small"><a href={b.insite_url} class="underline">The city's own records<span class="sr-only"> for {b.city}</span></a></p>
+          <p class="text-small"><a href={b.insite_url} class="inline-flex min-h-11 items-center underline">The city's own records<span class="sr-only"> for {b.city}</span></a></p>
         </li>
       );
     })}
