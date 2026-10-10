@@ -1,48 +1,58 @@
 ---
+/** Everything the reader follows, read from this browser only: each item
+ * with its latest recorded change and a way to stop following it. Rows
+ * are drawn by the script from the static API, feeds and data files. */
 import Base from "../layouts/Base.astro";
+
+const KINDS: [string, string][] = [
+  ["bills", "Bills"],
+  ["legislators", "State lawmakers"],
+  ["committees", "Committees"],
+  ["races", "2026 races"],
+  ["districts", "Districts"],
+  ["council", "City council members"],
+];
 ---
 
 <Base
   noindex
   title="Following"
-  description="Everything you follow, including bills, legislators, committees, districts and races, with what changed since your last visit. Stored on this device only."
+  description="Everything you follow, including bills, lawmakers, committees, districts and races, with what changed since your last visit. Stored on this device only."
+  layout="wide"
 >
-  <h1 class="text-2xl font-bold">Following</h1>
-  <p class="mt-1 max-w-3xl text-sm text-navy-700">
-    Follows live in this browser only; the site never learns what you
-    follow. For updates anywhere, bills, legislators and committees also
-    have Atom feeds: links you can add to a feed reader to receive updates
-    outside this browser.
-  </p>
-  <p id="follow-changed-note" hidden class="mt-3 max-w-3xl rounded-lg border border-moss-600/40 bg-moss-50 px-4 py-2 text-sm font-semibold text-moss-600"></p>
-
-  <div id="follow-empty" hidden class="mt-4 max-w-3xl rounded-lg border border-navy-100 bg-white p-4 text-sm">
-    <p>
-      You aren't following anything yet. Use the Follow button on any bill,
-      legislator, council member, committee, district or race page, then
-      check back here to see what changed.
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">Following</h1>
+    <p class="sm:text-lead">
+      What you follow is kept in this browser only; the site never learns what it is. Each item shows its
+      latest recorded change.
     </p>
-    <p class="mt-3 flex flex-wrap gap-2">
-      <a href="/my-reps/" class="rounded-lg bg-navy-800 px-3 py-2 font-semibold text-white hover:bg-navy-700">Find my legislators</a>
-      <a href="/bills/" class="rounded-lg border border-navy-100 px-3 py-2 font-semibold hover:bg-navy-50">Browse bills</a>
+    <p class="text-small text-granite">
+      To get updates outside this browser, bills, state lawmakers, committees and council members each have a
+      feed you can add to a feed reader, linked next to their Follow button.
+    </p>
+  </header>
+
+  <p id="follow-changed-note" hidden class="sheet mt-6 max-w-[47.5rem] p-4 font-bold"></p>
+
+  <div id="follow-empty" hidden class="sheet mt-6 flex max-w-[47.5rem] flex-col gap-4 p-5 sm:p-6">
+    <p>
+      You aren't following anything yet. Use the Follow button on any bill, lawmaker, council member,
+      committee, district or race page, then check back here to see what changed.
+    </p>
+    <p class="flex flex-wrap gap-3">
+      <a href="/my-reps/" class="btn btn-primary">Find your lawmakers</a>
+      <a href="/bills/" class="btn btn-secondary">Browse bills</a>
     </p>
   </div>
 
-  {
-    [
-      ["bills", "Bills"],
-      ["legislators", "Legislators"],
-      ["committees", "Committees"],
-      ["races", "2026 races"],
-      ["districts", "Districts"],
-      ["council", "City council members"],
-    ].map(([kind, label]) => (
-      <section id={`follow-${kind}-section`} hidden class="mt-6">
-        <h2 class="text-xl font-bold">{label}</h2>
-        <ul id={`follow-${kind}`} class="mt-2 divide-y divide-navy-100 rounded-lg border border-navy-100 bg-white text-sm"></ul>
+  <div class="max-w-[47.5rem]">
+    {KINDS.map(([kind, label]) => (
+      <section id={`follow-${kind}-section`} hidden class="mt-10" aria-labelledby={`follow-${kind}-heading`}>
+        <h2 id={`follow-${kind}-heading`} class="t-section" tabindex="-1">{label}</h2>
+        <ul id={`follow-${kind}`} class="mt-3 border-b border-rule" role="list"></ul>
       </section>
-    ))
-  }
+    ))}
+  </div>
 
   <p id="follow-status" role="status" class="sr-only"></p>
 
@@ -50,144 +60,179 @@ import Base from "../layouts/Base.astro";
     import { getFollows, toggleFollow, lastSeen, markSeen, FOLLOW_KINDS } from "../scripts/follows";
     import type { Follows } from "../scripts/follows";
     import { esc } from "../lib/html";
-    import type { Ballot } from "../lib/wire";
+    import { fmtDate, partyWord, shortTitle } from "../lib/format";
+    import { raceSentenceHtml } from "../lib/ballot";
+    import type { Ballot, Reps } from "../lib/wire";
 
-    // every kind's row ends the same way
-    const unfollow = (kind: string, id: string) =>
-      `<button type="button" data-unfollow-kind="${esc(kind)}" data-unfollow-id="${esc(id)}" class="ml-auto shrink-0 py-2 text-xs underline">unfollow</button>`;
-    const changedBadge =
-      `<span class="shrink-0 rounded-full bg-moss-50 px-2 py-0.5 text-xs font-semibold text-moss-600">new action</span>`;
-    const row = (changed: boolean, body: string) =>
-      `<li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2${changed ? " border-l-4 border-moss-600" : ""}">${body}</li>`;
+    type Row = { changed: boolean; html: string };
     const seatName = (id: string) => {
       const [kind, num] = id.split("-");
       return `${kind === "senate" ? "Senate" : "Assembly"} District ${num}`;
     };
+    const today = new Date().toISOString().slice(0, 10);
 
-    async function billRow(id: string, seen: string | null) {
-      const [session, slug] = [id.slice(0, id.indexOf("-")), id.slice(id.indexOf("-") + 1)];
+    // every row: the item, what changed, then a button to stop following it
+    const row = (kind: string, id: string, name: string, title: string, detail: string, changed = false): Row => ({
+      changed,
+      html:
+        `<li class="flex flex-col gap-2 border-t border-rule py-4 sm:flex-row sm:items-start sm:gap-5">` +
+        `<div class="min-w-0 flex-1 [overflow-wrap:anywhere]">` +
+        (changed ? `<p class="t-label">New since your last visit</p>` : "") +
+        `<p>${title}</p>` +
+        (detail ? `<p class="mt-0.5 text-small text-granite">${detail}</p>` : "") +
+        `</div>` +
+        `<button type="button" class="btn btn-secondary shrink-0 self-start" data-unfollow-kind="${esc(kind)}" data-unfollow-id="${esc(id)}" data-unfollow-name="${esc(name)}">` +
+        `Unfollow<span class="sr-only"> ${esc(name)}</span></button>` +
+        `</li>`,
+    });
+    const link = (href: string, text: string) => `<a href="${esc(href)}" class="font-bold underline">${esc(text)}</a>`;
+    const failed = (kind: string, id: string, href: string, what: string) =>
+      row(kind, id, id, link(href, what), "We couldn't load its latest record right now.");
+
+    async function billRow(id: string, seen: string | null): Promise<Row> {
+      const at = id.indexOf("-");
+      const [session, slug] = [id.slice(0, at), id.slice(at + 1)];
+      const href = `/bills/${session}/${slug}/`;
       try {
         const b = await (await fetch(`/api/v1/bills/${session}/${slug}.json`)).json();
         const changed = !!(seen && b.latest_action_date && b.latest_action_date > seen);
-        return { changed, html: row(changed,
-          `<a href="/bills/${esc(session)}/${esc(slug)}/" class="w-20 shrink-0 py-1 font-bold underline">${esc(b.identifier)}</a>
-           ${changed ? changedBadge : ""}
-           ${unfollow("bills", id)}
-           <span class="basis-full leading-snug">${esc(b.title ?? "")}</span>
-           <span class="basis-full break-words text-xs text-navy-600">${esc(b.latest_action_desc ?? "")} (${esc(b.latest_action_date ?? "")})</span>`) };
+        const latest = b.latest_action_date
+          ? `Latest action${b.latest_action_desc ? `: ${esc(b.latest_action_desc)},` : ""} ${esc(fmtDate(b.latest_action_date))}.`
+          : "";
+        return row("bills", id, b.identifier ?? id,
+          `${link(href, b.identifier ?? id)}${b.title ? `: ${esc(shortTitle(b.title))}` : ""}`, latest, changed);
       } catch {
-        return { changed: false, html: row(false, `<span class="text-navy-600">Couldn't load ${esc(id)}</span>${unfollow("bills", id)}`) };
+        return failed("bills", id, href, "This bill");
       }
     }
 
-    async function legislatorRow(id: string, seen: string | null) {
+    async function legislatorRow(id: string, seen: string | null): Promise<Row> {
+      const href = `/legislators/${id}/`;
       try {
         const p = await (await fetch(`/api/v1/legislators/${id}.json`)).json();
         const last = p.votes?.[0];
         const changed = !!(seen && last?.date && last.date > seen);
-        return { changed, html: row(changed,
-          `<a href="/legislators/${esc(id)}/" class="min-w-0 flex-1 break-words py-1 font-semibold underline">${esc(p.name ?? id)}</a>
-           ${changed ? changedBadge : ""}
-           ${last ? `<span class="shrink-0 text-xs text-navy-600">last vote ${esc(last.date)} on ${esc(last.bill_id ?? "")}</span>` : ""}
-           ${unfollow("legislators", id)}`) };
+        const how = last?.option === "yes" ? "Voted yes" : last?.option === "no" ? "Voted no" : "Didn't vote";
+        const detail = last
+          ? `Latest roll call: ${how} on ${esc(last.identifier ?? "a bill")}, ${esc(fmtDate(last.date))}.`
+          : "No roll calls on record yet.";
+        return row("legislators", id, p.name ?? id, link(href, p.name ?? id), detail, changed);
       } catch {
-        return { changed: false, html: row(false,
-          `<a href="/legislators/${esc(id)}/" class="py-1 underline">View profile</a>${unfollow("legislators", id)}`) };
+        return failed("legislators", id, href, "This lawmaker");
       }
     }
 
-    async function committeeRow(id: string, seen: string | null) {
+    async function committeeRow(id: string, seen: string | null): Promise<Row> {
       // no per-committee JSON; the Atom feed carries the name and the
       // newest hearing's date, which is all this row needs
+      const href = `/committees/${id}/`;
       try {
         const xml = await (await fetch(`/feeds/committees/${id}.xml`)).text();
         const name = (xml.match(/<title>([^<]+)<\/title>/)?.[1] ?? id).replace(/ — hearings$/, "");
         const updated = xml.match(/<entry>.*?<updated>([^<]+)<\/updated>/s)?.[1]?.slice(0, 10);
         const changed = !!(seen && updated && updated > seen);
-        return { changed, html: row(changed,
-          `<a href="/committees/${esc(id)}/" class="min-w-0 flex-1 break-words py-1 font-semibold underline">${esc(name)}</a>
-           ${changed ? changedBadge : ""}
-           ${updated ? `<span class="shrink-0 text-xs text-navy-600">latest hearing ${esc(updated)}</span>` : ""}
-           ${unfollow("committees", id)}`) };
+        const detail = updated
+          ? `${updated >= today ? "Next hearing" : "Latest hearing"}: ${esc(fmtDate(updated))}.`
+          : "No hearings on record yet.";
+        return row("committees", id, name, link(href, name), detail, changed);
       } catch {
-        return { changed: false, html: row(false,
-          `<a href="/committees/${esc(id)}/" class="py-1 underline">${esc(id)}</a>${unfollow("committees", id)}`) };
+        return failed("committees", id, href, "This committee");
       }
     }
 
-    function raceRow(id: string, ballot: Ballot | null) {
+    function raceRow(id: string, ballot: Ballot | null): Row {
       const [kind, num] = id.split("-");
       const r = kind === "senate" ? ballot?.senate[num] : ballot?.assembly[num];
-      const names = r
-        ? [...(r.incumbentRunning && r.incumbent ? [r.incumbent.name] : []), ...r.candidates.map((c) => c.name)]
-        : [];
-      return row(false,
-        `<a href="/elections/2026/${esc(id)}/" class="min-w-0 flex-1 break-words py-1 font-semibold underline">${esc(seatName(id))}</a>
-         ${r?.incumbentStatus === "not-running" ? `<span class="shrink-0 rounded-full bg-badger-50 px-2 py-0.5 text-xs font-bold text-badger-700">open seat</span>` : ""}
-         ${names.length ? `<span class="basis-full break-words text-xs text-navy-600 sm:basis-auto sm:flex-1">${esc(names.join(", "))}</span>` : ""}
-         ${unfollow("races", id)}`);
+      const detail = r && ballot
+        ? (r.incumbentStatus === "not-running" ? "<strong>Open seat.</strong> " : "") +
+          raceSentenceHtml({
+            holder: r.incumbent
+              ? { name: r.incumbent.name, party: r.incumbent.party, href: `/legislators/${r.incumbent.slug}/` }
+              : null,
+            status: r.incumbentStatus,
+            others: r.candidates,
+            phase: ballot.phase,
+            unsettled: !!r.writeIn,
+          })
+        : ballot ? "We don't have this race's candidates yet." : "We couldn't load the candidates right now.";
+      return row("races", id, seatName(id), link(`/elections/2026/${id}/`, seatName(id)), detail);
     }
 
-    async function councilRow(id: string, seen: string | null) {
+    async function councilRow(id: string, seen: string | null): Promise<Row> {
       // id is "body-slug/member-slug"; the JSON record carries the latest votes
+      const href = `/local/${id}/`;
       try {
         const m = await (await fetch(`/api/v1/local/${id}.json`)).json();
         const last = m.votes?.[0];
         const changed = !!(seen && last?.date && last.date > seen);
-        return { changed, html: row(changed,
-          `<a href="/local/${esc(id)}/" class="min-w-0 flex-1 break-words py-1 font-semibold underline">${esc(m.name ?? id)}</a>
-           ${changed ? changedBadge : ""}
-           ${last ? `<span class="shrink-0 text-xs text-navy-600">last vote ${esc(last.date)} on ${esc(last.matter_file ?? "an item")}</span>` : ""}
-           ${unfollow("council", id)}`) };
+        const detail = last
+          ? `Latest vote: ${esc(last.value ?? "recorded")} on ${esc(last.matter_file ?? "an item")}, ${esc(fmtDate(last.date))}.`
+          : "No votes on record yet.";
+        return row("council", id, m.name ?? id, link(href, m.name ?? id), detail, changed);
       } catch {
-        return { changed: false, html: row(false,
-          `<a href="/local/${esc(id)}/" class="py-1 underline">View record</a>${unfollow("council", id)}`) };
+        return failed("council", id, href, "This council member");
       }
     }
 
-    const districtRow = (id: string) =>
-      row(false,
-        `<a href="/districts/${esc(id)}/" class="min-w-0 flex-1 break-words py-1 font-semibold underline">${esc(seatName(id))}</a>
-         ${unfollow("districts", id)}`);
+    function districtRow(id: string, reps: Reps | null): Row {
+      const [kind, num] = id.split("-");
+      const holder = reps ? (kind === "senate" ? reps.senate[num] : reps.assembly[num]) : undefined;
+      const detail = !reps
+        ? ""
+        : holder
+          ? `Represented by <a href="/legislators/${esc(holder.slug)}/" class="underline">${esc(holder.name)}</a>${holder.party ? `, ${esc(partyWord(holder.party))}` : ""}.`
+          : "No sitting member is on record for this district.";
+      return row("districts", id, seatName(id), link(`/districts/${id}/`, seatName(id)), detail);
+    }
 
-    async function render() {
+    async function render(): Promise<void> {
       const follows = getFollows();
       const seen = lastSeen();
       const total = FOLLOW_KINDS.reduce((n, k) => n + follows[k].length, 0);
       document.getElementById("follow-empty")!.hidden = total > 0;
 
-      // races share one static file; fetch it once, only when needed
+      // shared static files, fetched once and only when needed
       const ballot: Ballot | null = follows.races.length
         ? await fetch("/data/ballot-2026.json").then((r) => r.json()).catch(() => null)
         : null;
+      const reps: Reps | null = follows.districts.length
+        ? await fetch("/data/reps.json").then((r) => r.json()).catch(() => null)
+        : null;
 
       let changedCount = 0;
-      const fill = async (kind: string, htmls: { changed?: boolean; html: string }[] | string[]) => {
-        const list = htmls.map((h) => (typeof h === "string" ? { changed: false, html: h } : h));
-        changedCount += list.filter((h) => h.changed).length;
-        document.getElementById(`follow-${kind}-section`)!.hidden = list.length === 0;
-        document.getElementById(`follow-${kind}`)!.innerHTML = list.map((h) => h.html).join("");
+      const fill = (kind: string, rows: Row[]) => {
+        changedCount += rows.filter((r) => r.changed).length;
+        document.getElementById(`follow-${kind}-section`)!.hidden = rows.length === 0;
+        document.getElementById(`follow-${kind}`)!.innerHTML = rows.map((r) => r.html).join("");
       };
 
-      await fill("bills", await Promise.all(follows.bills.map((id) => billRow(id, seen))));
-      await fill("legislators", await Promise.all(follows.legislators.map((id) => legislatorRow(id, seen))));
-      await fill("committees", await Promise.all(follows.committees.map((id) => committeeRow(id, seen))));
-      await fill("races", follows.races.map((id) => raceRow(id, ballot)));
-      await fill("districts", follows.districts.map(districtRow));
-      await fill("council", await Promise.all(follows.council.map((id) => councilRow(id, seen))));
+      fill("bills", await Promise.all(follows.bills.map((id) => billRow(id, seen))));
+      fill("legislators", await Promise.all(follows.legislators.map((id) => legislatorRow(id, seen))));
+      fill("committees", await Promise.all(follows.committees.map((id) => committeeRow(id, seen))));
+      fill("races", follows.races.map((id) => raceRow(id, ballot)));
+      fill("districts", follows.districts.map((id) => districtRow(id, reps)));
+      fill("council", await Promise.all(follows.council.map((id) => councilRow(id, seen))));
 
       const note = document.getElementById("follow-changed-note")!;
       note.hidden = !seen || changedCount === 0;
-      note.textContent = changedCount
-        ? `${changedCount} of the things you follow ${changedCount > 1 ? "have" : "has"} new action since your last visit (${seen}).`
+      note.textContent = seen && changedCount
+        ? `${changedCount.toLocaleString()} of the ${total.toLocaleString()} things you follow ${changedCount === 1 ? "has" : "have"} new action since your last visit, ${fmtDate(seen)}.`
         : "";
       document.getElementById("follow-status")!.textContent =
         `${total} followed item${total === 1 ? "" : "s"} loaded${changedCount ? `, ${changedCount} with new action` : ""}.`;
 
       document.querySelectorAll<HTMLButtonElement>("[data-unfollow-kind]").forEach((b) =>
-        b.addEventListener("click", () => {
-          toggleFollow(b.dataset.unfollowKind as keyof Follows, b.dataset.unfollowId!);
-          render();
+        b.addEventListener("click", async () => {
+          const kind = b.dataset.unfollowKind as keyof Follows;
+          toggleFollow(kind, b.dataset.unfollowId!);
+          await render();
+          // focus stays in the same place in the page: the section's
+          // heading, or the page heading once the section is empty
+          const section = document.getElementById(`follow-${kind}-section`)!;
+          const target = section.hidden ? document.querySelector<HTMLElement>("h1") : document.getElementById(`follow-${kind}-heading`);
+          if (target && !target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+          target?.focus();
+          document.getElementById("follow-status")!.textContent = `Stopped following ${b.dataset.unfollowName}.`;
         }));
     }
 
