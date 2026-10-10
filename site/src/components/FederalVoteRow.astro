@@ -25,7 +25,7 @@ const subject = v.title ?? v.question ?? "A roll call";
     )}.</p>
     <p class="text-small text-granite">
       {v.title && v.question && `${v.question}. `}{v.result ? `${v.result}, ` : ""}{v.yeas} to {v.nays}.
-      {record && <>{" "}<a href={record} class="underline">The official record</a></>}
+      {record && <>{" "}<a href={record} class="underline">The official record<span class="sr-only"> of the {fmtDate(v.date)} vote</span></a></>}
     </p>
   </div>
 </li>

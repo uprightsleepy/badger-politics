@@ -45,7 +45,7 @@ const source = senate
 <Base
   title={`${member.name}, ${senate ? "U.S. Senator" : `U.S. Representative, WI-${member.district}`}`}
   description={`${member.name}'s ${senate ? "Senate" : "House"} voting record since ${sinceYear}, from official roll calls: ${votes.length.toLocaleString()} votes, ${missed} missed.`}
-  breadcrumbs={[{ name: "Federal delegation", url: "/federal/" }]}
+  breadcrumbs={[{ name: "Members of Congress", url: "/federal/" }]}
   filters={{ type: "Legislator", chamber: senate ? "U.S. Senate" : "U.S. House", party: member.party }}
   layout="wide"
 >
@@ -65,15 +65,15 @@ const source = senate
         {now && (
           <p>
             Missed <span class="figure">{now.missed.toLocaleString()}</span> of {now.total.toLocaleString()} roll calls
-            in the {congressLabel(now.congress)}{now.total ? ` (${pct(now.missed, now.total)})` : ""}.
+            {" "}({pct(now.missed, now.total)}) in the {congressLabel(now.congress)}.
           </p>
         )}
         <p class="text-small">
-          {senate
-            ? `Next on the ballot in November ${nextElection}.`
-            : race
-              ? "On the ballot November 3, 2026."
-              : `Next on the ballot in November ${nextElection}.`}
+          {race
+            ? race.retiring
+              ? `Their seat is on the November 3, 2026 ballot, and they ${general ? "aren't on it" : "aren't seeking reelection"}.`
+              : "Their seat is on the November 3, 2026 ballot."
+            : `Their seat is next up in November ${nextElection}.`}
           {" "}<a href={`https://www.congress.gov/member/${member.slug}/${member.bioguide}`} class="underline">Their official profile on congress.gov</a>
         </p>
       </section>
@@ -86,7 +86,7 @@ const source = senate
           <p>
             {race.retiring && <><strong>Open seat.</strong> {member.name} {general ? "isn't on the November ballot" : "isn't seeking reelection"}. </>}
             {race.candidates.length > 0
-              ? `${general ? "On the November ballot" : "Approved for the ballot so far"}: ${nameList(race.candidates.map((c) => withParty(c.candidate, c.party)))}.`
+              ? `${general ? "On the November ballot" : "Approved for the ballot so far"}: ${nameList([...race.candidates].sort((a, b) => a.candidate.localeCompare(b.candidate)).map((c) => withParty(c.candidate, c.party)))}.`
               : general ? "No candidates are on the November ballot yet in our records." : "No candidates are approved for the ballot yet."}
             {writeIn && ` ${writeIn}`}
           </p>
@@ -96,11 +96,11 @@ const source = senate
 
       <section class="flex flex-col gap-3" aria-labelledby="votes-heading">
         <h2 id="votes-heading" class="t-section">How they vote</h2>
-        <p>
+        {votes.length === 0 ? <p>No roll calls are recorded for {member.name} yet.</p> : <p>
           Our records cover {votes.length.toLocaleString()} {senate ? "Senate" : "House"} roll calls since
           {" "}{sinceYear}. {member.name} didn't vote in <span class="figure">{missed.toLocaleString()}</span> of them
           {" "}({pct(missed, votes.length)}).
-        </p>
+        </p>}
         <div class="overflow-x-auto" role="region" tabindex="0" aria-labelledby="by-congress-caption">
           <table class="w-full max-w-[36rem] text-left tabular-nums">
             <caption id="by-congress-caption" class="pb-2 text-left text-small text-granite">Roll calls and missed votes, by Congress</caption>
@@ -145,8 +145,8 @@ const source = senate
       <FederalMoney bioguide={member.bioguide} />
 
       <p class="text-fine text-granite">
-        Roll calls from the <a href={source.href} class="underline">{source.label}</a>{latest && `, the latest from ${fmtDate(latest)}`};
-        campaign money from the <a href="https://www.fec.gov" class="underline">Federal Election Commission</a>{pulledOn && `. Checked ${fmtDate(pulledOn)}`}.
+        Roll calls from the <a href={source.href} class="underline">{source.label}</a>{latest && `, the latest from ${fmtDate(latest)}`}{pulledOn && `; checked ${fmtDate(pulledOn)}`}.
+        Campaign money from the <a href="https://www.fec.gov" class="underline">Federal Election Commission</a>, with the date it was retrieved.
       </p>
     </div>
   </div>

@@ -25,7 +25,8 @@ const pct = (n: number, of: number) => (of ? `${((n / of) * 100).toFixed(1)}%` :
     <h1 class="t-display">Members of Congress from Wisconsin</h1>
     <p class="sm:text-lead">
       Wisconsin's two U.S. senators and eight House members, with every floor vote each has cast, from
-      their chamber's official records, and their campaign money from the FEC.
+      their chamber's official records, and their campaign money from the FEC and any Wisconsin campaign
+      they run.
     </p>
     <p class="text-small text-granite">
       Federal bills and hearings are on <a href="https://www.congress.gov" class="underline">congress.gov</a>,
@@ -48,8 +49,8 @@ const pct = (n: number, of: number) => (of ? `${((n / of) * 100).toFixed(1)}%` :
               <p class="text-granite">{partyWord(s.party)}. Term ends {longDate(s.term_end)}.</p>
               {stats && (
                 <p>
-                  Missed <span class="figure">{stats.missed.toLocaleString()}</span> of {stats.total.toLocaleString()} roll calls in
-                  the {congressLabel(stats.congress)}{stats.total ? ` (${pct(stats.missed, stats.total)})` : ""}.
+                  Missed <span class="figure">{stats.missed.toLocaleString()}</span> of {stats.total.toLocaleString()} roll calls
+                  {" "}({pct(stats.missed, stats.total)}) in the {congressLabel(stats.congress)}.
                 </p>
               )}
               {recent.length > 0 && (
@@ -58,7 +59,7 @@ const pct = (n: number, of: number) => (of ? `${((n / of) * 100).toFixed(1)}%` :
                   <ul class="mt-1 border-b border-rule text-small" role="list">
                     {recent.map((v) => (
                       <li class="border-t border-rule py-2">
-                        <span class="font-bold">{castWords(v.vote_cast)}</span> on {v.title ?? v.question}.
+                        <span class="font-bold">{castWords(v.vote_cast)}</span> on {v.title ?? v.question ?? "a roll call"}.
                         {" "}<span class="text-granite">{fmtDate(v.date)}</span>
                       </li>
                     ))}
@@ -88,7 +89,7 @@ const pct = (n: number, of: number) => (of ? `${((n / of) * 100).toFixed(1)}%` :
               <div class="min-w-0 flex-1">
                 <p><a href={`/federal/${m.slug}/`} class="font-bold underline">{m.name}</a>, {partyWord(m.party)}</p>
                 <p class="text-small text-granite">
-                  {stats ? `Missed ${stats.missed.toLocaleString()} of ${stats.total.toLocaleString()} roll calls in the ${congressLabel(stats.congress)}. ` : ""}
+                  {stats ? `Missed ${stats.missed.toLocaleString()} of ${stats.total.toLocaleString()} roll calls (${pct(stats.missed, stats.total)}) in the ${congressLabel(stats.congress)}. ` : ""}
                   <a href={`https://www.congress.gov/member/${m.slug}/${m.bioguide}`} class="underline">Official profile<span class="sr-only"> of {m.name}</span></a>
                 </p>
               </div>

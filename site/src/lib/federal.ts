@@ -29,7 +29,14 @@ export const castWords = (cast: string): string =>
       ? "Voted no"
       : cast === "Not Voting"
         ? "Didn't vote"
-        : `Voted ${cast.toLowerCase()}`;
+        : cast === "Present"
+          ? "Voted present"
+          : cast === "Guilty"
+            ? "Voted guilty"
+            : cast === "Not Guilty"
+              ? "Voted not guilty"
+              // a Speaker election records the name voted for, as stored
+              : `Voted for ${cast}`;
 
 /** 119 -> "119th", 121 -> "121st", 112 -> "112th" (as congress.gov spells it). */
 export const ordinal = (n: number): string => {

@@ -36,7 +36,7 @@ const last = Math.min(page * PER_PAGE, all.length);
   description={`Every U.S. ${chamber} roll call cast by ${member.name} of Wisconsin, from the ${chamber === "Senate" ? "Senate's" : "House Clerk's"} official records. Page ${page} of ${pages}.`}
   searchable={false}
   breadcrumbs={[
-    { name: "Federal delegation", url: "/federal/" },
+    { name: "Members of Congress", url: "/federal/" },
     { name: member.name, url: `/federal/${member.slug}/` },
   ]}
   layout="wide"

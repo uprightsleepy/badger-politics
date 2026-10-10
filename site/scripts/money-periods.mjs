@@ -14,7 +14,7 @@ const page = await browser.newPage();
 await blockThirdPartyAssets(page);
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-const dollar = (v) => "$" + Math.round(v).toLocaleString("en-US");
+const dollar = (v) => { const r = Math.round(v); return (r < 0 ? "-$" : "$") + Math.abs(r).toLocaleString("en-US"); };
 const year = Number(new Intl.DateTimeFormat("en-US", {year:"numeric",timeZone:"America/Chicago"}).format(new Date()));
 const current = String(year + year % 2);
 const previous = String(Number(current) - 2);

@@ -7,6 +7,7 @@ import { moneyPeriods, currentMoneyCycle } from "../lib/money-periods";
 import StateCampaignMoney from "./StateCampaignMoney.astro";
 import { federalMoneyFor, stateCampaignsFor } from "../lib/db";
 import { fmtDate, fmtMoney, fmtMoneyShort } from "../lib/format";
+import { longDate } from "../lib/federal";
 
 interface Props { bioguide: string; }
 const { bioguide } = Astro.props;
@@ -31,17 +32,19 @@ const current = String(currentMoneyCycle());
         </p>
       )}
       {selectedFederal.map((f) => (
-        <article class="flex flex-col gap-3 border-t border-rule pt-4" aria-labelledby={`fec-${f.cycle}`}>
-          <h3 id={`fec-${f.cycle}`} class="t-question text-[1.1875rem]">Federal campaign, {f.cycle - 1}–{f.cycle}</h3>
+        <article class="flex flex-col gap-3 border-t border-rule pt-4" aria-labelledby={`fec-${period.key}-${f.cycle}`}>
+          <h3 id={`fec-${period.key}-${f.cycle}`} class="t-question text-[1.1875rem]">Federal campaign, {f.cycle - 1}–{f.cycle}</h3>
           {f.receipts === null ? (
             <p>The FEC file we collected has no summary for this cycle yet.</p>
           ) : (
             <p>
               Reported <span class="figure">{short(f.receipts)}</span> in receipts and
               {" "}<span class="figure">{short(f.disbursements) ?? "an unreported amount"}</span> in spending
-              {f.coverage_end && ` through ${fmtDate(f.coverage_end)}`}{f.cash_end !== null && <>, with <span class="figure">{short(f.cash_end)}</span> in cash on hand</>}.
+              {f.coverage_end && ` through ${longDate(f.coverage_end)}`}{f.cash_end !== null && <>, with <span class="figure">{short(f.cash_end)}</span> in cash on hand</>}.
             </p>
           )}
+          {f.receipts !== null && (
+            <>
           <dl class="grid grid-cols-1 gap-x-8 gap-y-3 min-[400px]:grid-cols-2 sm:grid-cols-4">
             {[["Receipts", f.receipts], ["Spending", f.disbursements],
               ["Cash on hand", f.cash_end], ["Debts owed", f.debts]].map(([label, value]) => (
@@ -62,10 +65,12 @@ const current = String(currentMoneyCycle());
                 .map(([label, value]) => <><dt class="border-t border-rule py-2">{label}</dt><dd class="border-t border-rule py-2 text-right tabular-nums">{dollars(value as number | null)}</dd></>)}
             </dl>
           </details>
+            </>
+          )}
           <p class="text-small text-granite">
-            The FEC's two-year totals across the member's own committees. Receipts include more than
-            donations, and a transfer between their committees can count the same money twice, so transfers
-            are listed apart. Outside spending and state campaigns aren't included. Retrieved
+            The FEC's two-year totals across the member's own (authorized) committees. Receipts include more
+            than donations, spending is what the FEC calls disbursements, and a transfer between their
+            committees can count the same money twice, so transfers are listed apart. Outside spending and state campaigns aren't included. Retrieved
             {" "}{fmtDate(f.fetched_at.slice(0, 10))}.
             {" "}<a class="underline" href={`https://www.fec.gov/data/candidate/${f.candidate_id}/?cycle=${f.cycle}&election_full=false`}>Every itemized record at the FEC ({f.candidate_id})</a>
           </p>
