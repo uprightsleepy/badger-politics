@@ -115,8 +115,18 @@ const seatBasis = safeHref(member.seat_basis);
         </div>
         {!!member.is_current && (member.email || tel) && (
           <div class="flex flex-col gap-2">
-            {member.email && <a href={`mailto:${member.email}`} class="btn btn-secondary w-full">Email <span class="font-sans font-normal [overflow-wrap:anywhere]">{member.email}</span></a>}
-            {tel && <a href={tel} class="btn btn-secondary w-full">Call <span class="font-sans font-normal">{member.phone}</span></a>}
+            {member.email && (
+              <a href={`mailto:${member.email}`} class="btn btn-secondary w-full flex-col gap-0.5">
+                Email
+                <span class="text-small font-sans font-normal [overflow-wrap:anywhere]">{member.email}</span>
+              </a>
+            )}
+            {tel && (
+              <a href={tel} class="btn btn-secondary w-full flex-col gap-0.5">
+                Call
+                <span class="text-small font-sans font-normal">{member.phone}</span>
+              </a>
+            )}
             <p class="text-fine text-granite">Official office contacts, from the city's published records.</p>
           </div>
         )}
