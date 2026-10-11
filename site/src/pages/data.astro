@@ -147,6 +147,19 @@ const downloads: [string, string][] = [
         Individual donors appear in the database only in totals: each of their receipts keeps its amount,
         date and recipient, without a name, occupation or filer ID.
       </p>
+      <h3 class="t-question mt-6">Query the database on your own computer</h3>
+      <p class="mt-2">
+        The database is one SQLite file, so any SQLite tool can open it, such as the free
+        {" "}<a href="https://sqlitebrowser.org/" class="underline">DB Browser for SQLite</a> or the
+        {" "}<a href="https://sqlite.org/cli.html" class="underline"><code>sqlite3</code> command-line tool</a>.
+        Unzip it first:
+      </p>
+      <pre class="mt-3 overflow-x-auto"><code>gunzip wi-filtered.sqlite.gz
+sqlite3 wi-filtered.sqlite ".tables"
+sqlite3 wi-filtered.sqlite "SELECT identifier, title FROM bills WHERE session_id = '2025' LIMIT 10"</code></pre>
+      <p class="mt-2 text-small text-granite">
+        Check the download against <code>SHA256SUMS</code> with <code>sha256sum -c --ignore-missing SHA256SUMS</code>.
+      </p>
     </section>
 
     <section aria-labelledby="left-out-heading">
