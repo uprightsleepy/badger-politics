@@ -6,6 +6,7 @@ import ProfileMoneyView from "../../components/ProfileMoneyView.astro";
 import { moneyViews } from "../../lib/money-periods";
 import FollowButton from "../../components/FollowButton.astro";
 import VoteRow from "../../components/VoteRow.astro";
+import LegiscanCredit from "../../components/LegiscanCredit.astro";
 import JsonLd from "../../components/JsonLd.astro";
 import PlainText from "../../components/PlainText.astro";
 import TermsOnPage from "../../components/TermsOnPage.astro";
@@ -520,6 +521,7 @@ const ledSentence =
                   ))}
                 </p>
                 <p class="text-right text-fine"><a href={`/votes/${v.vote_event_id}/`} class="underline">Roll call</a></p>
+                <LegiscanCredit v={v} class="col-span-2" />
               </li>
             ))}
           </ul>
@@ -547,6 +549,7 @@ const ledSentence =
                   ))}
                 </p>
                 <p class="text-right text-fine"><a href={`/votes/${v.vote_event_id}/`} class="underline">Roll call</a></p>
+                <LegiscanCredit v={v} class="col-span-2" />
               </li>
                 ))}
               </ul>
@@ -582,6 +585,7 @@ const ledSentence =
                   <p class="col-span-2 text-fine text-granite">
                     {v.date ? `${fmtDate(v.date)}. ` : ""}Voted {voteWord(v.option).toLowerCase()}; {partyPlural} split {v.split.yes} yes, {v.split.no} no.
                   </p>
+                  <LegiscanCredit v={v} class="col-span-2" />
                 </li>
               ))}
             </ul>

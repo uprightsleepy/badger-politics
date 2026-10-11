@@ -52,6 +52,11 @@ const billNumberOrder = (t: string, dir = "") =>
   `substr(${t}.identifier, 1, instr(${t}.identifier, ' ') - 1) ${dir},
    CAST(substr(${t}.identifier, instr(${t}.identifier, ' ') + 1) AS INTEGER) ${dir}`;
 
+/** A member's vote row is LegiScan's if its roll call (e) or its bill (b)
+ * came from there; pages credit those (lib/legiscan). */
+const ROW_SOURCE =
+  "CASE WHEN 'legiscan' IN (e.source, b.source) THEN 'legiscan' ELSE e.source END AS source";
+
 // order by real start (first recorded action), newest first: special-session
 // ids like '2013s-oct' would otherwise sort alphabetically, not by month
 export const allSessions = once(
@@ -301,10 +306,9 @@ export const sittingPeople = once(
  * memory. */
 export const personVotes = (personId: string, limit: number, offset = 0, { noLegiscan = false } = {}) =>
   prep(
-      // a row is LegiScan's if its roll call or its bill came from there;
-      // noLegiscan drops those for the public JSON (lib/legiscan)
+      // noLegiscan drops LegiScan's rows for the public JSON (lib/legiscan)
       `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result, e.source_url,
-              CASE WHEN 'legiscan' IN (e.source, b.source) THEN 'legiscan' ELSE e.source END AS source,
+              ${ROW_SOURCE},
               b.id AS bill_id, b.identifier, b.title, b.session_id
        FROM vote_records r
        JOIN vote_events e ON e.id = r.vote_event_id
@@ -570,6 +574,7 @@ export const partyBreaks = (personId: string, party: string | null) => {
   const { majority: majorities, splits } = partyPositions();
   const votes = prep(
       `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.source_url,
+              ${ROW_SOURCE},
               b.id AS bill_id, b.identifier, b.title, b.session_id
        FROM vote_records r
        JOIN vote_events e ON e.id = r.vote_event_id
@@ -579,7 +584,7 @@ export const partyBreaks = (personId: string, party: string | null) => {
     )
     .all(personId) as {
     option: string; vote_event_id: string; date: string | null; motion: string | null;
-    source_url: string | null; bill_id: string; identifier: string;
+    source_url: string | null; source: string | null; bill_id: string; identifier: string;
     title: string | null; session_id: string;
   }[];
   return votes
@@ -1541,7 +1546,7 @@ export const keyVotesFor = (personId: string) => {
   const keys = keyEvents();
   const rows = prep(
       `SELECT r.option, e.id AS vote_event_id, e.date, e.motion,
-              e.yes_count, e.no_count,
+              e.yes_count, e.no_count, e.source_url, ${ROW_SOURCE},
               b.identifier, b.title, b.session_id
        FROM vote_records r
        JOIN vote_events e ON e.id = r.vote_event_id
@@ -1551,6 +1556,7 @@ export const keyVotesFor = (personId: string) => {
     .all(personId) as {
       option: string; vote_event_id: string; date: string | null;
       motion: string | null; yes_count: number | null; no_count: number | null;
+      source_url: string | null; source: string | null;
       identifier: string; title: string | null; session_id: string;
     }[];
   return rows
