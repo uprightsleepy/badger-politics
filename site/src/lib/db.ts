@@ -519,6 +519,24 @@ export const recentlyActedBills = (sessionIds: string[], limit = 8) =>
     )
     .all(...sessionIds, limit) as Bill[];
 
+/** Every recorded action from `from` through `to`, newest first, on the
+ * built sessions' bills; the bill's source rides along so a LegiScan row
+ * is credited (lib/legiscan). */
+export const actionsBetween = (from: string, to: string) => {
+  const built = builtSessions().map((s) => s.id);
+  return prep(
+      `SELECT a.date, a.description, b.id AS bill_id, b.identifier, b.title, b.session_id,
+              b.source, NULL AS source_url
+       FROM actions a JOIN bills b ON b.id = a.bill_id
+       WHERE a.date BETWEEN ? AND ? AND b.session_id IN (${built.map(() => "?").join(",")})
+       ORDER BY a.date DESC, a.rowid DESC`,
+    )
+    .all(from, to, ...built) as {
+    date: string; description: string; bill_id: string; identifier: string; title: string | null;
+    session_id: string; source: string | null; source_url: null;
+  }[];
+};
+
 /** Days each chamber held attributed floor votes: (chamber, date) -> count.
  * One scan serves every legislator page in the build. */
 export const chamberVoteDays = once(

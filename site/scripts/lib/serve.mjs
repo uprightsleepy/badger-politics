@@ -104,7 +104,8 @@ const SAMPLE_PATHS = [
   "/votes/2025-av0001-ar1/", "/laws/", "/laws/2025/", "/vetoes/", "/partial-veto/",
   "/governors-desk/", "/hearing-none/", "/hearing-none/2025/", "/subjects/",
   "/legislators/", "/districts/", "/districts/senate-21/", "/committees/", "/federal/",
-  "/calendar/", "/my-reps/", "/elections/2026/", "/elections/2026/senate-5/",
+  "/calendar/", "/this-week/", "/my-reps/", "/elections/2026/", "/elections/2026/senate-5/",
+  "/legislators/compare/",
   "/money/", "/money/committees/", "/money/committees/651839/", "/money/independent/",
   "/local/", "/local/milwaukee/", "/local/west-allis/",
 ];
