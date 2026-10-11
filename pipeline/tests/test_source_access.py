@@ -312,6 +312,7 @@ def test_policy_refresh_blocks_mid_run_change(network):
     "https://unreviewed.example/records",
     "https://docs.legis.wisconsin.gov/scroll/2025/related/subject_index/index",
     "https://docs.legis.wisconsin.gov/search/results?q=ab1",
+    "https://docs.legis.wisconsin.gov/search",
     "https://docs.legis.wisconsin.gov/%73croll/",
     "https://docs.legis.wisconsin.gov:8443/2025/proposals/ab1",
     "https://docs.legis.wisconsin.gov/2025/%2e%2e/scroll/",
@@ -344,7 +345,6 @@ def test_reviewed_manifest_rejects_restricted_or_unreviewed_urls(url):
 
 
 @pytest.mark.parametrize("url", [
-    "https://docs.legis.wisconsin.gov/search",
     "https://docs.legis.wisconsin.gov/2025/related/subject_index/index?down=1",
     "https://docs.legis.wisconsin.gov/document/session/2025/reg/ab1",
     "https://docs.legis.wisconsin.gov/document/proposaltext/2025/AB246",

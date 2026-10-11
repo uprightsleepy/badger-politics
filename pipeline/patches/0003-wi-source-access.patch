@@ -1,15 +1,13 @@
 --- a/scrapers/wi/__init__.py
 +++ b/scrapers/wi/__init__.py
-@@ -1,4 +1,5 @@
+@@ -1,4 +1,3 @@
 -from utils import url_xpath
-+import lxml.html
-+from scraper.http import session as policy_session
  from openstates.scrape import State
  from .bills import WIBillScraper
  from .events import WIEventScraper
-@@ -230,12 +231,10 @@
+@@ -230,12 +229,6 @@ class Wisconsin(State):
      ]
-
+ 
      def get_session_list(self):
 -        user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36"
 -
@@ -18,13 +16,11 @@
 -            "//select[@name='sessionNumber']/option/text()",
 -            verify=False,
 -            user_agent=user_agent,
-+        with policy_session() as http:
-+            response = http.get("https://docs.legis.wisconsin.gov/search", timeout=60)
-+            response.raise_for_status()
-+        sessions = lxml.html.fromstring(response.text).xpath(
-+            "//select[@name='sessionNumber']/option/text()"
-         )
-         return [session.strip(" -") for session in sessions]
+-        )
+-        return [session.strip(" -") for session in sessions]
++        # docs.legis robots.txt disallows /search (reviewed 2026-10-11) and no
++        # allowed page names sessions, so report the sessions this pin knows.
++        return [s["_scraped_name"] for s in self.legislative_sessions]
 --- a/scrapers/wi/bills.py
 +++ b/scrapers/wi/bills.py
 @@ -1,3 +1,4 @@

@@ -49,7 +49,6 @@
     "docs.legis.wisconsin.gov": {
       "paths": {
         "GET": [
-          "/search",
           "/\\d{4}/(?:proposals|related|legislators)/.*",
           "/document/(?:proposaltext|proposal|session|amendment|fe)/.*"
         ]
@@ -58,7 +57,7 @@
       "robots": {
         "status": 200,
         "url": "https://docs.legis.wisconsin.gov/robots.txt",
-        "sha256": "2c3601cc00d63c244d1b954cc362665e1203ca3250a47ee0d38da52226d0a530"
+        "sha256": "71a8ac719506a9d4455a7255519edcb235394a1bf017ba572da34660553327bf"
       }
     },
     "committeeschedule.legis.wisconsin.gov": {
