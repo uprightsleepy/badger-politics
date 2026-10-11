@@ -76,6 +76,22 @@ for (const p of ["/", "/bills/2025/", "/legislators/", "/money/", "/calendar/"])
   if (!(await check(p))) bad++;
 }
 
+// embed cards are the one path other sites may frame; Firebase must serve
+// their override in place of the sitewide policy, not alongside it
+{
+  const index = await (await fetch(`${BASE}/legislators/`)).text();
+  const slug = index.match(/href="\/legislators\/([^/"]+)\/"/)?.[1];
+  const embed = `/embed/legislators/${slug}/`;
+  const framing = slug
+    ? (await page.goto(`${BASE}${embed}`, { waitUntil: "domcontentloaded" })).headers()["content-security-policy"] ?? ""
+    : "";
+  const ok = /frame-ancestors \*/.test(framing) && !/frame-ancestors 'none'/.test(framing) &&
+    /frame-ancestors 'none'/.test(h["content-security-policy"] ?? "");
+  console.log(`${ok ? "PASS" : "FAIL"}: only ${embed} may be framed`);
+  if (!ok) bad++;
+  if (slug && !(await check(embed))) bad++;
+}
+
 // the two things the CSP could plausibly break
 if (
   !(await check("/my-reps/", async () => {

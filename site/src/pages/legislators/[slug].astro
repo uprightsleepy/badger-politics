@@ -5,6 +5,7 @@ import MoneyFilters from "../../components/MoneyFilters.astro";
 import ProfileMoneyView from "../../components/ProfileMoneyView.astro";
 import { moneyViews } from "../../lib/money-periods";
 import FollowButton from "../../components/FollowButton.astro";
+import EmbedCode from "../../components/EmbedCode.astro";
 import VoteRow from "../../components/VoteRow.astro";
 import LegiscanCredit from "../../components/LegiscanCredit.astro";
 import JsonLd from "../../components/JsonLd.astro";
@@ -229,6 +230,7 @@ const ledSentence =
         Following saves them on this device. You can also
         {" "}<a href={`/feeds/legislators/${slug}.xml`} class="underline">get updates in a feed reader</a>.
       </p>
+      {share && <EmbedCode path={`/embed/legislators/${slug}/`} title={`${person.name} on Badger Politics`} height={320} />}
     </div>
 
     {glance.length > 0 && (

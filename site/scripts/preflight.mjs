@@ -124,6 +124,24 @@ for (const c of counts) {
   }
 }
 
+// --- embed cards: one per sitting legislator, each with the disclaimer ------
+{
+  const sitting = db
+    .prepare("SELECT COUNT(*) AS n FROM people WHERE current_role IN ('Representative', 'Senator')")
+    .get().n;
+  const cards = (await subdirs("embed", "legislators")) ?? [];
+  const sample = cards.length
+    ? await readFile(join(DIST, "embed", "legislators", cards[0], "index.html"), "utf-8")
+    : "";
+  if (cards.length < sitting) {
+    fail(`legislator embeds: built ${cards.length}, ${sitting} sitting legislators`);
+  } else if (!/not affiliated with the State of Wisconsin/i.test(sample)) {
+    fail("embed cards are missing the independence disclaimer");
+  } else {
+    pass(`legislator embeds: ${cards.length}, with the disclaimer`);
+  }
+}
+
 // --- council member pages mirror the local tables, when present ------------
 const hasLocal = db
   .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='local_members'")

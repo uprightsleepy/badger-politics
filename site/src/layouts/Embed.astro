@@ -1,0 +1,51 @@
+---
+/** A card other sites put in an iframe (EmbedCode gives them the snippet).
+ * The only pages Firebase lets other origins frame (firebase.json). Kept
+ * out of search engines, the sitemap and Pagefind (no data-pagefind-body);
+ * the full page is the canonical one. Links open a new tab rather than
+ * navigating the host's frame. */
+import "../styles/global.css";
+import { meta } from "../lib/db";
+import { fmtDate } from "../lib/format";
+interface Props {
+  title: string;
+  /** The full page this card summarizes. */
+  page: string;
+}
+const { title, page } = Astro.props;
+const pulledOn = meta().imported_at?.slice(0, 10);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{`${title} · Badger Politics`}</title>
+    <meta name="robots" content="noindex, follow" />
+    <link rel="canonical" href={new URL(page, Astro.site).href} />
+  </head>
+  <body class="bg-white text-spruce antialiased">
+    <main class="flex flex-col gap-3 p-4">
+      <a href={page} target="_blank" rel="noopener" class="flex items-center gap-2 self-start font-display font-extrabold text-spruce no-underline">
+        <img src="/mark.svg" alt="" width="20" height="21" />
+        Badger Politics<span class="sr-only"> (opens in a new tab)</span>
+      </a>
+      <slot />
+      <footer class="flex flex-col gap-1 border-t border-rule pt-2.5 text-fine text-granite">
+        <p>
+          <a href={page} target="_blank" rel="noopener" class="font-bold underline">See the full record<span class="sr-only"> (opens in a new tab)</span></a>
+          {pulledOn && <> · From the Legislature's official records, checked {fmtDate(pulledOn)}.</>}
+        </p>
+        <p>Badger Politics is an independent project, not affiliated with the State of Wisconsin.</p>
+      </footer>
+    </main>
+    {/* cookieless, and allowed to count inside another site's frame */}
+    <script
+      is:inline
+      data-goatcounter="https://badgerpolitics.goatcounter.com/count"
+      data-goatcounter-settings='{"allow_frame": true}'
+      async
+      src="//gc.zgo.at/count.js"></script>
+  </body>
+</html>

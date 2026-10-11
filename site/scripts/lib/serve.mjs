@@ -106,7 +106,7 @@ const SAMPLE_PATHS = [
   "/legislators/", "/districts/", "/districts/senate-21/", "/committees/", "/federal/",
   "/calendar/", "/my-reps/", "/elections/2026/", "/elections/2026/senate-5/",
   "/money/", "/money/committees/", "/money/committees/651839/", "/money/independent/",
-  "/local/", "/local/milwaukee/", "/local/west-allis/",
+  "/local/", "/local/milwaukee/", "/local/west-allis/", "/embed/bills/2025/ab1/",
 ];
 export const samplePages = async () => {
   const councils = (await readdir(join(DIST, "local"), { withFileTypes: true }).catch(() => []))
@@ -126,6 +126,8 @@ export const samplePages = async () => {
     // carries the timeline chart (coverage differs between the two)
     firstLegislatorHref(),
     moneyLegislatorHref(),
+    // embed cards exist for sitting members only
+    readdir(join(DIST, "embed", "legislators")).then(([slug]) => slug && `/embed/legislators/${slug}/`, () => null),
   ]);
   return [...new Set([...SAMPLE_PATHS, ...dynamic, ...localPages.flat()].filter(Boolean))];
 };

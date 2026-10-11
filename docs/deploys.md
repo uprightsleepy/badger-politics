@@ -57,7 +57,9 @@ constituents as a side effect of committing.
    a broken deploy for exactly that long.
    The live API metadata must also match the snapshot used for the build,
    and the API must send `Access-Control-Allow-Origin: *` (the API, feeds,
-   and calendars are readable from any origin).
+   and calendars are readable from any origin). `scripts/csp.mjs` then
+   checks the served Content-Security-Policy, including that `/embed/`
+   cards, and nothing else, may be framed by other sites.
 
 The gates are also where three latent defects surfaced the first time this
 ran: `npm ci --ignore-scripts` leaves `better-sqlite3` unloadable, the

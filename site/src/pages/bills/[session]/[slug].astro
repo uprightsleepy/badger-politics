@@ -1,6 +1,7 @@
 ---
 import Base from "../../../layouts/Base.astro";
 import FollowButton from "../../../components/FollowButton.astro";
+import EmbedCode from "../../../components/EmbedCode.astro";
 import RollCall from "../../../components/RollCall.astro";
 import Route from "../../../components/Route.astro";
 import PlainText from "../../../components/PlainText.astro";
@@ -323,6 +324,9 @@ const share = billCard(bill, sessionName);
             </p>
           )}
         </div>
+        {share && (
+          <EmbedCode path={`/embed/bills/${bill.session_id}/${billSlug(bill.identifier)}/`} title={`${bill.identifier} on Badger Politics`} height={420} />
+        )}
         {companions.length > 0 && (
           <p class="border-t border-rule pt-4">
             {companions.map((c, i) => (
