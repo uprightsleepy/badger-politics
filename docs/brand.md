@@ -234,8 +234,8 @@ Nothing else uses Prairie.
 
 A Fog track with a `lake-tint` band for the middle half of the chamber and a Spruce marker for this
 person. The sentence above it gives the number ("Voted on 241 of 245 roll call votes this session"), and
-the bar runs the same way as the sentence: the share voted on, higher to the right. Its ends are plain
-axis numbers ("77%", "100%"), never words that could read as this person's result. The label below names
+the bar runs the same way as the sentence: the share voted on, higher to the right. The only number on
+the bar is this person's own, under the marker ("98%"); the ends carry no labels. The note below names
 the typical range in words. Ranges are computed at build time from data the site already has.
 
 ### Person card
