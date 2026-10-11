@@ -110,6 +110,8 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
         # two grouped scans per session replace two queries per bill
         session_sponsors = queries.sponsors_for_session(conn, session_id)
         session_actions = queries.actions_for_session(conn, session_id)
+        session_versions = queries.links_for_session(conn, session_id, "bill_versions")
+        session_documents = queries.links_for_session(conn, session_id, "bill_documents")
         companions: dict[str, list[dict]] = {}
         for row in conn.execute(
             f"""SELECT bc.bill_id, b.identifier, b.status FROM bill_companions bc
@@ -126,6 +128,9 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
                 "sponsors": session_sponsors.get(bill["id"], []),
                 "actions": session_actions.get(bill["id"], []),
                 "votes": events_by_bill.get(bill["id"], []),
+                # official docs.legis links; the texts themselves are not rehosted
+                "versions": session_versions.get(bill["id"], []),
+                "documents": session_documents.get(bill["id"], []),
                 "companions": companions.get(bill["id"], []),
             }
             write_json(

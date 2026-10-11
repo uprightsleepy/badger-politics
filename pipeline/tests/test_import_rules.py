@@ -294,3 +294,25 @@ def test_sponsor_change_parse() -> None:
         "lower", "Tucker", "coauthor", False,
     )
     assert parse_sponsor_change("Read first time and referred") is None
+
+
+def test_version_links_keep_every_format_once() -> None:
+    from importer.import_openstates import version_links
+    bill = {"versions": [
+        {"note": "Bill Text", "date": "", "links": [
+            {"url": "https://docs.legis.wisconsin.gov/document/proposaltext/2025/REG/AB1",
+             "media_type": "text/html"},
+            {"url": "https://docs.legis.wisconsin.gov/document/proposaltext/2025/REG/AB1.pdf",
+             "media_type": "application/pdf"}]},
+        {"note": "Senate Amendment 1", "date": "", "links": [
+            {"url": "https://docs.legis.wisconsin.gov/document/amendments/2025/REG/AB1/sa1",
+             "media_type": "text/html"}]},
+        # the scraper adds a version per adoption action; a repeat is one link
+        {"note": "Senate Amendment 1", "links": [
+            {"url": "https://docs.legis.wisconsin.gov/document/amendments/2025/REG/AB1/sa1",
+             "media_type": "text/html"}]},
+    ]}
+    assert [(note, media) for note, _, _, media in version_links(bill)] == [
+        ("Bill Text", "text/html"), ("Bill Text", "application/pdf"),
+        ("Senate Amendment 1", "text/html")]
+    assert version_links({}) == []

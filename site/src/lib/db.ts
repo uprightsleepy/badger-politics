@@ -1406,6 +1406,42 @@ export const documentsFor = (billId: string) =>
   prep("SELECT note, url FROM bill_documents WHERE bill_id = ? ORDER BY note")
     .all(billId) as { note: string; url: string }[];
 
+// "AB 12: Fiscal Estimate From DOA" -> "Fiscal Estimate From DOA"
+export const documentLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
+
+type Version = { note: string; url: string; media_type: string | null };
+export type BillText = { label: string; url: string; pdf: string | null };
+
+/** Every printed text of a bill as docs.legis links, never copies: its
+ * versions in the Legislature's order (each HTML with its PDF), then any
+ * amendment offered but not already listed, in docs.legis order. Older
+ * snapshots predate the versions table and list amendments alone. */
+export const textsFor = (billId: string): BillText[] => {
+  const versions = hasTable("bill_versions")
+    ? prep("SELECT note, url, media_type FROM bill_versions WHERE bill_id = ? ORDER BY rowid")
+      .all(billId) as Version[]
+    : [];
+  const byLabel = new Map<string, BillText>();
+  for (const v of versions) {
+    const text = byLabel.get(v.note);
+    const pdf = v.media_type === "application/pdf";
+    if (!text) byLabel.set(v.note, { label: v.note, url: v.url, pdf: null });
+    else if (pdf && !text.pdf) text.pdf = v.url;
+    // a PDF listed first gives way to its HTML
+    else if (!pdf && text.url.endsWith(".pdf") && !text.pdf) [text.pdf, text.url] = [text.url, v.url];
+  }
+  const urls = new Set([...byLabel.values()].flatMap((t) => [t.url, t.pdf]));
+  const documents = prep("SELECT note, url FROM bill_documents WHERE bill_id = ? ORDER BY rowid")
+    .all(billId) as { note: string; url: string }[];
+  for (const d of documents) {
+    const label = documentLabel(d.note);
+    if (/amendment/i.test(label) && !byLabel.has(label) && !urls.has(d.url)) {
+      byLabel.set(label, { label, url: d.url, pdf: null });
+    }
+  }
+  return [...byLabel.values()];
+};
+
 /** ---- New laws, veto tracker, key votes ---- */
 
 export const bienniumOf = (sessionId: string): number => {

@@ -53,7 +53,14 @@ def db_path(tmp_path: Path, make_db) -> Path:
                  ('2025-ab9999', '2025-ab656', 'https://example.gov/ab9999');
         INSERT INTO bill_subjects (bill_id, subject) VALUES ('2025-ab9999', 'LEGISCAN SUBJECT');
         INSERT INTO bill_documents (bill_id, note, url)
-          VALUES ('2025-ab9999', 'LEGISCAN FISCAL ESTIMATE', 'https://example.gov/fe');
+          VALUES ('2025-ab9999', 'LEGISCAN FISCAL ESTIMATE', 'https://example.gov/fe'),
+                 ('2025-ab656', 'AB 656: Assembly Amendment 1',
+                  'https://docs.legis.wisconsin.gov/2025/related/amendments/ab656/aa1_ab656');
+        INSERT INTO bill_versions (bill_id, note, date, url, media_type)
+          VALUES ('2025-ab656', 'Bill Text',  NULL,
+                  'https://docs.legis.wisconsin.gov/document/proposaltext/2025/REG/AB656',
+                  'text/html'),
+                 ('2025-ab9999', 'LEGISCAN BILL TEXT', NULL, 'https://example.gov/t', 'text/html');
         -- an openstates roll call on the legiscan bill is withheld with it
         INSERT INTO vote_events (id, bill_id, date, chamber, motion, result, source)
           VALUES ('2025-v8', '2025-ab9999', '2025-06-02', 'lower', 'Concurrence',
@@ -109,6 +116,10 @@ def test_bill_json_full_shape(built: Path) -> None:
     assert payload["sponsors"][0]["person_id"] == "ocd-person/p1"
     assert payload["actions"][0]["description"] == "Introduced"
     assert payload["votes"][0]["records"][0]["option"] == "yes"
+    assert payload["versions"] == [{
+        "note": "Bill Text", "date": None, "media_type": "text/html",
+        "url": "https://docs.legis.wisconsin.gov/document/proposaltext/2025/REG/AB656"}]
+    assert payload["documents"][0]["note"] == "AB 656: Assembly Amendment 1"
 
 
 def test_legislator_json_shape(built: Path) -> None:
@@ -157,7 +168,8 @@ def test_filtered_sqlite_has_no_legiscan_rows(built: Path) -> None:
     # the exportable bill is still there, and nothing points at the withheld one
     assert conn.execute("SELECT COUNT(*) FROM bills").fetchone()[0] == 1
     assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
-    for table in ("bill_companions", "bill_subjects", "bill_documents", "vote_events"):
+    for table in ("bill_companions", "bill_subjects", "bill_documents", "bill_versions",
+                  "vote_events"):
         assert conn.execute(
             f"SELECT COUNT(*) FROM {table} WHERE bill_id = '2025-ab9999'"  # noqa: S608
         ).fetchone()[0] == 0, table

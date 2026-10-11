@@ -44,7 +44,8 @@ CSV_TABLES = {
 
 # every table that references bills or vote_events
 BILL_CHILDREN = (
-    "actions", "sponsorships", "bill_subjects", "bill_documents", "bill_companions",
+    "actions", "sponsorships", "bill_subjects", "bill_documents", "bill_versions",
+    "bill_companions",
     "ballot_measures", "vote_events", "vote_records", "lobbying_interests",
 )
 
@@ -87,7 +88,8 @@ def export_sqlite(db_path: Path, exports_dir: Path) -> Path:
         )
         conn.execute(f"DELETE FROM vote_records WHERE vote_event_id IN {withheld_events}")
         conn.execute(f"DELETE FROM vote_events WHERE id IN {withheld_events}")
-        for table in ("actions", "sponsorships", "bill_subjects", "bill_documents"):
+        for table in ("actions", "sponsorships", "bill_subjects", "bill_documents",
+                      "bill_versions"):
             conn.execute(f"DELETE FROM {table} WHERE bill_id IN {legiscan_bills}")  # noqa: S608
         conn.execute(
             f"DELETE FROM bill_companions WHERE bill_id IN {legiscan_bills}"
