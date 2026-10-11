@@ -47,6 +47,16 @@
         ]
       },
       {
+        "comment": "The keyless public API, feeds, and calendars are readable from any origin. They carry no credentials and are provenance-filtered; site-internal /data/ JSON is not included.",
+        "source": "/@(api|feeds|calendar)/**",
+        "headers": [
+          {
+            "key": "Access-Control-Allow-Origin",
+            "value": "*"
+          }
+        ]
+      },
+      {
         "comment": "Security headers. HSTS is already supplied by Firebase. Three things in this CSP are load-bearing and were each verified against the dev site: Pagefind compiles WebAssembly, so script-src needs 'wasm-unsafe-eval' or site search dies silently; /my-reps injects a script from the Census geocoder; and GoatCounter's counter comes from gc.zgo.at.",
         "source": "**",
         "headers": [

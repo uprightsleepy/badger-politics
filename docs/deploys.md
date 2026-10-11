@@ -52,7 +52,9 @@ constituents as a side effect of committing.
    asserts 200s on pages, a feed and an API file, and checks that HTML is
    still served with `must-revalidate`. A page cached for an hour once hid
    a broken deploy for exactly that long.
-   The live API metadata must also match the snapshot used for the build.
+   The live API metadata must also match the snapshot used for the build,
+   and the API must send `Access-Control-Allow-Origin: *` (the API, feeds,
+   and calendars are readable from any origin).
 
 The gates are also where three latent defects surfaced the first time this
 ran: `npm ci --ignore-scripts` leaves `better-sqlite3` unloadable, the
