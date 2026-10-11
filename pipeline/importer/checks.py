@@ -67,8 +67,6 @@ def check_bill_counts(conn: sqlite3.Connection, counts_file: Path) -> list[str]:
                 f"session {session_id}: bill count fell {prev_count} -> {now}"
                 f" (floor {floor}) — scrape looks broken"
             )
-    if not failures:
-        counts_file.write_text(json.dumps(current, indent=1), encoding="utf-8")
     return failures
 
 
@@ -451,6 +449,13 @@ def run_checks(db_path: Path, counts_file: Path) -> list[str]:
         failures += check_campaign_finance(conn)
         failures += check_ballot(conn)
         failures += check_congress(conn)
+        # the floor only moves on a fully clean run; saving after a failed
+        # one would let repeated small dips ratchet it down
+        if not failures:
+            current = dict(
+                conn.execute("SELECT session_id, COUNT(*) FROM bills GROUP BY session_id")
+            )
+            counts_file.write_text(json.dumps(current, indent=1), encoding="utf-8")
     finally:
         conn.close()
     return failures
