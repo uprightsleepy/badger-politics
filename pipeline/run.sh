@@ -15,10 +15,24 @@ for arg in "$@"; do
   esac
 done
 
-# Deploy target defaults to dev: promoting to prod is always explicit, so a
-# stray or automated run can never overwrite the live site.
+# Deploy target is dev; production is promoted only by deploy.yml.
 FB_PROJECT="${FB_PROJECT:-badgerpolitics-dev}"
 BUCKET="${BUCKET:-badgerpolitics-prod-snapshots}"
+
+if [ "$SKIP_DEPLOY" -eq 0 ]; then
+  # Production goes out only through deploy.yml's gates (browser, link, and
+  # live checks this script lacks), never from a laptop.
+  if [ "$FB_PROJECT" = "badgerpolitics-prod" ]; then
+    echo "run.sh does not release production. Promote with the deploy workflow:" >&2
+    echo "  gh workflow run deploy.yml -f target=badgerpolitics-prod" >&2
+    exit 2
+  fi
+  # A release must match a commit, not whatever is on disk.
+  if [ -n "$(git status --porcelain)" ]; then
+    echo "working tree has uncommitted changes; commit them or pass --skip-deploy" >&2
+    exit 2
+  fi
+fi
 
 # Cloud-writing laptop runs share the scheduler's lock. --local retains its
 # offline-storage behavior and must still be coordinated with other scrapes.
@@ -95,7 +109,7 @@ python -m importer.checks ../data/wi.sqlite   # hard gate: abort deploy on failu
 # --- Phase 3: static JSON API, feeds, calendars, bulk exports ---
 python -m dataproducts.build ../data/wi.sqlite ../site/public/
 
-# --- Phase 5+: site build, deploy ---
+# --- Phase 5+: site build, snapshot, deploy ---
 # BUILD_SESSIONS=all: every session gets pages so profile links to
 # historical bills and votes always resolve (dev builds default partial).
 # npm run build also runs pagefind, so the index matches what was built.
@@ -106,13 +120,6 @@ python -m dataproducts.build ../data/wi.sqlite ../site/public/
 # that produced it before anything is published.
 (cd ../site && node scripts/preflight.mjs)
 
-if [ "$SKIP_DEPLOY" -eq 0 ]; then
-  # runs from the repo root: firebase.json maps hosting to site/dist
-  (cd .. && site/node_modules/.bin/firebase deploy --only hosting --project "$FB_PROJECT" --non-interactive)
-else
-  echo "skipping firebase deploy (--skip-deploy)"
-fi
-
 if [ "$LOCAL" -eq 0 ]; then
   # Compressed: the snapshot goes 397MB -> ~90MB, and CI pulls one on every
   # deploy, so uncompressed egress alone would eat most of the cost ceiling.
@@ -121,4 +128,12 @@ if [ "$LOCAL" -eq 0 ]; then
   gzip -6 -c ../data/wi.sqlite | gcloud storage cp - "gs://$BUCKET/snapshots/wi-${snapshot_id}.sqlite.gz"
 else
   echo "skipping snapshot upload (--local)"
+fi
+
+# Release only after the snapshot that produced it is saved.
+if [ "$SKIP_DEPLOY" -eq 0 ]; then
+  # runs from the repo root: firebase.json maps hosting to site/dist
+  (cd .. && site/node_modules/.bin/firebase deploy --only hosting --project "$FB_PROJECT" --non-interactive)
+else
+  echo "skipping firebase deploy (--skip-deploy)"
 fi

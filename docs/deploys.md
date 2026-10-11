@@ -131,11 +131,11 @@ commit, or the next deploy will republish the bad build.
 
 ## Running a deploy by hand
 
-Still supported, and still gated — `run.sh` runs preflight too:
+`run.sh` can still release **dev** (it runs preflight, but not the browser,
+link, or live checks). It refuses a working tree with uncommitted changes,
+uploads the snapshot before releasing, and refuses `badgerpolitics-prod`
+outright. Promote production through the workflow:
 
 ```bash
-cd pipeline && FB_PROJECT=badgerpolitics-prod ./run.sh
+gh workflow run deploy.yml -f target=badgerpolitics-prod
 ```
-
-`run.sh` defaults to `badgerpolitics-dev`, so promoting to production is
-always an explicit act.

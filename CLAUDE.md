@@ -11,15 +11,15 @@ Separate gated releases build Astro and publish Firebase Hosting. See docs/night
 - Site dev: `cd site && npm run dev`   Build: `npm run build`
 - Tests: `uv run pytest pipeline/tests`
 - Infra: `cd infra && tofu plan` (never apply without asking)
-- Deploy dev: `cd pipeline && ./run.sh --local` (FB_PROJECT defaults to badgerpolitics-dev)
-- Deploy prod: `FB_PROJECT=badgerpolitics-prod ./run.sh` (explicit on purpose)
+- Deploy dev: `cd pipeline && ./run.sh --local` (dev only; refuses a dirty working tree)
+- Deploy prod: `gh workflow run deploy.yml -f target=badgerpolitics-prod` (run.sh refuses prod)
 - Site only: `site/node_modules/.bin/firebase deploy --only hosting --project badgerpolitics-dev`
 
 ## Deploy targets
 - `badgerpolitics-dev` -> https://badgerpolitics-dev.web.app
 - `badgerpolitics-prod` -> https://badgerpolitics-prod.web.app, badgerpolitics.org (www 301s to apex; .com 301s via Porkbun forwarding)
 - Snapshots: `gs://badgerpolitics-prod-snapshots/snapshots/` (private, 30-day lifecycle)
-- run.sh defaults to dev; prod requires setting FB_PROJECT explicitly.
+- run.sh releases dev only; prod is promoted solely through deploy.yml.
 
 ## Hard rules
 - SQLite is the only database. Never introduce Cloud SQL/Firestore/Postgres.
