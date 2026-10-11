@@ -46,6 +46,12 @@ export interface Person {
   contact_url: string | null;
 }
 
+/** ORDER BY terms for "AB 2" before "AB 10": the prefix, then the number
+ * as an integer (text puts AB 10 and AB 100 ahead of AB 2). */
+const billNumberOrder = (t: string, dir = "") =>
+  `substr(${t}.identifier, 1, instr(${t}.identifier, ' ') - 1) ${dir},
+   CAST(substr(${t}.identifier, instr(${t}.identifier, ' ') + 1) AS INTEGER) ${dir}`;
+
 // order by real start (first recorded action), newest first: special-session
 // ids like '2013s-oct' would otherwise sort alphabetically, not by month
 export const allSessions = once(
@@ -216,12 +222,14 @@ export const usesLegiscan = once((): boolean =>
 );
 
 export const billsFor = (sessionId: string): Bill[] =>
-  prep("SELECT * FROM bills WHERE session_id = ? ORDER BY id")
+  prep(`SELECT * FROM bills b WHERE session_id = ? ORDER BY ${billNumberOrder("b")}`)
     .all(sessionId) as Bill[];
 
+// same-day actions keep the order the importer wrote them; their text ids
+// would put a10 before a8
 export const actionsFor = (billId: string) =>
   prep(
-      "SELECT date, chamber, description, classification FROM actions WHERE bill_id = ? ORDER BY date, id",
+      "SELECT date, chamber, description, classification FROM actions WHERE bill_id = ? ORDER BY date, rowid",
     )
     .all(billId) as { date: string; chamber: string | null; description: string; classification: string }[];
 
@@ -352,7 +360,7 @@ export const personSponsorships = (personId: string, limit = -1, offset = 0) => 
               b.title, b.status, b.session_id, b.died_without_hearing
        FROM sponsorships s JOIN bills b ON b.id = s.bill_id
        WHERE s.person_id = ?
-       ORDER BY b.id DESC LIMIT ? OFFSET ?`,
+       ORDER BY b.session_id DESC, ${billNumberOrder("b", "DESC")} LIMIT ? OFFSET ?`,
     )
     .all(personId, limit, offset) as {
     is_primary: number;
@@ -430,10 +438,10 @@ export const graveyardBills = (
   chair: string | null = null,
 ) =>
   prep(
-      `SELECT id, identifier, title, classification FROM bills
+      `SELECT id, identifier, title, classification FROM bills b
        WHERE session_id = ? AND died_without_hearing = 1
        AND committee_at_death IS ? AND committee_chamber_at_death IS ?
-       AND committee_chair_at_death IS ? ORDER BY id`,
+       AND committee_chair_at_death IS ? ORDER BY ${billNumberOrder("b")}`,
     )
     .all(sessionId, committee, chamber, chair) as {
     id: string; identifier: string; title: string | null; classification: string | null;
@@ -1316,7 +1324,7 @@ export const billsForSubject = (subject: string): Bill[] =>
   prep(
       `SELECT b.* FROM bill_subjects s JOIN bills b ON b.id = s.bill_id
        WHERE s.subject = ?
-       ORDER BY b.session_id DESC, LENGTH(b.identifier), b.identifier`,
+       ORDER BY b.session_id DESC, ${billNumberOrder("b")}`,
     )
     .all(subject) as Bill[];
 
