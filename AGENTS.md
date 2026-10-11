@@ -58,7 +58,7 @@ From `pipeline/`:
 - `uv run python -m importer.checks ../data/wi.sqlite`: validate data integrity.
 
 From `site/`:
-- `npm ci --ignore-scripts`, then `npm rebuild better-sqlite3`: install dependencies and build the native database module.
+- `npm ci --ignore-scripts`, then `npm rebuild better-sqlite3 --build-from-source`: install dependencies and build the native database module.
 - `npm run dev`: start local development.
 - `npm run build`: build the current biennium and Pagefind index; set `BUILD_SESSIONS=all` for history.
 - `npx astro check`: check Astro/TypeScript.

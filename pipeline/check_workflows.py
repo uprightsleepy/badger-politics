@@ -11,6 +11,8 @@ import yaml
 from nightly.stages import STAGES
 
 PIN = re.compile(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}")
+# npx can fetch and run an unlocked package; run binaries from node_modules/.bin.
+NPX = re.compile(r"(^|[\s;&|(])npx\s")
 DEPLOY_TRIGGER = (
     "github.ref == 'refs/heads/main' && "
     "(github.event_name != 'workflow_run' || "
@@ -56,6 +58,8 @@ def validate(workflow: dict, name: str) -> list[str]:
             action = step.get("uses", "")
             if action and not action.startswith("./") and not PIN.fullmatch(action):
                 errors.append(f"{job_name}: action must use a full commit SHA: {action}")
+            if NPX.search(step.get("run", "")):
+                errors.append(f"{job_name}: run locked binaries, not npx")
             if action.startswith("actions/cache"):
                 settings = str(step.get("with", {}))
                 if "snapshot-" in settings or "data/wi.sqlite" in settings:

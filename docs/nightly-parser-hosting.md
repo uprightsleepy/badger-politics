@@ -206,9 +206,10 @@ the existing 50 GiB/month guard. No additional GCP resource is required.
   excluded. Object-name listing is bucket-wide because GCS IAM cannot
   prefix-filter that permission. This account has no Firebase Hosting role.
 - `infra/github-deploy.tf` maps workflow, ref, and event claims for that
-  binding. Existing deployer grants are preserved, including its current
-  bucket-wide read access. The new account is separated by its grants;
-  existing main-branch workflows can still assume the existing deployer.
+  binding, and workflow, ref, and environment claims for the deployer: only
+  `deploy.yml` on `main` in the `badgerpolitics-dev` or `badgerpolitics-prod`
+  environment can assume it, so parser stages cannot release the site. The
+  deployer reads only objects under `snapshots/`.
 
 The import block is declarative: a plan reads the existing bucket; only an
 approved apply records the import and changes its lifecycle policy. Do not

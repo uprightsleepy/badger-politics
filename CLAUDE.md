@@ -11,15 +11,15 @@ Separate gated releases build Astro and publish Firebase Hosting. See docs/night
 - Site dev: `cd site && npm run dev`   Build: `npm run build`
 - Tests: `uv run pytest pipeline/tests`
 - Infra: `cd infra && tofu plan` (never apply without asking)
-- Deploy dev: `cd pipeline && ./run.sh --local` (FB_PROJECT defaults to badgerpolitics-dev)
-- Deploy prod: `FB_PROJECT=badgerpolitics-prod ./run.sh` (explicit on purpose)
-- Site only: `firebase deploy --only hosting --project badgerpolitics-dev`
+- Deploy dev: `cd pipeline && ./run.sh --local` (dev only; refuses a dirty working tree)
+- Deploy prod: `gh workflow run deploy.yml -f target=badgerpolitics-prod` (run.sh refuses prod)
+- Site only: `site/node_modules/.bin/firebase deploy --only hosting --project badgerpolitics-dev`
 
 ## Deploy targets
 - `badgerpolitics-dev` -> https://badgerpolitics-dev.web.app
 - `badgerpolitics-prod` -> https://badgerpolitics-prod.web.app, badgerpolitics.org (www 301s to apex; .com 301s via Porkbun forwarding)
 - Snapshots: `gs://badgerpolitics-prod-snapshots/snapshots/` (private, 30-day lifecycle)
-- run.sh defaults to dev; prod requires setting FB_PROJECT explicitly.
+- run.sh releases dev only; prod is promoted solely through deploy.yml.
 
 ## Hard rules
 - SQLite is the only database. Never introduce Cloud SQL/Firestore/Postgres.
@@ -42,9 +42,10 @@ Separate gated releases build Astro and publish Firebase Hosting. See docs/night
 - Interact with openstates-scrapers ONLY as a subprocess CLI (os-update). Never `import` their modules into our Apache-2.0 code (GPL boundary).
 - Vote attribution: match against a session-scoped roster; any ambiguous surname is a hard failure, never a best guess.
 - Dependencies are hash-pinned (uv.lock / package-lock.json); `npm ci --ignore-scripts`
-  everywhere, then `npm rebuild better-sqlite3` by name (the flag leaves that native
-  module with no binary; rebuilding one named package still blocks every other
-  package's install scripts). No deploy ever runs from a PR.
+  everywhere, then `npm rebuild better-sqlite3 --build-from-source` by name (the
+  flag leaves that native module with no binary; rebuilding one named package
+  still blocks every other package's install scripts, and compiling avoids its
+  unchecksummed prebuilt download). No deploy ever runs from a PR.
 - LTSB GeoJSON is the authoritative district source; Census is geocoding only.
 
 ## Gotchas

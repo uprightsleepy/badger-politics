@@ -14,7 +14,7 @@ import pytest
 import yaml
 
 from check_workflows import validate
-from nightly.__main__ import run_stage
+from nightly.__main__ import CLOUD_CREDENTIALS, run_stage
 from nightly.archive import pack, unpack
 from nightly.export_scraper_lock import export
 from nightly.finance import merge_months, months_for
@@ -417,6 +417,20 @@ def test_failed_subprocess_cannot_leave_success_receipt(tmp_path, seeded, monkey
     with pytest.raises(subprocess.CalledProcessError):
         run_stage(r, "legislature", "2026")
     assert not (r.scratch / "success.json").exists()
+
+
+def test_collectors_cannot_mint_cloud_credentials(tmp_path, seeded, monkeypatch):
+    r = runner(tmp_path, seeded)
+    r.acquire()
+    r.restore("legislature")
+    monkeypatch.setenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "private-token")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/creds.json")
+    seen = []
+    monkeypatch.setattr("nightly.__main__.subprocess.run",
+                        lambda command, **kwargs: seen.append(kwargs["env"]))
+    run_stage(r, "legislature", "2026")
+    assert seen and all("PATH" in env for env in seen)
+    assert not any(CLOUD_CREDENTIALS & env.keys() for env in seen)
 
 
 def test_upstream_export_uses_hashes_and_platform_markers():
