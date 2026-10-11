@@ -85,6 +85,8 @@ python -m importer.import_lobbying _data/lobbying ../data/wi.sqlite
 
 python -m scraper.fetch_subjects              # subject index (current refreshes)
 python -m importer.import_subjects _data/subjects ../data/wi.sqlite
+python -m scraper.fetch_executive_orders      # governors' EO index (links only)
+python -m importer.import_executive_orders _data/subjects/executive_orders ../data/wi.sqlite
 
 # WisconsinEye retrieval paused 2026-09-07 pending approval for metadata reuse
 # under its user agreement. Only the existing local archive is read here.

@@ -16,6 +16,7 @@ const api: [string, string][] = [
   ["/api/v1/votes/{id}.json", "One roll call with every member's vote. The id matches the roll call page's address."],
   ["/api/v1/legislators/index.json", "Every state lawmaker on record."],
   ["/api/v1/legislators/{name}.json", "One lawmaker: their profile, election, bills and votes. The name matches their page's address."],
+  ["/api/v1/executive-orders.json", "Every governor's executive orders, newest first, each with its official link."],
   ["/api/v1/elections/statewide.json", "Statewide races on the 2026 ballot, and past statewide results."],
   ["/api/v1/elections/us-house.json", "U.S. House candidates on the 2026 ballot."],
   ["/api/v1/elections/seats/assembly-15.json", "One legislative seat: who holds it, their 2026 race, and its certified results, each labeled with the district maps it was held under. Swap in any seat, like senate-5."],
@@ -48,6 +49,7 @@ const feeds: [string, string][] = [
   ["/feeds/laws.xml", "New laws, as the governor's approval numbers each act."],
   ["/feeds/vetoes.xml", "Vetoes, partial vetoes and veto override attempts."],
   ["/feeds/money/independent.xml", "New outside-spending filings, one at a time, with each one's transaction ID."],
+  ["/feeds/executive-orders.xml", "The governor's newest executive orders."],
 ];
 const RELEASES = "https://github.com/uprightsleepy/badger-politics/releases/latest/download";
 const downloads: [string, string][] = [

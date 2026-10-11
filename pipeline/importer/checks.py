@@ -503,6 +503,20 @@ def check_congress(conn: sqlite3.Connection) -> list[str]:
                                   or family_key(races[d]) == family_key(members[d])))]
 
 
+def check_executive_orders(conn: sqlite3.Connection) -> list[str]:
+    """The governor's orders are listed, and every link opens the order in
+    its own governor's folder of the official archive. Numbers are unique
+    per governor and year by the table's key."""
+    if not conn.execute("SELECT 1 FROM executive_orders").fetchone():
+        return ["executive_orders: no orders imported"]
+    bad = conn.execute(
+        "SELECT COUNT(*) FROM (SELECT url, 'https://docs.legis.wisconsin.gov/code/"
+        "executive_orders/' || folder || '/' AS prefix FROM executive_orders)"
+        " WHERE substr(url, 1, length(prefix)) != prefix OR length(url) = length(prefix)"
+    ).fetchone()[0]
+    return [f"executive_orders: {bad} links outside the official archive"] if bad else []
+
+
 def run_checks(db_path: Path, counts_file: Path) -> list[str]:
     conn = sqlite3.connect(db_path)
     try:
@@ -516,6 +530,7 @@ def run_checks(db_path: Path, counts_file: Path) -> list[str]:
         failures += check_ballot(conn)
         failures += check_congress(conn)
         failures += check_court_challenges(conn)
+        failures += check_executive_orders(conn)
         # the floor only moves on a fully clean run; saving after a failed
         # one would let repeated small dips ratchet it down
         if not failures:

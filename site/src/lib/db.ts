@@ -1490,6 +1490,31 @@ export const textsFor = (billId: string): BillText[] => {
   return [...byLabel.values()];
 };
 
+export type ExecutiveOrder = {
+  year: number; number: number; title: string | null; date: string | null; url: string;
+};
+export type GovernorOrders = {
+  folder: string; governor: string; years: { year: number; orders: ExecutiveOrder[] }[];
+};
+
+/** Governors' executive orders as the docs.legis archive lists them, each
+ * governor, year and order newest first. Links only. An
+ * older snapshot without the table lists none. */
+export const executiveOrders = once((): GovernorOrders[] => {
+  if (!hasTable("executive_orders")) return [];
+  const rows = prep(`SELECT folder, governor, year, number, title, date, url FROM executive_orders
+    ORDER BY folder DESC, year DESC, number DESC`).all() as (ExecutiveOrder & { folder: string; governor: string })[];
+  const governors: GovernorOrders[] = [];
+  for (const { folder, governor, ...order } of rows) {
+    let g = governors.at(-1);
+    if (g?.folder !== folder) governors.push(g = { folder, governor, years: [] });
+    let y = g.years.at(-1);
+    if (y?.year !== order.year) g.years.push(y = { year: order.year, orders: [] });
+    y.orders.push(order);
+  }
+  return governors;
+});
+
 /** ---- New laws, veto tracker, key votes ---- */
 
 export const bienniumOf = (sessionId: string): number => {

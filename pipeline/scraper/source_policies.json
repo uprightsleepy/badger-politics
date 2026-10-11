@@ -50,7 +50,8 @@
       "paths": {
         "GET": [
           "/\\d{4}/(?:proposals|related|legislators)/.*",
-          "/document/(?:proposaltext|proposal|session|amendment|fe)/.*"
+          "/document/(?:proposaltext|proposal|session|amendment|fe)/.*",
+          "/code/executive_orders(?:/\\d{4}_[a-z0-9_]+)?"
         ]
       },
       "delay_seconds": 1,

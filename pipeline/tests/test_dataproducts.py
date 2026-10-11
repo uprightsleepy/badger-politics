@@ -135,6 +135,12 @@ def db_path(tmp_path: Path, make_db) -> Path:
                  (12, 88, 'Independent Expenditure Committee', 'OUTGOING', '2025-09-01',
                   5000, NULL, 'Ad Vendor LLC', 'Business', 'AGAINST', 'Ann Example',
                   'State Assembly', '15', 'TV ad', 4242, 'Fall Report');
+        INSERT INTO executive_orders (folder, governor, year, number, title, date, url)
+          VALUES ('2019_tony_evers', 'Tony Evers', 2020, 72, 'Declaring a Health Emergency',
+                  '2020-03-12',
+                  'https://docs.legis.wisconsin.gov/code/executive_orders/2019_tony_evers/2020_72.pdf'),
+                 ('2019_tony_evers', 'Tony Evers', 2019, 1, NULL, NULL,
+                  'https://docs.legis.wisconsin.gov/code/executive_orders/2019_tony_evers/2019_1.pdf');
         INSERT INTO statewide_races (office, incumbent, incumbent_noncandidacy,
                                      candidate, party, ballot_status, source)
           VALUES ('GOVERNOR', 'Tony Evers', 1, 'Sara Rodriguez', 'Democratic',
@@ -349,6 +355,17 @@ def test_feeds_are_valid_atom(built: Path) -> None:
     # entry ids are the actions' own ids, stable as the week's list shifts
     ids = [e.find("a:id", ns).text for e in weekly.findall("a:entry", ns)]
     assert ids == ["https://badgerpolitics.org/feeds/weekly.xml#a1"]
+    orders = ET.parse(built / "public" / "feeds" / "executive-orders.xml").getroot()
+    assert [e.find("a:title", ns).text for e in orders.findall("a:entry", ns)] == [
+        "Executive Order 72 (2020): Declaring a Health Emergency",
+        "Executive Order 1 (2019)"]
+
+
+def test_executive_orders_json_is_newest_first(built: Path) -> None:
+    payload = json.loads(
+        (built / "public" / "api" / "v1" / "executive-orders.json").read_text(encoding="utf-8"))
+    assert [(o["year"], o["number"]) for o in payload] == [(2020, 72), (2019, 1)]
+    assert payload[0]["url"].startswith("https://docs.legis.wisconsin.gov/code/")
 
 
 @pytest.mark.parametrize(("feed", "entry_ids"), [
