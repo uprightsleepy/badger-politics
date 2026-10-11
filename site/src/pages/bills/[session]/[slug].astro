@@ -304,14 +304,20 @@ const record = fromLegiscan ? "LegiScan's copy of the record" : "the official re
           <p class="text-body" data-sponsor-note-text></p>
         </div>
         <div class="flex flex-col gap-2.5">
-          <FollowButton kind="bills" id={bill.id} label={`Follow this ${isBill ? "bill" : "proposal"}`} variant="primary" />
+          {/* following reads the JSON API and feeds, which never carry
+              LegiScan's records (lib/legiscan) */}
+          {!fromLegiscan && (
+            <FollowButton kind="bills" id={bill.id} label={`Follow this ${isBill ? "bill" : "proposal"}`} variant="primary" />
+          )}
           {bill.text_url && (
             <a href={bill.text_url} class="btn btn-secondary w-full">Read the {isBill ? "bill" : "proposal"}</a>
           )}
-          <p class="text-small text-granite">
-            Following saves it on this device. New actions show on your <a href="/following/" class="underline">Following page</a>.
-            You can also <a href={`/feeds/bills/${bill.id}.xml`} class="underline">get updates in a feed reader</a>.
-          </p>
+          {!fromLegiscan && (
+            <p class="text-small text-granite">
+              Following saves it on this device. New actions show on your <a href="/following/" class="underline">Following page</a>.
+              You can also <a href={`/feeds/bills/${bill.id}.xml`} class="underline">get updates in a feed reader</a>.
+            </p>
+          )}
         </div>
         {companions.length > 0 && (
           <p class="border-t border-rule pt-4">

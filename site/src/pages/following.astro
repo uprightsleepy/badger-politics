@@ -96,7 +96,14 @@ const KINDS: [string, string][] = [
       const [session, slug] = [id.slice(0, at), id.slice(at + 1)];
       const href = `/bills/${session}/${slug}/`;
       try {
-        const b = await (await fetch(`/api/v1/bills/${session}/${slug}.json`)).json();
+        const res = await fetch(`/api/v1/bills/${session}/${slug}.json`);
+        // the API leaves out bills whose record came from LegiScan (lib/legiscan),
+        // so a 404 is permanent, not a failed load
+        if (res.status === 404) {
+          return row("bills", id, id, link(href, "This bill"),
+            "Its record isn't in our data files, so its updates can't show here. Its page has the latest action.");
+        }
+        const b = await res.json();
         const changed = !!(seen && b.latest_action_date && b.latest_action_date > seen);
         const latest = b.latest_action_date
           ? `Latest action${b.latest_action_desc ? `: ${esc(b.latest_action_desc)},` : ""} ${esc(fmtDate(b.latest_action_date))}.`
