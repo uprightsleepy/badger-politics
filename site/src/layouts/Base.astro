@@ -379,6 +379,10 @@ const mainClass =
           .then((r) => r.json())
           .then((reps: Reps) => {
             const slugs = [reps.assembly[ad]?.slug, reps.senate[sd]?.slug].filter(Boolean);
+            const spoken: [string | undefined, string][] = [
+              [reps.assembly[ad]?.slug, "Your representative: "],
+              [reps.senate[sd]?.slug, "Your state senator: "],
+            ];
             // a bill page names the reader's own lawmakers when they are
             // among its authors or supporters
             const note = document.querySelector<HTMLElement>("[data-sponsor-note]");
@@ -418,14 +422,15 @@ const mainClass =
             document.querySelectorAll<HTMLElement>("[data-mine-person]").forEach((el) => {
               if (slugs.includes(el.dataset.minePerson)) el.hidden = false;
             });
-            for (const slug of slugs) {
+            for (const [slug, srLabel] of spoken) {
+              if (!slug) continue;
               document.querySelectorAll<HTMLAnchorElement>(`a[href="/legislators/${slug}/"]`).forEach((a) => {
                 if (
                   a.closest("[data-vote-row]") ||
                   a.closest("nav") ||
                   a.closest("[data-no-rep-highlight]")
                 ) return;
-                markAsMine(a, "Your representative: ");
+                markAsMine(a, srLabel);
               });
             }
           })

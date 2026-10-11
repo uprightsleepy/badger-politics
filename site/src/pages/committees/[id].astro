@@ -10,6 +10,7 @@ import {
   partyWord, sessionPlainName,
 } from "../../lib/format";
 import { safeHref } from "../../lib/html";
+import { wisconsinToday } from "../../lib/today";
 
 export function getStaticPaths() {
   // the directory row already carries this page's headline counts
@@ -28,7 +29,7 @@ const { committee, members, hearings, graveyard } = committeeFor(committeeId);
 const hasFeed = existsSync(
   new URL(`../../../public/feeds/committees/${committeeSlug(committee.id)}.xml`, import.meta.url),
 );
-const today = new Date().toISOString().slice(0, 10);
+const today = wisconsinToday();
 const upcoming = hearings.filter((h) => (h.date ?? "") >= today).reverse();
 const recent = hearings.filter((h) => (h.date ?? "") < today);
 const shown = upcoming.length > 0 ? upcoming : recent;

@@ -4,8 +4,8 @@
  * own page (built at build time), so the two never word the same fact two
  * ways. Pure and browser-safe: it reads only the summary it is handed.
  * Every value that reaches the HTML goes through esc(). */
-import { ballotStatus, writeInSentence } from "./ballot.ts";
-import { clip, fmtDate, partyPlural, partyWord } from "./format.ts";
+import { ballotStatus, nameList, withParty, writeInSentence } from "./ballot.ts";
+import { clip, fmtDate, partyPlural } from "./format.ts";
 import { esc } from "./html.ts";
 import type { RepSummary, Typical } from "./wire.ts";
 
@@ -29,7 +29,6 @@ export interface Answer {
 const fig = (n: number | string) => `<span class="figure">${esc(String(n))}</span>`;
 const link = (href: string, text: string) => `<a href="${esc(href)}" class="underline">${esc(text)}</a>`;
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
-const article = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
 const round = (n: number) => Math.round(n);
 const fine = (text: string) => `<p class="text-fine text-granite">${text}</p>`;
 
@@ -42,14 +41,8 @@ export const longDate = (iso: string) => {
 };
 
 /** "Avery Lund, a Republican, and Jordan Pike, a Democrat" */
-const people = (list: { name: string; party: string | null }[]) => {
-  const each = list.map((p) =>
-    p.party ? `${esc(p.name)}, ${article(partyWord(p.party))} ${esc(partyWord(p.party))}` : esc(p.name),
-  );
-  if (each.length < 2) return each.join("");
-  if (each.length === 2) return `${each[0]}, and ${each[1]}`;
-  return `${each.slice(0, -1).join("; ")}; and ${each.at(-1)}`;
-};
+const people = (list: { name: string; party: string | null }[]) =>
+  nameList(list.map((p) => esc(withParty(p.name, p.party))));
 
 /** One value against the middle half of the chamber, with the value
  * itself under the marker. No end labels: the band and the note under it

@@ -46,6 +46,17 @@ export interface Person {
   contact_url: string | null;
 }
 
+/** ORDER BY terms for "AB 2" before "AB 10": the prefix, then the number
+ * as an integer (text puts AB 10 and AB 100 ahead of AB 2). */
+const billNumberOrder = (t: string, dir = "") =>
+  `substr(${t}.identifier, 1, instr(${t}.identifier, ' ') - 1) ${dir},
+   CAST(substr(${t}.identifier, instr(${t}.identifier, ' ') + 1) AS INTEGER) ${dir}`;
+
+/** A member's vote row is LegiScan's if its roll call (e) or its bill (b)
+ * came from there; pages credit those (lib/legiscan). */
+const ROW_SOURCE =
+  "CASE WHEN 'legiscan' IN (e.source, b.source) THEN 'legiscan' ELSE e.source END AS source";
+
 // order by real start (first recorded action), newest first: special-session
 // ids like '2013s-oct' would otherwise sort alphabetically, not by month
 export const allSessions = once(
@@ -216,12 +227,14 @@ export const usesLegiscan = once((): boolean =>
 );
 
 export const billsFor = (sessionId: string): Bill[] =>
-  prep("SELECT * FROM bills WHERE session_id = ? ORDER BY id")
+  prep(`SELECT * FROM bills b WHERE session_id = ? ORDER BY ${billNumberOrder("b")}`)
     .all(sessionId) as Bill[];
 
+// same-day actions keep the order the importer wrote them; their text ids
+// would put a10 before a8
 export const actionsFor = (billId: string) =>
   prep(
-      "SELECT date, chamber, description, classification FROM actions WHERE bill_id = ? ORDER BY date, id",
+      "SELECT date, chamber, description, classification FROM actions WHERE bill_id = ? ORDER BY date, rowid",
     )
     .all(billId) as { date: string; chamber: string | null; description: string; classification: string }[];
 
@@ -291,17 +304,23 @@ export const sittingPeople = once(
  * preview and the paged record pages take slices, so counting and
  * slicing happen in SQLite and a build never holds a whole career in
  * memory. */
-export const personVotes = (personId: string, limit: number, offset = 0) =>
+export const personVotes = (personId: string, limit: number, offset = 0, { noLegiscan = false } = {}) =>
   prep(
-      `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result,
+      // noLegiscan drops LegiScan's rows for the public JSON (lib/legiscan)
+      `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result, e.source_url,
+              ${ROW_SOURCE},
               b.id AS bill_id, b.identifier, b.title, b.session_id
        FROM vote_records r
        JOIN vote_events e ON e.id = r.vote_event_id
        JOIN bills b ON b.id = e.bill_id
-       WHERE r.person_id = ? ORDER BY e.date DESC, e.id LIMIT ? OFFSET ?`,
+       WHERE r.person_id = ?
+         AND NOT (? AND 'legiscan' IN (COALESCE(e.source, ''), COALESCE(b.source, '')))
+       ORDER BY e.date DESC, e.id LIMIT ? OFFSET ?`,
     )
-    .all(personId, limit, offset) as {
+    .all(personId, noLegiscan ? 1 : 0, limit, offset) as {
     option: string;
+    source: string | null;
+    source_url: string | null;
     vote_event_id: string;
     date: string | null;
     motion: string | null;
@@ -345,7 +364,7 @@ export const personSponsorships = (personId: string, limit = -1, offset = 0) => 
               b.title, b.status, b.session_id, b.died_without_hearing
        FROM sponsorships s JOIN bills b ON b.id = s.bill_id
        WHERE s.person_id = ?
-       ORDER BY b.id DESC LIMIT ? OFFSET ?`,
+       ORDER BY b.session_id DESC, ${billNumberOrder("b", "DESC")} LIMIT ? OFFSET ?`,
     )
     .all(personId, limit, offset) as {
     is_primary: number;
@@ -423,10 +442,10 @@ export const graveyardBills = (
   chair: string | null = null,
 ) =>
   prep(
-      `SELECT id, identifier, title, classification FROM bills
+      `SELECT id, identifier, title, classification FROM bills b
        WHERE session_id = ? AND died_without_hearing = 1
        AND committee_at_death IS ? AND committee_chamber_at_death IS ?
-       AND committee_chair_at_death IS ? ORDER BY id`,
+       AND committee_chair_at_death IS ? ORDER BY ${billNumberOrder("b")}`,
     )
     .all(sessionId, committee, chamber, chair) as {
     id: string; identifier: string; title: string | null; classification: string | null;
@@ -555,6 +574,7 @@ export const partyBreaks = (personId: string, party: string | null) => {
   const { majority: majorities, splits } = partyPositions();
   const votes = prep(
       `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.source_url,
+              ${ROW_SOURCE},
               b.id AS bill_id, b.identifier, b.title, b.session_id
        FROM vote_records r
        JOIN vote_events e ON e.id = r.vote_event_id
@@ -564,7 +584,7 @@ export const partyBreaks = (personId: string, party: string | null) => {
     )
     .all(personId) as {
     option: string; vote_event_id: string; date: string | null; motion: string | null;
-    source_url: string | null; bill_id: string; identifier: string;
+    source_url: string | null; source: string | null; bill_id: string; identifier: string;
     title: string | null; session_id: string;
   }[];
   return votes
@@ -1309,7 +1329,7 @@ export const billsForSubject = (subject: string): Bill[] =>
   prep(
       `SELECT b.* FROM bill_subjects s JOIN bills b ON b.id = s.bill_id
        WHERE s.subject = ?
-       ORDER BY b.session_id DESC, LENGTH(b.identifier), b.identifier`,
+       ORDER BY b.session_id DESC, ${billNumberOrder("b")}`,
     )
     .all(subject) as Bill[];
 
@@ -1526,7 +1546,7 @@ export const keyVotesFor = (personId: string) => {
   const keys = keyEvents();
   const rows = prep(
       `SELECT r.option, e.id AS vote_event_id, e.date, e.motion,
-              e.yes_count, e.no_count,
+              e.yes_count, e.no_count, e.source_url, ${ROW_SOURCE},
               b.identifier, b.title, b.session_id
        FROM vote_records r
        JOIN vote_events e ON e.id = r.vote_event_id
@@ -1536,6 +1556,7 @@ export const keyVotesFor = (personId: string) => {
     .all(personId) as {
       option: string; vote_event_id: string; date: string | null;
       motion: string | null; yes_count: number | null; no_count: number | null;
+      source_url: string | null; source: string | null;
       identifier: string; title: string | null; session_id: string;
     }[];
   return rows

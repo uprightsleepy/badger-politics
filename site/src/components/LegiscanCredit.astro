@@ -1,0 +1,19 @@
+---
+/** The credit a member's vote row carries when LegiScan supplied it: the
+ * record and the CC BY 4.0 license, as roll call pages give (lib/legiscan).
+ * Renders nothing for official rows. */
+import { safeHref } from "../lib/html";
+import { LEGISCAN_LICENSE_URL, isLegiscan, legiscanBillUrl } from "../lib/legiscan";
+interface Props {
+  v: { source: string | null; source_url: string | null; session_id: string; identifier: string };
+  class?: string;
+}
+const { v, class: extra = "" } = Astro.props;
+const href = isLegiscan(v) ? safeHref(v.source_url) ?? legiscanBillUrl(v.session_id, v.identifier) : null;
+---
+{href && (
+  <span class:list={["text-fine text-granite", extra]}>
+    From <a href={href} class="underline">LegiScan</a>, used under the
+    {" "}<a href={LEGISCAN_LICENSE_URL} class="underline">CC BY 4.0 license</a>.
+  </span>
+)}

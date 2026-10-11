@@ -50,7 +50,10 @@ async function setup(t, response = async () => ({ json: async () => boundaries }
     return response();
   });
   const lookup = isolatedModuleUrl(lookupSource);
-  const city = await import(isolatedModuleUrl(citySource.replace('from "./lookup.ts"', `from ${JSON.stringify(lookup)}`)));
+  const store = new URL("../../src/lib/store.ts", import.meta.url).href;
+  const city = await import(isolatedModuleUrl(citySource
+    .replace('from "./lookup.ts"', `from ${JSON.stringify(lookup)}`)
+    .replace('from "./store.ts"', `from ${JSON.stringify(store)}`)));
   assert.deepEqual(requests, [], "importing storage helpers must not fetch boundaries");
   assert.deepEqual(writes, [], "importing helpers must not alter saved districts");
   return { ...city, storage, values, writes, requests };
@@ -103,19 +106,18 @@ test("a point in a polygon hole clears the old city", async (t) => {
   assert.equal(city.savedCityDistrict(), null);
 });
 
-test("saving failures still reject and do not clear the existing city", async (t) => {
+// blocked storage must not break the lookup that saves into it (lib/store)
+test("a failed save leaves the existing city and the lookup still finishes", async (t) => {
   const city = await setup(t);
-  const failure = new Error("storage unavailable");
-  city.storage.setItem = () => { throw failure; };
-  await assert.rejects(city.resolveCity(...point), (error) => error === failure);
+  city.storage.setItem = () => { throw new Error("storage unavailable"); };
+  await city.resolveCity(...point);
   assert.equal(city.values.get("bp-city-district"), '{"t":"old-city","d":2}');
   assert.deepEqual(city.writes, []);
 });
 
-test("clearing failures still reject after a lookup failure", async (t) => {
+test("a failed clear after a lookup failure leaves the existing city and still finishes", async (t) => {
   const city = await setup(t, async () => { throw new Error("offline"); });
-  const failure = new Error("cannot remove saved city");
-  city.storage.removeItem = () => { throw failure; };
-  await assert.rejects(city.resolveCity(...point), (error) => error === failure);
+  city.storage.removeItem = () => { throw new Error("cannot remove saved city"); };
+  await city.resolveCity(...point);
   assert.equal(city.values.get("bp-city-district"), '{"t":"old-city","d":2}');
 });

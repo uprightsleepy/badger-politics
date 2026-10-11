@@ -1,5 +1,4 @@
 import PERSON_SLUGS from "../data/person-slugs.json" with { type: "json" };
-import { esc } from "./html.ts";
 
 export const STATUS_LABELS: Record<string, string> = {
   introduced: "Introduced",
@@ -24,28 +23,6 @@ export const STATUS_PLAIN: Record<string, string> = {
   vetoed: "Vetoed",
   failed_sjr1: "Stopped when the session ended",
 };
-
-export const STATUS_SHORT: Record<string, string> = {
-  introduced: "Introduced",
-  in_committee: "In committee",
-  passed_chamber: "Passed 1 house",
-  passed: "Passed both",
-  adopted: "Adopted",
-  enacted: "Law",
-  vetoed: "Vetoed",
-  failed_sjr1: "Died",
-};
-
-// Status is told by its words, never by color: every status shares one
-// neutral chip (docs/brand.md, "No status colors").
-const STATUS_CHIP = "bg-fog text-spruce";
-export const STATUS_STYLES: Record<string, string> = Object.fromEntries(
-  Object.keys(STATUS_LABELS).map((k) => [k, STATUS_CHIP]),
-);
-
-// Party is a word, not a color: one neutral style for every party.
-export const partyStyle = (_party: string | null): string =>
-  "bg-white text-spruce ring-1 ring-inset ring-edge";
 
 /** "Democratic" (the party's name) -> "Democrat" (what a member is). */
 export const partyWord = (party: string | null): string =>
@@ -147,21 +124,6 @@ export const partySplitSentence = (split: {
 
 export const partyLetter = (party: string | null): string =>
   party ? party[0] : "?";
-
-/** Party markup shared by Astro and browser cards. Use decorative when
- * adjacent text already names the party, avoiding duplicate announcements. */
-export const partyChipHtml = (
-  party: string | null,
-  { dims = "h-5 w-5 text-xs", decorative = false }: { dims?: string; decorative?: boolean } = {},
-): string => {
-  const a11y = decorative
-    ? ' aria-hidden="true"'
-    : ` role="img" aria-label="${esc(party ?? "party unknown")}"`;
-  return (
-    `<span class="inline-flex ${dims} shrink-0 items-center justify-center rounded-full font-bold ${partyStyle(party)}"${a11y}>` +
-    `<span aria-hidden="true">${esc(partyLetter(party))}</span></span>`
-  );
-};
 
 /** Truncate with an ellipsis, preferring a nearby word boundary. */
 export const clip = (text: string, max: number): string => {
