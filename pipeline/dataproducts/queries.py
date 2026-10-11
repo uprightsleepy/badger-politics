@@ -63,10 +63,12 @@ def bills(
 
 
 def actions_for(conn: sqlite3.Connection, bill_id: str) -> list[dict]:
+    # same-day actions keep the importer's insertion order; text ids would
+    # sort '-a10' before '-a8'
     return _rows(
         conn,
         "SELECT date, chamber, description, classification FROM actions"
-        " WHERE bill_id = ? ORDER BY date, id",
+        " WHERE bill_id = ? ORDER BY date, rowid",
         (bill_id,),
     )
 
@@ -125,7 +127,7 @@ def actions_grouped(conn: sqlite3.Connection):
         "SELECT a.bill_id, a.date, a.chamber, a.description, a.classification"
         " FROM actions a JOIN bills b ON b.id = a.bill_id"
         f" WHERE {exportable('b.')}"
-        " ORDER BY a.bill_id, a.date, a.id"
+        " ORDER BY a.bill_id, a.date, a.rowid"
     )
     for bill_id, rows in itertools.groupby(cursor, key=lambda r: r["bill_id"]):
         yield bill_id, [
@@ -141,7 +143,7 @@ def actions_for_session(conn: sqlite3.Connection, session_id: str) -> dict[str, 
         "SELECT a.bill_id, a.date, a.chamber, a.description, a.classification"
         " FROM actions a JOIN bills b ON b.id = a.bill_id"
         f" WHERE b.session_id = ? AND {exportable('b.')}"
-        " ORDER BY a.bill_id, a.date, a.id",
+        " ORDER BY a.bill_id, a.date, a.rowid",
         (session_id,),
     )
     return {

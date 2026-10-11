@@ -212,3 +212,27 @@ def test_session_csvs_written(built: Path) -> None:
     bills_csv = (built / "exports" / "2025" / "bills.csv").read_text(encoding="utf-8")
     assert "AB 656" in bills_csv
     assert "9999" not in bills_csv
+
+
+def test_same_day_actions_keep_their_order(tmp_path: Path, make_db) -> None:
+    conn = make_db(tmp_path / "order.sqlite")
+    conn.execute(
+        "INSERT INTO sessions (id, identifier, name) VALUES ('2025', '2025', '2025-26')"
+    )
+    conn.execute(
+        "INSERT INTO bills (id, session_id, identifier, source)"
+        " VALUES ('2025-ab1', '2025', 'AB 1', 'openstates')"
+    )
+    for i in range(12):
+        conn.execute(
+            "INSERT INTO actions (id, bill_id, date, description) VALUES (?, ?, ?, ?)",
+            (f"2025-ab1-a{i}", "2025-ab1", "2025-06-01", f"step {i}"),
+        )
+    conn.commit()
+    conn.row_factory = sqlite3.Row
+    expected = [f"step {i}" for i in range(12)]
+    assert [a["description"] for a in queries.actions_for(conn, "2025-ab1")] == expected
+    (_, grouped), = queries.actions_grouped(conn)
+    assert [a["description"] for a in grouped] == expected
+    by_session = queries.actions_for_session(conn, "2025")["2025-ab1"]
+    assert [a["description"] for a in by_session] == expected

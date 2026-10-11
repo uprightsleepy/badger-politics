@@ -172,7 +172,7 @@ def build_feeds(
             f"""SELECT a.date, a.description, b.id, b.identifier, b.title, b.session_id
                 FROM actions a JOIN bills b ON b.id = a.bill_id
                 WHERE a.date >= ? AND {queries.exportable("b.")}
-                ORDER BY a.date DESC LIMIT 200""",
+                ORDER BY a.date DESC, a.rowid DESC LIMIT 200""",
             (cutoff,),
         ).fetchall()
         root = _feed(
