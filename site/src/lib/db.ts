@@ -1025,6 +1025,26 @@ export const lastMarginFor = (chamber: string | null, district: number | null) =
   return { year, margin: total > 0 ? (gap / total) * 100 : null };
 };
 
+/** The district map the site draws (LTSB, 2023 Wis. Act 94). */
+export const CURRENT_MAP = 2024;
+
+/** Census ACS 5-year figures for one seat, keyed by measure, only when the
+ * release describes the current map; null on older snapshots or another map. */
+export const districtDemographicsFor = (chamber: string, district: number) => {
+  if (!hasTable("district_demographics")) return null;
+  const rows = prep(
+      `SELECT acs_year, measure, estimate, moe FROM district_demographics
+       WHERE chamber = ? AND district = ? AND map_year = ?`,
+    )
+    .all(chamber, district, CURRENT_MAP) as { acs_year: number; measure: string; estimate: number; moe: number }[];
+  if (!rows.length) return null;
+  return {
+    acsYear: rows[0].acs_year,
+    figures: Object.fromEntries(rows.map((r) => [r.measure, { estimate: r.estimate, moe: r.moe }])) as
+      Record<string, { estimate: number; moe: number } | undefined>,
+  };
+};
+
 /** Certified county aggregates for one statewide contest, alphabetical,
  * candidates ordered by statewide finish within each county. */
 export const statewideCountiesFor = (office: string) =>

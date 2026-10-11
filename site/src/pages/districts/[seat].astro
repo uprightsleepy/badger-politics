@@ -9,7 +9,7 @@ import ElectionResult from "../../components/ElectionResult.astro";
 import SeatMapFigure from "../../components/SeatMapFigure.astro";
 import {
   seatTerms, sittingPeople, electionFor, electionHistoryFor, lastMarginFor, ballotPhase,
-  writeInPending, meta, serviceRecordsBegin,
+  writeInPending, meta, serviceRecordsBegin, districtDemographicsFor, CURRENT_MAP,
 } from "../../lib/db";
 import { personSlug, monthYear, chamberName, partyWord, fmtDate } from "../../lib/format";
 import { safeHref } from "../../lib/html";
@@ -107,6 +107,29 @@ const marginLine = lastMargin
     : `In ${lastMargin.year}, the race was decided by ${lastMargin.margin.toFixed(1)} points.`
   : "";
 const pulledOn = meta().imported_at?.slice(0, 10);
+
+// Census ACS figures, shown only for a release on the current map
+const people = districtDemographicsFor(chamber, district);
+const num = (v: number, digits = 0) =>
+  v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+const pct = (v: number) => `${num(v, 1)}%`;
+const points = (m: number) => `${num(m, 1)} points`;
+const dollars = (v: number) => (v >= 250001 ? "$250,000 or more" : `$${num(v)}`);
+const peopleRows = people
+  ? ([
+      ["population", "People", (v: number) => num(v), (m: number) => num(m)],
+      ["median_age", "Median age", (v: number) => `${num(v, 1)} years`, (m: number) => `${num(m, 1)} years`],
+      ["age_65_plus_pct", "Age 65 and older", pct, points],
+      // Census top-codes the median at $250,001 and gives it no margin
+      ["median_household_income", "Median household income", dollars,
+        (m: number, v: number) => (v >= 250001 ? "n/a" : `$${num(m)}`)],
+      ["bachelors_pct", "Adults 25 and older with a bachelor's degree or more", pct, points],
+      ["owner_occupied_pct", "Homes lived in by their owners", pct, points],
+    ] as const).flatMap(([measure, label, show, margin]) => {
+      const f = people.figures[measure];
+      return f ? [{ label, value: show(f.estimate), moe: margin(f.moe, f.estimate) }] : [];
+    })
+  : [];
 ---
 
 <Base
@@ -184,6 +207,44 @@ const pulledOn = meta().imported_at?.slice(0, 10);
           )}
           <p class="border-t border-rule pt-4">
             <a href={`/legislators/${personSlug(holder.id)}/`} class="font-bold underline">Their full record</a>
+          </p>
+        </section>
+      )}
+
+      {people && (
+        <section aria-labelledby="people-heading">
+          <h2 id="people-heading" class="t-section">Who lives here</h2>
+          <p class="mt-2 text-small text-granite">
+            Census Bureau survey estimates for {people.acsYear - 4} to {people.acsYear}, counted within this
+            district's {CURRENT_MAP} lines. Each figure is give or take its margin of error (90% confidence).
+          </p>
+          <div class="mt-3 overflow-x-auto" role="region" tabindex="0" aria-labelledby="people-caption">
+            <table class="w-full max-w-[36rem] text-left tabular-nums">
+              <caption id="people-caption" class="sr-only">{seatName}: Census estimates, {people.acsYear - 4} to {people.acsYear}</caption>
+              <thead>
+                <tr class="border-b border-edge text-small">
+                  <th scope="col" class="py-2 pr-4 font-bold">Measure</th>
+                  <th scope="col" class="py-2 pr-4 text-right font-bold">Estimate</th>
+                  <th scope="col" class="py-2 text-right font-bold">Give or take</th>
+                </tr>
+              </thead>
+              <tbody>
+                {peopleRows.map((r) => (
+                  <tr class="border-b border-rule">
+                    <th scope="row" class="py-2 pr-4 font-normal">{r.label}</th>
+                    <td class="py-2 pr-4 text-right">{r.value}</td>
+                    <td class="py-2 text-right text-granite">{r.moe}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-3 text-fine text-granite">
+            Source: U.S. Census Bureau,{" "}
+            <a href={`https://api.census.gov/data/${people.acsYear}/acs/acs5/profile.html`} class="underline">{people.acsYear - 4}–{people.acsYear} American Community Survey 5-year Data Profiles</a>,
+            {" "}tabulated by the Census Bureau to the {CURRENT_MAP} state legislative districts
+            (<a href={`https://www.census.gov/programs-surveys/acs/technical-documentation/table-and-geography-changes/${people.acsYear}/geography-changes.html`} class="underline">geography notes</a>).
+            This product uses the Census Bureau Data API but is not endorsed or certified by the Census Bureau.
           </p>
         </section>
       )}
