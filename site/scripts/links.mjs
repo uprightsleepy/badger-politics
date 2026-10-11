@@ -39,6 +39,10 @@ for await (const file of htmlFiles(DIST)) {
     failures++;
     console.log(`WITHHELD lobbying records found on ${page}`);
   }
+  // share images are absolute URLs to this site; each must have been rendered
+  for (const m of html.matchAll(/<meta (?:property|name)="(?:og|twitter):image" content="https:\/\/badgerpolitics\.org(\/[^"]+)"/g)) {
+    if (!internal.has(m[1])) internal.set(flat(m[1]), page);
+  }
   for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
     const url = m[1];
     if (url.startsWith("mailto:") || url.startsWith("data:") || url.startsWith("//")) continue;

@@ -10,8 +10,10 @@ import { fmtDate } from "../lib/format";
 interface Props {
   title: string;
   description?: string;
-  /** Share-card image; pages may override the sitewide card. */
+  /** Share-card image and its alt text; pages may override the sitewide
+   * card (lib/share). */
   image?: string;
+  imageAlt?: string;
   /** Index this page's main content for search. Off for roll-call pages,
    * which are name lists whose substance lives on the bill and member
    * pages already. */
@@ -36,6 +38,7 @@ const {
   title,
   description = "Free, independent tracking of the Wisconsin Legislature. Every bill, every vote, and where each one stands, in plain words.",
   image = "/og.png",
+  imageAlt = "Badger Politics: Wisconsin's Legislature, in plain words.",
   searchable = true,
   noindex = false,
   breadcrumbs,
@@ -137,13 +140,14 @@ const mainClass =
     <meta property="og:image" content={imageUrl} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Badger Politics: Wisconsin's Legislature, in plain words." />
+    <meta property="og:image:alt" content={imageAlt} />
     <meta property="og:locale" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={imageUrl} />
+    <meta name="twitter:image:alt" content={imageAlt} />
   </head>
   <body class="min-h-screen bg-limestone text-spruce antialiased">
     <a

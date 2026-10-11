@@ -27,6 +27,7 @@ import type { TermId } from "../../../lib/glossary";
 import JsonLd from "../../../components/JsonLd.astro";
 import { linkifyAction } from "../../../lib/actionLinks";
 import { LEGISCAN_LICENSE_URL, isLegiscan, legiscanBillUrl } from "../../../lib/legiscan";
+import { billCard } from "../../../lib/share";
 
 export function getStaticPaths() {
   return builtSessions().flatMap((session) =>
@@ -191,11 +192,14 @@ const pulledOn = meta().imported_at?.slice(0, 10);
 const fromLegiscan = isLegiscan(bill);
 const legiscanUrl = legiscanBillUrl(bill.session_id, bill.identifier);
 const record = fromLegiscan ? "LegiScan's copy of the record" : "the official record";
+const share = billCard(bill, sessionName);
 ---
 
 <Base
   title={seoTitle}
   description={seoDescription}
+  image={share?.image}
+  imageAlt={share?.alt}
   layout="wide"
   filters={{
     type: isBill ? "Bill" : "Resolution",

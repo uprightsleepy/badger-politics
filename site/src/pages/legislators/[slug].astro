@@ -25,6 +25,7 @@ import {
   meta,
 } from "../../lib/db";
 import { legislatorProfile } from "../../lib/legislator";
+import { personCard } from "../../lib/share";
 import { seatOffice, ELECTION_CYCLE } from "../../lib/ballot";
 import { chamberTypical, repSummary } from "../../lib/repSummary";
 import { answers } from "../../lib/repAnswers";
@@ -131,6 +132,7 @@ const terms: TermId[] = [
   "roll-call",
 ];
 const portraitAlt = `Portrait of ${person.name}`;
+const share = personCard(person);
 // "$171" and "$85.50": cents only when there are some
 const dollars = (n: number) => `$${Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2)}`;
 // numbers only, so the sentence can carry figure markup safely
@@ -147,6 +149,8 @@ const ledSentence =
 
 <Base
   title={`${person.name}${person.district != null ? `, ${roleAbbr(person.chamber)} ${person.district}` : ""}`}
+  image={share?.image}
+  imageAlt={share?.alt}
   layout="wide"
   filters={{
     type: "Legislator",

@@ -47,7 +47,10 @@ constituents as a side effect of committing.
    large as the bill count, the landing pages present, and the independence
    disclaimer on the homepage. It derives its expectations from the data,
    so it never needs updating when the counts change.
-3. **Site verification** — `links`, `responsive`, `a11y`, `verify`.
+3. **Site verification** — `links`, `responsive`, `a11y`, `verify`. `links`
+   also fails a page whose share image (`og:image`) was not rendered: the
+   build lists per-page cards in `/og/cards.json` and
+   `scripts/share-cards.mjs` renders them in Chrome before Pagefind runs.
 4. **Post-release smoke test** — hits the released target's public URL,
    asserts 200s on pages, a feed and an API file, and checks that HTML is
    still served with `must-revalidate`. A page cached for an hour once hid

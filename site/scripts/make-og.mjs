@@ -4,24 +4,11 @@
  * Renders with the same headless browser the harness uses, so the card is
  * set in the site's own self-hosted fonts (Overpass and Atkinson
  * Hyperlegible Next) and reuses the real mark. See docs/brand.md. */
-import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { cardPage, cardTab, mark, shoot } from "./lib/og.mjs";
 import { launchBrowser } from "./lib/serve.mjs";
 
-// fonts inline as data: URLs, so the page needs no file or network access
-const font = async (pkg, file) =>
-  "data:font/woff2;base64," +
-  (await readFile(fileURLToPath(new URL(`../node_modules/@fontsource-variable/${pkg}/files/${file}`, import.meta.url)))).toString("base64");
-const overpass = await font("overpass", "overpass-latin-wght-normal.woff2");
-const atkinson = await font("atkinson-hyperlegible-next", "atkinson-hyperlegible-next-latin-wght-normal.woff2");
-const mark = await readFile(fileURLToPath(new URL("../public/mark.svg", import.meta.url)), "utf-8");
-
-const html = `<!doctype html><meta charset="utf-8"><style>
-@font-face { font-family: Overpass; src: url(${overpass}); font-weight: 100 900; }
-@font-face { font-family: Atkinson; src: url(${atkinson}); font-weight: 200 800; }
-html, body { margin: 0; }
-body { width: 1200px; height: 630px; background: #F4F6F2; color: #18241F; font-family: Atkinson, sans-serif; position: relative; overflow: hidden; }
-.mark { position: absolute; left: 96px; top: 118px; width: 300px; }
+const html = await cardPage(`.mark { position: absolute; left: 96px; top: 118px; width: 300px; }
 .mark svg { width: 100%; height: auto; display: block; }
 .copy { position: absolute; left: 470px; top: 150px; right: 80px; }
 h1 { font: 800 84px/1 Overpass, sans-serif; margin: 0; letter-spacing: -0.01em; }
@@ -35,7 +22,7 @@ h1 { font: 800 84px/1 Overpass, sans-serif; margin: 0; letter-spacing: -0.01em; 
 .dot { position: absolute; top: 6px; width: 18px; height: 18px; border-radius: 50%; box-sizing: border-box; background: #fff; border: 4px solid #848E88; }
 .dot.past { background: #0D5C63; border-color: #0D5C63; }
 .dot.here { top: -1px; width: 32px; height: 32px; margin-left: -7px; background: #F2C34F; border: 4px solid #18241F; }
-</style>
+`, `
 <div class="mark">${mark}</div>
 <div class="copy">
   <h1>Badger Politics</h1>
@@ -46,16 +33,12 @@ h1 { font: 800 84px/1 Overpass, sans-serif; margin: 0; letter-spacing: -0.01em; 
 <div class="route" aria-hidden="true">
   <div class="road done"></div><div class="road ahead"></div>
   ${[0, 20, 40, 60, 80, 100].map((x, i) => `<span class="dot ${i < 2 ? "past" : i === 2 ? "here" : ""}" style="left: calc(${x}% - ${x / 100 * 18}px)"></span>`).join("")}
-</div>`;
+</div>`);
 
 const browser = await launchBrowser();
 try {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1200, height: 630, deviceScaleFactor: 1 });
-  await page.setContent(html, { waitUntil: "load" });
-  await page.evaluate(() => document.fonts.ready);
-  const out = fileURLToPath(new URL("../public/og.png", import.meta.url));
-  await page.screenshot({ path: out, clip: { x: 0, y: 0, width: 1200, height: 630 } });
+  const page = await cardTab(browser, html);
+  await shoot(page, fileURLToPath(new URL("../public/og.png", import.meta.url)));
   console.log("og.png 1200x630");
 } finally {
   await browser.close();
