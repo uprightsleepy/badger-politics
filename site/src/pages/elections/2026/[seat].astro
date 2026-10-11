@@ -18,21 +18,20 @@ import Portrait from "../../../components/Portrait.astro";
 import ElectionResult from "../../../components/ElectionResult.astro";
 import SeatMapFigure from "../../../components/SeatMapFigure.astro";
 import {
-  sittingPeople, electionFor, electionHistoryFor, lastMarginFor, personIdByName, ballotPhase,
+  races2026, electionFor, electionHistoryFor, lastMarginFor, personIdByName, ballotPhase,
   writeInPending, meta,
 } from "../../../lib/db";
 import { chamberName, fmtDate, partyWord, personSlug } from "../../../lib/format";
 import { ballotStatus, raceSentenceHtml, seatOffice, writeInSentence } from "../../../lib/ballot";
+import { raceCard } from "../../../lib/share";
 
 export function getStaticPaths() {
-  return sittingPeople()
-    .filter((p) => electionFor(p.id)?.cycle_year === 2026 && p.district != null)
-    .map((p) => ({
-      params: {
-        seat: `${p.chamber === "upper" ? "senate" : "assembly"}-${p.district}`,
-      },
-      props: { person: p },
-    }));
+  return races2026().map((p) => ({
+    params: {
+      seat: `${p.chamber === "upper" ? "senate" : "assembly"}-${p.district}`,
+    },
+    props: { person: p },
+  }));
 }
 
 const { person } = Astro.props;
@@ -41,6 +40,7 @@ const seatKey = `${person.chamber === "upper" ? "senate" : "assembly"}-${person.
 const seatName = `${chamberName(person.chamber)} District ${person.district}`;
 const history = electionHistoryFor(person.chamber, person.district);
 const margin = lastMarginFor(person.chamber, person.district);
+const share = raceCard(person);
 
 const approved = election.opponents.filter((o) => o.ballot_status === "Approve");
 const pending = election.opponents.length - approved.length;
@@ -95,6 +95,8 @@ const howOn = (party: string | null) =>
 <Base
   title={`${seatName} election, 2026`}
   description={description}
+  image={share.image}
+  imageAlt={share.alt}
   breadcrumbs={[
     { name: "Elections", url: "/elections/2026/" },
     { name: "2026", url: "/elections/2026/" },

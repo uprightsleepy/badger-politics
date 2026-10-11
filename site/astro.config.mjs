@@ -46,6 +46,8 @@ export default defineConfig({
         !/\/votes\//.test(page) &&
         !/\/legislators\/[^/]+\/(votes|bills)\//.test(page) &&
         !/\/local\/[^/]+\/[^/]+\/votes\//.test(page) &&
+        // embed cards are framed by other sites; the full page is canonical
+        !page.includes("/embed/") &&
         // money period fragments are fetched by the page, never visited
         !/\/legislators\/[^/]+\/money\/[^/]+\/$/.test(page) &&
         !/\/money\/(?:committees\/)?views\/[^/]+\/$/.test(page),

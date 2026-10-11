@@ -415,6 +415,11 @@ export const electionFor = memoBy((personId: string) => {
   };
 });
 
+/** Sitting members whose seats are on the 2026 ballot: one race page each. */
+export const races2026 = once((): Person[] =>
+  sittingPeople().filter((p) => electionFor(p.id)?.cycle_year === 2026 && p.district != null),
+);
+
 /** Where a session's never-heard bills died: one group per committee,
  * chamber and chair at death, so same-named committees in the two
  * chambers, and a committee that changed chairs, stay apart. Counts bills

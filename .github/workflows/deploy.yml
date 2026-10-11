@@ -157,6 +157,13 @@ jobs:
           PUBLIC_PLACES_KEY: ${{ vars.PUBLIC_PLACES_KEY }}
         run: bash ../.github/scripts/timed.sh astro npm run build:astro
 
+      # Pages already link these images; links.mjs fails any that are missing.
+      - name: Render the share cards
+        working-directory: site
+        env:
+          BROWSER_PATH: /usr/bin/google-chrome
+        run: bash ../.github/scripts/timed.sh share-cards npm run build:cards
+
       - name: Build the complete search index
         working-directory: site
         run: bash ../.github/scripts/timed.sh pagefind npm run build:search
@@ -313,6 +320,7 @@ jobs:
             ${{ runner.temp }}/badger-ci/*.time
             ${{ runner.temp }}/badger-ci/data-products.log
             ${{ runner.temp }}/badger-ci/astro.log
+            ${{ runner.temp }}/badger-ci/share-cards.log
             ${{ runner.temp }}/badger-ci/pagefind.log
             ${{ runner.temp }}/badger-ci/preflight.log
             ${{ runner.temp }}/badger-ci/links.log
