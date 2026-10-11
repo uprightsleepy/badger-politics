@@ -112,17 +112,20 @@ export const districtForAddress = async (
   return { district, lng: match.coordinates.x, lat: match.coordinates.y };
 };
 
+/** What the lookups say when the boundary or roster files fail to load
+ * (both lookups reject in that case rather than return an error). */
+export const LOOKUP_LOAD_ERROR = "Couldn't load district data. Try again in a minute.";
+
 /** The browser's location -> district, in the same shape as an address. */
 export const districtForBrowser = (): Promise<
   { district: District; lng: number; lat: number } | { error: string }
 > =>
-  new Promise((resolve) => {
+  new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
-      async ({ coords: { longitude: lng, latitude: lat } }) => {
-        const district = await districtAt(lng, lat);
-        resolve(district
+      ({ coords: { longitude: lng, latitude: lat } }) => {
+        districtAt(lng, lat).then((district) => resolve(district
           ? { district, lng, lat }
-          : { error: "That location doesn't fall inside a Wisconsin legislative district." });
+          : { error: "That location doesn't fall inside a Wisconsin legislative district." }), reject);
       },
       () => resolve({ error: "Location unavailable or denied." }),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
