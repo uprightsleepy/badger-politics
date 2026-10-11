@@ -13,6 +13,8 @@ Layout (all CDN-served static files):
   /api/v1/elections/statewide.json       statewide races + certified results
   /api/v1/elections/us-house.json        U.S. House candidates on the ballot
   /api/v1/elections/seats/{seat}.json    assembly-15 / senate-5: holder, race, results
+  /api/v1/elections/judicial.json        Supreme Court + Court of Appeals results
+  /api/v1/elections/referenda.json       statewide referendum results
   /api/v1/committees/index.json          every committee + chair
   /api/v1/committees/{slug}.json         members + upcoming and past hearings
   /api/v1/hearings.json                  every hearing on record
@@ -256,11 +258,14 @@ def _person_ref(person_id: str | None, **fields) -> dict:
 
 def _build_elections(conn: sqlite3.Connection, api: Path) -> int:
     write_json(api / "elections" / "us-house.json", {"races": queries.congressional_races(conn)})
+    write_json(api / "elections" / "judicial.json", {"races": queries.judicial_history(conn)})
+    write_json(api / "elections" / "referenda.json",
+               {"questions": queries.referendum_history(conn)})
     results: dict[tuple[str, int], dict[int, dict]] = {}
     for r in queries.election_history(conn):
         years = results.setdefault((r["chamber"], r["district"]), {})
-        contest = years.setdefault(r["year"], {"year": r["year"], "total_cast": r["total_cast"],
-                                               "candidates": []})
+        contest = years.setdefault(r["year"], {"year": r["year"], "maps": r["maps"],
+                                               "total_cast": r["total_cast"], "candidates": []})
         contest["candidates"].append({k: r[k] for k in ("candidate", "party", "votes")})
     holders = {(p["chamber"], p["district"]): p for p in queries.sitting_legislators(conn)}
     seats = [("lower", d) for d in range(1, 100)] + [("upper", d) for d in range(1, 34)]
@@ -273,7 +278,7 @@ def _build_elections(conn: sqlite3.Connection, api: Path) -> int:
             "election": holder and queries.election_for(conn, holder["id"]),
             "results": list(results.get((chamber, district), {}).values()),
         })
-    return 1 + len(seats)
+    return 3 + len(seats)
 
 
 def _build_committees(conn: sqlite3.Connection, api: Path, hearings: list[dict]) -> int:

@@ -64,7 +64,8 @@ python -m importer.wec_pdf _data/wec/ballot-access.pdf _data/wec/candidates-${CY
 python -m importer.elections ../data/wi.sqlite --cycle "$CYCLE"
 python -m importer.import_wec _data/wec/candidates-${CYCLE}.csv ../data/wi.sqlite   --cycle "$CYCLE" --primary "_data/wec/primary-${CYCLE}.xlsx"
 
-# Existing pinned canvass files remain available offline.
+# certified canvasses (general, spring, referendum), pinned and fetched once
+python -m scraper.fetch_wec_results
 python -m importer.import_wec_results _data/wec-results ../data/wi.sqlite
 
 python -m scraper.fetch_cfis map ../data/wi.sqlite

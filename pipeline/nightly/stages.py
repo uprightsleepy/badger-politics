@@ -3,9 +3,9 @@
 from pathlib import Path
 
 # Bundle one directory at a time: jobs only download the inputs they use.
-STATIC = ("sessions", "wec-results", "lobbying", "wiseye", "rosters", "districts", "ftm", "legacy")
+STATIC = ("sessions", "lobbying", "wiseye", "rosters", "districts", "ftm", "legacy")
 DYNAMIC = ("wi", "people", "cfis", "subjects", "contacts", "federal", "local",
-           "wec", "lrb_cache", "companions_cache", "scraper_cache")
+           "wec", "wec-results", "lrb_cache", "companions_cache", "scraper_cache")
 SOURCES = STATIC + DYNAMIC
 STAGES = ("legislature", "finance", "finance-receipts", "finance-audit", "finance-committees",
           "community", "federal", "import", "enrich")
@@ -30,7 +30,7 @@ WRITES = {
     "finance-committees": ("cfis",),
     "community": ("subjects", "contacts", "local"),
     "federal": ("federal",),
-    "import": ("wec", "database"),
+    "import": ("wec", "wec-results", "database"),
     "enrich": ("lrb_cache", "companions_cache", "database"),
 }
 
@@ -67,6 +67,7 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
                    ["importer.elections", db, "--cycle", cycle],
                    ["importer.import_wec", f"_data/wec/candidates-{cycle}.csv",
                     db, "--cycle", cycle, "--primary", f"_data/wec/primary-{cycle}.xlsx"],
+                   ["scraper.fetch_wec_results"],
                    ["importer.import_wec_results", "_data/wec-results", db],
                    ["importer.import_cfis", "_data/cfis", db],
                    ["importer.import_cf_committees", "_data/cfis", db],

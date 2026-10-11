@@ -94,8 +94,12 @@ class SourceAccess:
         # Decode paths before matching so encoded slashes/dot segments cannot
         # turn a reviewed URL into an unreviewed endpoint on the server.
         path = unquote(parts.path)
+        # A host may store a literal "%20" in file names (elections.wi.gov's
+        # legacy files); only the reviewed escapes survive the single decode.
+        literal = policy.get("literal_escapes", [])
         if (any(segment in (".", "..") for segment in path.split("/"))
-                or "\\" in path or re.search(r"%[0-9a-fA-F]{2}", path)):
+                or "\\" in path
+                or any(e not in literal for e in re.findall(r"%[0-9a-fA-F]{2}", path))):
             raise SourceAccessError(f"Noncanonical collection path on {host}")
         patterns = policy["paths"].get(method.upper(), [])
         if not any(re.fullmatch(pattern, path) for pattern in patterns):
