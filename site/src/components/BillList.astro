@@ -31,7 +31,7 @@ const { bills, class: extra = "" } = Astro.props;
         class="bill-row"
         data-bill-row
         data-status={b.status}
-        data-text={`${b.identifier} ${b.title ?? ""}`.toLowerCase()}
+        data-text={`${b.identifier} ${billSlug(b.identifier)} ${b.title ?? ""}`.toLowerCase()}
       >
         <a href={`/bills/${b.session_id}/${billSlug(b.identifier)}/`} class="bill-link">
           <span class="bill-id">{b.identifier}</span>
