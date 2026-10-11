@@ -51,23 +51,29 @@ const people = (list: { name: string; party: string | null }[]) => {
   return `${each.slice(0, -1).join("; ")}; and ${each.at(-1)}`;
 };
 
-/** One value against the middle half of the chamber. The sentence beside
- * it states the same facts, so the bar is hidden from assistive tech. */
-const rangeBar = (o: {
-  value: number; min: number; max: number; typical: Typical; left: string; right: string;
-}) => {
+/** One value against the middle half of the chamber, with the value
+ * itself under the marker. No end labels: the band and the note under it
+ * give the comparison. The sentence beside it states the same facts, so
+ * the bar is hidden from assistive tech. */
+const rangeBar = (o: { value: number; min: number; max: number; typical: Typical }) => {
   const span = Math.max(o.max - o.min, 1);
   const pos = (n: number) => Math.min(100, Math.max(0, ((n - o.min) / span) * 100));
   // a band too narrow to see still shows, inside the track at either end
   const width = Math.max(pos(o.typical.high) - pos(o.typical.low), 2);
   const lo = Math.min(pos(o.typical.low), 100 - width);
+  const at = pos(o.value);
+  // never "100%" for someone who missed one; never past the track's ends
+  const label = o.value < 100 ? `${Math.min(99, round(o.value))}%` : "100%";
+  const shift = at > 88 ? "-100%" : at < 12 ? "0%" : "-50%";
   return (
     '<div class="range mt-1" aria-hidden="true">' +
     '<div class="relative mx-2.5 h-2.5 rounded-full bg-fog">' +
     `<span class="absolute inset-y-0 rounded-full bg-lake-tint" style="left:${lo.toFixed(1)}%;width:${width.toFixed(1)}%"></span>` +
-    `<span class="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-spruce" style="left:${pos(o.value).toFixed(1)}%"></span>` +
+    `<span class="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-spruce" style="left:${at.toFixed(1)}%"></span>` +
     '</div>' +
-    `<div class="mt-1.5 flex justify-between text-fine text-granite"><span>${esc(o.left)}</span><span>${esc(o.right)}</span></div>` +
+    '<div class="relative mx-2.5 mt-2 h-5">' +
+    `<span class="absolute whitespace-nowrap text-small font-bold text-spruce" style="left:${at.toFixed(1)}%;transform:translateX(${shift})">${esc(label)}</span>` +
+    '</div>' +
     '</div>'
   );
 };
@@ -93,9 +99,8 @@ export function answers(full: RepSummary, ctx: AnswerContext): Answer[] {
     const nv = t?.notVoting;
     if (nv) {
       // the bar reads the way the sentence does: the share they voted on,
-      // more to the right, with "100%" at the right end. Its left end is the
-      // chamber's lowest share (at least 5 points down), named as a number,
-      // never as anyone's result.
+      // more to the right, the share itself under the marker. The track
+      // starts at the chamber's lowest share (at least 5 points down).
       const share = (v.cast / v.total) * 100;
       const typical = { ...nv, low: 100 - nv.high, high: 100 - nv.low, max: 100 };
       const pct = (n: number) => (n < 100 && round(n) === 100 ? "over 99%" : `${round(n)}%`);
@@ -103,7 +108,7 @@ export function answers(full: RepSummary, ctx: AnswerContext): Answer[] {
         ? `The middle half of ${members} voted on every one, or nearly.`
         : `The middle half of ${members} voted on ${pct(typical.low)} to ${pct(typical.high)} of them.`;
       const floor = Math.min(95, Math.floor(Math.min(100 - nv.max, share)));
-      html += rangeBar({ value: share, min: floor, max: 100, typical, left: `${floor}%`, right: "100%" }) +
+      html += rangeBar({ value: share, min: floor, max: 100, typical }) +
         fine(`${esc(words)} Not voting counts being away and choosing not to vote alike.`);
     }
     out.push({ id: "voting", q: "How often do they vote?", html });
@@ -120,7 +125,7 @@ export function answers(full: RepSummary, ctx: AnswerContext): Answer[] {
       html = `<p>Voted with most ${esc(partyPlural(full.party))} on ${fig(`${pct}%`)} of ${fig(l.n.toLocaleString())} votes in the ${esc(l.label)}.</p>`;
       const lt = t?.loyalty;
       if (lt && lt.session === l.session) {
-        html += rangeBar({ value: l.pct, min: 50, max: 100, typical: lt, left: "50%", right: "100%" }) +
+        html += rangeBar({ value: l.pct, min: 50, max: 100, typical: lt }) +
           fine(esc(`The middle half of ${members} voted with their party ${round(lt.low)}% to ${round(lt.high)}% of the time.`));
       }
     } else {
