@@ -9,6 +9,7 @@ import pytest
 from importer.committees import Committee, CommitteeIndex
 from importer.import_openstates import (
     TITLE_VOTERS,
+    Importer,
     biennium,
     bill_key,
     committee_from_referral,
@@ -213,6 +214,26 @@ def test_hearing_times_convert_utc_to_central() -> None:
     # a UTC time past midnight lands on the previous Central day
     assert to_local("2025-06-04T02:30:00+00:00") == ("2025-06-03", "21:30")
     assert to_local("") == (None, None)
+
+
+def test_hearing_ids_survive_a_rescrape(make_db) -> None:
+    def scraped(uuid: str) -> dict:
+        # every scrape stamps a fresh uuid _id on the same hearing
+        return {"_id": uuid, "name": "Children and Families (Assembly)",
+                "start_date": "2025-06-03T15:00:00+00:00",
+                "location": {"name": "417 North, 2 E Main St, Madison, WI 53703"}}
+
+    ids = []
+    for uuid in ("8c1d0f4e-0000", "1f9a77b2-1111"):
+        conn = make_db(":memory:")
+        Importer(conn, {}, CommitteeIndex([]), set()).import_event(scraped(uuid))
+        ids.append(conn.execute("SELECT id FROM hearings").fetchone()[0])
+    assert ids[0] == ids[1]
+    # the same hearing twice in one import is a hard failure, never a merge
+    importer = Importer(make_db(":memory:"), {}, CommitteeIndex([]), set())
+    importer.import_event(scraped("a"))
+    with pytest.raises(RuntimeError, match="share title, location and start"):
+        importer.import_event(scraped("b"))
 
 
 def test_committee_index_is_chamber_scoped() -> None:

@@ -9,6 +9,7 @@ names abort the import. See docs/backfill.md for historical-era details.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sqlite3
@@ -254,6 +255,7 @@ class Importer:
         self.used_vote_fixes: set[tuple[str, str]] = set()
         self.bill_ids: dict[str, str] = {}  # scraper _id uuid -> our bill PK
         self.bill_pks: set[str] = set()  # every PK inserted into bills
+        self.hearing_ids: set[str] = set()
         self.warnings: list[str] = []
 
     def import_sessions(self, session_defs: dict[str, dict], seen: set[str]) -> None:
@@ -691,16 +693,25 @@ class Importer:
                         agenda_bills.append(entity["name"])
         start = event.get("start_date") or ""
         local_date, local_time = to_local(start)
+        location = (event.get("location") or {}).get("name")
+        # the scrape's _id is a fresh uuid every run; hearing ids name calendar
+        # files and feed entries, so they hash the fields the scraper itself
+        # dedupes on (title, location, start) and stay put night to night
+        key = f"{event.get('name') or ''}#{location or ''}#{start}"
+        hearing_id = hashlib.sha256(key.encode()).hexdigest()[:16]
+        if hearing_id in self.hearing_ids:
+            raise RuntimeError(f"two hearings share title, location and start: {key!r}")
+        self.hearing_ids.add(hearing_id)
         self.conn.execute(
             "INSERT INTO hearings (id, title, committee_id, date, time, location,"
             " agenda_bill_ids_json, source_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                event.get("_id") or f"{name}-{start}",
+                hearing_id,
                 name or None,
                 committee_id,
                 local_date,
                 local_time,
-                (event.get("location") or {}).get("name"),
+                location,
                 json.dumps(agenda_bills),
                 (event.get("sources") or [{}])[0].get("url"),
             ),
