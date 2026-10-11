@@ -5,7 +5,8 @@ Usage: python -m dataproducts.build <sqlite_path> <site_public_dir>
 
 Generates the JSON API tree, Atom feeds, and iCal files into the site's
 public directory (deployed with the site), and bulk CSV/SQLite exports into
-data/exports/ (published via GitHub Releases in Phase 6).
+data/exports/ (packaged by dataproducts.bulk and published to GitHub Releases
+by deploy.yml on production releases).
 """
 
 from __future__ import annotations

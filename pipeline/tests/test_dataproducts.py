@@ -72,6 +72,28 @@ def db_path(tmp_path: Path, make_db) -> Path:
                   '[{"name": "Bob Rival", "party": "Test", "ballot_status": "Approve"}]',
                   'wec');
         INSERT INTO meta (key, value) VALUES ('data_through', '2025-06-03');
+        INSERT INTO cf_committees (entity_id, name, committee_type, assigned_id)
+          VALUES (77, 'Realtors PAC', 'Political Action Committee', '0100'),
+                 (88, 'Outside Group', 'Independent Expenditure Committee', '0200');
+        INSERT INTO contributions (id, person_id, committee_entity_id, date, amount,
+                                   from_entity_id, from_name, from_type, occupation)
+          VALUES (1, 'ocd-person/p1', 500, '2025-05-01', 100, 9001,
+                  'PRIVATE INDIVIDUAL DONOR', 'Individual', 'Teacher'),
+                 (2, 'ocd-person/p1', 500, '2025-05-02', 1000, 77,
+                  'Realtors PAC', 'Registrant', NULL);
+        INSERT INTO cf_transactions (id, filer_entity_id, filer_type, direction, date,
+                                     amount, other_entity_id, other_name, other_type,
+                                     stance, related_name, related_office,
+                                     related_district, purpose, report_id, report_name)
+          VALUES (10, 77, 'Political Action Committee', 'INCOMING', '2025-04-01', 50,
+                  9002, 'PRIVATE PAC DONOR', 'Individual',
+                  NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+                 (11, 77, 'Political Action Committee', 'INCOMING', '2025-04-02', 300,
+                  66, 'Union Committee', 'Registrant',
+                  NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+                 (12, 88, 'Independent Expenditure Committee', 'OUTGOING', '2025-09-01',
+                  5000, NULL, 'Ad Vendor LLC', 'Business', 'AGAINST', 'Ann Example',
+                  'State Assembly', '15', 'TV ad', 4242, 'Fall Report');
         INSERT INTO statewide_races (office, incumbent, incumbent_noncandidacy,
                                      candidate, party, ballot_status, source)
           VALUES ('GOVERNOR', 'Tony Evers', 1, 'Sara Rodriguez', 'Democratic',
@@ -183,6 +205,47 @@ def test_lobbying_is_private_even_in_downloadable_database(built: Path, db_path:
         for path in directory.rglob("*"):
             if path.is_file():
                 assert marker not in path.read_bytes(), path
+
+
+def test_individual_donors_only_in_aggregate(built: Path, db_path: Path) -> None:
+    markers = (b"PRIVATE INDIVIDUAL DONOR", b"PRIVATE PAC DONOR", b"Teacher")
+    with sqlite3.connect(db_path) as source:
+        assert source.execute("SELECT COUNT(*) FROM contributions"
+                              " WHERE from_name IS NOT NULL").fetchone()[0] == 2
+    snapshot = built / "exports" / "wi-filtered.sqlite"
+    with sqlite3.connect(snapshot) as public:
+        # the receipts stay, so totals still add up; committees stay named
+        assert public.execute("SELECT SUM(amount) FROM contributions").fetchone()[0] == 1100
+        assert public.execute("SELECT from_name, from_entity_id FROM contributions"
+                              " WHERE id = 1").fetchone() == (None, None)
+        assert public.execute("SELECT other_name FROM cf_transactions"
+                              " WHERE id = 11").fetchone() == ("Union Committee",)
+    for directory in (built / "public", built / "exports"):
+        for path in directory.rglob("*"):
+            if path.is_file():
+                data = path.read_bytes()
+                assert not any(m in data for m in markers), path
+
+
+def test_release_package(built: Path) -> None:
+    import gzip
+    import hashlib
+    import zipfile
+
+    from dataproducts.bulk import package
+
+    release = built / "release"
+    assets = package(built / "exports", release)
+    assert [p.name for p in assets] == [
+        "badger-politics-csv.zip", "wi-filtered.sqlite.gz", "README.txt", "SHA256SUMS",
+    ]
+    names = zipfile.ZipFile(release / "badger-politics-csv.zip").namelist()
+    assert "2025/bills.csv" in names and "people.csv" in names
+    assert gzip.decompress((release / "wi-filtered.sqlite.gz").read_bytes()) == (
+        built / "exports" / "wi-filtered.sqlite").read_bytes()
+    for line in (release / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
+        digest, name = line.split("  ")
+        assert hashlib.sha256((release / name).read_bytes()).hexdigest() == digest
 
 
 def test_feeds_are_valid_atom(built: Path) -> None:

@@ -1,18 +1,27 @@
 """Bulk exports: per-session CSVs + a provenance-filtered SQLite snapshot.
 
 Written to data/exports/ (NOT the site tree — large files publish to GitHub
-Releases in Phase 6 so the site origin never serves them; plan §11).
+Releases so the site origin never serves them; plan §11). `package` turns
+them into the release assets deploy.yml publishes:
+
+  python -m dataproducts.bulk <exports_dir> <release_dir>
 
 The SQLite snapshot is a copy with LegiScan rows and all Eye on Lobbying
-registrations deleted and VACUUMed out. Private archived records must not be
-recoverable from the downloadable file's free pages.
+registrations deleted, individual donors' identities cleared, and VACUUMed.
+Private archived records must not be recoverable from the downloadable
+file's free pages.
 """
 
 from __future__ import annotations
 
+import argparse
 import csv
+import gzip
+import hashlib
 import shutil
 import sqlite3
+import sys
+import zipfile
 from pathlib import Path
 
 from dataproducts import queries
@@ -99,12 +108,27 @@ def export_sqlite(db_path: Path, exports_dir: Path) -> Path:
         )
         conn.execute("DELETE FROM bills WHERE source = 'legiscan'")
         conn.execute("DELETE FROM elections WHERE source = 'legiscan'")
+        # Individual donors appear only in aggregate (README mandate 5): the
+        # receipt stays so totals still add up; who gave it does not.
+        conn.execute(
+            "UPDATE contributions SET from_name = NULL, from_entity_id = NULL,"
+            f" occupation = NULL WHERE NOT {queries.named_donor('from_type')}"
+        )
+        for table in ("cf_transactions", "state_campaign_transactions"):
+            conn.execute(
+                f"UPDATE {table} SET other_name = NULL, other_entity_id = NULL"  # noqa: S608
+                f" WHERE NOT {queries.named_donor('other_type')}"
+            )
     conn.execute("VACUUM")
     remaining = conn.execute(
         "SELECT (SELECT COUNT(*) FROM bills WHERE source='legiscan')"
         " + (SELECT COUNT(*) FROM vote_events WHERE source='legiscan')"
         " + (SELECT COUNT(*) FROM elections WHERE source='legiscan')"
         " + (SELECT COUNT(*) FROM lobbying_interests)"
+        " + (SELECT COUNT(*) FROM contributions WHERE from_name IS NOT NULL"
+        f" AND NOT {queries.named_donor('from_type')})"
+        " + (SELECT COUNT(*) FROM cf_transactions WHERE other_name IS NOT NULL"
+        f" AND NOT {queries.named_donor('other_type')})"
     ).fetchone()[0]
     # scoped to what the deletes above touch, so an unrelated pre-existing
     # orphan elsewhere can't fail the export
@@ -125,3 +149,73 @@ def build_bulk(conn: sqlite3.Connection, db_path: Path, exports_dir: Path) -> in
     files = export_csvs(conn, exports_dir)
     export_sqlite(db_path, exports_dir)
     return files + 1
+
+
+RELEASE_README = """\
+Badger Politics bulk downloads
+==============================
+
+badger-politics-csv.zip  one folder per legislative session (bills, actions,
+                         sponsorships, vote_events, vote_records) and people.csv
+wi-filtered.sqlite.gz    the site's whole SQLite database, filtered as below;
+                         its tables are described in pipeline/importer/schema.sql
+SHA256SUMS               checksums: sha256sum --check SHA256SUMS
+
+The newest files are always at the same address:
+  https://github.com/uprightsleepy/badger-politics/releases/latest/download/<file>
+
+Left out: rows that came from LegiScan, and every Eye on Lobbying
+registration. Individual campaign donors appear only in aggregate: their
+receipts keep the amount, date and recipient, but no name, occupation or
+filer id.
+
+The records are Wisconsin public records (the Legislature, the Elections
+Commission, the Ethics Commission's campaign finance system, city clerks) and
+U.S. government works (Senate and House roll calls), each row linked to or
+traceable to its official source. Check a figure against that source before
+relying on it. The code that builds these files is Apache-2.0:
+https://github.com/uprightsleepy/badger-politics
+
+Badger Politics is an independent project, not affiliated with the State of
+Wisconsin.
+"""
+
+# GitHub refuses release assets of 2 GiB or more
+RELEASE_ASSET_LIMIT = 2 * 1024**3
+
+
+def package(exports_dir: Path, release_dir: Path) -> list[Path]:
+    """Release assets from build_bulk's output, plus their SHA256SUMS."""
+    release_dir.mkdir(parents=True, exist_ok=True)
+    csv_zip = release_dir / "badger-politics-csv.zip"
+    with zipfile.ZipFile(csv_zip, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted(exports_dir.rglob("*.csv")):
+            zf.write(path, path.relative_to(exports_dir).as_posix())
+    sqlite_gz = release_dir / "wi-filtered.sqlite.gz"
+    with (exports_dir / "wi-filtered.sqlite").open("rb") as src, sqlite_gz.open("wb") as raw:
+        with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as dst:
+            shutil.copyfileobj(src, dst, 1 << 20)
+    readme = release_dir / "README.txt"
+    readme.write_text(RELEASE_README, encoding="utf-8")
+    sums = []
+    for path in (csv_zip, sqlite_gz, readme):
+        if path.stat().st_size >= RELEASE_ASSET_LIMIT:
+            raise RuntimeError(f"{path.name} is too large for a GitHub release asset")
+        with path.open("rb") as fh:
+            sums.append(f"{hashlib.file_digest(fh, 'sha256').hexdigest()}  {path.name}\n")
+    (release_dir / "SHA256SUMS").write_text("".join(sums), encoding="utf-8")
+    return [csv_zip, sqlite_gz, readme, release_dir / "SHA256SUMS"]
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Package bulk exports as release assets.")
+    parser.add_argument("exports_dir", type=Path)
+    parser.add_argument("release_dir", type=Path)
+    ns = parser.parse_args(argv)
+    for path in package(ns.exports_dir, ns.release_dir):
+        print(f"{path.name}: {path.stat().st_size:,} bytes")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

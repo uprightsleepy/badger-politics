@@ -124,6 +124,28 @@ def test_automatic_release_boundaries_cannot_be_weakened(mutation):
     assert validate(workflow, "deploy.yml")
 
 
+@pytest.mark.parametrize("mutation", [
+    None, "dev", "no_needs", "checkout", "oidc", "environment", "deploy_writes",
+])
+def test_only_the_publishing_job_may_write_contents(mutation):
+    workflow = deploy_workflow()
+    publish = workflow["jobs"]["publish-downloads"]
+    if mutation == "dev":
+        publish["if"] = "always()"
+    elif mutation == "no_needs":
+        publish.pop("needs")
+    elif mutation == "checkout":
+        publish["steps"].insert(0, {"uses": "actions/checkout@" + "a" * 40})
+    elif mutation == "oidc":
+        publish["permissions"]["id-token"] = "write"
+    elif mutation == "environment":
+        publish["environment"] = "badgerpolitics-prod"
+    elif mutation == "deploy_writes":
+        workflow["jobs"]["deploy"]["permissions"]["contents"] = "write"
+    errors = validate(workflow, "deploy.yml")
+    assert (errors == []) is (mutation is None), errors
+
+
 @pytest.mark.parametrize("change", [None, "stale", "missing"])
 def test_live_metadata_must_match_the_built_snapshot(tmp_path, monkeypatch, change):
     import json

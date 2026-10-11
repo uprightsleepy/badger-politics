@@ -66,6 +66,19 @@ Validate layout changes in Linux Chrome before merging. The deployment runner's
 system font can be wider than Windows fonts, so a Windows-only responsive pass
 does not establish that the release check will pass.
 
+## Bulk downloads
+
+A production release also publishes the bulk CSVs and the filtered SQLite
+database (`pipeline/dataproducts/bulk.py`) as a GitHub Release, because the
+Hosting origin must never serve large files. The credentialed `deploy` job
+packages them (`python -m dataproducts.bulk`) after the live checks pass and
+hands them over as a one-day artifact; the separate `publish-downloads` job,
+the only job anywhere allowed `contents: write` (`check_workflows.py`
+enforces it), verifies `SHA256SUMS`, creates a `data-<UTC timestamp>` release
+marked latest, and deletes all but the three newest data releases. It holds no
+cloud credentials and checks out no code. Dev releases publish nothing, so
+`releases/latest/download/<file>` always matches badgerpolitics.org.
+
 ## Credentials
 
 There is no service-account key anywhere. GitHub Actions federates into

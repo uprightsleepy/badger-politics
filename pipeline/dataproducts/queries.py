@@ -22,6 +22,13 @@ def exportable(alias: str = "") -> str:
 EXPORTABLE = exportable()
 
 
+def named_donor(type_column: str) -> str:
+    """Whether a money counterparty may be named (README mandate 5:
+    individual donors appear only in aggregate). An untyped counterparty
+    could be a person, so it is treated as one."""
+    return f"COALESCE({type_column}, 'Individual') != 'Individual'"
+
+
 def connect(db_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row

@@ -213,6 +213,19 @@ committee plus a weekly digest (about 20,600), iCal calendars for every
 hearing and for election days (845), per-session CSVs, and a
 provenance-filtered SQLite snapshot. See [/data/](https://badgerpolitics.org/data/).
 
+The bulk files are published to GitHub Releases by each production deploy
+(never served from the site origin), always at the same addresses:
+
+- `https://github.com/uprightsleepy/badger-politics/releases/latest/download/badger-politics-csv.zip`
+- `https://github.com/uprightsleepy/badger-politics/releases/latest/download/wi-filtered.sqlite.gz`
+- `https://github.com/uprightsleepy/badger-politics/releases/latest/download/SHA256SUMS`
+- `https://github.com/uprightsleepy/badger-politics/releases/latest/download/README.txt`
+
+Like the API and feeds, they leave out LegiScan rows and lobbying
+registrations, and individual donors appear only in aggregate (their
+receipts keep amount, date and recipient, without name, occupation or filer
+id).
+
 ## Coverage
 
 | Data | Coverage |

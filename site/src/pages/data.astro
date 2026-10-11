@@ -1,7 +1,7 @@
 ---
-/** What the site publishes for reuse (JSON API, feeds, calendars), what
+/** What the site publishes for reuse (JSON API, feeds, calendars, bulk downloads), what
  * it leaves out, and how the records are collected and checked. The paths
- * match pipeline/dataproducts (api.py, feeds.py, ical.py). */
+ * match pipeline/dataproducts (api.py, feeds.py, ical.py, bulk.py). */
 import Base from "../layouts/Base.astro";
 import { meta, usesLegiscan } from "../lib/db";
 import { fmtDate } from "../lib/format";
@@ -26,11 +26,18 @@ const feeds: [string, string][] = [
   ["/feeds/committees/{id}.xml", "A committee's hearings."],
   ["/feeds/local/{city}/{member}.xml", "A city council member's votes."],
 ];
+const RELEASES = "https://github.com/uprightsleepy/badger-politics/releases/latest/download";
+const downloads: [string, string][] = [
+  ["badger-politics-csv.zip", "CSV files for every session: bills, their actions, sponsors, roll calls and each member's vote, plus every lawmaker."],
+  ["wi-filtered.sqlite.gz", "The site's whole database (SQLite, compressed), with what's left out below removed."],
+  ["SHA256SUMS", "Checksums for checking a download."],
+  ["README.txt", "What each file holds, and where the records come from."],
+];
 ---
 
 <Base
   title="Data and API"
-  description="Free JSON API, Atom feeds and calendars of Wisconsin legislative records, with what's left out and how the records are checked."
+  description="Free JSON API, Atom feeds, calendars and bulk downloads of Wisconsin political records, with what's left out and how the records are checked."
   layout="wide"
 >
   <header class="flex max-w-[47.5rem] flex-col gap-2.5">
@@ -86,11 +93,22 @@ const feeds: [string, string][] = [
     <section aria-labelledby="bulk-heading">
       <h2 id="bulk-heading" class="t-section">Bulk downloads</h2>
       <p class="mt-2">
-        Not published yet. Each update of the site already writes CSV files for every session (bills,
-        their actions, sponsors, roll calls and each member's vote) and a filtered copy of the database,
-        and they're planned for GitHub, beside the
-        {" "}<a href="https://github.com/uprightsleepy/badger-politics" class="underline">source code</a>.
-        Until then, the JSON API above has the bills, roll calls and lawmakers.
+        Each release of this site publishes the whole record on GitHub, beside the
+        {" "}<a href="https://github.com/uprightsleepy/badger-politics" class="underline">source code</a>. These
+        addresses always lead to the newest files:
+      </p>
+      <dl class="paths mt-3">
+        {downloads.map(([file, what]) => (
+          <div>
+            <dt><a href={`${RELEASES}/${file}`} class="underline"><code>{file}</code></a></dt>
+            <dd>{what}</dd>
+          </div>
+        ))}
+      </dl>
+      <p class="mt-2 text-small text-granite">
+        Earlier copies are on the <a href="https://github.com/uprightsleepy/badger-politics/releases" class="underline">releases page</a>.
+        Individual donors appear in the database only in totals: each of their receipts keeps its amount,
+        date and recipient, without a name, occupation or filer ID.
       </p>
     </section>
 
