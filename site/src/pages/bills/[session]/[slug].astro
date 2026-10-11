@@ -19,8 +19,10 @@ import { companionsFor,
   subjectsForBill,
   personIdByName,
   vetoMessageUrl,
+  courtChallengesFor,
   meta,
 } from "../../../lib/db";
+import CourtCase from "../../../components/CourtCase.astro";
 import {
   billSlug, clip, fmtDate, lrbParagraphs, personSlug, chamberName, sessionYear, shortTitle,
   subjectDisplay, subjectSlug, STATUS_LABELS, identifierLong, sessionPlainName, partyWord, partyPlural,
@@ -54,6 +56,7 @@ const fiscalEstimates = documentsFor(bill.id).filter((d) =>
 );
 const subjects = subjectsForBill(bill.id);
 const texts = textsFor(bill.id);
+const challenges = courtChallengesFor(bill.id);
 
 const vetoMsg = bill.status === "vetoed" || bill.status === "enacted"
   ? vetoMessageUrl(bill.id) : null;
@@ -439,6 +442,19 @@ const share = billCard(bill, sessionName);
                 )}
               </li>
             ))}
+          </ul>
+        </section>
+      )}
+
+      {challenges.length > 0 && (
+        <section class="flex max-w-[45rem] flex-col gap-2" aria-labelledby="court">
+          <h2 id="court" class="t-section scroll-mt-4">Court challenges</h2>
+          <p>
+            {challenges.length === 1 ? "A federal court case challenges" : `${challenges.length} federal court cases challenge`} this law.
+            Each opens its docket on CourtListener. <a href="/laws/court-challenges/" class="underline">How cases are chosen</a>.
+          </p>
+          <ul class="flex flex-col border-b border-rule" role="list">
+            {challenges.map((c) => <CourtCase challenge={c} />)}
           </ul>
         </section>
       )}

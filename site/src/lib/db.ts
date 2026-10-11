@@ -1531,6 +1531,35 @@ export const lawsFor = memoBy((biennium: number): Law[] => {
   return laws;
 });
 
+export interface CourtChallenge {
+  docket_id: number; bill_id: string; court: string; case_name: string;
+  docket_number: string | null; date_filed: string | null; date_terminated: string | null;
+  date_last_filing: string | null; url: string;
+  session_id: string; identifier: string; title: string | null;
+}
+
+/** Curated federal court cases challenging an act (pipeline
+ * importer/court_challenges.json), newest filing first. Older snapshots
+ * lack the table and show none. */
+const courtChallenges = once((): CourtChallenge[] =>
+  hasTable("court_challenges")
+    ? prep(
+        `SELECT c.docket_id, c.bill_id, c.court, c.case_name, c.docket_number, c.date_filed,
+           c.date_terminated, c.date_last_filing, c.url, b.session_id, b.identifier, b.title
+         FROM court_challenges c JOIN bills b ON b.id = c.bill_id
+         ORDER BY c.date_filed DESC, c.docket_id`,
+      ).all() as CourtChallenge[]
+    : []);
+
+export const courtChallengesFor = (billId: string) =>
+  courtChallenges().filter((c) => c.bill_id === billId);
+
+/** Every challenge to an act whose bill page this build has. */
+export const builtCourtChallenges = () => {
+  const built = new Set(builtSessions().map((s) => s.id));
+  return courtChallenges().filter((c) => built.has(c.session_id));
+};
+
 /** Bienniums covered by this build that produced acts, newest first. */
 export const lawBienniums = () =>
   [...new Set(builtSessions().map((s) => bienniumOf(s.id)))]

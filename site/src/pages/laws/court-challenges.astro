@@ -1,0 +1,49 @@
+---
+import Base from "../../layouts/Base.astro";
+import CourtCase from "../../components/CourtCase.astro";
+import { bienniumOf, builtCourtChallenges, lawsFor } from "../../lib/db";
+import { billSlug } from "../../lib/format";
+
+const challenges = builtCourtChallenges().map((c) => {
+  const biennium = bienniumOf(c.session_id);
+  const act = lawsFor(biennium).find((l) => l.bill_id === c.bill_id)?.act;
+  return { ...c, law: act ? `${biennium} Wisconsin Act ${act}` : c.identifier };
+});
+---
+
+<Base
+  title="Court challenges"
+  breadcrumbs={[{ name: "New laws", url: "/laws/" }]}
+  description="Federal court cases challenging Wisconsin Acts, with links to each docket on CourtListener."
+  layout="wide"
+>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <a href="/laws/" class="self-start text-small underline">New laws</a>
+    <h1 class="t-display">Court challenges</h1>
+    <p class="sm:text-lead">
+      Federal court cases that challenge a Wisconsin Act, and where each case stands.
+    </p>
+    <p class="text-small text-granite">
+      This list is not complete. It covers federal courts only: the district courts in Wisconsin, the
+      Seventh Circuit and the U.S. Supreme Court. State court cases are not listed yet. Badger Politics
+      adds a case only after checking a public source that shows it challenges the act. Court, case
+      number and dates come from <a href="https://www.courtlistener.com/" class="underline">CourtListener</a>,
+      the Free Law Project's copy of the federal court records. Filings stay on CourtListener.
+    </p>
+  </header>
+
+  {challenges.length > 0 ? (
+    <ul class="mt-8 max-w-[47.5rem] border-b border-rule" role="list">
+      {challenges.map((c) => (
+        <CourtCase challenge={c}>
+          <span>
+            Challenges <a href={`/bills/${c.session_id}/${billSlug(c.identifier)}/`} class="underline">{c.law}</a>
+            {c.title && ` (${c.title})`}
+          </span>
+        </CourtCase>
+      ))}
+    </ul>
+  ) : (
+    <p class="mt-8 max-w-[47.5rem]">No court challenges are listed yet.</p>
+  )}
+</Base>
