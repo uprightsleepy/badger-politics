@@ -191,7 +191,7 @@ jobs:
 
       - name: Release
         run: |
-          bash .github/scripts/timed.sh release npx --yes firebase-tools@14 deploy \
+          bash .github/scripts/timed.sh release site/node_modules/.bin/firebase deploy \
             --only hosting \
             --project "$TARGET" \
             --non-interactive \
@@ -255,7 +255,7 @@ jobs:
         if: failure()
         run: |
           echo "::notice::If a release went out and is bad, roll back with:"
-          echo "::notice::npx firebase-tools@14 hosting:rollback --project $TARGET"
+          echo "::notice::site/node_modules/.bin/firebase hosting:rollback --project $TARGET"
 
       - name: Summarize stage timings
         if: always()

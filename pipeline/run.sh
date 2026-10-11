@@ -108,7 +108,7 @@ python -m dataproducts.build ../data/wi.sqlite ../site/public/
 
 if [ "$SKIP_DEPLOY" -eq 0 ]; then
   # runs from the repo root: firebase.json maps hosting to site/dist
-  (cd .. && firebase deploy --only hosting --project "$FB_PROJECT" --non-interactive)
+  (cd .. && site/node_modules/.bin/firebase deploy --only hosting --project "$FB_PROJECT" --non-interactive)
 else
   echo "skipping firebase deploy (--skip-deploy)"
 fi

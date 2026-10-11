@@ -117,10 +117,11 @@ changes wait for the next snapshot.
 
 ## Rolling back
 
-Hosting keeps previous versions:
+Hosting keeps previous versions. The CLI is the locked `firebase-tools` in
+`site/` (install it with `npm ci --ignore-scripts` there first):
 
 ```bash
-npx firebase-tools@14 hosting:rollback --project badgerpolitics-prod
+site/node_modules/.bin/firebase hosting:rollback --project badgerpolitics-prod
 ```
 
 That reverts the serving version immediately. Follow it with a revert

@@ -13,7 +13,7 @@ Separate gated releases build Astro and publish Firebase Hosting. See docs/night
 - Infra: `cd infra && tofu plan` (never apply without asking)
 - Deploy dev: `cd pipeline && ./run.sh --local` (FB_PROJECT defaults to badgerpolitics-dev)
 - Deploy prod: `FB_PROJECT=badgerpolitics-prod ./run.sh` (explicit on purpose)
-- Site only: `firebase deploy --only hosting --project badgerpolitics-dev`
+- Site only: `site/node_modules/.bin/firebase deploy --only hosting --project badgerpolitics-dev`
 
 ## Deploy targets
 - `badgerpolitics-dev` -> https://badgerpolitics-dev.web.app

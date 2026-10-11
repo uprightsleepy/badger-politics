@@ -78,7 +78,7 @@ jobs:
           npm rebuild better-sqlite3
       - name: Typecheck
         working-directory: site
-        run: npx --yes astro check --minimumSeverity error
+        run: node_modules/.bin/astro check --minimumSeverity error
       - name: Harness scripts parse
         working-directory: site
         run: |

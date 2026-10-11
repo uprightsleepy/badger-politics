@@ -57,6 +57,19 @@ def test_job_permissions_and_raw_cache_are_checked() -> None:
     assert any("must not enter" in error for error in errors)
 
 
+@pytest.mark.parametrize("command", [
+    "npx --yes firebase-tools@14 deploy",
+    "npm ci && npx astro check",
+    "bash timed.sh release npx firebase deploy",
+])
+def test_npx_cannot_fetch_unlocked_packages(command) -> None:
+    workflow = deepcopy(WORKFLOW)
+    workflow["jobs"]["deploy"]["steps"].append({"run": command})
+    assert any("not npx" in error for error in validate(workflow, "deploy.yml"))
+    workflow["jobs"]["deploy"]["steps"][-1]["run"] = "site/node_modules/.bin/firebase deploy"
+    assert validate(workflow, "deploy.yml") == []
+
+
 def deploy_workflow():
     path = Path(__file__).resolve().parents[2] / ".github/workflows/deploy.yml"
     return yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
