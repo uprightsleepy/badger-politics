@@ -24,6 +24,11 @@ DEPLOY_TRIGGER = (
     "github.event.workflow_run.event == 'workflow_dispatch')))"
 )
 DEPLOY_TARGET = "${{ inputs.target || 'badgerpolitics-dev' }}"
+# The one job allowed contents: write: it publishes the bulk downloads the
+# credentialed deploy job hands it, after a successful production release,
+# and never checks out or runs repository code with that token.
+PUBLISH_JOB = "publish-downloads"
+PUBLISH_TRIGGER = "inputs.target == 'badgerpolitics-prod'"
 
 
 # UTC, the only clock Actions schedules know: 7pm and 8pm Central in summer
@@ -46,7 +51,8 @@ def validate(workflow: dict, name: str) -> list[str]:
             errors.append(f"{job_name}: permissions must be an explicit mapping")
         else:
             for scope, value in grants.items():
-                if value == "write" and scope != "id-token":
+                publishes = (name, job_name, scope) == ("deploy.yml", PUBLISH_JOB, "contents")
+                if value == "write" and scope != "id-token" and not publishes:
                     errors.append(f"{job_name}: forbidden write permission: {scope}")
             parser_call = (name == "nightly-parser.yml"
                            and job.get("uses") == "./.github/workflows/parser-stage.yml")
@@ -88,6 +94,17 @@ def validate(workflow: dict, name: str) -> list[str]:
         needs = [needs] if isinstance(needs, str) else needs
         if "validate" not in needs:
             errors.append("deploy must depend on validation of its revision")
+        publish = jobs.get(PUBLISH_JOB)
+        if publish is not None and (
+            publish.get("needs") != "deploy"
+            or publish.get("if") != PUBLISH_TRIGGER
+            or publish.get("permissions") != {"contents": "write"}
+            or "environment" in publish
+            or any(step.get("uses", "").startswith("actions/checkout")
+                   for step in publish.get("steps", []))
+        ):
+            errors.append(f"{PUBLISH_JOB}: must follow a production deploy with only"
+                          " contents: write and no checkout")
     if name == "nightly-parser.yml":
         if set(events) != {"schedule", "workflow_dispatch"}:
             errors.append("nightly parser requires only schedule and workflow_dispatch")

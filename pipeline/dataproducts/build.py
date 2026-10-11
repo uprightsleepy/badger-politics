@@ -5,7 +5,8 @@ Usage: python -m dataproducts.build <sqlite_path> <site_public_dir>
 
 Generates the JSON API tree, Atom feeds, and iCal files into the site's
 public directory (deployed with the site), and bulk CSV/SQLite exports into
-data/exports/ (published via GitHub Releases in Phase 6).
+data/exports/ (packaged by dataproducts.bulk and published to GitHub Releases
+by deploy.yml on production releases).
 """
 
 from __future__ import annotations
@@ -30,8 +31,8 @@ def main(argv: list[str]) -> int:
     exports_dir = ns.exports_dir or ns.db_path.parent / "exports"
 
     conn = queries.connect(ns.db_path)
-    hearings = queries.hearings(conn)  # shared by feeds and ical
-    api_files = build_api(conn, ns.site_public)
+    hearings = queries.hearings(conn)  # shared by the API, feeds and ical
+    api_files = build_api(conn, ns.site_public, hearings)
     feed_files = build_feeds(conn, ns.site_public, hearings)
     ical_files = build_ical(conn, ns.site_public, hearings)
     bulk_files = build_bulk(conn, ns.db_path, exports_dir)

@@ -1,7 +1,7 @@
 ---
-/** What the site publishes for reuse (JSON API, feeds, calendars), what
+/** What the site publishes for reuse (JSON API, feeds, calendars, bulk downloads), what
  * it leaves out, and how the records are collected and checked. The paths
- * match pipeline/dataproducts (api.py, feeds.py, ical.py). */
+ * match pipeline/dataproducts (api.py, feeds.py, ical.py, bulk.py). */
 import Base from "../layouts/Base.astro";
 import { meta, usesLegiscan } from "../lib/db";
 import { fmtDate } from "../lib/format";
@@ -17,20 +17,48 @@ const api: [string, string][] = [
   ["/api/v1/legislators/index.json", "Every state lawmaker on record."],
   ["/api/v1/legislators/{name}.json", "One lawmaker: their profile, election, bills and votes. The name matches their page's address."],
   ["/api/v1/elections/statewide.json", "Statewide races on the 2026 ballot, and past statewide results."],
+  ["/api/v1/elections/us-house.json", "U.S. House candidates on the 2026 ballot."],
+  ["/api/v1/elections/seats/assembly-15.json", "One legislative seat: who holds it, their 2026 race, and its certified results. Swap in any seat, like senate-5."],
+  ["/api/v1/committees/index.json", "Every committee and its chair."],
+  ["/api/v1/committees/{id}.json", "One committee: its members, and its upcoming and past hearings. The id matches the committee page's address."],
+  ["/api/v1/hearings.json", "Every committee hearing on record, with the bills on its agenda."],
+  ["/api/v1/subjects/index.json", "Every heading in the Legislature's subject index, with how many bills it holds."],
+  ["/api/v1/subjects/{subject}.json", "The bills filed under one subject. The name matches the subject page's address."],
+  ["/api/v1/federal/index.json", "Wisconsin's members of Congress."],
+  ["/api/v1/federal/{name}.json", "One member of Congress and every floor roll call they voted on. The name matches their page's address."],
   ["/api/v1/local/{city}/index.json", "One city council's members."],
   ["/api/v1/local/{city}/{member}.json", "One council member and their latest votes."],
+];
+// kept apart from the lawmaker files above, so money never sits beside votes
+const moneyApi: [string, string][] = [
+  ["/api/v1/money/legislators/{name}.json", "A state lawmaker's collected campaign receipts in all the history we have: totals, by kind of source and by quarter, the committees that gave the most, and what individual donors reported doing for a living."],
+  ["/api/v1/money/committees/index.json", "Committees that gave today's legislators $1,000 or more."],
+  ["/api/v1/money/committees/{id}.json", "One committee: what it gave and to whom, and its own reported money. The id matches its page's address."],
+  ["/api/v1/money/independent.json", "Every outside-spending filing, exactly as filed, with the Ethics Commission's transaction ID and report."],
 ];
 const feeds: [string, string][] = [
   ["/feeds/bills/{id}.xml", "Each step in one bill's history. Linked from the bill's page."],
   ["/feeds/legislators/{name}.xml", "A state lawmaker's roll-call votes."],
   ["/feeds/committees/{id}.xml", "A committee's hearings."],
   ["/feeds/local/{city}/{member}.xml", "A city council member's votes."],
+  ["/feeds/districts/assembly-15.xml", "The roll-call votes of whoever holds one seat now. Swap in any seat, like senate-5."],
+  ["/feeds/subjects/{subject}.xml", "The newest steps on bills under one subject. The name matches the subject page's address."],
+  ["/feeds/laws.xml", "New laws, as the governor's approval numbers each act."],
+  ["/feeds/vetoes.xml", "Vetoes, partial vetoes and veto override attempts."],
+  ["/feeds/money/independent.xml", "New outside-spending filings, one at a time, with each one's transaction ID."],
+];
+const RELEASES = "https://github.com/uprightsleepy/badger-politics/releases/latest/download";
+const downloads: [string, string][] = [
+  ["badger-politics-csv.zip", "CSV files for every session: bills, their actions, sponsors, roll calls and each member's vote, plus every lawmaker."],
+  ["wi-filtered.sqlite.gz", "The site's whole database (SQLite, compressed), with what's left out below removed."],
+  ["SHA256SUMS", "Checksums for checking a download."],
+  ["README.txt", "What each file holds, and where the records come from."],
 ];
 ---
 
 <Base
   title="Data and API"
-  description="Free JSON API, Atom feeds and calendars of Wisconsin legislative records, with what's left out and how the records are checked."
+  description="Free JSON API, Atom feeds, calendars and bulk downloads of Wisconsin political records, with what's left out and how the records are checked."
   layout="wide"
 >
   <header class="flex max-w-[47.5rem] flex-col gap-2.5">
@@ -48,6 +76,22 @@ const feeds: [string, string][] = [
       <p class="mt-2">Static JSON files, one for each record, rebuilt with every update of the site.</p>
       <dl class="paths mt-3">
         {api.map(([path, what]) => (
+          <div>
+            <dt><code>{path}</code></dt>
+            <dd>{what}</dd>
+          </div>
+        ))}
+      </dl>
+      <h3 class="t-question mt-6">Campaign money</h3>
+      <p class="mt-2">
+        The figures behind the <a href="/money/" class="underline">money pages</a>, over all the history we
+        have, in their own files so they're never beside a vote. Individual donors appear only in totals, never by name. Each file
+        carries the notes needed to read it: corporations can't give to Wisconsin candidates, a PAC's money
+        is its own, and a contribution isn't an endorsement of any vote.
+        {" "}<a href="/about/#money" class="underline">Full methodology</a>
+      </p>
+      <dl class="paths mt-3">
+        {moneyApi.map(([path, what]) => (
           <div>
             <dt><code>{path}</code></dt>
             <dd>{what}</dd>
@@ -86,11 +130,22 @@ const feeds: [string, string][] = [
     <section aria-labelledby="bulk-heading">
       <h2 id="bulk-heading" class="t-section">Bulk downloads</h2>
       <p class="mt-2">
-        Not published yet. Each update of the site already writes CSV files for every session (bills,
-        their actions, sponsors, roll calls and each member's vote) and a filtered copy of the database,
-        and they're planned for GitHub, beside the
-        {" "}<a href="https://github.com/uprightsleepy/badger-politics" class="underline">source code</a>.
-        Until then, the JSON API above has the bills, roll calls and lawmakers.
+        Each release of this site publishes the whole record on GitHub, beside the
+        {" "}<a href="https://github.com/uprightsleepy/badger-politics" class="underline">source code</a>. These
+        addresses always lead to the newest files:
+      </p>
+      <dl class="paths mt-3">
+        {downloads.map(([file, what]) => (
+          <div>
+            <dt><a href={`${RELEASES}/${file}`} class="underline"><code>{file}</code></a></dt>
+            <dd>{what}</dd>
+          </div>
+        ))}
+      </dl>
+      <p class="mt-2 text-small text-granite">
+        Earlier copies are on the <a href="https://github.com/uprightsleepy/badger-politics/releases" class="underline">releases page</a>.
+        Individual donors appear in the database only in totals: each of their receipts keeps its amount,
+        date and recipient, without a name, occupation or filer ID.
       </p>
     </section>
 

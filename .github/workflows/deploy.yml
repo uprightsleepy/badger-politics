@@ -258,6 +258,25 @@ jobs:
             node scripts/csp.mjs https://badgerpolitics-dev.web.app
           fi
 
+      # Bulk downloads are published from production releases only, so the
+      # stable download URL always matches badgerpolitics.org. This job holds
+      # deploy credentials and no contents: write; publish-downloads holds the
+      # reverse and only ever sees these files.
+      - name: Package the bulk downloads
+        if: env.TARGET == 'badgerpolitics-prod'
+        working-directory: pipeline
+        run: uv run python -m dataproducts.bulk ../data/exports "$RUNNER_TEMP/bulk"
+
+      - name: Hand the bulk downloads to the publishing job
+        if: env.TARGET == 'badgerpolitics-prod'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bulk-downloads-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/bulk/
+          if-no-files-found: error
+          compression-level: 0 # the large files are already compressed
+          retention-days: 1
+
       - name: Roll back guidance
         if: failure()
         run: |
@@ -304,3 +323,44 @@ jobs:
             ${{ runner.temp }}/badger-ci/ux.log
           if-no-files-found: ignore
           retention-days: 7
+
+  publish-downloads:
+    name: publish bulk downloads
+    needs: deploy
+    # Only a production release that passed every gate and the live checks.
+    if: inputs.target == 'badgerpolitics-prod'
+    concurrency:
+      group: publish-downloads
+      cancel-in-progress: false
+    permissions:
+      contents: write # create the release; no checkout, so no repository code runs here
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bulk-downloads-${{ github.run_id }}-${{ github.run_attempt }}
+          path: bulk
+
+      - name: Verify the checksums
+        working-directory: bulk
+        run: sha256sum --check --strict SHA256SUMS
+
+      # A new release per production deploy: gh uploads every asset to a draft
+      # before publishing it, so releases/latest/download/<file> never serves a
+      # half-uploaded set. The three newest data releases are kept.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="data-$(date -u +%Y%m%d-%H%M%S)"
+          gh release create "$tag" bulk/* \
+            --target "$GITHUB_SHA" \
+            --latest \
+            --title "Data, $(date -u +%Y-%m-%d)" \
+            --notes "Bulk downloads from the production release of ${GITHUB_SHA::8} (run ${GITHUB_RUN_ID}); see README.txt. The newest files are always at https://github.com/${GH_REPO}/releases/latest/download/<file>"
+          gh release list --limit 100 --json tagName --jq '.[].tagName' \
+            | { grep '^data-' || true; } | sort -r | tail -n +4 \
+            | while read -r old; do gh release delete "$old" --yes --cleanup-tag; done

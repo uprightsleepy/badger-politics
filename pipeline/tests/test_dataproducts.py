@@ -21,8 +21,9 @@ def db_path(tmp_path: Path, make_db) -> Path:
     conn.executescript(
         """
         INSERT INTO sessions (id, identifier, name) VALUES ('2025', '2025', '2025-26');
-        INSERT INTO people (id, name, party, chamber, district)
-          VALUES ('ocd-person/p1', 'Ann Example', 'Independent', 'lower', 15);
+        INSERT INTO people (id, name, party, current_role, chamber, district)
+          VALUES ('ocd-person/p1', 'Ann Example', 'Independent', 'Representative',
+                  'lower', 15);
         INSERT INTO bills (id, session_id, identifier, title, status,
                            died_without_hearing, source)
           VALUES ('2025-ab656', '2025', 'AB 656', 'Child marriage ban',
@@ -79,6 +80,56 @@ def db_path(tmp_path: Path, make_db) -> Path:
                   '[{"name": "Bob Rival", "party": "Test", "ballot_status": "Approve"}]',
                   'wec');
         INSERT INTO meta (key, value) VALUES ('data_through', '2025-06-03');
+        INSERT INTO bills (id, session_id, identifier, title, status, source)
+          VALUES ('2025-ab7', '2025', 'AB 7', 'State budget', 'enacted', 'openstates');
+        INSERT INTO actions (id, bill_id, date, description, classification)
+          VALUES ('a3', '2025-ab7', '2025-04-01',
+                  'Approved by the Governor with partial veto on 4-1-2025;'
+                  || ' 2025 Wisconsin Act 7', 'executive-signature');
+        INSERT INTO committee_members (committee_id, person_id, role)
+          VALUES ('c1', 'ocd-person/p1', 'chair');
+        INSERT INTO bill_subjects (bill_id, subject)
+          VALUES ('2025-ab656', 'Marriage — Minimum age');
+        INSERT INTO election_history (year, chamber, district, candidate, party, votes,
+                                      total_cast)
+          VALUES (2024, 'lower', 15, 'Ann Example', 'IND', 15000, 25010),
+                 (2024, 'lower', 15, 'Bob Rival', 'REP', 10000, 25010);
+        INSERT INTO congressional_races (district, incumbent, incumbent_noncandidacy,
+                                         candidate, party, ballot_status, source)
+          VALUES (2, 'Mark Pocan', 0, 'Mark Pocan', 'Democratic', 'Approve', 'wec');
+        INSERT INTO federal_members (bioguide, lis_id, name, slug, party, chamber,
+                                     term_start, term_end)
+          VALUES ('B001230', 'S354', 'Tammy Baldwin', 'tammy-baldwin', 'Democratic',
+                  'senate', '2025-01-03', '2031-01-03');
+        INSERT INTO federal_votes (id, congress, session, chamber, number, date, question,
+                                   result, yeas, nays, source_url)
+          VALUES ('s119-1-1', 119, 1, 'senate', 1, '2025-01-09', 'On the Motion',
+                  'Agreed to', 60, 40, 'https://www.senate.gov/vote1');
+        INSERT INTO federal_vote_records (vote_id, member_id, last_name, party, state,
+                                          vote_cast)
+          VALUES ('s119-1-1', 'S354', 'Baldwin', 'D', 'WI', 'Yea');
+        INSERT INTO cf_committees (entity_id, name, committee_type, assigned_id)
+          VALUES (77, 'Realtors PAC', 'Political Action Committee', '0100'),
+                 (88, 'Outside Group', 'Independent Expenditure Committee', '0200');
+        INSERT INTO contributions (id, person_id, committee_entity_id, date, amount,
+                                   from_entity_id, from_name, from_type, occupation)
+          VALUES (1, 'ocd-person/p1', 500, '2025-05-01', 100, 9001,
+                  'PRIVATE INDIVIDUAL DONOR', 'Individual', 'Teacher'),
+                 (2, 'ocd-person/p1', 500, '2025-05-02', 1000, 77,
+                  'Realtors PAC', 'Registrant', NULL);
+        INSERT INTO cf_transactions (id, filer_entity_id, filer_type, direction, date,
+                                     amount, other_entity_id, other_name, other_type,
+                                     stance, related_name, related_office,
+                                     related_district, purpose, report_id, report_name)
+          VALUES (10, 77, 'Political Action Committee', 'INCOMING', '2025-04-01', 50,
+                  9002, 'PRIVATE PAC DONOR', 'Individual',
+                  NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+                 (11, 77, 'Political Action Committee', 'INCOMING', '2025-04-02', 300,
+                  66, 'Union Committee', 'Registrant',
+                  NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+                 (12, 88, 'Independent Expenditure Committee', 'OUTGOING', '2025-09-01',
+                  5000, NULL, 'Ad Vendor LLC', 'Business', 'AGAINST', 'Ann Example',
+                  'State Assembly', '15', 'TV ad', 4242, 'Fall Report');
         INSERT INTO statewide_races (office, incumbent, incumbent_noncandidacy,
                                      candidate, party, ballot_status, source)
           VALUES ('GOVERNOR', 'Tony Evers', 1, 'Sara Rodriguez', 'Democratic',
@@ -145,6 +196,44 @@ def test_statewide_json_shape(built: Path) -> None:
     assert payload["history"][0]["votes"] == 1358774
 
 
+def test_wider_api_shapes(built: Path) -> None:
+    api = built / "public" / "api" / "v1"
+
+    def load(path: str):
+        return json.loads((api / path).read_text(encoding="utf-8"))
+
+    committee = load("committees/c1.json")
+    assert committee["chair"] == {"id": "p1", "name": "Ann Example"}
+    assert committee["members"][0]["role"] == "chair"
+    assert [h["id"] for h in committee["past_hearings"]] == ["h1"]
+    assert committee["upcoming_hearings"] == []
+    assert load("hearings.json")[0]["agenda_bills"] == ["AB 656"]
+    subjects = load("subjects/index.json")
+    assert subjects == [{"slug": "marriage-minimum-age", "title": "Marriage: Minimum age",
+                         "headings": ["Marriage — Minimum age"], "bills": 1}]
+    assert load("subjects/marriage-minimum-age.json")["bills"][0]["id"] == "2025-ab656"
+    seat = load("elections/seats/assembly-15.json")
+    assert seat["holder"]["id"] == "p1" and seat["election"]["cycle_year"] == 2026
+    assert seat["results"][0]["candidates"][0] == {
+        "candidate": "Ann Example", "party": "IND", "votes": 15000}
+    assert load("elections/seats/senate-33.json")["holder"] is None
+    assert load("elections/us-house.json")["races"][0]["candidate"] == "Mark Pocan"
+    assert load("federal/tammy-baldwin.json")["votes"][0]["vote_cast"] == "Yea"
+    # money: never beside votes, individuals only in totals
+    money = load("money/legislators/p1.json")
+    assert "votes" not in money and money["total"] == 1100
+    assert money["individual_total"] == 100
+    assert money["top_committees"][0]["entity_id"] == 77
+    assert money["top_occupations"][0]["occupation"] == "Teacher"
+    pac = load("money/committees/77.json")
+    assert pac["recipients"][0]["id"] == "p1"
+    donors = pac["own_money"]["itemized_donors"]
+    assert [d["name"] for d in donors["largest"]] == ["Union Committee"]
+    assert donors["individuals"] == {"total": 50, "transactions": 1}
+    filing = load("money/independent.json")["filings"][0]
+    assert filing["transaction_id"] == 12 and filing["report_id"] == 4242
+
+
 def test_no_legiscan_anywhere(built: Path) -> None:
     hits = []
     for path in built.rglob("*"):
@@ -165,8 +254,8 @@ def test_filtered_sqlite_has_no_legiscan_rows(built: Path) -> None:
             f"SELECT COUNT(*) FROM {table} WHERE source = 'legiscan'"  # noqa: S608
         ).fetchone()[0]
         assert count == 0, table
-    # the exportable bill is still there, and nothing points at the withheld one
-    assert conn.execute("SELECT COUNT(*) FROM bills").fetchone()[0] == 1
+    # the exportable bills are still there, and nothing points at the withheld one
+    assert conn.execute("SELECT COUNT(*) FROM bills").fetchone()[0] == 2
     assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
     for table in ("bill_companions", "bill_subjects", "bill_documents", "bill_versions",
                   "vote_events"):
@@ -197,6 +286,47 @@ def test_lobbying_is_private_even_in_downloadable_database(built: Path, db_path:
                 assert marker not in path.read_bytes(), path
 
 
+def test_individual_donors_only_in_aggregate(built: Path, db_path: Path) -> None:
+    markers = (b"PRIVATE INDIVIDUAL DONOR", b"PRIVATE PAC DONOR")
+    with sqlite3.connect(db_path) as source:
+        assert source.execute("SELECT COUNT(*) FROM contributions"
+                              " WHERE from_name IS NOT NULL").fetchone()[0] == 2
+    snapshot = built / "exports" / "wi-filtered.sqlite"
+    with sqlite3.connect(snapshot) as public:
+        # the receipts stay, so totals still add up; committees stay named
+        assert public.execute("SELECT SUM(amount) FROM contributions").fetchone()[0] == 1100
+        assert public.execute("SELECT from_name, from_entity_id, occupation FROM contributions"
+                              " WHERE id = 1").fetchone() == (None, None, None)
+        assert public.execute("SELECT other_name FROM cf_transactions"
+                              " WHERE id = 11").fetchone() == ("Union Committee",)
+    for directory in (built / "public", built / "exports"):
+        for path in directory.rglob("*"):
+            if path.is_file():
+                data = path.read_bytes()
+                assert not any(m in data for m in markers), path
+
+
+def test_release_package(built: Path) -> None:
+    import gzip
+    import hashlib
+    import zipfile
+
+    from dataproducts.bulk import package
+
+    release = built / "release"
+    assets = package(built / "exports", release)
+    assert [p.name for p in assets] == [
+        "badger-politics-csv.zip", "wi-filtered.sqlite.gz", "README.txt", "SHA256SUMS",
+    ]
+    names = zipfile.ZipFile(release / "badger-politics-csv.zip").namelist()
+    assert "2025/bills.csv" in names and "people.csv" in names
+    assert gzip.decompress((release / "wi-filtered.sqlite.gz").read_bytes()) == (
+        built / "exports" / "wi-filtered.sqlite").read_bytes()
+    for line in (release / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
+        digest, name = line.split("  ")
+        assert hashlib.sha256((release / name).read_bytes()).hexdigest() == digest
+
+
 def test_feeds_are_valid_atom(built: Path) -> None:
     feed = built / "public" / "feeds" / "bills" / "2025-ab656.xml"
     root = ET.parse(feed).getroot()
@@ -210,6 +340,21 @@ def test_feeds_are_valid_atom(built: Path) -> None:
     # entry ids are the actions' own ids, stable as the week's list shifts
     ids = [e.find("a:id", ns).text for e in weekly.findall("a:entry", ns)]
     assert ids == ["https://badgerpolitics.org/feeds/weekly.xml#a1"]
+
+
+@pytest.mark.parametrize(("feed", "entry_ids"), [
+    ("districts/assembly-15.xml", ["2025-v1"]),
+    ("subjects/marriage-minimum-age.xml", ["a1"]),
+    ("laws.xml", ["a3"]),
+    ("vetoes.xml", ["a3"]),
+    ("money/independent.xml", ["t12"]),
+])
+def test_new_feeds_use_record_ids(built: Path, feed: str, entry_ids: list[str]) -> None:
+    ns = {"a": "http://www.w3.org/2005/Atom"}
+    root = ET.parse(built / "public" / "feeds" / feed).getroot()
+    assert root.find("a:updated", ns).text.endswith("T00:00:00Z")
+    ids = [e.find("a:id", ns).text for e in root.findall("a:entry", ns)]
+    assert ids == [f"https://badgerpolitics.org/feeds/{feed}#{i}" for i in entry_ids]
 
 
 def test_ical_structure(built: Path) -> None:

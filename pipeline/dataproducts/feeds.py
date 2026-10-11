@@ -5,17 +5,26 @@
   /feeds/committees/{id}.xml        a committee's hearings
   /feeds/local/{body}/{member}.xml  a council member's votes
   /feeds/weekly.xml                 "this week in the legislature" digest
+  /feeds/districts/{seat}.xml       assembly-15 / senate-5: its sitting member's votes
+  /feeds/subjects/{slug}.xml        newest actions on a subject heading's bills
+  /feeds/laws.xml                   new acts, as the governor's approval numbers them
+  /feeds/vetoes.xml                 vetoes, partial vetoes, override attempts
+  /feeds/money/independent.xml      outside-spending filings, one at a time
+
+Entry ids in the digest, seat, subject, law, veto and money feeds are the
+record's own id (vote, action, transaction), so they hold as lists shift.
 """
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from dataproducts import queries
-from dataproducts.api import bill_slug, person_slug
+from dataproducts.api import bill_slug, person_slug, seat_slug, subject_slug
 
 SITE = "https://badgerpolitics.org"
 ATOM = "http://www.w3.org/2005/Atom"
@@ -97,12 +106,8 @@ def build_feeds(
         _write(root, feeds_dir / "bills" / f"{bill['id']}.xml")
         files += 1
 
-    for person in queries.people(conn):
-        slug = person_slug(person["id"])
-        votes = queries.votes_by_person(conn, person["id"], limit=100)
-        path = f"/feeds/legislators/{slug}.xml"
-        updated = _stamp(votes[0]["date"] if votes else None)
-        root = _feed(f"{person['name']} — votes", path, updated)
+    def vote_feed(title: str, path: str, votes: list[dict]) -> None:
+        root = _feed(title, path, _stamp(votes[0]["date"] if votes else None))
         for vote in votes:
             _entry(
                 root,
@@ -113,8 +118,23 @@ def build_feeds(
                 f"{vote['motion'] or 'Vote'} — {vote['identifier']}:"
                 f" {(vote['title'] or '')[:120]}",
             )
-        _write(root, feeds_dir / "legislators" / f"{slug}.xml")
+        _write(root, out / path.lstrip("/"))
+
+    # a seat's feed is its sitting member's votes; one roll call has one
+    # record per seat, so the vote id stays a stable entry id
+    seats = {p["id"]: seat_slug(p["chamber"], p["district"])
+             for p in queries.sitting_legislators(conn) if p["district"] is not None}
+    for person in queries.people(conn):
+        slug = person_slug(person["id"])
+        votes = queries.votes_by_person(conn, person["id"], limit=100)
+        vote_feed(f"{person['name']} — votes", f"/feeds/legislators/{slug}.xml", votes)
         files += 1
+        if person["id"] in seats:
+            seat = seats[person["id"]]
+            office = "Senate" if seat.startswith("senate") else "Assembly"
+            vote_feed(f"{office} District {person['district']}: {person['name']} — votes",
+                      f"/feeds/districts/{seat}.xml", votes)
+            files += 1
 
     # council members: one feed per member, the same shape as a legislator's
     for body in queries.local_bodies(conn):
@@ -168,28 +188,92 @@ def build_feeds(
         cutoff = (
             datetime.fromisoformat(data_through).replace(tzinfo=UTC) - timedelta(days=7)
         ).date().isoformat()
-        rows = conn.execute(
-            f"""SELECT a.id, a.date, a.description, b.identifier, b.title, b.session_id
-                FROM actions a JOIN bills b ON b.id = a.bill_id
-                WHERE a.date >= ? AND {queries.exportable("b.")}
-                ORDER BY a.date DESC, a.rowid DESC LIMIT 200""",
-            (cutoff,),
-        ).fetchall()
-        root = _feed(
-            "This week in the Wisconsin Legislature", "/feeds/weekly.xml",
-            _stamp(data_through),
-        )
-        for action_id, date, desc, identifier, title, session_id in rows:
-            _entry(
-                root,
-                # the action's own id: a list position shifts every night
-                f"{SITE}/feeds/weekly.xml#{action_id}",
-                f"{identifier}: {desc[:100]}",
-                _stamp(date),
-                f"{SITE}/bills/{session_id}/{bill_slug(identifier)}",
-                f"{identifier} — {(title or '')[:150]}: {desc}",
-            )
-        _write(root, feeds_dir / "weekly.xml")
+        _action_feed(out, "This week in the Wisconsin Legislature", "/feeds/weekly.xml",
+                     data_through, _actions(conn, "a.date >= ?", cutoff, 200))
         files += 1
 
+    # the governor's desk: acts as the approval action numbers them, and
+    # every veto, partial veto and override attempt, verbatim
+    for path, title, where in (
+        ("/feeds/laws.xml", "New Wisconsin laws",
+         "b.status = 'enacted' AND a.description LIKE '%Wisconsin Act %'"),
+        ("/feeds/vetoes.xml", "Wisconsin vetoes and override attempts",
+         "(a.description LIKE '%vetoed by the governor%'"
+         " OR a.description LIKE '%partial veto%'"
+         " OR a.description LIKE '%notwithstanding the objections%')"),
+    ):
+        rows = _actions(conn, where, 100)
+        _action_feed(out, title, path, rows[0]["date"] if rows else data_through, rows)
+        files += 1
+
+    # a subject's feed: the newest actions on the bills filed under it;
+    # headings the index reprints share a slug (and a page), so merge them
+    by_slug: dict[str, dict[str, dict]] = {}
+    for row in queries.subject_actions(conn, per_subject=SUBJECT_ENTRIES):
+        by_slug.setdefault(subject_slug(row["subject"]), {}).setdefault(row["id"], row)
+    for slug, actions in by_slug.items():
+        rows = sorted(actions.values(), key=lambda r: (r["date"] or "", r["seq"]),
+                      reverse=True)[:SUBJECT_ENTRIES]
+        heading = re.sub(r" (?:_|—|--) ", ": ", rows[0]["subject"])
+        _action_feed(out, f"{heading} — bills", f"/feeds/subjects/{slug}.xml",
+                     rows[0]["date"], rows)
+        files += 1
+
+    files += _independent_feed(conn, out)
     return files
+
+
+SUBJECT_ENTRIES = 20  # thousands of subjects: keep each feed small
+
+def _actions(conn: sqlite3.Connection, where: str, *params) -> list[sqlite3.Row]:
+    """Exportable bills' actions, newest first; `where` is fixed SQL from
+    this module and the LIMIT is the last parameter."""
+    return conn.execute(
+        f"""SELECT a.id, a.date, a.description, b.identifier, b.title, b.session_id
+            FROM actions a JOIN bills b ON b.id = a.bill_id
+            WHERE {where} AND {queries.exportable("b.")}
+            ORDER BY a.date DESC, a.rowid DESC LIMIT ?""",
+        params,
+    ).fetchall()
+
+
+def _action_feed(out: Path, feed_title: str, path: str, updated: str | None, rows) -> None:
+    root = _feed(feed_title, path, _stamp(updated))
+    for r in rows:
+        identifier, desc = r["identifier"], r["description"]
+        _entry(
+            root,
+            # the action's own id: a list position shifts every night
+            f"{SITE}{path}#{r['id']}",
+            f"{identifier}: {desc[:100]}",
+            _stamp(r["date"]),
+            f"{SITE}/bills/{r['session_id']}/{bill_slug(identifier)}",
+            f"{identifier} — {(r['title'] or '')[:150]}: {desc}",
+        )
+    _write(root, out / path.lstrip("/"))
+
+
+def _independent_feed(conn: sqlite3.Connection, out: Path) -> int:
+    """Outside spending one filing at a time, as filed (README mandate 5)."""
+    path = "/feeds/money/independent.xml"
+    filings = queries.independent_expenditures(conn, limit=100)
+    root = _feed("Outside spending on Wisconsin candidates", path,
+                 _stamp(filings[0]["date"] if filings else None))
+    for f in filings:
+        race = " ".join(x for x in (f["related_office"], f["related_district"]) if x)
+        paid = f" Paid to {f['paid_to']}." if f["paid_to"] else ""
+        report = f" on {f['report_name'] or 'the filed report'}" if f["report_id"] else ""
+        _entry(
+            root,
+            f"{SITE}{path}#t{f['transaction_id']}",
+            f"{f['filer_name'] or 'A committee'}: ${f['amount']:,.2f}"
+            f" {f['stance'].lower()} {f['related_name']}",
+            _stamp(f["date"]),
+            f"https://campaignfinance.wi.gov/browse-data/report/{f['report_id']}"
+            if f["report_id"] else f"{SITE}/money/independent/",
+            f"{f['date']}: {f['filer_name'] or 'A committee'} reported ${f['amount']:,.2f}"
+            f" {f['stance'].lower()} {f['related_name']}{f' ({race})' if race else ''}."
+            f"{paid} Transaction ID {f['transaction_id']}{report}.",
+        )
+    _write(root, out / path.lstrip("/"))
+    return 1
