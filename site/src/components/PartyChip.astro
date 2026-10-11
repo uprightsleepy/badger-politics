@@ -1,8 +1,0 @@
----
-/** The party chip; see partyChipHtml for the one place its markup lives. */
-import { partyChipHtml } from "../lib/format";
-interface Props { party: string | null; size?: "sm" | "md"; decorative?: boolean }
-const { party, size = "md", decorative = false } = Astro.props;
-const dims = size === "sm" ? "h-4 w-4 text-[0.625rem]" : "h-5 w-5 text-xs";
----
-<Fragment set:html={partyChipHtml(party, { dims, decorative })} />
