@@ -58,8 +58,9 @@ const rangeBar = (o: {
 }) => {
   const span = Math.max(o.max - o.min, 1);
   const pos = (n: number) => Math.min(100, Math.max(0, ((n - o.min) / span) * 100));
-  const lo = pos(o.typical.low);
-  const width = Math.max(pos(o.typical.high) - lo, 2);
+  // a band too narrow to see still shows, inside the track at either end
+  const width = Math.max(pos(o.typical.high) - pos(o.typical.low), 2);
+  const lo = Math.min(pos(o.typical.low), 100 - width);
   return (
     '<div class="range mt-1" aria-hidden="true">' +
     '<div class="relative mx-2.5 h-2.5 rounded-full bg-fog">' +
@@ -91,13 +92,18 @@ export function answers(full: RepSummary, ctx: AnswerContext): Answer[] {
       : `<p>Voted on ${fig(v.cast.toLocaleString())} of ${fig(v.total.toLocaleString())} roll call votes this session. Didn't vote on ${fig(skipped.toLocaleString())}.</p>`;
     const nv = t?.notVoting;
     if (nv) {
-      const rate = (skipped / v.total) * 100;
-      const pct = (n: number) => (n > 0 && n < 1 ? "under 1%" : `${round(n)}%`);
+      // the bar reads the way the sentence does: the share they voted on,
+      // more to the right, with "100%" at the right end. Its left end is the
+      // chamber's lowest share (at least 5 points down), named as a number,
+      // never as anyone's result.
+      const share = (v.cast / v.total) * 100;
+      const typical = { ...nv, low: 100 - nv.high, high: 100 - nv.low, max: 100 };
+      const pct = (n: number) => (n < 100 && round(n) === 100 ? "over 99%" : `${round(n)}%`);
       const words = round(nv.high) === 0 && nv.high < 0.5
         ? `The middle half of ${members} voted on every one, or nearly.`
-        : `The middle half of ${members} didn't vote on ${pct(nv.low)} to ${pct(nv.high)} of them.`;
-      const top = Math.max(5, Math.ceil(Math.max(nv.max, rate)));
-      html += rangeBar({ value: rate, min: 0, max: top, typical: nv, left: "Voted on all", right: `Didn't vote on ${top}%` }) +
+        : `The middle half of ${members} voted on ${pct(typical.low)} to ${pct(typical.high)} of them.`;
+      const floor = Math.min(95, Math.floor(Math.min(100 - nv.max, share)));
+      html += rangeBar({ value: share, min: floor, max: 100, typical, left: `${floor}%`, right: "100%" }) +
         fine(`${esc(words)} Not voting counts being away and choosing not to vote alike.`);
     }
     out.push({ id: "voting", q: "How often do they vote?", html });
