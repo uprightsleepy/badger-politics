@@ -318,6 +318,23 @@ def subject_bills(conn: sqlite3.Connection) -> list[dict]:
     )
 
 
+def subject_actions(conn: sqlite3.Connection, per_subject: int) -> list[sqlite3.Row]:
+    """The newest actions on each subject heading's exportable bills; seq is
+    the insertion order that breaks same-day ties, as in actions_for."""
+    return conn.execute(
+        f"""SELECT * FROM (
+              SELECT s.subject, a.id, a.date, a.description, b.identifier, b.title,
+                     b.session_id, a.rowid AS seq,
+                     ROW_NUMBER() OVER (PARTITION BY s.subject
+                                        ORDER BY a.date DESC, a.rowid DESC) AS n
+              FROM bill_subjects s
+              JOIN bills b ON b.id = s.bill_id AND {exportable("b.")}
+              JOIN actions a ON a.bill_id = b.id)
+            WHERE n <= ?""",
+        (per_subject,),
+    ).fetchall()
+
+
 def federal_members(conn: sqlite3.Connection) -> list[dict]:
     return _rows(conn, "SELECT * FROM federal_members ORDER BY chamber DESC, district")
 

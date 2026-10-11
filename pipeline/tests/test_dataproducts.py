@@ -73,6 +73,12 @@ def db_path(tmp_path: Path, make_db) -> Path:
                   '[{"name": "Bob Rival", "party": "Test", "ballot_status": "Approve"}]',
                   'wec');
         INSERT INTO meta (key, value) VALUES ('data_through', '2025-06-03');
+        INSERT INTO bills (id, session_id, identifier, title, status, source)
+          VALUES ('2025-ab7', '2025', 'AB 7', 'State budget', 'enacted', 'openstates');
+        INSERT INTO actions (id, bill_id, date, description, classification)
+          VALUES ('a3', '2025-ab7', '2025-04-01',
+                  'Approved by the Governor with partial veto on 4-1-2025;'
+                  || ' 2025 Wisconsin Act 7', 'executive-signature');
         INSERT INTO committee_members (committee_id, person_id, role)
           VALUES ('c1', 'ocd-person/p1', 'chair');
         INSERT INTO bill_subjects (bill_id, subject)
@@ -237,8 +243,8 @@ def test_filtered_sqlite_has_no_legiscan_rows(built: Path) -> None:
             f"SELECT COUNT(*) FROM {table} WHERE source = 'legiscan'"  # noqa: S608
         ).fetchone()[0]
         assert count == 0, table
-    # the exportable bill is still there, and nothing points at the withheld one
-    assert conn.execute("SELECT COUNT(*) FROM bills").fetchone()[0] == 1
+    # the exportable bills are still there, and nothing points at the withheld one
+    assert conn.execute("SELECT COUNT(*) FROM bills").fetchone()[0] == 2
     assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
     for table in ("bill_companions", "bill_subjects", "bill_documents", "vote_events"):
         assert conn.execute(
@@ -322,6 +328,21 @@ def test_feeds_are_valid_atom(built: Path) -> None:
     # entry ids are the actions' own ids, stable as the week's list shifts
     ids = [e.find("a:id", ns).text for e in weekly.findall("a:entry", ns)]
     assert ids == ["https://badgerpolitics.org/feeds/weekly.xml#a1"]
+
+
+@pytest.mark.parametrize(("feed", "entry_ids"), [
+    ("districts/assembly-15.xml", ["2025-v1"]),
+    ("subjects/marriage-minimum-age.xml", ["a1"]),
+    ("laws.xml", ["a3"]),
+    ("vetoes.xml", ["a3"]),
+    ("money/independent.xml", ["t12"]),
+])
+def test_new_feeds_use_record_ids(built: Path, feed: str, entry_ids: list[str]) -> None:
+    ns = {"a": "http://www.w3.org/2005/Atom"}
+    root = ET.parse(built / "public" / "feeds" / feed).getroot()
+    assert root.find("a:updated", ns).text.endswith("T00:00:00Z")
+    ids = [e.find("a:id", ns).text for e in root.findall("a:entry", ns)]
+    assert ids == [f"https://badgerpolitics.org/feeds/{feed}#{i}" for i in entry_ids]
 
 
 def test_ical_structure(built: Path) -> None:

@@ -212,8 +212,9 @@ Everything on the site is also data, keyless: a static JSON API under
 and hearings, subjects, seats and election results, the federal
 delegation's roll calls, city councils, and campaign money in separate
 files, with individual donors only in aggregate; the layout is in
-[api.py](pipeline/dataproducts/api.py)), Atom feeds per bill, legislator and
-committee plus a weekly digest (about 20,600), iCal calendars for every
+[api.py](pipeline/dataproducts/api.py)), Atom feeds per bill, legislator,
+committee, seat and subject, plus a weekly digest and feeds of new laws,
+vetoes and outside-spending filings (more than 20,600), iCal calendars for every
 hearing and for election days (845), per-session CSVs, and a
 provenance-filtered SQLite snapshot. See [/data/](https://badgerpolitics.org/data/).
 
