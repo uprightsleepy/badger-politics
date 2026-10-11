@@ -237,14 +237,23 @@ folder is fetched once; the index and the sitting governor's folder refresh each
 run (two requests at the existing one-second floor). Raw pages and the parsed
 listing stay in the private subjects bundle.
 
-The [docs robots file](https://docs.legis.wisconsin.gov/robots.txt) could not be
-read from the build sandbox (its egress proxy denies docs.legis), so neither the
-`/code/` route nor the listing markup was checked live. Before the nightly
-parser runs this collector, read the robots file and confirm `/code/executive_orders`
-is not disallowed, record the date here, run `python -m scraper.fetch_executive_orders`
-locally, and replace the hand-built pages in `tests/test_executive_orders.py`
-with reduced real captures. The manifest change already requires a fresh
-policy-only report. The fingerprint and pacing are unchanged.
+On 2026-10-11 the [docs robots file](https://docs.legis.wisconsin.gov/robots.txt)
+was read with the pipeline User-Agent: HTTP 200, `text/plain`, one `User-agent: *`
+group, no crawl delay. It disallows `/frame`, `/frame/`, `/scroll/`, `/feed/`,
+`/doc/feed/`, `/breadcrumbs/`, `/preferences`, `/preferences/`, `/search` and one
+LRB report PDF. Nothing under `/code/`, so `/code/executive_orders` and its
+folders are allowed.
+
+The file's fingerprint no longer matches the reviewed one in
+`source_policies.json` (live `71a8ac71…27bf` as the policy check reads it), so
+the gate stops all docs.legis collection, this collector included. It also now
+disallows `/search` itself, which the manifest still enables for the upstream
+session list (`0003-wi-source-access.patch`). Neither change has been accepted:
+a reviewer must resolve the `/search` conflict and record a new fingerprint
+before any docs.legis fetch runs. The archive markup has not been checked live
+yet, so the parser tests still use hand-built pages. After that review, run
+`python -m scraper.fetch_executive_orders` locally and replace those pages with
+reduced real captures.
 
 ## Nightly finance windowing (2026-09-07)
 
