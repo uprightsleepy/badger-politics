@@ -80,11 +80,12 @@ for (const p of ["/", "/bills/2025/", "/legislators/", "/money/", "/calendar/"])
 // their override in place of the sitewide policy, not alongside it
 {
   const index = await (await fetch(`${BASE}/legislators/`)).text();
-  const slug = index.match(/href="\/legislators\/([^/"]+)\/"/)?.[1];
+  // the index also links /legislators/compare/, which has no embed card
+  const slug = index.match(/href="\/legislators\/(?!compare\/)([^/"]+)\/"/)?.[1];
   const embed = `/embed/legislators/${slug}/`;
-  const framing = slug
-    ? (await page.goto(`${BASE}${embed}`, { waitUntil: "domcontentloaded" })).headers()["content-security-policy"] ?? ""
-    : "";
+  const response = slug ? await page.goto(`${BASE}${embed}`, { waitUntil: "domcontentloaded" }) : null;
+  // a 404 carries the sitewide policy, so only a served card proves the override
+  const framing = response?.status() === 200 ? response.headers()["content-security-policy"] ?? "" : "";
   const ok = /frame-ancestors \*/.test(framing) && !/frame-ancestors 'none'/.test(framing) &&
     /frame-ancestors 'none'/.test(h["content-security-policy"] ?? "");
   console.log(`${ok ? "PASS" : "FAIL"}: only ${embed} may be framed`);
