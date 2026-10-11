@@ -405,3 +405,23 @@ def test_same_day_actions_keep_their_order(tmp_path: Path, make_db) -> None:
     assert [a["description"] for a in grouped] == expected
     by_session = queries.actions_for_session(conn, "2025")["2025-ab1"]
     assert [a["description"] for a in by_session] == expected
+
+
+def test_builds_from_a_snapshot_older_than_the_newest_tables(
+    db_path: Path, tmp_path: Path
+) -> None:
+    # Releases build from the newest snapshot, which can predate a new table.
+    conn = sqlite3.connect(db_path)
+    for table in ("bill_versions", "court_challenges", "judicial_history",
+                  "referendum_history"):
+        conn.execute(f"DROP TABLE {table}")  # noqa: S608 - fixed names
+    conn.commit()
+    conn.row_factory = sqlite3.Row
+    out = tmp_path / "public"
+    build_api(conn, out)
+    build_feeds(conn, out)
+    build_bulk(conn, db_path, tmp_path / "exports")
+    bill = json.loads((out / "api/v1/bills/2025/ab656.json").read_text(encoding="utf-8"))
+    assert bill["versions"] == []
+    judicial = (out / "api/v1/elections/judicial.json").read_text(encoding="utf-8")
+    assert json.loads(judicial) == {"races": []}

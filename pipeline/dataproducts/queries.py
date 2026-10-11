@@ -39,6 +39,13 @@ def _rows(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> list[dict]:
     return [dict(r) for r in conn.execute(sql, params)]
 
 
+def has_table(conn: sqlite3.Connection, name: str) -> bool:
+    """Releases build from the newest snapshot, which may predate a new table."""
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)
+    ).fetchone() is not None
+
+
 def sessions(conn: sqlite3.Connection) -> list[dict]:
     return _rows(conn, "SELECT * FROM sessions ORDER BY identifier")
 
@@ -169,6 +176,8 @@ def links_for_session(
     session, in import order."""
     if table not in ("bill_versions", "bill_documents"):
         raise ValueError(f"links_for_session: unknown table {table!r}")
+    if not has_table(conn, table):
+        return {}
     cursor = conn.execute(
         f"SELECT d.* FROM {table} d JOIN bills b ON b.id = d.bill_id"  # noqa: S608 - allowlisted
         f" WHERE b.session_id = ? AND {exportable('b.')} ORDER BY d.bill_id, d.rowid",
@@ -282,6 +291,8 @@ def election_history(conn: sqlite3.Connection) -> list[dict]:
 
 def judicial_history(conn: sqlite3.Connection) -> list[dict]:
     """Certified Supreme Court and Court of Appeals results, newest first."""
+    if not has_table(conn, "judicial_history"):
+        return []
     return _rows(
         conn,
         "SELECT * FROM judicial_history"
@@ -291,6 +302,8 @@ def judicial_history(conn: sqlite3.Connection) -> list[dict]:
 
 def referendum_history(conn: sqlite3.Connection) -> list[dict]:
     """Certified statewide referendum results, newest first."""
+    if not has_table(conn, "referendum_history"):
+        return []
     return _rows(
         conn, "SELECT * FROM referendum_history ORDER BY year DESC, election, question"
     )

@@ -99,7 +99,8 @@ def export_sqlite(db_path: Path, exports_dir: Path) -> Path:
         conn.execute(f"DELETE FROM vote_events WHERE id IN {withheld_events}")
         for table in ("actions", "sponsorships", "bill_subjects", "bill_documents",
                       "bill_versions"):
-            conn.execute(f"DELETE FROM {table} WHERE bill_id IN {legiscan_bills}")  # noqa: S608
+            if queries.has_table(conn, table):
+                conn.execute(f"DELETE FROM {table} WHERE bill_id IN {legiscan_bills}")  # noqa: S608
         conn.execute(
             f"DELETE FROM bill_companions WHERE bill_id IN {legiscan_bills}"
             f" OR companion_bill_id IN {legiscan_bills}"
@@ -137,6 +138,7 @@ def export_sqlite(db_path: Path, exports_dir: Path) -> Path:
     orphans = [
         row
         for table in BILL_CHILDREN
+        if queries.has_table(conn, table)
         for row in conn.execute(f"PRAGMA foreign_key_check({table})")
     ]
     conn.close()
