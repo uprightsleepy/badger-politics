@@ -5,6 +5,7 @@ import Database from "better-sqlite3";
 import { queries } from "./database.mjs";
 import { legislatorProfile } from "../../src/lib/legislator.ts";
 import { ballotStatus } from "../../src/lib/ballot.ts";
+import { repSummary } from "../../src/lib/repSummary.ts";
 
 const schema = await readFile(new URL("../../../pipeline/importer/schema.sql", import.meta.url), "utf8");
 
@@ -103,6 +104,24 @@ test("the profile derives attendance, loyalty, authorship and ballot status from
 
   assert.deepEqual(p.ballot, { kind: "pending", year: 2026 });
   assert.deepEqual(p.opponents.map((o) => o.name), ["Challenger"], "denied filings are not opponents");
+});
+
+test("LegiScan's roll calls are tagged on the pages and kept out of the public summary", (t) => {
+  const conn = new Database(":memory:");
+  t.after(() => conn.close());
+  conn.exec(schema);
+  conn.exec(`INSERT INTO sessions (id, identifier) VALUES ('2025', '2025');
+    INSERT INTO people (id, name, party, current_role, chamber, district) VALUES ('lz', 'Member', 'Democratic', 'Representative', 'lower', 9);
+    INSERT INTO bills (id, session_id, identifier, source) VALUES ('os', '2025', 'AB 1', 'openstates'), ('ls', '2025', 'AB 2', 'legiscan');
+    INSERT INTO vote_events (id, bill_id, date, chamber, source) VALUES
+      ('v1', 'os', '2025-01-01', 'lower', NULL), ('v2', 'ls', '2025-01-02', 'lower', NULL),
+      ('v3', 'os', '2025-01-03', 'lower', 'legiscan');
+    INSERT INTO vote_records VALUES ('v1', 'lz', 'yes'), ('v2', 'lz', 'yes'), ('v3', 'lz', 'no');`);
+  const db = queries(conn);
+  assert.deepEqual(db.personVotes("lz", 10).map((v) => [v.vote_event_id, v.source]),
+    [["v3", "legiscan"], ["v2", "legiscan"], ["v1", null]], "a LegiScan bill or roll call marks the row");
+  const p = conn.prepare("SELECT * FROM people WHERE id = 'lz'").get();
+  assert.deepEqual(repSummary(p).recentVotes.map((v) => v.event), ["v1"]);
 });
 
 test("ballot status reads the Commission's report and never infers a candidacy or a retirement", () => {

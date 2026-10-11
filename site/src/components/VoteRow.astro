@@ -2,14 +2,21 @@
 /** One row of a legislator's vote history: how they voted, on which bill,
  * on what motion, and when. The vote is a word, never a color. */
 import { fmtDate } from "../lib/format";
+import { safeHref } from "../lib/html";
+import { LEGISCAN_LICENSE_URL, isLegiscan, legiscanBillUrl } from "../lib/legiscan";
 interface Props {
   v: {
     option: string; vote_event_id: string; identifier: string;
     motion: string | null; title: string | null; date: string | null;
+    source: string | null; source_url: string | null; session_id: string;
   };
 }
 const { v } = Astro.props;
 const word = v.option === "yes" ? "Yes" : v.option === "no" ? "No" : "Didn't vote";
+// LegiScan's rows are credited where they appear (lib/legiscan)
+const legiscanHref = isLegiscan(v)
+  ? safeHref(v.source_url) ?? legiscanBillUrl(v.session_id, v.identifier)
+  : null;
 ---
 <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-rule/60 px-1 py-1.5 text-small first:border-t-0">
   <span class="w-[6.5rem] max-w-full shrink-0 font-display font-bold">{word}</span>
@@ -18,4 +25,10 @@ const word = v.option === "yes" ? "Yes" : v.option === "no" ? "No" : "Didn't vot
     {" "}<span class="text-granite">{v.motion ?? v.title}</span>
   </span>
   <span class="ml-auto shrink-0 text-fine tabular-nums text-granite">{fmtDate(v.date)}</span>
+  {legiscanHref && (
+    <span class="basis-full text-fine text-granite">
+      From <a href={legiscanHref} class="underline">LegiScan</a>, used under the
+      {" "}<a href={LEGISCAN_LICENSE_URL} class="underline">CC BY 4.0 license</a>.
+    </span>
+  )}
 </li>

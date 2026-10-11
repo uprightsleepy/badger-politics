@@ -291,17 +291,24 @@ export const sittingPeople = once(
  * preview and the paged record pages take slices, so counting and
  * slicing happen in SQLite and a build never holds a whole career in
  * memory. */
-export const personVotes = (personId: string, limit: number, offset = 0) =>
+export const personVotes = (personId: string, limit: number, offset = 0, { noLegiscan = false } = {}) =>
   prep(
-      `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result,
+      // a row is LegiScan's if its roll call or its bill came from there;
+      // noLegiscan drops those for the public JSON (lib/legiscan)
+      `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result, e.source_url,
+              CASE WHEN 'legiscan' IN (e.source, b.source) THEN 'legiscan' ELSE e.source END AS source,
               b.id AS bill_id, b.identifier, b.title, b.session_id
        FROM vote_records r
        JOIN vote_events e ON e.id = r.vote_event_id
        JOIN bills b ON b.id = e.bill_id
-       WHERE r.person_id = ? ORDER BY e.date DESC, e.id LIMIT ? OFFSET ?`,
+       WHERE r.person_id = ?
+         AND NOT (? AND 'legiscan' IN (COALESCE(e.source, ''), COALESCE(b.source, '')))
+       ORDER BY e.date DESC, e.id LIMIT ? OFFSET ?`,
     )
-    .all(personId, limit, offset) as {
+    .all(personId, noLegiscan ? 1 : 0, limit, offset) as {
     option: string;
+    source: string | null;
+    source_url: string | null;
     vote_event_id: string;
     date: string | null;
     motion: string | null;
