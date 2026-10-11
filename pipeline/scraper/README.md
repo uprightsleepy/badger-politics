@@ -226,34 +226,40 @@ exhausted limits, error/redirect responses with Retry-After, and nonzero or malf
 values still stop collection. Policy fingerprints and source permissions are unchanged.
 The nightly runner must produce a fresh successful report before collection resumes.
 
-## Executive orders (2026-10-11, review pending)
+## Executive orders (2026-10-11)
 
 `fetch_executive_orders` reads the Legislature's
-[executive order archive](https://docs.legis.wisconsin.gov/code/executive_orders):
-the index and one listing page per governor's folder
-(`/code/executive_orders/YYYY_name`), the only two GET shapes added to the
-docs.legis scope. Order PDFs are linked, never downloaded. A former governor's
-folder is fetched once; the index and the sitting governor's folder refresh each
-run (two requests at the existing one-second floor). Raw pages and the parsed
-listing stay in the private subjects bundle.
+[executive order archive](https://docs.legis.wisconsin.gov/code/executive_orders).
+The records menu's `/document/executiveorders/top` entry redirects there. The
+index links one folder per governor (`/code/executive_orders/2019_tony_evers`,
+labelled "2019- Tony Evers"); each folder lists its orders as
+"2020 Executive Order 72", linking the official PDF at
+`/document/executiveorders/2020/72.pdf` (a few older orders carry a letter:
+"1969 Executive Order 12A", `12a.pdf`). The listing states no title or date,
+so none is recorded or shown. The index and the folder pages are the only GET
+shapes added to the docs.legis scope; the folder pattern cannot reach anything
+below a folder. Order PDFs are linked, never downloaded: `/document/executiveorders/YYYY/N`
+redirects to `/code/executive_orders/{folder}/YYYY-N`, which serves the PDF
+itself, and both stay outside the manifest. A former governor's folder is fetched
+once; the index and the sitting governor's folder refresh each run (two
+requests at the existing one-second floor). Raw pages and the parsed listing
+stay in the private subjects bundle.
 
 On 2026-10-11 the [docs robots file](https://docs.legis.wisconsin.gov/robots.txt)
 was read with the pipeline User-Agent: HTTP 200, `text/plain`, one `User-agent: *`
 group, no crawl delay. It disallows `/frame`, `/frame/`, `/scroll/`, `/feed/`,
 `/doc/feed/`, `/breadcrumbs/`, `/preferences`, `/preferences/`, `/search` and one
-LRB report PDF. Nothing under `/code/`, so `/code/executive_orders` and its
-folders are allowed.
+LRB report PDF. Nothing under `/code/` or `/document/executiveorders/`, so the
+archive is allowed; its feed (`/feed/code/executive_orders`) and tree view
+(`/frame/...`) are disallowed and not used. The live file matches the reviewed
+fingerprint in `source_policies.json`, and the policy gate approved the host.
 
-The file's fingerprint no longer matches the reviewed one in
-`source_policies.json` (live `71a8ac71…27bf` as the policy check reads it), so
-the gate stops all docs.legis collection, this collector included. It also now
-disallows `/search` itself, which the manifest still enables for the upstream
-session list (`0003-wi-source-access.patch`). Neither change has been accepted:
-a reviewer must resolve the `/search` conflict and record a new fingerprint
-before any docs.legis fetch runs. The archive markup has not been checked live
-yet, so the parser tests still use hand-built pages. After that review, run
-`python -m scraper.fetch_executive_orders` locally and replace those pages with
-reduced real captures.
+The first live run read the index and all ten folders (11 requests): 1,874
+orders, Warren P. Knowles (1965) through Tony Evers. Numbering is each
+governor's own and some restart by year; Scott McCallum's first order continues
+Tommy Thompson's series as 2001 No. 418 before his own restarts at 1, and the
+archive files it in McCallum's folder as listed. The parser tests use reduced
+real captures in `tests/fixtures/executive_orders/`.
 
 ## Nightly finance windowing (2026-09-07)
 

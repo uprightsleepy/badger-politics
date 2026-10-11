@@ -1,6 +1,7 @@
 ---
 /** Every Wisconsin governor's executive orders, as the Legislature's
- * archive lists them. Links only: each order opens on docs.legis. */
+ * archive lists them: by number only, with no title or date. Links only:
+ * each order opens as its official PDF on docs.legis. */
 import Base from "../../layouts/Base.astro";
 import { executiveOrders, meta } from "../../lib/db";
 import { fmtDate } from "../../lib/format";
@@ -26,7 +27,7 @@ const count = (n: number) => `${n.toLocaleString()} ${n === 1 ? "order" : "order
     </p>
     <p class="text-small text-granite">
       {total > 0 ? `${count(total)} from ${governors.length} ${governors.length === 1 ? "governor" : "governors"}, newest first.` : "No orders are on record yet."}
-      {" "}Each opens on the Legislature's site. <a href="/feeds/executive-orders.xml" class="underline">Get new orders in a feed reader</a>.
+      {" "}The archive lists each order by number only; each opens as a PDF on the Legislature's site.
     </p>
   </header>
 
@@ -42,14 +43,11 @@ const count = (n: number) => `${n.toLocaleString()} ${n === 1 ? "order" : "order
         {g.years.map((y) => (
           <div class="mt-4">
             <h3 class="t-label text-spruce">{y.year}</h3>
-            <ul class="mt-1 flex flex-col">
+            <ul class="mt-1 flex flex-wrap gap-x-4">
               {y.orders.map((o) => (
-                <li class="flex flex-col py-1.5 sm:flex-row sm:gap-3">
-                  <a href={o.url} class="inline-flex min-h-11 shrink-0 items-center underline sm:min-w-[8.5rem]">Order {o.number}</a>
-                  <span class="self-center">
-                    {o.title ?? "Title not listed"}
-                    {o.date && <span class="text-granite"> · {fmtDate(o.date)}</span>}
-                  </span>
+                <li>
+                  <a href={o.url} class="inline-flex min-h-11 min-w-11 items-center underline"
+                    aria-label={`Executive Order ${o.number}${o.suffix} of ${y.year} (PDF)`}>{o.number}{o.suffix}</a>
                 </li>
               ))}
             </ul>
@@ -60,7 +58,6 @@ const count = (n: number) => `${n.toLocaleString()} ${n === 1 ? "order" : "order
   ))}
 
   <p class="mt-12 max-w-[47.5rem] text-fine text-granite">
-    From the Legislature's <a href={ARCHIVE} class="underline">executive order archive</a>, titles as
-    listed there{pulledOn && `. Checked ${fmtDate(pulledOn)}`}.
+    From the Legislature's <a href={ARCHIVE} class="underline">executive order archive</a>{pulledOn && `. Checked ${fmtDate(pulledOn)}`}.
   </p>
 </Base>

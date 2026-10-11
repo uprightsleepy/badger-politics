@@ -29,17 +29,21 @@ def db_path(tmp_path: Path, make_db) -> Path:
             "INSERT INTO vote_records (vote_event_id, person_id, option) VALUES ('v1', ?, ?)",
             (pid, option),
         )
-    conn.execute(
-        "INSERT INTO executive_orders (folder, governor, year, number, url)"
-        " VALUES ('2019_tony_evers', 'Tony Evers', 2020, 72, ?)",
-        (f"{EO_ARCHIVE}/2019_tony_evers/2020_72.pdf",),
+    conn.executemany(
+        "INSERT INTO executive_orders (folder, governor, year, number, suffix, url)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        [("2011_scott_walker", "Scott Walker", 2019, 319, "", f"{EO_ARCHIVE}/2019/319.pdf"),
+         ("2019_tony_evers", "Tony Evers", 2019, 1, "", f"{EO_ARCHIVE}/2019/1.pdf"),
+         ("2019_tony_evers", "Tony Evers", 2020, 72, "", f"{EO_ARCHIVE}/2020/72.pdf"),
+         ("1965_warren_p_knowles", "Warren P. Knowles", 1969, 12, "A",
+          f"{EO_ARCHIVE}/1969/12a.pdf")],
     )
     conn.commit()
     conn.close()
     return path
 
 
-EO_ARCHIVE = "https://docs.legis.wisconsin.gov/code/executive_orders"
+EO_ARCHIVE = "https://docs.legis.wisconsin.gov/document/executiveorders"
 
 
 def test_executive_orders_must_be_listed(db_path: Path, tmp_path: Path) -> None:
@@ -48,20 +52,37 @@ def test_executive_orders_must_be_listed(db_path: Path, tmp_path: Path) -> None:
     assert run_checks(db_path, tmp_path / "c.json") == ["executive_orders: no orders imported"]
 
 
-@pytest.mark.parametrize("url", [
-    "http://docs.legis.wisconsin.gov/code/executive_orders/2019_tony_evers/2020_73.pdf",
-    f"{EO_ARCHIVE}/2011_scott_walker/2020_73.pdf",
-    "https://evers.wi.gov/eo/2020_73.pdf",
+@pytest.mark.parametrize(("year", "number", "suffix", "url"), [
+    (2020, 73, "", "http://docs.legis.wisconsin.gov/document/executiveorders/2020/73.pdf"),
+    (2020, 73, "", f"{EO_ARCHIVE}/2020/74.pdf"),
+    (2020, 73, "", f"{EO_ARCHIVE}/2021/73.pdf"),
+    (2020, 73, "", "https://docs.legis.wisconsin.gov/code/executive_orders/2019_tony_evers/2020-73"),
+    (2020, 73, "", "https://evers.wi.gov/eo/2020_73.pdf"),
+    (2020, 73, "a", f"{EO_ARCHIVE}/2020/73a.pdf"),
+    (2020, 7, "3", f"{EO_ARCHIVE}/2020/73.pdf"),
 ])
-def test_executive_order_links_stay_in_their_governors_folder(
-    db_path: Path, tmp_path: Path, url: str
+def test_executive_order_links_are_their_own_archive_pdf(
+    db_path: Path, tmp_path: Path, year: int, number: int, suffix: str, url: str
+) -> None:
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO executive_orders (folder, governor, year, number, suffix, url)"
+            " VALUES ('2019_tony_evers', 'Tony Evers', ?, ?, ?, ?)", (year, number, suffix, url))
+    assert run_checks(db_path, tmp_path / "c.json") == [
+        "executive_orders: 1 links outside the official archive"]
+
+
+@pytest.mark.parametrize(("folder", "year"), [
+    ("2019_tony_evers", 2018), ("2011_scott_walker", 2020), ("2011_scott_walker", 2010)])
+def test_executive_orders_fall_in_their_governors_tenure(
+    db_path: Path, tmp_path: Path, folder: str, year: int
 ) -> None:
     with sqlite3.connect(db_path) as conn:
         conn.execute(
             "INSERT INTO executive_orders (folder, governor, year, number, url)"
-            " VALUES ('2019_tony_evers', 'Tony Evers', 2020, 73, ?)", (url,))
+            " VALUES (?, 'Governor', ?, 900, ?)", (folder, year, f"{EO_ARCHIVE}/{year}/900.pdf"))
     assert run_checks(db_path, tmp_path / "c.json") == [
-        "executive_orders: 1 links outside the official archive"]
+        "executive_orders: 1 orders outside their governor's tenure"]
 
 
 def test_consistent_db_passes(db_path: Path, tmp_path: Path) -> None:

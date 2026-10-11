@@ -51,7 +51,7 @@
         "GET": [
           "/\\d{4}/(?:proposals|related|legislators)/.*",
           "/document/(?:proposaltext|proposal|session|amendment|fe)/.*",
-          "/code/executive_orders(?:/\\d{4}_[a-z0-9_]+)?"
+          "/code/executive_orders(?:/\\d{4}_[a-z]+(?:_[a-z]+)+)?"
         ]
       },
       "delay_seconds": 1,

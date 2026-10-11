@@ -1490,9 +1490,9 @@ export const textsFor = (billId: string): BillText[] => {
   return [...byLabel.values()];
 };
 
-export type ExecutiveOrder = {
-  year: number; number: number; title: string | null; date: string | null; url: string;
-};
+/** The archive lists no title or date; suffix is the letter a few older
+ * orders carry ("12A"), "" otherwise. */
+export type ExecutiveOrder = { year: number; number: number; suffix: string; url: string };
 export type GovernorOrders = {
   folder: string; governor: string; years: { year: number; orders: ExecutiveOrder[] }[];
 };
@@ -1502,8 +1502,8 @@ export type GovernorOrders = {
  * older snapshot without the table lists none. */
 export const executiveOrders = once((): GovernorOrders[] => {
   if (!hasTable("executive_orders")) return [];
-  const rows = prep(`SELECT folder, governor, year, number, title, date, url FROM executive_orders
-    ORDER BY folder DESC, year DESC, number DESC`).all() as (ExecutiveOrder & { folder: string; governor: string })[];
+  const rows = prep(`SELECT folder, governor, year, number, suffix, url FROM executive_orders
+    ORDER BY folder DESC, year DESC, number DESC, suffix DESC`).all() as (ExecutiveOrder & { folder: string; governor: string })[];
   const governors: GovernorOrders[] = [];
   for (const { folder, governor, ...order } of rows) {
     let g = governors.at(-1);

@@ -17,7 +17,7 @@ from pathlib import Path
 
 from scraper.fetch_executive_orders import FORMAT
 
-COLUMNS = ("folder", "governor", "year", "number", "title", "date", "url")
+COLUMNS = ("folder", "governor", "year", "number", "suffix", "url")
 
 
 def run(archive_dir: Path, db_path: Path) -> int:

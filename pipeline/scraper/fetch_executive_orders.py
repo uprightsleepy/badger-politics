@@ -2,10 +2,14 @@
 
 Usage: python -m scraper.fetch_executive_orders
 
-The archive index (/code/executive_orders) links one folder per governor's
-tenure; each folder page lists that governor's orders and links each one's
-official document. Raw pages are archived under pages/ and parsed into
-orders.json. A former governor's folder is closed and fetched once; the
+The archive index (/code/executive_orders, where the records site's
+/document/executiveorders/top menu entry redirects) links one folder per
+governor's tenure, labelled "2019- Tony Evers". Each folder page lists that
+governor's orders as "2020 Executive Order 72", linking the official PDF at
+/document/executiveorders/2020/72.pdf; a few older orders carry a letter
+("1969 Executive Order 12A" -> 12a.pdf). The listing states no title or
+date, so none is recorded. Raw pages are archived under pages/ and parsed
+into orders.json. A former governor's folder is closed and fetched once; the
 index and the newest folder (the sitting governor) refresh every run.
 Parsing always reruns over the archived pages.
 
@@ -13,9 +17,9 @@ Links only: no order or PDF is ever downloaded. The archive lives inside
 the community stage's subjects bundle (both are docs.legis index archives),
 so adding it needs no new checkpoint bundle.
 
-Nothing is guessed: an order whose number or year the official listing
-doesn't state, a folder without orders, or a governor without a printed
-name fails the fetch.
+Nothing is guessed: an order link whose label disagrees with its address,
+an order without a printed label, a folder without orders, or a governor
+without a printed name fails the fetch.
 """
 
 from __future__ import annotations
@@ -31,22 +35,12 @@ from scraper.http import save_json, session
 BASE = "https://docs.legis.wisconsin.gov"
 INDEX_URL = f"{BASE}/code/executive_orders"
 DATA_DIR = Path(__file__).resolve().parents[1] / "_data" / "subjects" / "executive_orders"
-FORMAT = 1
+FORMAT = 2
 
 ANCHOR_RE = re.compile(r"<a\s[^>]*?href\s*=\s*[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", re.S | re.I)
-FOLDER_RE = re.compile(r"/code/executive_orders/((\d{4})_[a-z0-9_]+)/?")
-# one listing entry ends at its line/row/item; the next order starts a new one
-ENTRY_END_RE = re.compile(r"</(?:li|tr|p|div|dd)>|<br\s*/?>", re.I)
-FILE_NUMBER_RE = re.compile(r"(?:^|[_-])(\d{4})[_-]0*(\d+)$")
-TEXT_NUMBER_RE = re.compile(r"Executive\s+Order\s*(?:No\.?|Number|#)?\s*0*(\d+)\b", re.I)
-LEAD_RE = re.compile(r"^\s*Executive\s+Order\s*(?:No\.?|Number|#)?\s*\d+\s*[-–—:,.]?\s*", re.I)
-# a format link's label and a closing "(March 12, 2020)" are not title
-LABEL_RE = re.compile(r"(?:\s+(?:PDF|HTML))+\s*$")
-PAREN_TAIL_RE = re.compile(r"\s*\(([^()]*)\)\s*$")
-MONTHS = ("January February March April May June July August September October"
-          " November December").split()
-LONG_DATE_RE = re.compile(rf"\b({'|'.join(MONTHS)})\s+(\d{{1,2}}),\s+(\d{{4}})\b")
-SHORT_DATE_RE = re.compile(r"\b(\d{1,2})/(\d{1,2})/(\d{4})\b")
+FOLDER_RE = re.compile(r"/code/executive_orders/((\d{4})_[a-z]+(?:_[a-z]+)+)")
+ORDER_RE = re.compile(r"/document/executiveorders/(\d{4})/(\d+)([a-z]?)\.pdf")
+LABEL_RE = re.compile(r"(\d{4}) Executive Order (\d+)([A-Z]?)")
 
 
 def _text(fragment: str) -> str:
@@ -55,25 +49,24 @@ def _text(fragment: str) -> str:
 
 
 def _anchors(page: str, page_url: str):
-    """(absolute https URL, path, link text, start, end) for every link."""
+    """(absolute https URL, path, link text) for every docs.legis link."""
     for m in ANCHOR_RE.finditer(page):
         url = urljoin(page_url, html_lib.unescape(m.group(1).strip()))
         parts = urlsplit(url)
         if parts.hostname != urlsplit(BASE).hostname:
             continue
-        url = f"{BASE}{parts.path}"
-        yield url, parts.path, _text(m.group(2)), m.start(), m.end()
+        yield f"{BASE}{parts.path}", parts.path, _text(m.group(2))
 
 
 def parse_index(page: str) -> list[dict]:
     """[{folder, start_year, governor}] for each governor's folder, as listed."""
     folders: dict[str, dict] = {}
-    for _, path, text, _, _ in _anchors(page, INDEX_URL):
+    for _, path, text in _anchors(page, INDEX_URL):
         m = FOLDER_RE.fullmatch(path)
         if not m or m.group(1) in folders:
             continue
-        # "2019 - Tony Evers" / "Tony Evers (2019-)": the name as printed
-        name = re.sub(r"\s+", " ", re.sub(r"[\d()\-–—,]|\bGovernor\b", " ", text)).strip()
+        # "1965-1970 Warren P. Knowles" / "2019- Tony Evers": the name as printed
+        name = re.sub(r"\s+", " ", re.sub(r"[\d()\-–—,]", " ", text)).strip()
         if not name:
             raise RuntimeError(f"executive orders index: no governor name for {m.group(1)}")
         folders[m.group(1)] = {"folder": m.group(1), "start_year": int(m.group(2)),
@@ -83,48 +76,30 @@ def parse_index(page: str) -> list[dict]:
     return sorted(folders.values(), key=lambda f: f["start_year"])
 
 
-def _date(text: str) -> str | None:
-    if m := LONG_DATE_RE.search(text):
-        return f"{m.group(3)}-{MONTHS.index(m.group(1)) + 1:02d}-{int(m.group(2)):02d}"
-    if m := SHORT_DATE_RE.search(text):
-        return f"{m.group(3)}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"
-    return None
-
-
 def parse_folder(page: str, folder: dict) -> list[dict]:
-    """Every order the folder page lists, with its official link."""
-    page_url = f"{INDEX_URL}/{folder['folder']}"
-    order_re = re.compile(rf"/code/executive_orders/{re.escape(folder['folder'])}/([^/]+)")
-    orders: dict[tuple[int, int], dict] = {}
-    for url, path, _, start, end in _anchors(page, page_url):
-        m = order_re.fullmatch(path)
-        if not m:
+    """Every order the folder page lists, with its official PDF link. Each
+    order has a labelled link and an unlabelled PDF icon to the same file."""
+    orders: dict[str, dict] = {}
+    unlabelled: set[str] = set()
+    for url, path, text in _anchors(page, f"{INDEX_URL}/{folder['folder']}"):
+        if not (m := ORDER_RE.fullmatch(path)):
             continue
-        close = ENTRY_END_RE.search(page, end)
-        entry = _text(page[start:close.start() if close else len(page)])
-        stem = re.sub(r"\.pdf$", "", m.group(1), flags=re.I)
-        date = _date(entry)
-        if fm := FILE_NUMBER_RE.search(stem):
-            year, number = int(fm.group(1)), int(fm.group(2))
-        elif (tm := TEXT_NUMBER_RE.search(entry)) and date:
-            year, number = int(date[:4]), int(tm.group(1))
-        else:
-            raise RuntimeError(f"{folder['folder']}: no order number/year for {url}")
-        order = orders.setdefault((year, number), {
-            "folder": folder["folder"], "governor": folder["governor"], "year": year,
-            "number": number, "title": None, "date": None, "url": url})
-        title = LABEL_RE.sub("", " " + LEAD_RE.sub("", entry))
-        if (tail := PAREN_TAIL_RE.search(title)) and _date(tail.group(1)):
-            title = title[:tail.start()]
-        title = title.strip(" -–—:,") or None
-        if title and (order["title"] is None or len(title) > len(order["title"])):
-            order["title"] = title
-        order["date"] = order["date"] or date
-        if url.lower().endswith(".pdf"):  # the official document over its page
-            order["url"] = url
+        if not text:
+            unlabelled.add(url)
+            continue
+        year, number, suffix = int(m.group(1)), int(m.group(2)), m.group(3).upper()
+        label = LABEL_RE.fullmatch(text)
+        if not label or (int(label.group(1)), int(label.group(2)), label.group(3)) \
+                != (year, number, suffix):
+            raise RuntimeError(f"{folder['folder']}: label {text!r} disagrees with {url}")
+        orders.setdefault(url, {"folder": folder["folder"], "governor": folder["governor"],
+                                "year": year, "number": number, "suffix": suffix,
+                                "url": url})
+    if missing := unlabelled - orders.keys():
+        raise RuntimeError(f"{folder['folder']}: no printed label for {sorted(missing)[0]}")
     if not orders:
         raise RuntimeError(f"{folder['folder']}: no executive orders listed (markup changed?)")
-    return sorted(orders.values(), key=lambda o: (o["year"], o["number"]))
+    return sorted(orders.values(), key=lambda o: (o["year"], o["number"], o["suffix"]))
 
 
 def main(argv: list[str]) -> int:

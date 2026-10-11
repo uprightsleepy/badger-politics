@@ -10,7 +10,6 @@
   /feeds/laws.xml                   new acts, as the governor's approval numbers them
   /feeds/vetoes.xml                 vetoes, partial vetoes, override attempts
   /feeds/money/independent.xml      outside-spending filings, one at a time
-  /feeds/executive-orders.xml       the governor's newest executive orders
 
 Entry ids in the digest, seat, subject, law, veto and money feeds are the
 record's own id (vote, action, transaction), so they hold as lists shift.
@@ -182,24 +181,6 @@ def build_feeds(
             )
         _write(root, feeds_dir / "committees" / f"{committee_id.rsplit('/', 1)[-1]}.xml")
         files += 1
-
-    orders = queries.executive_orders(conn)[:50]
-    path = "/feeds/executive-orders.xml"
-    root = _feed("Wisconsin governor's executive orders", path,
-                 _stamp(orders[0]["date"] or f"{orders[0]['year']}-01-01") if orders
-                 else _stamp(None))
-    for order in orders:
-        label = f"Executive Order {order['number']} ({order['year']})"
-        _entry(
-            root,
-            order["url"],  # the official link is the order's stable identity
-            f"{label}: {(order['title'] or '')[:120]}".rstrip(": "),
-            _stamp(order["date"] or f"{order['year']}-01-01"),
-            order["url"],
-            f"{order['governor']}, {label}. {order['title'] or ''}".strip(),
-        )
-    _write(root, feeds_dir / "executive-orders.xml")
-    files += 1
 
     # weekly digest: everything that moved in the 7 days up to the data's edge
     data_through = queries.meta(conn).get("data_through")

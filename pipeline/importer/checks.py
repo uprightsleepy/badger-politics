@@ -504,17 +504,30 @@ def check_congress(conn: sqlite3.Connection) -> list[str]:
 
 
 def check_executive_orders(conn: sqlite3.Connection) -> list[str]:
-    """The governor's orders are listed, and every link opens the order in
-    its own governor's folder of the official archive. Numbers are unique
-    per governor and year by the table's key."""
+    """The governors' orders are listed, every link is the official archive
+    PDF that its own year, number and letter name, and every order falls in its
+    governor's tenure: from the folder's start year through the year the
+    next governor's folder starts (both governors issue orders that year)."""
     if not conn.execute("SELECT 1 FROM executive_orders").fetchone():
         return ["executive_orders: no orders imported"]
+    failures = []
     bad = conn.execute(
-        "SELECT COUNT(*) FROM (SELECT url, 'https://docs.legis.wisconsin.gov/code/"
-        "executive_orders/' || folder || '/' AS prefix FROM executive_orders)"
-        " WHERE substr(url, 1, length(prefix)) != prefix OR length(url) = length(prefix)"
+        "SELECT COUNT(*) FROM executive_orders WHERE NOT (suffix = '' OR suffix GLOB '[A-Z]')"
+        " OR url != 'https://docs.legis.wisconsin.gov/document/"
+        "executiveorders/' || year || '/' || number || lower(suffix) || '.pdf'"
     ).fetchone()[0]
-    return [f"executive_orders: {bad} links outside the official archive"] if bad else []
+    if bad:
+        failures.append(f"executive_orders: {bad} links outside the official archive")
+    outside = conn.execute(
+        "WITH tenure AS (SELECT folder, CAST(substr(folder, 1, 4) AS INTEGER) AS first,"
+        " LEAD(CAST(substr(folder, 1, 4) AS INTEGER)) OVER (ORDER BY folder) AS last"
+        " FROM (SELECT DISTINCT folder FROM executive_orders))"
+        " SELECT COUNT(*) FROM executive_orders JOIN tenure USING (folder)"
+        " WHERE year < first OR year > coalesce(last, year)"
+    ).fetchone()[0]
+    if outside:
+        failures.append(f"executive_orders: {outside} orders outside their governor's tenure")
+    return failures
 
 
 def run_checks(db_path: Path, counts_file: Path) -> list[str]:

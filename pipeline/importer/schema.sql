@@ -90,17 +90,18 @@ CREATE TABLE bill_versions (
 CREATE INDEX idx_bill_versions_bill ON bill_versions (bill_id);
 
 -- governors' executive orders as the docs.legis archive lists them; links
--- only. folder is the archive's per-governor folder (2019_tony_evers);
--- numbering is the governor's own, so a number repeats across governors
+-- only, and the listing states no title or date. folder is the archive's
+-- per-governor folder (2019_tony_evers); numbering is the governor's own, so
+-- a number repeats across governors. suffix is the letter a few older orders
+-- carry ("1969 Executive Order 12A"), '' otherwise
 CREATE TABLE executive_orders (
     folder   TEXT NOT NULL,
     governor TEXT NOT NULL,  -- as the archive prints it
     year     INTEGER NOT NULL,
     number   INTEGER NOT NULL,
-    title    TEXT,
-    date     TEXT,
+    suffix   TEXT NOT NULL DEFAULT '',
     url      TEXT NOT NULL UNIQUE,
-    PRIMARY KEY (folder, year, number)
+    PRIMARY KEY (folder, year, number, suffix)
 );
 
 -- service terms from the people files (recalls and resignations end

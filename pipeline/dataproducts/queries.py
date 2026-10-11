@@ -182,8 +182,8 @@ def links_for_session(
 
 def executive_orders(conn: sqlite3.Connection) -> list[dict]:
     """Newest first. Official links only; no LegiScan rows exist here."""
-    return _rows(conn, "SELECT governor, year, number, title, date, url FROM executive_orders"
-                       " ORDER BY year DESC, number DESC, folder DESC")
+    return _rows(conn, "SELECT governor, year, number, suffix, url FROM executive_orders"
+                       " ORDER BY year DESC, folder DESC, number DESC, suffix DESC")
 
 
 def sponsors_for_session(conn: sqlite3.Connection, session_id: str) -> dict[str, list[dict]]:
