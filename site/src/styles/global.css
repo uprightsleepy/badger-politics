@@ -376,3 +376,93 @@
   line-height: 1rem;
   color: var(--color-granite);
 }
+
+/* Print: the page's own content in black on white. The site chrome goes,
+   except the independence disclaimer, which every copy keeps. Data
+   graphics keep their fills; everything else drops its tint. */
+@media print {
+  @page {
+    margin: 1.5cm;
+  }
+  html,
+  body,
+  .sheet {
+    background: #fff !important;
+  }
+  * {
+    color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  body > header,
+  body > a[href="#main"],
+  .btn,
+  button:not(.term),
+  form,
+  label:has(select, input),
+  .scroll-hint,
+  footer > div > :not([data-disclaimer]) {
+    display: none !important;
+  }
+  footer {
+    margin-top: 1.5rem !important;
+    border: 0 !important;
+  }
+  footer > div {
+    padding: 0.75rem 0 0 !important;
+    border-top: 1px solid #000;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .sheet {
+    border: 1px solid #999;
+  }
+  .mine {
+    background: none !important;
+    box-shadow: none !important;
+  }
+  /* a scroll panel prints every row, not the first screenful */
+  .scroll-body,
+  .overflow-auto,
+  .overflow-x-auto,
+  .overflow-y-auto {
+    max-height: none !important;
+    overflow: visible !important;
+    background-image: none !important;
+  }
+  .hm-cell,
+  .hm-miss,
+  .seat-hatch {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  /* a link on paper is its address; site links are named in the page */
+  main a[href^="http"]::after {
+    content: "(" attr(href) ")";
+    /* inline-block keeps the link's underline off the address */
+    display: inline-block;
+    margin-left: 0.25em;
+    text-decoration: none;
+    font-size: 0.8em;
+    font-weight: 400;
+    overflow-wrap: anywhere;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    break-after: avoid;
+  }
+  li,
+  tr,
+  img,
+  svg,
+  figure {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+}

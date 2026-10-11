@@ -57,6 +57,19 @@ def test_job_permissions_and_raw_cache_are_checked() -> None:
     assert any("must not enter" in error for error in errors)
 
 
+@pytest.mark.parametrize("command", [
+    "npx --yes firebase-tools@14 deploy",
+    "npm ci && npx astro check",
+    "bash timed.sh release npx firebase deploy",
+])
+def test_npx_cannot_fetch_unlocked_packages(command) -> None:
+    workflow = deepcopy(WORKFLOW)
+    workflow["jobs"]["deploy"]["steps"].append({"run": command})
+    assert any("not npx" in error for error in validate(workflow, "deploy.yml"))
+    workflow["jobs"]["deploy"]["steps"][-1]["run"] = "site/node_modules/.bin/firebase deploy"
+    assert validate(workflow, "deploy.yml") == []
+
+
 def deploy_workflow():
     path = Path(__file__).resolve().parents[2] / ".github/workflows/deploy.yml"
     return yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
@@ -109,6 +122,28 @@ def test_automatic_release_boundaries_cannot_be_weakened(mutation):
     elif mutation == "workflow_concurrency":
         workflow["concurrency"] = workflow["jobs"]["deploy"].pop("concurrency")
     assert validate(workflow, "deploy.yml")
+
+
+@pytest.mark.parametrize("mutation", [
+    None, "dev", "no_needs", "checkout", "oidc", "environment", "deploy_writes",
+])
+def test_only_the_publishing_job_may_write_contents(mutation):
+    workflow = deploy_workflow()
+    publish = workflow["jobs"]["publish-downloads"]
+    if mutation == "dev":
+        publish["if"] = "always()"
+    elif mutation == "no_needs":
+        publish.pop("needs")
+    elif mutation == "checkout":
+        publish["steps"].insert(0, {"uses": "actions/checkout@" + "a" * 40})
+    elif mutation == "oidc":
+        publish["permissions"]["id-token"] = "write"
+    elif mutation == "environment":
+        publish["environment"] = "badgerpolitics-prod"
+    elif mutation == "deploy_writes":
+        workflow["jobs"]["deploy"]["permissions"]["contents"] = "write"
+    errors = validate(workflow, "deploy.yml")
+    assert (errors == []) is (mutation is None), errors
 
 
 @pytest.mark.parametrize("change", [None, "stale", "missing"])

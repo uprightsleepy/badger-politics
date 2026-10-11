@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "npm run build:astro && npm run build:search",
+    "build": "npm run build:astro && npm run build:cards && npm run build:search",
     "preview": "astro preview",
     "build:astro": "astro build",
+    "build:cards": "node scripts/share-cards.mjs",
     "build:search": "pagefind --site dist",
     "test:harness": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test scripts/tests/*.test.mjs"
   },
@@ -25,6 +26,7 @@
     "@astrojs/check": "^0.9.10",
     "@types/better-sqlite3": "^7.6.0",
     "axe-core": "^4.13.0",
+    "firebase-tools": "14.27.0",
     "pagefind": "^1.3.0",
     "puppeteer-core": "25.9.0",
     "typescript": "^5.9.3"

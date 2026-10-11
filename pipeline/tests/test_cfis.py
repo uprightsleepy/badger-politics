@@ -31,6 +31,13 @@ def test_nickname_prefix_matches() -> None:
     assert len(match_committees("Will Penterman", hits)) == 1
 
 
+def test_surname_never_prefix_matches() -> None:
+    hits = [hit("Friends of Mark Bornemann"), hit("Mark Born for Assembly", entity_id=2)]
+    assert [m["id"] for m in match_committees("Mark Born", hits)] == [2]
+    # a comma-suffixed surname is still the surname
+    assert len(match_committees("Darrin Madison", [hit("Darrin Madison, Jr.")])) == 1
+
+
 def test_other_persons_committee_never_matches() -> None:
     # same surname, different first name: every-word rule rejects
     hits = [hit("Brent Jacobson for Assembly"), hit("Citizens for Lothian", entity_id=2)]
@@ -78,6 +85,22 @@ def test_import_rejects_unknown_person(tmp_path: Path, make_db) -> None:
     bad = dict(good, id=2, person_id="ghost")
     (archive / "tx-2026-02.json").write_text(json.dumps([bad]), encoding="utf-8")
     with pytest.raises(RuntimeError, match="unknown person"):
+        import_run(archive, db)
+
+
+def test_import_rejects_a_receipt_without_an_amount(tmp_path: Path, make_db) -> None:
+    db = tmp_path / "wi.sqlite"
+    conn = make_db(db)
+    conn.execute("INSERT INTO people (id, name) VALUES ('p1', 'A')")
+    conn.commit()
+    conn.close()
+    archive = tmp_path / "cfis"
+    archive.mkdir()
+    row = {"id": 1, "person_id": "p1", "committee_entity_id": 9, "date": "2026-01-05",
+           "amount": None, "from_name": "Jane Donor", "from_type": "Individual",
+           "occupation": "Teacher", "category": "Monetary"}
+    (archive / "tx-2026-01.json").write_text(json.dumps([row]), encoding="utf-8")
+    with pytest.raises(ValueError, match="no amount"):
         import_run(archive, db)
 
 

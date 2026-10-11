@@ -1,17 +1,13 @@
 ---
 /** The hearings list section of the calendar page: what's scheduled, or
  * the most recent hearings when nothing is. */
-import { upcomingHearings, recentHearings, findBillByIdentifier, allCommittees } from "../lib/db";
-import { committeeSlug, fmtDate, fmtTime, hearingDisplayName, billSlug, personSlug } from "../lib/format";
-import { safeHref } from "../lib/html";
-const today = new Date().toISOString().slice(0, 10);
+import HearingRow from "./HearingRow.astro";
+import { upcomingHearings, recentHearings } from "../lib/db";
+import { wisconsinToday } from "../lib/today";
+const today = wisconsinToday();
 const upcoming = upcomingHearings(today);
 const shown = upcoming.length ? upcoming : recentHearings(30);
 const heading = upcoming.length ? "Upcoming committee hearings" : "Recent committee hearings";
-// schedule-feed committees without a roster have no page; don't link them
-const committeePages = new Set(allCommittees().map((c) => c.id));
-const weekday = (iso: string) =>
-  new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
 ---
 
 <section id="hearings" aria-labelledby="hearings-heading">
@@ -26,60 +22,7 @@ const weekday = (iso: string) =>
     {" "}<a href="/calendar/hearings.ics" class="underline">Add hearings to your calendar</a>
   </p>
   <ul class="mt-4 max-w-[60rem] border-b border-rule" role="list">
-    {shown.map((h) => {
-      const agendaBills = JSON.parse(h.agenda_bill_ids_json ?? "[]") as string[];
-      // must match hearing_uid() in pipeline/dataproducts/ical.py
-      const uid = h.id.split("/").pop()!.replace(/\s+/g, "-");
-      const name = hearingDisplayName(h);
-      const video = safeHref(h.video_url);
-      const notice = safeHref(h.source_url);
-      return (
-        <li class="flex flex-col gap-1.5 border-t border-rule py-4">
-          <p class="text-small font-bold text-granite">
-            {h.date ? `${weekday(h.date)}, ${fmtDate(h.date)}` : "Date not posted"}{h.time && `, ${fmtTime(h.time)}`}
-          </p>
-          <h3 class="t-question text-[1.1875rem]">
-            {h.committee_id && committeePages.has(h.committee_id) ? (
-              <a href={`/committees/${committeeSlug(h.committee_id)}/`} class="underline">{name}</a>
-            ) : (
-              name
-            )}
-          </h3>
-          {(h.location || h.chair_name) && (
-            <p class="text-small text-granite">
-              {h.location && `${h.location}.`}
-              {h.chair_name && (
-                <> Chair: {h.chair_person_id ? (
-                  <a href={`/legislators/${personSlug(h.chair_person_id)}/`} class="underline">{h.chair_name}</a>
-                ) : (
-                  h.chair_name
-                )}.</>
-              )}
-            </p>
-          )}
-          {agendaBills.length > 0 && (
-            <p>
-              On the agenda:{" "}
-              {agendaBills.map((ident, i) => {
-                const found = findBillByIdentifier(ident);
-                return (
-                  <>{i > 0 && ", "}{found ? <a href={`/bills/${found.session_id}/${billSlug(ident)}/`} class="underline">{ident}</a> : ident}</>
-                );
-              })}
-            </p>
-          )}
-          <ul class="flex flex-wrap gap-x-5 gap-y-1 text-small" role="list">
-            {video && (
-              <li><a href={video} class="inline-flex min-h-11 items-center underline" aria-label={`Watch ${name} hearing from ${fmtDate(h.date)} on WisconsinEye`}>Watch on WisconsinEye</a></li>
-            )}
-            <li><a href={`/calendar/hearings/${uid}.ics`} class="inline-flex min-h-11 items-center underline" aria-label={`Add ${name} hearing on ${fmtDate(h.date)} to calendar`}>Add to calendar</a></li>
-            {notice && (
-              <li><a href={notice} class="inline-flex min-h-11 items-center underline" aria-label={`Official notice for ${name} hearing on ${fmtDate(h.date)}`}>Official notice</a></li>
-            )}
-          </ul>
-        </li>
-      );
-    })}
+    {shown.map((h) => <HearingRow h={h} />)}
   </ul>
 
   <section class="mt-8 max-w-[47.5rem]" aria-labelledby="attending-heading">

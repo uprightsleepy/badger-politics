@@ -10,6 +10,11 @@ source policies in `scraper/http.py`. It removes browser impersonation and
 disabled TLS checks. The wrapper exposes our Apache-2.0 HTTP helpers to the GPL
 subprocess; our application never imports upstream scraper modules. General
 upstream intent: verified TLS, identifying User-Agent, and policy-aware access.
+Since 2026-10-11 docs.legis robots.txt disallows `/search`, the page upstream
+read the session list from, and no allowed page names sessions; `get_session_list`
+now returns the pinned metadata's `_scraped_name`s, so a new session surfaces only
+when the pin is bumped. Upstream intent: discover sessions from a robots-allowed
+source.
 
 | Patch | Upstream intent |
 |---|---|

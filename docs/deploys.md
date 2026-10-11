@@ -47,12 +47,19 @@ constituents as a side effect of committing.
    large as the bill count, the landing pages present, and the independence
    disclaimer on the homepage. It derives its expectations from the data,
    so it never needs updating when the counts change.
-3. **Site verification** — `links`, `responsive`, `a11y`, `verify`.
+3. **Site verification** — `links`, `responsive`, `a11y`, `verify`. `links`
+   also fails a page whose share image (`og:image`) was not rendered: the
+   build lists per-page cards in `/og/cards.json` and
+   `scripts/share-cards.mjs` renders them in Chrome before Pagefind runs.
 4. **Post-release smoke test** — hits the released target's public URL,
    asserts 200s on pages, a feed and an API file, and checks that HTML is
    still served with `must-revalidate`. A page cached for an hour once hid
    a broken deploy for exactly that long.
-   The live API metadata must also match the snapshot used for the build.
+   The live API metadata must also match the snapshot used for the build,
+   and the API must send `Access-Control-Allow-Origin: *` (the API, feeds,
+   and calendars are readable from any origin). `scripts/csp.mjs` then
+   checks the served Content-Security-Policy, including that `/embed/`
+   cards, and nothing else, may be framed by other sites.
 
 The gates are also where three latent defects surfaced the first time this
 ran: `npm ci --ignore-scripts` leaves `better-sqlite3` unloadable, the
@@ -64,6 +71,19 @@ Validate layout changes in Linux Chrome before merging. The deployment runner's
 system font can be wider than Windows fonts, so a Windows-only responsive pass
 does not establish that the release check will pass.
 
+## Bulk downloads
+
+A production release also publishes the bulk CSVs and the filtered SQLite
+database (`pipeline/dataproducts/bulk.py`) as a GitHub Release, because the
+Hosting origin must never serve large files. The credentialed `deploy` job
+packages them (`python -m dataproducts.bulk`) after the live checks pass and
+hands them over as a one-day artifact; the separate `publish-downloads` job,
+the only job anywhere allowed `contents: write` (`check_workflows.py`
+enforces it), verifies `SHA256SUMS`, creates a `data-<UTC timestamp>` release
+marked latest, and deletes all but the three newest data releases. It holds no
+cloud credentials and checks out no code. Dev releases publish nothing, so
+`releases/latest/download/<file>` always matches badgerpolitics.org.
+
 ## Credentials
 
 There is no service-account key anywhere. GitHub Actions federates into
@@ -72,19 +92,24 @@ Workload Identity, restricted in two places:
 
 - the provider refuses to exchange a token whose `repository` claim is not
   `uprightsleepy/badger-politics`, so no other repo can reach the pool
-- the service account is bound to a single principal built from a mapped
-  attribute combining both claims: `uprightsleepy/badger-politics@refs/heads/main`
+- the service account is bound to two principals built from a mapped
+  `deploy` attribute combining the workflow, ref, and environment claims:
+  `uprightsleepy/badger-politics/.github/workflows/deploy.yml@refs/heads/main:refs/heads/main:<env>`
+  for the `badgerpolitics-dev` and `badgerpolitics-prod` environments
 
-A pull request runs with `refs/pull/N/merge`, which produces a different
-principal that holds no roles, so it cannot assume the identity even from
-inside this repository. Note the restriction has to live in the principal,
-not in an IAM condition: mapped attributes are not visible to IAM
-conditions during impersonation, so a condition on
-`request.auth.claims['attribute.ref']` is silently always false and denies
-every deploy. The service account holds
-`firebasehosting.admin` on the prod project and *read-only* access to the
-snapshot bucket, so a compromised run can publish a site but cannot alter
-or delete the database.
+A pull request runs with `refs/pull/N/merge`, and any other workflow on
+`main` (including nightly parser stages, which run third-party scraper code)
+has a different `workflow_ref` or environment. Those principals hold no
+roles, so they cannot assume the identity even from inside this repository.
+Collector subprocesses also run without the Actions OIDC request variables.
+Note the restriction has to live in the principal, not in an IAM condition:
+mapped attributes are not visible to IAM conditions during impersonation, so
+a condition on `request.auth.claims['attribute.ref']` is silently always
+false and denies every deploy. The service account holds
+`firebasehosting.admin` on the prod and dev projects and *read-only* access
+to objects under `snapshots/` (plus bucket-wide name listing, which GCS IAM
+cannot prefix-filter; parser state and archives are not readable), so a
+compromised run can publish a site but cannot alter or delete the database.
 
 Two repository variables wire it up. They are not secrets — the conditions
 above are what make the identity safe, not the obscurity of these values:
@@ -112,10 +137,11 @@ changes wait for the next snapshot.
 
 ## Rolling back
 
-Hosting keeps previous versions:
+Hosting keeps previous versions. The CLI is the locked `firebase-tools` in
+`site/` (install it with `npm ci --ignore-scripts` there first):
 
 ```bash
-npx firebase-tools@14 hosting:rollback --project badgerpolitics-prod
+site/node_modules/.bin/firebase hosting:rollback --project badgerpolitics-prod
 ```
 
 That reverts the serving version immediately. Follow it with a revert
@@ -123,11 +149,11 @@ commit, or the next deploy will republish the bad build.
 
 ## Running a deploy by hand
 
-Still supported, and still gated — `run.sh` runs preflight too:
+`run.sh` can still release **dev** (it runs preflight, but not the browser,
+link, or live checks). It refuses a working tree with uncommitted changes,
+uploads the snapshot before releasing, and refuses `badgerpolitics-prod`
+outright. Promote production through the workflow:
 
 ```bash
-cd pipeline && FB_PROJECT=badgerpolitics-prod ./run.sh
+gh workflow run deploy.yml -f target=badgerpolitics-prod
 ```
-
-`run.sh` defaults to `badgerpolitics-dev`, so promoting to production is
-always an explicit act.

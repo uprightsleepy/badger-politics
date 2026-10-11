@@ -5,7 +5,9 @@ import MoneyFilters from "../../components/MoneyFilters.astro";
 import ProfileMoneyView from "../../components/ProfileMoneyView.astro";
 import { moneyViews } from "../../lib/money-periods";
 import FollowButton from "../../components/FollowButton.astro";
+import EmbedCode from "../../components/EmbedCode.astro";
 import VoteRow from "../../components/VoteRow.astro";
+import LegiscanCredit from "../../components/LegiscanCredit.astro";
 import JsonLd from "../../components/JsonLd.astro";
 import PlainText from "../../components/PlainText.astro";
 import TermsOnPage from "../../components/TermsOnPage.astro";
@@ -24,7 +26,8 @@ import {
   meta,
 } from "../../lib/db";
 import { legislatorProfile } from "../../lib/legislator";
-import { seatOffice, ELECTION_CYCLE } from "../../lib/ballot";
+import { personCard } from "../../lib/share";
+import { mapsNote, seatOffice, ELECTION_CYCLE } from "../../lib/ballot";
 import { chamberTypical, repSummary } from "../../lib/repSummary";
 import { answers } from "../../lib/repAnswers";
 import type { TermId } from "../../lib/glossary";
@@ -130,6 +133,7 @@ const terms: TermId[] = [
   "roll-call",
 ];
 const portraitAlt = `Portrait of ${person.name}`;
+const share = personCard(person);
 // "$171" and "$85.50": cents only when there are some
 const dollars = (n: number) => `$${Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2)}`;
 // numbers only, so the sentence can carry figure markup safely
@@ -146,6 +150,8 @@ const ledSentence =
 
 <Base
   title={`${person.name}${person.district != null ? `, ${roleAbbr(person.chamber)} ${person.district}` : ""}`}
+  image={share?.image}
+  imageAlt={share?.alt}
   layout="wide"
   filters={{
     type: "Legislator",
@@ -224,6 +230,7 @@ const ledSentence =
         Following saves them on this device. You can also
         {" "}<a href={`/feeds/legislators/${slug}.xml`} class="underline">get updates in a feed reader</a>.
       </p>
+      {share && <EmbedCode path={`/embed/legislators/${slug}/`} title={`${person.name} on Badger Politics`} height={320} />}
     </div>
 
     {glance.length > 0 && (
@@ -338,7 +345,7 @@ const ledSentence =
           <h2 id="results-heading" class="t-label text-[1.1875rem]">Past results for this seat</h2>
           {history.map((h) => (
             <div class="border-t border-rule pt-2">
-              <p class="text-fine font-semibold text-granite">November {h.year}</p>
+              <p class="text-fine font-semibold text-granite">November {h.year}{mapsNote(h.year) && <span class="font-normal">, {mapsNote(h.year)}</span>}</p>
               <ul>
                 {h.candidates.map((c) => {
                   const isThem = c.candidate.toLowerCase().includes(surname);
@@ -356,7 +363,8 @@ const ledSentence =
           ))}
           <p class="text-fine text-granite">
             Official canvass results from the Wisconsin Elections Commission for
-            {" "}{chamber} District {person.district}. District lines changed in 2024.
+            {" "}{chamber} District {person.district}. District lines changed in 2012, 2022 and 2024;
+            older results are labeled with the maps they were held under.
           </p>
         </section>
       )}
@@ -520,6 +528,7 @@ const ledSentence =
                   ))}
                 </p>
                 <p class="text-right text-fine"><a href={`/votes/${v.vote_event_id}/`} class="underline">Roll call</a></p>
+                <LegiscanCredit v={v} class="col-span-2" />
               </li>
             ))}
           </ul>
@@ -547,6 +556,7 @@ const ledSentence =
                   ))}
                 </p>
                 <p class="text-right text-fine"><a href={`/votes/${v.vote_event_id}/`} class="underline">Roll call</a></p>
+                <LegiscanCredit v={v} class="col-span-2" />
               </li>
                 ))}
               </ul>
@@ -582,6 +592,7 @@ const ledSentence =
                   <p class="col-span-2 text-fine text-granite">
                     {v.date ? `${fmtDate(v.date)}. ` : ""}Voted {voteWord(v.option).toLowerCase()}; {partyPlural} split {v.split.yes} yes, {v.split.no} no.
                   </p>
+                  <LegiscanCredit v={v} class="col-span-2" />
                 </li>
               ))}
             </ul>
@@ -665,6 +676,13 @@ const ledSentence =
           <p>
             <a href={`${recordBase}/votes/1/`} class="inline-flex min-h-11 items-center font-bold underline">
               See all {voteTotal.toLocaleString()} votes
+            </a>
+          </p>
+        )}
+        {sitting && voteTotal > 0 && (
+          <p>
+            <a href={`/legislators/compare/?a=${slug}`} class="inline-flex min-h-11 items-center underline">
+              Compare {person.name}'s votes with another lawmaker's
             </a>
           </p>
         )}

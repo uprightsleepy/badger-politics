@@ -132,18 +132,44 @@ See [scheduling and activation](../../docs/nightly-parser-hosting.md#daily-polic
 
 | Source / collector | Robots result and current decision | Terms / permitted scope |
 | --- | --- | --- |
-| Wisconsin Legislature (`scrape`, contacts, subjects, session rosters, enrichers) | [docs robots](https://docs.legis.wisconsin.gov/robots.txt) restrict internal mechanisms and search-result routes; only reviewed year/document routes and `/search` are enabled. [Schedule robots](https://committeeschedule.legis.wisconsin.gov/robots.txt) returns 404. Minimum 1 second/request. | Reviewed [Legislature](https://legis.wisconsin.gov/) and [records site](https://docs.legis.wisconsin.gov/); no separate public-site terms link or conflicting collection restriction found. Official legislative records and office contacts only; retain attribution. |
+| Wisconsin Legislature (`scrape`, contacts, subjects, session rosters, enrichers) | [docs robots](https://docs.legis.wisconsin.gov/robots.txt) restrict internal mechanisms and `/search`; only reviewed year/document and executive-order routes are enabled. The changed robots file (now disallowing `/search`) was reviewed and approved by the repo owner on 2026-10-11. [Schedule robots](https://committeeschedule.legis.wisconsin.gov/robots.txt) returns 404. Minimum 1 second/request. | Reviewed [Legislature](https://legis.wisconsin.gov/) and [records site](https://docs.legis.wisconsin.gov/); no separate public-site terms link or conflicting collection restriction found. Official legislative records and office contacts only; retain attribution. |
 | CFIS (`fetch_cfis`, `fetch_cf_committees`) | [Robots](https://campaignfinance.wi.gov/robots.txt) leaves the three used JSON procedures open to general crawlers; named AI agents are blocked. Both general groups were reviewed. Conservative 10-second interval because a crawl-delay directive has ambiguous placement. | [Official public search](https://ethics.wi.gov/Pages/CampaignFinance/ViewReports.aspx), [Commission reuse notice, pp. 8–9](https://ethics.wi.gov/Resources/20251021%20Open%20Session%20Materials%20Revised.pdf): noncommercial civic reporting only; no sale, commercial use, solicitations, or AI training. Preserve `alwaysRespectPiiRedaction`. This is the public frontend's JSON interface, not a documented API service guarantee. Do not use an AI browsing agent to collect its records or change identities to avoid restrictions. |
-| WEC ballot, referendum-notice and canvass files (`fetch_wec`, `fetch_wec_results`) | [Robots](https://elections.wi.gov/robots.txt) permits the documents path and names no agents. Rechecked 2026-09-13: the homepage and report pages answer 200 to the project identity (the 2026-09-07 403 has cleared). GET only on `/sites/default/files/documents/*.pdf|xlsx`, 10-second interval, pinned files fetched once. | The site publishes no separate terms of use; its footer carries a general copyright notice over public records (Wis. Stat. 19.31), the basis on which certified canvasses were already used. Never work around a denial. |
+| WEC ballot, referendum-notice and canvass files (`fetch_wec`, `fetch_wec_results`) | [Robots](https://elections.wi.gov/robots.txt) permits the files paths and names no agents. Rechecked 2026-10-11 with the unchanged fingerprint. Results and report pages (`/election-result/...`, `/media/...`, `/sitemap.xml`) now answer the project identity with a Cloudflare challenge (HTTP 403, `cf-mitigated: challenge`); the files paths answer 200. GET only on `/sites/default/files/documents/*.pdf|xlsx` and `/sites/default/files/legacy/*.xlsx`, 10-second interval, pinned files fetched once. | The site publishes no separate terms of use; its footer carries a general copyright notice over public records (Wis. Stat. 19.31), the basis on which certified canvasses were already used. Never work around a denial: no other identity, browser or archive copy is used to read the challenged pages. See [canvass history](#canvass-history-2026-10-11). |
 | OpenStates people/committees; congressional roster | Robots returned 404 on [api.github.com](https://api.github.com/robots.txt), [raw.githubusercontent.com](https://raw.githubusercontent.com/robots.txt), and [unitedstates.github.io](https://unitedstates.github.io/robots.txt). Only the specific roster repositories/paths are enabled, minimum 1 second/request. | [GitHub API terms](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service#h-api-terms), [rate handling](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#handle-rate-limit-errors-appropriately), [people license](https://github.com/openstates/people/blob/main/LICENSE), [congress roster dedication](https://github.com/unitedstates/congress-legislators#public-domain). CC0/public-domain roster data; no unrelated GitHub user data. |
 | Federal roll calls | [House robots](https://clerk.house.gov/robots.txt) returns 404. [Senate robots](https://www.senate.gov/robots.txt) redirects to its specific `file_not_found.htm` page; this known missing response is recorded explicitly, not interpreted as an allow-all file. XML paths only, minimum 1 second/request. | [House rights/reproductions](https://clerk.house.gov/PrivacyPolicy), [Senate XML publication](https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_119_2.htm), [Senate privacy policy](https://www.senate.gov/general/privacy.htm). Attribute factual voting records; no photos, broadcast footage, endorsements, or campaign advertising. |
 | Milwaukee / West Allis council records | Robots returns 404 on [Web API](https://webapi.legistar.com/robots.txt), [Milwaukee InSite](https://milwaukee.legistar.com/robots.txt), [West Allis InSite](https://westalliswi.legistar.com/robots.txt). Reviewed public tenant API and meeting/department pagination only, minimum 1 second/request. | [Published API](https://webapi.legistar.com/Help), [Milwaukee policies](https://city.milwaukee.gov/Information-and-Services/webpolicies). Public meeting/vote facts and source links; no login, unpublished tenants, video or attachments collection. |
 | Council profile pages | [Milwaukee robots](https://city.milwaukee.gov/robots.txt) returned HTTP 403 from the nightly runner on September 8; retrieval is **paused**, retaining the complete existing profile archive. [West Allis robots](https://www.westalliswi.gov/robots.txt) disallows `/api/`; reviewed district HTML remains enabled, minimum 1 second/request. | [Milwaukee disclaimer](https://city.milwaukee.gov/Information-and-Services/webpolicies/DisclaimerofLiabilit), [privacy](https://city.milwaukee.gov/Information-and-Services/webpolicies/Privacy), [West Allis site](https://www.westalliswi.gov/). No separate West Allis terms link found. Capture official office-contact facts and portrait URLs; this collector does not download image files. |
+| DPI school district referenda (not collected) | [dpi.wi.gov robots](https://dpi.wi.gov/robots.txt) (2026-10-11) disallows only administrative and search paths. The data itself is the [School District Referenda Report](https://sfs.dpi.wi.gov/wisfpr/SchoolDistrictReferendaReport?moduleId=11) and [custom reports](https://sfs.dpi.wi.gov/Referenda/CustomReporting.aspx) on `sfs.dpi.wi.gov`, linked from [Referenda Information](https://dpi.wi.gov/sfs/reporting/safr/referenda-info). That host could not be reached for review from the build environment (its robots.txt is unchecked), so no collector exists; `source_policies.json` lists it paused. | [DPI website use](https://dpi.wi.gov/about-dpi/copyright-dpi-website-use-and-disclaimer): files are copyrighted by DPI for noncommercial use by the public under fair use; other reuse needs permission. Recent per-election results are also posted as Google Sheets, which are not an official bulk download. Review `sfs.dpi.wi.gov` robots and whether factual referendum results fall within that notice before adding a collector. |
 | Eye on Lobbying | [Robots](https://lobbying.wi.gov/robots.txt) disallows all crawling. Automated retrieval **removed**; CLI fails without network requests. | May be restored later with **site approval** and a fresh policy review. [Official records access](https://ethics.wi.gov/Pages/AboutUs/PublicRecordsNotice.aspx) offers a route to request an approved extract. |
 | WisconsinEye | [Robots](https://wiseye.org/robots.txt) permits crawling with a 10-second delay, but retrieval is **paused**. | [User agreement](https://wiseye.org/user-agreement/), especially sections 1 and 14, leaves metadata republication uncertain. Obtain approval/clarification before restoring retrieval. Existing local metadata can still match archived hearing links. |
 | FollowTheMoney | [API robots](https://api.followthemoney.org/robots.txt) disallows all crawling. Network requests are **paused**; cached research remains available. | Previously documented API-key/license access does not resolve the current robots conflict. Obtain explicit approval covering automated API use before restoring either research helper. |
 | Boundary utilities | [LTSB ArcGIS host](https://services1.arcgis.com/robots.txt) returned 403; [Milwaukee maps](https://milwaukeemaps.milwaukee.gov/robots.txt) disallows general crawlers. New requests are **paused**; committed boundaries/local caches remain. | [Milwaukee open data](https://data.milwaukee.gov/) resource files may be an alternative, but `/api/` is robots-disallowed. No active downloader exists for that host or West Allis GIS; review individual dataset terms before adding one. |
+| CourtListener (`fetch_court_dockets`) | [Robots](https://www.courtlistener.com/robots.txt) and the [terms page](https://www.courtlistener.com/terms/) returned HTTP 403 (CloudFront) to the project User-Agent on 2026-10-11. Collection is **paused**; with no curated dockets the fetcher sends no request. | Free Law Project [API v4 docs](https://wiki.free.law/c/courtlistener/help/api/rest/v4/overview) (not reachable from the review environment; see the section below). Docket metadata only: court, case name, number, dates, docket link. No filings or documents are downloaded or rehosted. |
 | Organization logos | Automatic retrieval is disabled. Existing assets/monogram fallback remain. | The former homepage checks lacked individual robots/terms reviews. The logo.dev terms recheck could not be completed (429). Review provider API/caching/attribution terms and each identity-verification source before restoring. |
+
+## Canvass history (2026-10-11)
+
+`fetch_wec_results` now pins certified canvasses back to 2014 (general
+elections), the 2020-2025 spring elections (Supreme Court, Court of Appeals)
+and the statewide referendum questions in those files. Because the results
+pages are challenged, each file name was taken from a search engine's listing
+of its results page and fetched once from the reviewed files path. Nothing
+trusts the name: the importer requires each workbook's own election line
+("2016 General Election", "2025 Spring Election") to match the pinned file's
+year and kind, and every contest's ward sums to equal its certified Office
+Totals.
+
+Files from before 2021 sit under `legacy/` with a literal `%20` in their
+stored names, so their URLs carry `%2520`. `source_access` still rejects any
+escape left after its single decode, except escapes a host lists in
+`literal_escapes`; only `elections.wi.gov` lists one, `%20`, which decodes to
+a space and cannot form a slash or dot segment.
+
+Not pinned: 2012 (no file name found), spring 2013-2019 and the 2015, 2018 and
+2020 spring questions and the November 2024 question (no name found or the
+guessed name 404'd), and the 2026 spring workbook. That workbook's County
+Totals for the Supreme Court sum to 905,510 votes for Chris Taylor, but its
+Office Totals give 905,490. Pin it once the Commission reconciles the file.
 
 ## Robots transport recovery (2026-09-08)
 
@@ -308,3 +334,45 @@ general crawlers from images. Collect only the image URL metadata on the permitt
 city roster, and leave image loading to visitors' browsers. Do not download images
 or run automated image-load checks against that host. Waukesha redirects portraits
 to its `webfile.waukesha-wi.gov/waukeshawi25/` image host (robots 404 at review).
+
+## Federal court challenges (2026-10-11)
+
+`importer/court_challenges.json` is a human-verified list of CourtListener
+docket ids and the enacted bills each case challenges, each with a public basis
+URL and review date. Matching cases to acts is an editorial judgment, so nothing
+is added from search results. `fetch_court_dockets` reads only
+`/api/rest/v4/dockets/{id}/` for curated ids into `_data/federal/court-dockets.json`
+(the existing federal bundle). The import and the integrity gate fail when a
+curated docket or bill does not resolve. Only federal courts (W.D. Wis., E.D. Wis.,
+7th Cir., Supreme Court) are in scope. State court records need a separate review.
+
+Review findings. A single request to robots.txt and `/terms/` with the project
+User-Agent got HTTP 403 from CloudFront. An earlier anonymous probe got 429. This
+is a technical denial, not a published prohibition. Collection stays paused and
+the denial is not worked around. The API documentation has moved to the Free Law
+Project wiki, which the review environment could not reach. Secondary summaries of
+the [v4 overview](https://wiki.free.law/c/courtlistener/help/api/rest/v4/overview)
+and [API usage](https://wiki.free.law/c/courtlistener/help/api/rest/v4/api-usage)
+pages say the following. Requests send `Authorization: Token <token>`. Docket
+endpoints reject anonymous requests. The default limits are 5 requests per minute,
+50 per hour and 125 per day, on rolling windows. Each project may have only one account.
+Confirm these against the wiki before enabling collection. The fetcher's 12-second
+floor matches the per-minute limit. There are at most 40 curated dockets, one
+request each per run, and 429/Retry-After stops the source through the shared
+transport.
+
+Enabling collection (owner steps):
+
+1. Read the v4 overview, the API usage page and the
+   [terms](https://www.courtlistener.com/terms/) directly. Record the review date,
+   the limits and the constraints here.
+2. From the nightly runner's network, fetch `robots.txt` with the project
+   User-Agent. Then replace the `paused` key in `source_policies.json` with the
+   reviewed `robots` status, URL and `sha256` (`source_access.robots_fingerprint`).
+3. Create one free CourtListener account for the project. Add its API token as
+   the `COURTLISTENER_TOKEN` secret on the `nightly-parser` GitHub environment.
+   `parser-stage.yml` gives the token only to the federal stage. For local runs,
+   export the token in the shell. The fetcher fails if curated dockets exist and
+   the token is missing, because the integrity gate would reject the import anyway.
+4. Add curated entries, then run the policy-only workflow. The changed manifest
+   invalidates older reports. After that passes, run collection.

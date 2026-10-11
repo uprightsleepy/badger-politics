@@ -3,7 +3,8 @@
  * the exact ballot wording, the constitution's text as changed, and the
  * two Legislatures' votes that put each question there. */
 import Base from "../../../layouts/Base.astro";
-import { ballotMeasures, votesFor, meta } from "../../../lib/db";
+import { ballotMeasures, referendumResults, votesFor, meta } from "../../../lib/db";
+import { pctOf, questionSubject } from "../../../lib/ballot";
 import { billSlug, chamberName, fmtDate } from "../../../lib/format";
 import { safeHref } from "../../../lib/html";
 
@@ -22,6 +23,10 @@ const passages = (m: (typeof measures)[number]) => [
 const marked = (m: (typeof measures)[number]) =>
   m.changes.some((c) => c.text.some((runs) => runs.some(([kind]) => kind !== "same")));
 const count = ["no", "one", "two", "three", "four", "five", "six"][measures.length] ?? String(measures.length);
+// past statewide questions, as certified; the canvass names the election
+// by year and kind, and the question by number and a short heading
+const past = referendumResults();
+const electionName = { spring: "spring election", primary: "August partisan primary", general: "November general election" } as Record<string, string>;
 ---
 
 <Base
@@ -147,6 +152,34 @@ const count = ["no", "one", "two", "three", "four", "five", "six"][measures.leng
       </div>
     </section>
   ))}
+
+  {past.length > 0 && (
+    <section id="past-questions" class="mt-12 max-w-[47.5rem] scroll-mt-4" aria-labelledby="past-questions-heading">
+      <h2 id="past-questions-heading" class="t-section">Past statewide questions</h2>
+      <p class="mt-2 text-small text-granite">
+        Certified results for the statewide questions in the Elections Commission's canvass files we
+        hold, newest first. Some earlier questions aren't in our records yet. Shares are of the votes
+        cast on each question.
+      </p>
+      <ul class="mt-4 border-b border-rule" role="list">
+        {past.map((q) => (
+          <li class="flex flex-col gap-1 border-t border-rule py-4">
+            <h3 class="t-question">{questionSubject(q.title) ?? "Statewide question"}</h3>
+            <p class="text-small text-granite">{q.year} {electionName[q.election] ?? q.election}, question {q.question}</p>
+            <p>
+              <span class="font-bold">{q.yes > q.no ? "Yes won" : q.no > q.yes ? "No won" : "Tied"}:</span>
+              {" "}yes {q.yes.toLocaleString()} <span class="text-granite">{pctOf(q.yes, q.total_cast)}</span>,
+              {" "}no {q.no.toLocaleString()} <span class="text-granite">{pctOf(q.no, q.total_cast)}</span>.
+            </p>
+            <p class="text-fine"><a href={safeHref(q.source_url)} class="underline">The certified canvass</a> <span class="text-granite">(spreadsheet)</span></p>
+          </li>
+        ))}
+      </ul>
+      <p class="mt-3 text-fine text-granite">
+        Judicial races are on the <a href="/elections/supreme-court/" class="underline">Supreme Court and Court of Appeals</a> page.
+      </p>
+    </section>
+  )}
 
   {measures.length > 0 && (
     <p class="mt-12 max-w-[47.5rem] text-fine text-granite">

@@ -9,6 +9,7 @@ names abort the import. See docs/backfill.md for historical-era details.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sqlite3
@@ -239,6 +240,21 @@ def option_bucket(option: str) -> str:
     return option if option in ("yes", "no") else "other"
 
 
+def version_links(bill: dict) -> list[tuple[str, str | None, str, str | None]]:
+    """(note, date, url, media type) for every text the Legislature printed:
+    introduced, engrossed and enrolled texts and adopted amendments, one row
+    per format, in docs.legis order. Links only; the text is never copied."""
+    rows, seen = [], set()
+    for version in bill.get("versions", []):
+        for link in version.get("links", []):
+            url = link.get("url")
+            if url and url not in seen:
+                seen.add(url)
+                rows.append((version["note"], version.get("date") or None, url,
+                             link.get("media_type")))
+    return rows
+
+
 class Importer:
     def __init__(
         self,
@@ -254,6 +270,7 @@ class Importer:
         self.used_vote_fixes: set[tuple[str, str]] = set()
         self.bill_ids: dict[str, str] = {}  # scraper _id uuid -> our bill PK
         self.bill_pks: set[str] = set()  # every PK inserted into bills
+        self.hearing_ids: set[str] = set()
         self.warnings: list[str] = []
 
     def import_sessions(self, session_defs: dict[str, dict], seen: set[str]) -> None:
@@ -448,12 +465,8 @@ class Importer:
                 )
         latest = actions[-1] if actions else None
         chamber = pseudo_chamber(bill.get("from_organization"))
-        html_links = [
-            link["url"]
-            for version in bill.get("versions", [])
-            for link in version.get("links", [])
-            if link.get("media_type") == "text/html"
-        ]
+        versions = version_links(bill)
+        html_links = [url for _, _, url, media in versions if media == "text/html"]
         # Prefer the original proposal text: enrolled/act versions of passed
         # bills omit the LRB analysis section.
         text_url = next(
@@ -497,6 +510,11 @@ class Importer:
                     ",".join(action.get("classification") or []),
                 ),
             )
+        self.conn.executemany(
+            "INSERT INTO bill_versions (bill_id, note, date, url, media_type)"
+            " VALUES (?, ?, ?, ?, ?)",
+            [(pk, *version) for version in versions],
+        )
         for doc in bill.get("documents", []):
             url = doc["links"][0]["url"] if doc.get("links") else None
             if url and doc.get("note"):
@@ -691,16 +709,25 @@ class Importer:
                         agenda_bills.append(entity["name"])
         start = event.get("start_date") or ""
         local_date, local_time = to_local(start)
+        location = (event.get("location") or {}).get("name")
+        # the scrape's _id is a fresh uuid every run; hearing ids name calendar
+        # files and feed entries, so they hash the fields the scraper itself
+        # dedupes on (title, location, start) and stay put night to night
+        key = f"{event.get('name') or ''}#{location or ''}#{start}"
+        hearing_id = hashlib.sha256(key.encode()).hexdigest()[:16]
+        if hearing_id in self.hearing_ids:
+            raise RuntimeError(f"two hearings share title, location and start: {key!r}")
+        self.hearing_ids.add(hearing_id)
         self.conn.execute(
             "INSERT INTO hearings (id, title, committee_id, date, time, location,"
             " agenda_bill_ids_json, source_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                event.get("_id") or f"{name}-{start}",
+                hearing_id,
                 name or None,
                 committee_id,
                 local_date,
                 local_time,
-                (event.get("location") or {}).get("name"),
+                location,
                 json.dumps(agenda_bills),
                 (event.get("sources") or [{}])[0].get("url"),
             ),
@@ -840,7 +867,8 @@ def run_import(
     stats = {
         table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]  # noqa: S608
         for table in ("sessions", "people", "bills", "actions", "sponsorships",
-                      "bill_documents", "vote_events", "vote_records", "committees",
+                      "bill_documents", "bill_versions", "vote_events", "vote_records",
+                      "committees",
                       "hearings")
     }
     quality = conn.execute(

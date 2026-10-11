@@ -253,7 +253,7 @@ def roster_for(people: list[Person], start: str, end: str) -> Roster:
     return Roster([m for _, m in latest.values()])
 
 
-def find_person(people: list[Person], name: str) -> Person:
+def find_person(people: list[Person], name: str, chamber: str, district: int | None) -> Person:
     """Resolve a listing name to a Person; ambiguity or absence raises."""
     key = _normalize(name)
     exact = [
@@ -278,8 +278,14 @@ def find_person(people: list[Person], name: str) -> Person:
         return loose[0]
     if len(loose) > 1:
         raise AmbiguousNameError(f"listing name {name!r} is ambiguous across people files")
-    # nicknames defeat prefix matching; accept a unique family-only match
-    family_only = [p for p in people if _normalize(p.family_name) == family]
+    # nicknames defeat prefix matching; accept a unique family-only match,
+    # but only among people who held this seat: a newcomer with no people
+    # file must never inherit a retired same-surname member's votes
+    family_only = [
+        p for p in people
+        if _normalize(p.family_name) == family
+        and any(t.chamber == chamber and t.district == district for t in p.terms)
+    ]
     if len(family_only) == 1:
         return family_only[0]
     if not family_only:
@@ -292,7 +298,7 @@ def merge_listing(roster: Roster, listing: list[dict], people: list[Person]) -> 
     including mid-session replacements) into a windowed roster."""
     members = {(m.id, m.chamber): m for m in roster.members}
     for entry in listing:
-        person = find_person(people, entry["name"])
+        person = find_person(people, entry["name"], entry["chamber"], entry.get("district"))
         key = (person.id, entry["chamber"])
         if key not in members:
             member = Member.from_person(person, entry["chamber"], entry.get("district"))

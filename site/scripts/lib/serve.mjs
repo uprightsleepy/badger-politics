@@ -104,9 +104,11 @@ const SAMPLE_PATHS = [
   "/votes/2025-av0001-ar1/", "/laws/", "/laws/2025/", "/vetoes/", "/partial-veto/",
   "/governors-desk/", "/hearing-none/", "/hearing-none/2025/", "/subjects/",
   "/legislators/", "/districts/", "/districts/senate-21/", "/committees/", "/federal/",
-  "/calendar/", "/my-reps/", "/elections/2026/", "/elections/2026/senate-5/",
+  "/calendar/", "/this-week/", "/my-reps/", "/elections/2026/", "/elections/2026/senate-5/",
+  "/elections/2026/amendments/", "/elections/supreme-court/",
+  "/legislators/compare/",
   "/money/", "/money/committees/", "/money/committees/651839/", "/money/independent/",
-  "/local/", "/local/milwaukee/", "/local/west-allis/",
+  "/local/", "/local/milwaukee/", "/local/west-allis/", "/embed/bills/2025/ab1/",
 ];
 export const samplePages = async () => {
   const councils = (await readdir(join(DIST, "local"), { withFileTypes: true }).catch(() => []))
@@ -126,6 +128,8 @@ export const samplePages = async () => {
     // carries the timeline chart (coverage differs between the two)
     firstLegislatorHref(),
     moneyLegislatorHref(),
+    // embed cards exist for sitting members only
+    readdir(join(DIST, "embed", "legislators")).then(([slug]) => slug && `/embed/legislators/${slug}/`, () => null),
   ]);
   return [...new Set([...SAMPLE_PATHS, ...dynamic, ...localPages.flat()].filter(Boolean))];
 };

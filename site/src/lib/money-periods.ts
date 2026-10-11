@@ -1,3 +1,5 @@
+import { wisconsinToday } from "./today.ts";
+
 export type MoneyBounds = {
   start?: string;
   end?: string;
@@ -5,9 +7,7 @@ export type MoneyBounds = {
 };
 
 export const currentMoneyCycle = (now = new Date()): number => {
-  const year = Number(new Intl.DateTimeFormat("en-US", {
-    year: "numeric", timeZone: "America/Chicago",
-  }).format(now));
+  const year = Number(wisconsinToday(now).slice(0, 4));
   return year + year % 2;
 };
 

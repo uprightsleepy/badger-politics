@@ -1,11 +1,13 @@
 ---
 /** One row of a legislator's vote history: how they voted, on which bill,
  * on what motion, and when. The vote is a word, never a color. */
+import LegiscanCredit from "./LegiscanCredit.astro";
 import { fmtDate } from "../lib/format";
 interface Props {
   v: {
     option: string; vote_event_id: string; identifier: string;
     motion: string | null; title: string | null; date: string | null;
+    source: string | null; source_url: string | null; session_id: string;
   };
 }
 const { v } = Astro.props;
@@ -18,4 +20,5 @@ const word = v.option === "yes" ? "Yes" : v.option === "no" ? "No" : "Didn't vot
     {" "}<span class="text-granite">{v.motion ?? v.title}</span>
   </span>
   <span class="ml-auto shrink-0 text-fine tabular-nums text-granite">{fmtDate(v.date)}</span>
+  <LegiscanCredit v={v} class="basis-full" />
 </li>

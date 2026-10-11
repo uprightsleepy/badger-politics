@@ -78,6 +78,17 @@ CREATE TABLE bill_documents (
 );
 CREATE INDEX idx_bill_documents_bill ON bill_documents (bill_id);
 
+-- every printed text of a bill (introduced, enrolled, adopted amendments),
+-- one row per format, in docs.legis order; official links only
+CREATE TABLE bill_versions (
+    bill_id    TEXT NOT NULL REFERENCES bills (id),
+    note       TEXT NOT NULL,
+    date       TEXT,
+    url        TEXT NOT NULL,
+    media_type TEXT
+);
+CREATE INDEX idx_bill_versions_bill ON bill_versions (bill_id);
+
 -- service terms from the people files (recalls and resignations end
 -- terms mid-biennium); out-of-office gaps must never count against or
 -- toward a member
@@ -98,6 +109,23 @@ CREATE TABLE hearing_videos (
     hearing_id TEXT PRIMARY KEY REFERENCES hearings (id),
     url        TEXT NOT NULL,
     title      TEXT NOT NULL
+);
+
+-- federal court cases challenging a Wisconsin Act: the case-to-act link is
+-- human-verified curation (importer/court_challenges.json); docket facts
+-- come from CourtListener and are linked, never rehosted
+CREATE TABLE court_challenges (
+    docket_id        INTEGER NOT NULL,
+    bill_id          TEXT NOT NULL REFERENCES bills (id),
+    court            TEXT NOT NULL,
+    case_name        TEXT NOT NULL,
+    docket_number    TEXT,
+    date_filed       TEXT,
+    date_terminated  TEXT,
+    date_last_filing TEXT,
+    url              TEXT NOT NULL,
+    basis_url        TEXT NOT NULL,
+    PRIMARY KEY (docket_id, bill_id)
 );
 
 -- the state's own subject index terms per bill, matched by exact
@@ -258,6 +286,34 @@ CREATE TABLE statewide_county_results (
     candidate TEXT NOT NULL,
     party     TEXT,
     votes     INTEGER NOT NULL
+);
+
+-- Statewide judicial races (Supreme Court; Court of Appeals by district),
+-- summed from the same WEC canvass spreadsheets. Display data (no FKs).
+CREATE TABLE judicial_history (
+    year       INTEGER NOT NULL,
+    election   TEXT NOT NULL CHECK (election IN ('spring', 'primary', 'general')),
+    office     TEXT NOT NULL CHECK (office IN ('JUSTICE OF THE SUPREME COURT',
+                                               'COURT OF APPEALS JUDGE')),
+    district   INTEGER,  -- Court of Appeals district; NULL for the Supreme Court
+    candidate  TEXT NOT NULL,
+    votes      INTEGER NOT NULL,
+    total_cast INTEGER NOT NULL,  -- official Total Votes Cast, repeated per row
+    source_url TEXT NOT NULL      -- the pinned certified canvass file
+);
+
+-- Statewide referendum questions as certified. The canvass gives the
+-- question's short title only; the full text is in the referendum notice.
+CREATE TABLE referendum_history (
+    year       INTEGER NOT NULL,
+    election   TEXT NOT NULL CHECK (election IN ('spring', 'primary', 'general')),
+    question   INTEGER NOT NULL,
+    title      TEXT NOT NULL,
+    yes        INTEGER NOT NULL,
+    no         INTEGER NOT NULL,
+    total_cast INTEGER NOT NULL,
+    source_url TEXT NOT NULL,
+    PRIMARY KEY (year, election, question)
 );
 
 -- Organizations registered as lobbying on a bill (Ethics Commission's Eye

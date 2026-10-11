@@ -494,7 +494,7 @@ const FIELD =
 <script>
   import { savedDistrict, saveDistrict, forgetDistrict } from "../lib/district";
   import { forgetCityDistrict, resolveCity, savedCityDistrict } from "../lib/cityDistrict";
-  import { districtForAddress, districtForBrowser } from "../lib/lookup";
+  import { districtForAddress, districtForBrowser, LOOKUP_LOAD_ERROR } from "../lib/lookup";
   import { esc } from "../lib/html";
   import { attachSuggest } from "../scripts/addressSuggest";
   import { partyWord } from "../lib/format";
@@ -553,7 +553,14 @@ const FIELD =
     e.preventDefault();
     if (!addr?.value.trim()) return;
     if (addrStatus) addrStatus.textContent = "Looking up your address…";
-    const result = await districtForAddress(addr.value.trim());
+    // the boundary file can fail to load; say so rather than hang
+    let result;
+    try {
+      result = await districtForAddress(addr.value.trim());
+    } catch {
+      if (addrStatus) addrStatus.textContent = LOOKUP_LOAD_ERROR;
+      return;
+    }
     if ("error" in result) {
       if (addrStatus) addrStatus.textContent = result.error;
       return;
@@ -564,7 +571,13 @@ const FIELD =
 
   geoBtn?.addEventListener("click", async () => {
     if (addrStatus) addrStatus.textContent = "Asking your browser for your location…";
-    const result = await districtForBrowser();
+    let result;
+    try {
+      result = await districtForBrowser();
+    } catch {
+      if (addrStatus) addrStatus.textContent = LOOKUP_LOAD_ERROR;
+      return;
+    }
     if ("error" in result) {
       if (addrStatus) addrStatus.textContent = result.error;
       return;

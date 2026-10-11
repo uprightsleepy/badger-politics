@@ -1,0 +1,30 @@
+---
+/** A sitting lawmaker's card for other sites to frame (layouts/Embed). */
+import Embed from "../../../layouts/Embed.astro";
+import Portrait from "../../../components/Portrait.astro";
+import { sittingPeople } from "../../../lib/db";
+import { chamberName, partyWord, personSlug } from "../../../lib/format";
+
+export function getStaticPaths() {
+  return sittingPeople().map((p) => ({ params: { slug: personSlug(p.id) }, props: { person: p } }));
+}
+
+const { person } = Astro.props;
+const role = person.chamber === "upper" ? "State senator" : "State representative";
+---
+
+<Embed title={person.name} page={`/legislators/${personSlug(person.id)}/`}>
+  <div class="flex items-center gap-3">
+    <Portrait src={person.image_url} name={person.name} size={64} />
+    <div class="flex min-w-0 flex-col gap-0.5">
+      <h1 class="t-section">{person.name}</h1>
+      <p class="text-small">{role}, {chamberName(person.chamber)} District {person.district}. {partyWord(person.party)}.</p>
+    </div>
+  </div>
+  {(person.email || person.office_phone) && (
+    <p class="flex flex-wrap gap-x-4 gap-y-1 text-small">
+      {person.email && <a href={`mailto:${person.email}`} class="underline [overflow-wrap:anywhere]">{person.email}</a>}
+      {person.office_phone && <a href={`tel:${person.office_phone.replace(/\D/g, "")}`} class="underline">{person.office_phone}</a>}
+    </p>
+  )}
+</Embed>

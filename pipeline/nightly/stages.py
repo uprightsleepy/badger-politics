@@ -3,9 +3,9 @@
 from pathlib import Path
 
 # Bundle one directory at a time: jobs only download the inputs they use.
-STATIC = ("sessions", "wec-results", "lobbying", "wiseye", "rosters", "districts", "ftm", "legacy")
+STATIC = ("sessions", "lobbying", "wiseye", "rosters", "districts", "ftm", "legacy")
 DYNAMIC = ("wi", "people", "cfis", "subjects", "contacts", "federal", "local",
-           "wec", "lrb_cache", "companions_cache", "scraper_cache")
+           "wec", "wec-results", "lrb_cache", "companions_cache", "scraper_cache")
 SOURCES = STATIC + DYNAMIC
 STAGES = ("legislature", "finance", "finance-receipts", "finance-audit", "finance-committees",
           "community", "federal", "import", "enrich")
@@ -30,7 +30,7 @@ WRITES = {
     "finance-committees": ("cfis",),
     "community": ("subjects", "contacts", "local"),
     "federal": ("federal",),
-    "import": ("wec", "database"),
+    "import": ("wec", "wec-results", "database"),
     "enrich": ("lrb_cache", "companions_cache", "database"),
 }
 
@@ -58,7 +58,8 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
         "community": [["scraper.fetch_subjects"], ["scraper.fetch_contacts", "--refresh"],
                       ["scraper.fetch_local_profiles"], ["scraper.fetch_local_votes"]],
         "federal": [["scraper.fetch_federal_votes"],
-                    ["scraper.fetch_federal_finance", "--as-of", context["finance_as_of"]]],
+                    ["scraper.fetch_federal_finance", "--as-of", context["finance_as_of"]],
+                    ["scraper.fetch_court_dockets"]],
         "import": [rebuild,
                    # pinned per cycle; fetched once, then carried in the wec bundle
                    ["scraper.fetch_wec", "--cycle", cycle],
@@ -67,6 +68,7 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
                    ["importer.elections", db, "--cycle", cycle],
                    ["importer.import_wec", f"_data/wec/candidates-{cycle}.csv",
                     db, "--cycle", cycle, "--primary", f"_data/wec/primary-{cycle}.xlsx"],
+                   ["scraper.fetch_wec_results"],
                    ["importer.import_wec_results", "_data/wec-results", db],
                    ["importer.import_cfis", "_data/cfis", db],
                    ["importer.import_cf_committees", "_data/cfis", db],
@@ -76,6 +78,7 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
                    ["importer.import_contacts", "_data/contacts/contacts.json", db],
                    ["importer.import_federal", "_data/federal", db],
                    ["importer.federal_finance", "_data/federal", db],
+                   ["importer.court_challenges", "_data/federal/court-dockets.json", db],
                    ["importer.import_local", "_data/local", db]],
         "enrich": [["importer.enrich_lrb", db], ["importer.enrich_companions", db],
                    # enrolled resolution pages share the LRB page cache

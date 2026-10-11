@@ -130,7 +130,7 @@ const general =
     import { esc } from "../lib/html";
     import { partyWord } from "../lib/format";
     import { answers } from "../lib/repAnswers";
-    import { districtForAddress, districtForBrowser } from "../lib/lookup";
+    import { districtForAddress, districtForBrowser, LOOKUP_LOAD_ERROR } from "../lib/lookup";
     import { forgetPollingPlace, savePollingPlace, savedPollingPlace } from "../lib/pollingPlace";
     import type { LocalReps, RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
 
@@ -321,13 +321,17 @@ const general =
       e.preventDefault();
       const addr = $<HTMLInputElement>("addr").value;
       statusEl.textContent = "Looking up address…";
-      const [result] = await Promise.all([districtForAddress(addr), loadData()]);
-      if ("error" in result) {
-        statusEl.textContent = result.error;
-        return;
+      try {
+        const [result] = await Promise.all([districtForAddress(addr), loadData()]);
+        if ("error" in result) {
+          statusEl.textContent = result.error;
+          return;
+        }
+        await resolveCity(result.lng, result.lat);
+        show(result.district, true);
+      } catch {
+        statusEl.textContent = LOOKUP_LOAD_ERROR;
       }
-      await resolveCity(result.lng, result.lat);
-      show(result.district, true);
     });
 
     attachSuggest($<HTMLInputElement>("addr"), () => $<HTMLFormElement>("addr-form").requestSubmit());
@@ -350,7 +354,7 @@ const general =
             + " a street address is more precise.";
         }
       } catch {
-        statusEl.textContent = "Couldn't load district data. Try again in a minute.";
+        statusEl.textContent = LOOKUP_LOAD_ERROR;
       }
     });
 
@@ -370,7 +374,7 @@ const general =
 
     const saved = savedDistrict();
     if (saved) {
-      loadData().then(() => show(saved));
+      loadData().then(() => show(saved), () => (statusEl.textContent = LOOKUP_LOAD_ERROR));
     }
 
     // polling place: user-entered, device-only

@@ -1,0 +1,18 @@
+---
+import type { CourtChallenge } from "../lib/db";
+import { fmtDate } from "../lib/format";
+
+interface Props { challenge: CourtChallenge }
+const { challenge: c } = Astro.props;
+---
+
+<li class="flex flex-col gap-0.5 border-t border-rule py-3">
+  <a href={c.url} class="inline-flex min-h-11 items-center self-start font-bold underline">{c.case_name}</a>
+  <span>{c.court}{c.docket_number && `, No. ${c.docket_number}`}{c.date_filed && `, filed ${fmtDate(c.date_filed)}`}</span>
+  <span class="text-granite">
+    {c.date_terminated
+      ? `The court closed this case on ${fmtDate(c.date_terminated)}.`
+      : `Open${c.date_last_filing ? `; latest filing ${fmtDate(c.date_last_filing)}` : ""}.`}
+  </span>
+  <slot />
+</li>

@@ -4,6 +4,7 @@ import { hasTable, memoBy, once, prep } from "./connection.ts";
 import { OPEN_END, OPEN_START } from "./sentinels.ts";
 import type { MoneyBounds } from "./money-periods.ts";
 import { subjectDisplay, subjectSlug } from "./subjects.ts";
+import { voteChar } from "./agreement.ts";
 
 export interface Session {
   id: string;
@@ -45,6 +46,17 @@ export interface Person {
   office_address: string | null;
   contact_url: string | null;
 }
+
+/** ORDER BY terms for "AB 2" before "AB 10": the prefix, then the number
+ * as an integer (text puts AB 10 and AB 100 ahead of AB 2). */
+const billNumberOrder = (t: string, dir = "") =>
+  `substr(${t}.identifier, 1, instr(${t}.identifier, ' ') - 1) ${dir},
+   CAST(substr(${t}.identifier, instr(${t}.identifier, ' ') + 1) AS INTEGER) ${dir}`;
+
+/** A member's vote row is LegiScan's if its roll call (e) or its bill (b)
+ * came from there; pages credit those (lib/legiscan). */
+const ROW_SOURCE =
+  "CASE WHEN 'legiscan' IN (e.source, b.source) THEN 'legiscan' ELSE e.source END AS source";
 
 // order by real start (first recorded action), newest first: special-session
 // ids like '2013s-oct' would otherwise sort alphabetically, not by month
@@ -216,12 +228,14 @@ export const usesLegiscan = once((): boolean =>
 );
 
 export const billsFor = (sessionId: string): Bill[] =>
-  prep("SELECT * FROM bills WHERE session_id = ? ORDER BY id")
+  prep(`SELECT * FROM bills b WHERE session_id = ? ORDER BY ${billNumberOrder("b")}`)
     .all(sessionId) as Bill[];
 
+// same-day actions keep the order the importer wrote them; their text ids
+// would put a10 before a8
 export const actionsFor = (billId: string) =>
   prep(
-      "SELECT date, chamber, description, classification FROM actions WHERE bill_id = ? ORDER BY date, id",
+      "SELECT date, chamber, description, classification FROM actions WHERE bill_id = ? ORDER BY date, rowid",
     )
     .all(billId) as { date: string; chamber: string | null; description: string; classification: string }[];
 
@@ -291,17 +305,23 @@ export const sittingPeople = once(
  * preview and the paged record pages take slices, so counting and
  * slicing happen in SQLite and a build never holds a whole career in
  * memory. */
-export const personVotes = (personId: string, limit: number, offset = 0) =>
+export const personVotes = (personId: string, limit: number, offset = 0, { noLegiscan = false } = {}) =>
   prep(
-      `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result,
+      // noLegiscan drops LegiScan's rows for the public JSON (lib/legiscan)
+      `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.result, e.source_url,
+              ${ROW_SOURCE},
               b.id AS bill_id, b.identifier, b.title, b.session_id
        FROM vote_records r
        JOIN vote_events e ON e.id = r.vote_event_id
        JOIN bills b ON b.id = e.bill_id
-       WHERE r.person_id = ? ORDER BY e.date DESC, e.id LIMIT ? OFFSET ?`,
+       WHERE r.person_id = ?
+         AND NOT (? AND 'legiscan' IN (COALESCE(e.source, ''), COALESCE(b.source, '')))
+       ORDER BY e.date DESC, e.id LIMIT ? OFFSET ?`,
     )
-    .all(personId, limit, offset) as {
+    .all(personId, noLegiscan ? 1 : 0, limit, offset) as {
     option: string;
+    source: string | null;
+    source_url: string | null;
     vote_event_id: string;
     date: string | null;
     motion: string | null;
@@ -345,7 +365,7 @@ export const personSponsorships = (personId: string, limit = -1, offset = 0) => 
               b.title, b.status, b.session_id, b.died_without_hearing
        FROM sponsorships s JOIN bills b ON b.id = s.bill_id
        WHERE s.person_id = ?
-       ORDER BY b.id DESC LIMIT ? OFFSET ?`,
+       ORDER BY b.session_id DESC, ${billNumberOrder("b", "DESC")} LIMIT ? OFFSET ?`,
     )
     .all(personId, limit, offset) as {
     is_primary: number;
@@ -395,6 +415,11 @@ export const electionFor = memoBy((personId: string) => {
   };
 });
 
+/** Sitting members whose seats are on the 2026 ballot: one race page each. */
+export const races2026 = once((): Person[] =>
+  sittingPeople().filter((p) => electionFor(p.id)?.cycle_year === 2026 && p.district != null),
+);
+
 /** Where a session's never-heard bills died: one group per committee,
  * chamber and chair at death, so same-named committees in the two
  * chambers, and a committee that changed chairs, stay apart. Counts bills
@@ -423,10 +448,10 @@ export const graveyardBills = (
   chair: string | null = null,
 ) =>
   prep(
-      `SELECT id, identifier, title, classification FROM bills
+      `SELECT id, identifier, title, classification FROM bills b
        WHERE session_id = ? AND died_without_hearing = 1
        AND committee_at_death IS ? AND committee_chamber_at_death IS ?
-       AND committee_chair_at_death IS ? ORDER BY id`,
+       AND committee_chair_at_death IS ? ORDER BY ${billNumberOrder("b")}`,
     )
     .all(sessionId, committee, chamber, chair) as {
     id: string; identifier: string; title: string | null; classification: string | null;
@@ -499,6 +524,24 @@ export const recentlyActedBills = (sessionIds: string[], limit = 8) =>
     )
     .all(...sessionIds, limit) as Bill[];
 
+/** Every recorded action from `from` through `to`, newest first, on the
+ * built sessions' bills; the bill's source rides along so a LegiScan row
+ * is credited (lib/legiscan). */
+export const actionsBetween = (from: string, to: string) => {
+  const built = builtSessions().map((s) => s.id);
+  return prep(
+      `SELECT a.date, a.description, b.id AS bill_id, b.identifier, b.title, b.session_id,
+              b.source, NULL AS source_url
+       FROM actions a JOIN bills b ON b.id = a.bill_id
+       WHERE a.date BETWEEN ? AND ? AND b.session_id IN (${built.map(() => "?").join(",")})
+       ORDER BY a.date DESC, a.rowid DESC`,
+    )
+    .all(from, to, ...built) as {
+    date: string; description: string; bill_id: string; identifier: string; title: string | null;
+    session_id: string; source: string | null; source_url: null;
+  }[];
+};
+
 /** Days each chamber held attributed floor votes: (chamber, date) -> count.
  * One scan serves every legislator page in the build. */
 export const chamberVoteDays = once(
@@ -555,6 +598,7 @@ export const partyBreaks = (personId: string, party: string | null) => {
   const { majority: majorities, splits } = partyPositions();
   const votes = prep(
       `SELECT r.option, e.id AS vote_event_id, e.date, e.motion, e.source_url,
+              ${ROW_SOURCE},
               b.id AS bill_id, b.identifier, b.title, b.session_id
        FROM vote_records r
        JOIN vote_events e ON e.id = r.vote_event_id
@@ -564,7 +608,7 @@ export const partyBreaks = (personId: string, party: string | null) => {
     )
     .all(personId) as {
     option: string; vote_event_id: string; date: string | null; motion: string | null;
-    source_url: string | null; bill_id: string; identifier: string;
+    source_url: string | null; source: string | null; bill_id: string; identifier: string;
     title: string | null; session_id: string;
   }[];
   return votes
@@ -574,6 +618,50 @@ export const partyBreaks = (personId: string, party: string | null) => {
     })
     .map((v) => ({ ...v, split: splits.get(`${v.vote_event_id}|${party}`)! }));
 };
+
+/** A session's floor roll calls per chamber and each sitting member's
+ * vote on them, for comparing two members (lib/agreement). LegiScan's
+ * rows are left out: the matrix is published as a data file. Roll calls
+ * no sitting member voted Aye or No on are dropped. */
+export const voteMatrix = memoBy((sessionId: string) => {
+  const official = "COALESCE(e.source, '') != 'legiscan' AND COALESCE(b.source, '') != 'legiscan'";
+  const records = prep(
+      `SELECT r.vote_event_id, r.person_id, r.option, e.chamber
+       FROM vote_records r
+       JOIN vote_events e ON e.id = r.vote_event_id
+       JOIN bills b ON b.id = e.bill_id
+       JOIN people p ON p.id = r.person_id
+       WHERE b.session_id = ? AND e.chamber IN ('lower', 'upper') AND ${official}
+         AND r.option IN ('yes', 'no') AND p.current_role IN ('Representative', 'Senator')`,
+    )
+    .all(sessionId) as { vote_event_id: string; person_id: string; option: string; chamber: string }[];
+  const events = prep(
+      `SELECT e.id, e.date, e.chamber, e.motion, b.identifier
+       FROM vote_events e JOIN bills b ON b.id = e.bill_id
+       WHERE b.session_id = ? AND e.chamber IN ('lower', 'upper') AND ${official}
+       ORDER BY e.date, e.id`,
+    )
+    .all(sessionId) as { id: string; date: string | null; chamber: string; motion: string | null; identifier: string }[];
+  const roster = new Map(sittingPeople().map((p) => [p.id, p]));
+  const out: Partial<Record<"upper" | "lower", {
+    rollCalls: typeof events; members: Person[]; votes: string[];
+  }>> = {};
+  for (const chamber of ["upper", "lower"] as const) {
+    const mine = records.filter((r) => r.chamber === chamber);
+    const voted = new Set(mine.map((r) => r.vote_event_id));
+    const rollCalls = events.filter((e) => e.chamber === chamber && voted.has(e.id));
+    if (!rollCalls.length) continue;
+    const column = new Map(rollCalls.map((e, i) => [e.id, i]));
+    const members = [...new Set(mine.map((r) => r.person_id))]
+      .map((id) => roster.get(id)!)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const row = new Map(members.map((m, i) => [m.id, i]));
+    const cells = members.map(() => Array<string>(rollCalls.length).fill("."));
+    for (const r of mine) cells[row.get(r.person_id)!][column.get(r.vote_event_id)!] = voteChar(r.option);
+    out[chamber] = { rollCalls, members, votes: cells.map((c) => c.join("")) };
+  }
+  return out;
+});
 
 /** Per-party Aye/Nay splits for one roll call, for the party-line /
  * bipartisan tag. Null when either party cast no recorded Aye/Nay. */
@@ -813,6 +901,49 @@ export const statewideHistory = () =>
     /** The contest's official Total Votes Cast, repeated on each row. */
     total_cast: number | null;
   }[];
+
+export interface JudicialRace {
+  year: number; election: string; office: string; district: number | null;
+  total: number; source_url: string;
+  candidates: { candidate: string; party: null; votes: number }[];
+}
+
+/** Certified Supreme Court and Court of Appeals races (WEC canvasses), newest
+ * first, the Supreme Court before the Court of Appeals districts in a year. */
+export const judicialRaces = once((): JudicialRace[] => {
+  if (!hasTable("judicial_history")) return [];
+  const rows = prep(
+      `SELECT * FROM judicial_history
+       ORDER BY year DESC, office DESC, district, votes DESC`,
+    ).all() as {
+    year: number; election: string; office: string; district: number | null;
+    candidate: string; votes: number; total_cast: number; source_url: string;
+  }[];
+  const races = new Map<string, JudicialRace>();
+  for (const r of rows) {
+    const key = `${r.year}|${r.election}|${r.office}|${r.district}`;
+    if (!races.has(key)) {
+      races.set(key, { year: r.year, election: r.election, office: r.office, district: r.district,
+                       total: r.total_cast, source_url: r.source_url, candidates: [] });
+    }
+    races.get(key)!.candidates.push({ candidate: r.candidate, party: null, votes: r.votes });
+  }
+  return [...races.values()];
+});
+
+/** Certified statewide referendum results (WEC canvasses), newest first. */
+export const referendumResults = once(() =>
+  hasTable("referendum_history")
+    ? (prep(
+        `SELECT * FROM referendum_history
+         ORDER BY year DESC, CASE election WHEN 'general' THEN 0 WHEN 'primary' THEN 1 ELSE 2 END,
+                  question`,
+      ).all() as {
+        year: number; election: string; question: number; title: string;
+        yes: number; no: number; total_cast: number; source_url: string;
+      }[])
+    : [],
+);
 
 // chair, then co-chair, then vice-chair, then rank-and-file
 const ROLE_ORDER =
@@ -1309,7 +1440,7 @@ export const billsForSubject = (subject: string): Bill[] =>
   prep(
       `SELECT b.* FROM bill_subjects s JOIN bills b ON b.id = s.bill_id
        WHERE s.subject = ?
-       ORDER BY b.session_id DESC, LENGTH(b.identifier), b.identifier`,
+       ORDER BY b.session_id DESC, ${billNumberOrder("b")}`,
     )
     .all(subject) as Bill[];
 
@@ -1322,6 +1453,42 @@ export const subjectsForBill = (billId: string) =>
 export const documentsFor = (billId: string) =>
   prep("SELECT note, url FROM bill_documents WHERE bill_id = ? ORDER BY note")
     .all(billId) as { note: string; url: string }[];
+
+// "AB 12: Fiscal Estimate From DOA" -> "Fiscal Estimate From DOA"
+export const documentLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
+
+type Version = { note: string; url: string; media_type: string | null };
+export type BillText = { label: string; url: string; pdf: string | null };
+
+/** Every printed text of a bill as docs.legis links, never copies: its
+ * versions in the Legislature's order (each HTML with its PDF), then any
+ * amendment offered but not already listed, in docs.legis order. Older
+ * snapshots predate the versions table and list amendments alone. */
+export const textsFor = (billId: string): BillText[] => {
+  const versions = hasTable("bill_versions")
+    ? prep("SELECT note, url, media_type FROM bill_versions WHERE bill_id = ? ORDER BY rowid")
+      .all(billId) as Version[]
+    : [];
+  const byLabel = new Map<string, BillText>();
+  for (const v of versions) {
+    const text = byLabel.get(v.note);
+    const pdf = v.media_type === "application/pdf";
+    if (!text) byLabel.set(v.note, { label: v.note, url: v.url, pdf: null });
+    else if (pdf && !text.pdf) text.pdf = v.url;
+    // a PDF listed first gives way to its HTML
+    else if (!pdf && text.url.endsWith(".pdf") && !text.pdf) [text.pdf, text.url] = [text.url, v.url];
+  }
+  const urls = new Set([...byLabel.values()].flatMap((t) => [t.url, t.pdf]));
+  const documents = prep("SELECT note, url FROM bill_documents WHERE bill_id = ? ORDER BY rowid")
+    .all(billId) as { note: string; url: string }[];
+  for (const d of documents) {
+    const label = documentLabel(d.note);
+    if (/amendment/i.test(label) && !byLabel.has(label) && !urls.has(d.url)) {
+      byLabel.set(label, { label, url: d.url, pdf: null });
+    }
+  }
+  return [...byLabel.values()];
+};
 
 /** ---- New laws, veto tracker, key votes ---- */
 
@@ -1406,6 +1573,35 @@ export const lawsFor = memoBy((biennium: number): Law[] => {
     .sort((a, b) => a.act - b.act);
   return laws;
 });
+
+export interface CourtChallenge {
+  docket_id: number; bill_id: string; court: string; case_name: string;
+  docket_number: string | null; date_filed: string | null; date_terminated: string | null;
+  date_last_filing: string | null; url: string;
+  session_id: string; identifier: string; title: string | null;
+}
+
+/** Curated federal court cases challenging an act (pipeline
+ * importer/court_challenges.json), newest filing first. Older snapshots
+ * lack the table and show none. */
+const courtChallenges = once((): CourtChallenge[] =>
+  hasTable("court_challenges")
+    ? prep(
+        `SELECT c.docket_id, c.bill_id, c.court, c.case_name, c.docket_number, c.date_filed,
+           c.date_terminated, c.date_last_filing, c.url, b.session_id, b.identifier, b.title
+         FROM court_challenges c JOIN bills b ON b.id = c.bill_id
+         ORDER BY c.date_filed DESC, c.docket_id`,
+      ).all() as CourtChallenge[]
+    : []);
+
+export const courtChallengesFor = (billId: string) =>
+  courtChallenges().filter((c) => c.bill_id === billId);
+
+/** Every challenge to an act whose bill page this build has. */
+export const builtCourtChallenges = () => {
+  const built = new Set(builtSessions().map((s) => s.id));
+  return courtChallenges().filter((c) => built.has(c.session_id));
+};
 
 /** Bienniums covered by this build that produced acts, newest first. */
 export const lawBienniums = () =>
@@ -1526,7 +1722,7 @@ export const keyVotesFor = (personId: string) => {
   const keys = keyEvents();
   const rows = prep(
       `SELECT r.option, e.id AS vote_event_id, e.date, e.motion,
-              e.yes_count, e.no_count,
+              e.yes_count, e.no_count, e.source_url, ${ROW_SOURCE},
               b.identifier, b.title, b.session_id
        FROM vote_records r
        JOIN vote_events e ON e.id = r.vote_event_id
@@ -1536,6 +1732,7 @@ export const keyVotesFor = (personId: string) => {
     .all(personId) as {
       option: string; vote_event_id: string; date: string | null;
       motion: string | null; yes_count: number | null; no_count: number | null;
+      source_url: string | null; source: string | null;
       identifier: string; title: string | null; session_id: string;
     }[];
   return rows

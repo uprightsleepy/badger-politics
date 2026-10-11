@@ -12,6 +12,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from importer.court_challenges import CURATION, curated
 from importer.import_wec import family_key, same_person
 from importer.roster import OPEN_END
 
@@ -67,8 +68,6 @@ def check_bill_counts(conn: sqlite3.Connection, counts_file: Path) -> list[str]:
                 f"session {session_id}: bill count fell {prev_count} -> {now}"
                 f" (floor {floor}) — scrape looks broken"
             )
-    if not failures:
-        counts_file.write_text(json.dumps(current, indent=1), encoding="utf-8")
     return failures
 
 
@@ -228,6 +227,10 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             "SELECT COUNT(*) FROM bill_documents d"
             " LEFT JOIN bills b ON b.id = d.bill_id WHERE b.id IS NULL"
         ),
+        "bill_versions -> bills": (
+            "SELECT COUNT(*) FROM bill_versions v"
+            " LEFT JOIN bills b ON b.id = v.bill_id WHERE b.id IS NULL"
+        ),
         "committee_members -> committees": (
             "SELECT COUNT(*) FROM committee_members m"
             " LEFT JOIN committees c ON c.id = m.committee_id WHERE c.id IS NULL"
@@ -242,6 +245,51 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
         orphans = conn.execute(query).fetchone()[0]
         if orphans:
             failures.append(f"{label}: {orphans} orphaned rows")
+    return failures
+
+
+def check_results(conn: sqlite3.Connection) -> list[str]:
+    """Certified results keep the shape of the elections they come from: one
+    row per candidate per contest, every Assembly seat each general election,
+    Senate seats only in their own cycle (odd districts in midterm years,
+    even in presidential years), candidates within the official ballots cast,
+    and each referendum's yes + no equal to its votes cast."""
+    queries = {
+        "a candidate listed twice in one legislative contest": (
+            "SELECT COUNT(*) FROM (SELECT 1 FROM election_history"
+            " GROUP BY year, chamber, district, candidate HAVING COUNT(*) > 1)"
+        ),
+        "general elections missing Assembly seats": (
+            "SELECT COUNT(*) FROM (SELECT year FROM election_history WHERE chamber = 'lower'"
+            " GROUP BY year HAVING COUNT(DISTINCT district) != 99)"
+        ),
+        "Senate results for a seat not on that year's ballot": (
+            "SELECT COUNT(*) FROM election_history WHERE chamber = 'upper'"
+            " AND district % 2 != CASE WHEN year % 4 = 2 THEN 1 ELSE 0 END"
+        ),
+        "legislative contests above their official ballots cast": (
+            "SELECT COUNT(*) FROM (SELECT 1 FROM election_history"
+            " GROUP BY year, chamber, district"
+            " HAVING MIN(total_cast) != MAX(total_cast) OR MIN(total_cast) < SUM(votes))"
+        ),
+        "a candidate listed twice in one judicial contest": (
+            "SELECT COUNT(*) FROM (SELECT 1 FROM judicial_history"
+            " GROUP BY year, election, office, district, candidate HAVING COUNT(*) > 1)"
+        ),
+        "judicial contests above their official ballots cast": (
+            "SELECT COUNT(*) FROM (SELECT 1 FROM judicial_history"
+            " GROUP BY year, election, office, district"
+            " HAVING MIN(total_cast) != MAX(total_cast) OR MIN(total_cast) < SUM(votes))"
+        ),
+        "referendum yes + no differs from votes cast": (
+            "SELECT COUNT(*) FROM referendum_history WHERE yes + no != total_cast"
+        ),
+    }
+    failures = []
+    for label, query in queries.items():
+        bad = conn.execute(query).fetchone()[0]
+        if bad:
+            failures.append(f"{label}: {bad}")
     return failures
 
 
@@ -418,6 +466,21 @@ def check_ballot(conn: sqlite3.Connection) -> list[str]:
     return failures
 
 
+def check_court_challenges(conn: sqlite3.Connection, curation: Path = CURATION) -> list[str]:
+    """Every curated case resolves to its docket on every curated act, and
+    nothing else is shown as a challenge."""
+    wanted = {(e["docket"], b) for e in curated(curation) for b in e["bills"]}
+    stored = set(conn.execute(
+        "SELECT c.docket_id, c.bill_id FROM court_challenges c JOIN bills b"
+        " ON b.id = c.bill_id WHERE b.status = 'enacted'"))
+    total = conn.execute("SELECT COUNT(*) FROM court_challenges").fetchone()[0]
+    failures = [f"court challenge docket {d} on {b} did not resolve"
+                for d, b in sorted(wanted - stored)]
+    if stored - wanted or total != len(stored):
+        failures.append("court_challenges holds rows that are not curated enacted acts")
+    return failures
+
+
 def check_congress(conn: sqlite3.Connection) -> list[str]:
     """The Commission's House incumbents are the members serving on election
     day, district for district: a misread report can never put a race under
@@ -446,11 +509,20 @@ def run_checks(db_path: Path, counts_file: Path) -> list[str]:
         failures = check_vote_counts(conn)
         failures += check_bill_counts(conn, counts_file)
         failures += check_referential_integrity(conn)
+        failures += check_results(conn)
         failures += check_federal(conn)
         failures += check_local(conn)
         failures += check_campaign_finance(conn)
         failures += check_ballot(conn)
         failures += check_congress(conn)
+        failures += check_court_challenges(conn)
+        # the floor only moves on a fully clean run; saving after a failed
+        # one would let repeated small dips ratchet it down
+        if not failures:
+            current = dict(
+                conn.execute("SELECT session_id, COUNT(*) FROM bills GROUP BY session_id")
+            )
+            counts_file.write_text(json.dumps(current, indent=1), encoding="utf-8")
     finally:
         conn.close()
     return failures

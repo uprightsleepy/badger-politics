@@ -312,6 +312,7 @@ def test_policy_refresh_blocks_mid_run_change(network):
     "https://unreviewed.example/records",
     "https://docs.legis.wisconsin.gov/scroll/2025/related/subject_index/index",
     "https://docs.legis.wisconsin.gov/search/results?q=ab1",
+    "https://docs.legis.wisconsin.gov/search",
     "https://docs.legis.wisconsin.gov/%73croll/",
     "https://docs.legis.wisconsin.gov:8443/2025/proposals/ab1",
     "https://docs.legis.wisconsin.gov/2025/%2e%2e/scroll/",
@@ -330,6 +331,13 @@ def test_policy_refresh_blocks_mid_run_change(network):
     "https://webapi.legistar.com/v1/cityofappleton/Matters",
     "https://greenbaywi.api.civicclerk.com/v1/Users",
     "https://www.kenosha.org/government/common-council/",
+    "https://sfs.dpi.wi.gov/Referenda/CustomReporting.aspx",
+    # a literal "%20" survives one decode on legacy names; nothing else does
+    "https://elections.wi.gov/sites/default/files/legacy/a%252Fb.xlsx",
+    "https://elections.wi.gov/sites/default/files/legacy/%252e%252e.xlsx",
+    "https://elections.wi.gov/sites/default/files/legacy/2020-08/Ward%2520Report.xlsx",
+    "https://elections.wi.gov/sites/default/files/legacy/Ward%2520Report.pdf",
+    "https://docs.legis.wisconsin.gov/2025/proposals/ab%25201",
 ])
 def test_reviewed_manifest_rejects_restricted_or_unreviewed_urls(url):
     with pytest.raises(SourceAccessError):
@@ -337,7 +345,6 @@ def test_reviewed_manifest_rejects_restricted_or_unreviewed_urls(url):
 
 
 @pytest.mark.parametrize("url", [
-    "https://docs.legis.wisconsin.gov/search",
     "https://docs.legis.wisconsin.gov/2025/related/subject_index/index?down=1",
     "https://docs.legis.wisconsin.gov/document/session/2025/reg/ab1",
     "https://docs.legis.wisconsin.gov/document/proposaltext/2025/AB246",
@@ -357,6 +364,7 @@ def test_reviewed_manifest_rejects_restricted_or_unreviewed_urls(url):
     "https://webapi.legistar.com/v1/waukesha/EventItems/330128/Votes",
     "https://cityofappleton.legistar.com/MeetingDetail.aspx?LEGID=6462",
     "https://waukesha.legistar.com/Departments.aspx",
+    "https://elections.wi.gov/sites/default/files/legacy/Ward%2520by%2520Ward%2520Report-Assembly.xlsx",
 ])
 def test_reviewed_manifest_accepts_only_intended_routes(url):
     SourceAccess().source(url)
@@ -472,4 +480,5 @@ def test_nightly_job_keeps_archives_and_omits_paused_fetchers():
                for host in ("lobbying.wi.gov", "wiseye.org"))
     # the Commission review (2026-09-13) reopened its pinned report files only
     assert policies["sources"]["elections.wi.gov"]["paths"] == {
-        "GET": [r"/sites/default/files/documents/[^/]+\.(?:pdf|xlsx)"]}
+        "GET": [r"/sites/default/files/documents/[^/]+\.(?:pdf|xlsx)",
+                r"/sites/default/files/legacy/[^/]+\.xlsx"]}

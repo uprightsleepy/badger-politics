@@ -9,6 +9,7 @@ import pytest
 from importer.committees import Committee, CommitteeIndex
 from importer.import_openstates import (
     TITLE_VOTERS,
+    Importer,
     biennium,
     bill_key,
     committee_from_referral,
@@ -215,6 +216,26 @@ def test_hearing_times_convert_utc_to_central() -> None:
     assert to_local("") == (None, None)
 
 
+def test_hearing_ids_survive_a_rescrape(make_db) -> None:
+    def scraped(uuid: str) -> dict:
+        # every scrape stamps a fresh uuid _id on the same hearing
+        return {"_id": uuid, "name": "Children and Families (Assembly)",
+                "start_date": "2025-06-03T15:00:00+00:00",
+                "location": {"name": "417 North, 2 E Main St, Madison, WI 53703"}}
+
+    ids = []
+    for uuid in ("8c1d0f4e-0000", "1f9a77b2-1111"):
+        conn = make_db(":memory:")
+        Importer(conn, {}, CommitteeIndex([]), set()).import_event(scraped(uuid))
+        ids.append(conn.execute("SELECT id FROM hearings").fetchone()[0])
+    assert ids[0] == ids[1]
+    # the same hearing twice in one import is a hard failure, never a merge
+    importer = Importer(make_db(":memory:"), {}, CommitteeIndex([]), set())
+    importer.import_event(scraped("a"))
+    with pytest.raises(RuntimeError, match="share title, location and start"):
+        importer.import_event(scraped("b"))
+
+
 def test_committee_index_is_chamber_scoped() -> None:
 
     index = CommitteeIndex(
@@ -273,3 +294,25 @@ def test_sponsor_change_parse() -> None:
         "lower", "Tucker", "coauthor", False,
     )
     assert parse_sponsor_change("Read first time and referred") is None
+
+
+def test_version_links_keep_every_format_once() -> None:
+    from importer.import_openstates import version_links
+    bill = {"versions": [
+        {"note": "Bill Text", "date": "", "links": [
+            {"url": "https://docs.legis.wisconsin.gov/document/proposaltext/2025/REG/AB1",
+             "media_type": "text/html"},
+            {"url": "https://docs.legis.wisconsin.gov/document/proposaltext/2025/REG/AB1.pdf",
+             "media_type": "application/pdf"}]},
+        {"note": "Senate Amendment 1", "date": "", "links": [
+            {"url": "https://docs.legis.wisconsin.gov/document/amendments/2025/REG/AB1/sa1",
+             "media_type": "text/html"}]},
+        # the scraper adds a version per adoption action; a repeat is one link
+        {"note": "Senate Amendment 1", "links": [
+            {"url": "https://docs.legis.wisconsin.gov/document/amendments/2025/REG/AB1/sa1",
+             "media_type": "text/html"}]},
+    ]}
+    assert [(note, media) for note, _, _, media in version_links(bill)] == [
+        ("Bill Text", "text/html"), ("Bill Text", "application/pdf"),
+        ("Senate Amendment 1", "text/html")]
+    assert version_links({}) == []

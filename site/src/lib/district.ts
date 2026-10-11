@@ -1,10 +1,12 @@
+import { store } from "./store.ts";
+
 export type District = { ad: number; sd: number };
 
 const KEY = "bp-district";
 
 export const savedDistrict = (): District | null => {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = store.get(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     const ad = Number(parsed?.ad);
@@ -17,17 +19,17 @@ export const savedDistrict = (): District | null => {
     }
     return { ad, sd };
   } catch {
-    localStorage.removeItem(KEY);
+    store.remove(KEY);
     return null;
   }
 };
 
 export const saveDistrict = (d: District): void => {
-  localStorage.setItem(KEY, JSON.stringify(d));
+  store.set(KEY, JSON.stringify(d));
 };
 
 export const forgetDistrict = (): void => {
-  localStorage.removeItem(KEY);
+  store.remove(KEY);
 };
 
 /** How the reader's own things look everywhere: their reps, their

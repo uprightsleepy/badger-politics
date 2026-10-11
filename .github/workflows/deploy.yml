@@ -134,12 +134,13 @@ jobs:
           echo "snapshot holds $bills bills"
           [ "$bills" -ge 15000 ]
 
-      # Disable dependency install scripts; build only the required SQLite addon.
+      # Disable dependency install scripts; compile only the required SQLite addon
+      # (from source: its prebuilt-binary download is not checksummed).
       - name: Install (locked, no lifecycle scripts)
         working-directory: site
         run: |
           npm ci --ignore-scripts
-          npm rebuild better-sqlite3
+          npm rebuild better-sqlite3 --build-from-source
 
       # Regenerate the linked API, feeds, and calendars from this same snapshot.
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
@@ -156,6 +157,13 @@ jobs:
           PUBLIC_PLACES_KEY: ${{ vars.PUBLIC_PLACES_KEY }}
         run: bash ../.github/scripts/timed.sh astro npm run build:astro
 
+      # Pages already link these images; links.mjs fails any that are missing.
+      - name: Render the share cards
+        working-directory: site
+        env:
+          BROWSER_PATH: /usr/bin/google-chrome
+        run: bash ../.github/scripts/timed.sh share-cards npm run build:cards
+
       - name: Build the complete search index
         working-directory: site
         run: bash ../.github/scripts/timed.sh pagefind npm run build:search
@@ -171,27 +179,29 @@ jobs:
           BROWSER_PATH: /usr/bin/google-chrome
         run: |
           set -euo pipefail
+          # timed.sh keeps each check's full log; print only its tail here.
+          logs="$RUNNER_TEMP/badger-ci"
           # Run links alongside serial browser checks to avoid Chrome contention.
-          bash ../.github/scripts/timed.sh links node scripts/links.mjs > /tmp/links.log 2>&1 &
+          bash ../.github/scripts/timed.sh links node scripts/links.mjs > /dev/null 2>&1 &
           links_pid=$!
           browser_failed=0
           for h in responsive a11y verify money-periods ux; do
-            if bash ../.github/scripts/timed.sh "$h" node "scripts/$h.mjs" > "/tmp/$h.log" 2>&1; then
-              echo "::group::$h passed"; tail -3 "/tmp/$h.log"; echo "::endgroup::"
+            if bash ../.github/scripts/timed.sh "$h" node "scripts/$h.mjs" > /dev/null 2>&1; then
+              echo "::group::$h passed"; tail -3 "$logs/$h.log"; echo "::endgroup::"
             else
-              echo "::error::$h failed"; tail -25 "/tmp/$h.log"; browser_failed=1
+              echo "::error::$h failed"; tail -25 "$logs/$h.log"; browser_failed=1
             fi
           done
           if wait "$links_pid"; then
-            echo "::group::links passed"; tail -3 /tmp/links.log; echo "::endgroup::"
+            echo "::group::links passed"; tail -3 "$logs/links.log"; echo "::endgroup::"
           else
-            echo "::error::links failed"; tail -25 /tmp/links.log; browser_failed=1
+            echo "::error::links failed"; tail -25 "$logs/links.log"; browser_failed=1
           fi
           exit $browser_failed
 
       - name: Release
         run: |
-          bash .github/scripts/timed.sh release npx --yes firebase-tools@14 deploy \
+          bash .github/scripts/timed.sh release site/node_modules/.bin/firebase deploy \
             --only hosting \
             --project "$TARGET" \
             --non-interactive \
@@ -224,6 +234,10 @@ jobs:
           cc=$(curl -sSI "$base/" | tr -d '\r' | awk -F': ' 'tolower($1)=="cache-control"{print $2}')
           echo "Cache-Control: $cc"
           case "$cc" in *must-revalidate*) ;; *) echo "::error::HTML is not revalidating"; exit 1 ;; esac
+          # The keyless API must stay readable from other origins.
+          acao=$(curl -sSI "$base/api/v1/meta.json" | tr -d '\r' \
+                 | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2}')
+          [ "$acao" = "*" ] || { echo "::error::API is not readable cross-origin"; exit 1; }
           curl --fail --silent --show-error --retry 3 --retry-delay 5 \
             "$base/api/v1/meta.json" > "$RUNNER_TEMP/live-meta.json"
           python3 - "$RUNNER_TEMP/live-meta.json" <<'PY'
@@ -251,11 +265,30 @@ jobs:
             node scripts/csp.mjs https://badgerpolitics-dev.web.app
           fi
 
+      # Bulk downloads are published from production releases only, so the
+      # stable download URL always matches badgerpolitics.org. This job holds
+      # deploy credentials and no contents: write; publish-downloads holds the
+      # reverse and only ever sees these files.
+      - name: Package the bulk downloads
+        if: env.TARGET == 'badgerpolitics-prod'
+        working-directory: pipeline
+        run: uv run python -m dataproducts.bulk ../data/exports "$RUNNER_TEMP/bulk"
+
+      - name: Hand the bulk downloads to the publishing job
+        if: env.TARGET == 'badgerpolitics-prod'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bulk-downloads-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/bulk/
+          if-no-files-found: error
+          compression-level: 0 # the large files are already compressed
+          retention-days: 1
+
       - name: Roll back guidance
         if: failure()
         run: |
           echo "::notice::If a release went out and is bad, roll back with:"
-          echo "::notice::npx firebase-tools@14 hosting:rollback --project $TARGET"
+          echo "::notice::site/node_modules/.bin/firebase hosting:rollback --project $TARGET"
 
       - name: Summarize stage timings
         if: always()
@@ -282,15 +315,60 @@ jobs:
         with:
           name: deploy-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           # Artifact uploads do not apply GitHub's console secret masking.
-          # Keep credentialed logo/release logs out of the downloadable archive.
+          # Keep the credentialed release log out of the downloadable archive.
           path: |
             ${{ runner.temp }}/badger-ci/*.time
+            ${{ runner.temp }}/badger-ci/data-products.log
             ${{ runner.temp }}/badger-ci/astro.log
+            ${{ runner.temp }}/badger-ci/share-cards.log
             ${{ runner.temp }}/badger-ci/pagefind.log
             ${{ runner.temp }}/badger-ci/preflight.log
             ${{ runner.temp }}/badger-ci/links.log
             ${{ runner.temp }}/badger-ci/responsive.log
             ${{ runner.temp }}/badger-ci/a11y.log
             ${{ runner.temp }}/badger-ci/verify.log
+            ${{ runner.temp }}/badger-ci/money-periods.log
+            ${{ runner.temp }}/badger-ci/ux.log
           if-no-files-found: ignore
           retention-days: 7
+
+  publish-downloads:
+    name: publish bulk downloads
+    needs: deploy
+    # Only a production release that passed every gate and the live checks.
+    if: inputs.target == 'badgerpolitics-prod'
+    concurrency:
+      group: publish-downloads
+      cancel-in-progress: false
+    permissions:
+      contents: write # create the release; no checkout, so no repository code runs here
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bulk-downloads-${{ github.run_id }}-${{ github.run_attempt }}
+          path: bulk
+
+      - name: Verify the checksums
+        working-directory: bulk
+        run: sha256sum --check --strict SHA256SUMS
+
+      # A new release per production deploy: gh uploads every asset to a draft
+      # before publishing it, so releases/latest/download/<file> never serves a
+      # half-uploaded set. The three newest data releases are kept.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="data-$(date -u +%Y%m%d-%H%M%S)"
+          gh release create "$tag" bulk/* \
+            --target "$GITHUB_SHA" \
+            --latest \
+            --title "Data, $(date -u +%Y-%m-%d)" \
+            --notes "Bulk downloads from the production release of ${GITHUB_SHA::8} (run ${GITHUB_RUN_ID}); see README.txt. The newest files are always at https://github.com/${GH_REPO}/releases/latest/download/<file>"
+          gh release list --limit 100 --json tagName --jq '.[].tagName' \
+            | { grep '^data-' || true; } | sort -r | tail -n +4 \
+            | while read -r old; do gh release delete "$old" --yes --cleanup-tag; done

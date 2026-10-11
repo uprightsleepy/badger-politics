@@ -60,6 +60,21 @@ def test_bill_count_state_written_on_success(db_path: Path, tmp_path: Path) -> N
     assert json.loads(counts_file.read_text(encoding="utf-8")) == {"2025": 1}
 
 
+def test_bill_count_state_kept_when_another_check_fails(db_path: Path, tmp_path: Path) -> None:
+    counts_file = tmp_path / "counts.json"
+    counts_file.write_text(json.dumps({"2025": 1}), encoding="utf-8")
+    conn = sqlite3.connect(db_path)
+    conn.execute("UPDATE vote_events SET yes_count = 3 WHERE id = 'v1'")
+    conn.execute(
+        "INSERT INTO bills (id, session_id, identifier, source)"
+        " VALUES ('2025-ab2', '2025', 'AB 2', 'openstates')"
+    )
+    conn.commit()
+    conn.close()
+    assert run_checks(db_path, counts_file)
+    assert json.loads(counts_file.read_text(encoding="utf-8")) == {"2025": 1}
+
+
 def test_nv_all_or_none(db_path: Path, tmp_path: Path) -> None:
     conn = sqlite3.connect(db_path)
     # page-omitted NV list: count says 2, zero NV records -> allowed

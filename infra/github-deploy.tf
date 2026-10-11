@@ -35,6 +35,11 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     # Separate parser identity: require the named workflow, main, and a
     # scheduled/manual event. In particular, pull_request_target is excluded.
     "attribute.parser_workflow" = "assertion.workflow_ref + ':' + assertion.ref + ':' + assertion.event_name"
+    # Deployer identity: deploy.yml on main inside a release environment, so
+    # other main-branch jobs (parser stages run third-party scraper code)
+    # cannot release. Every federating job declares an environment
+    # (check_workflows.py), so the claim is always present.
+    "attribute.deploy" = "assertion.workflow_ref + ':' + assertion.ref + ':' + assertion.environment"
   }
 
   # Accept tokens only from this repository.
@@ -52,14 +57,19 @@ resource "google_service_account" "deployer" {
   description  = "Reads a SQLite snapshot and releases Firebase Hosting. No write access to data."
 }
 
-# Only main may impersonate the deployer; PR refs do not match this principal.
+# Only deploy.yml on main, in a release environment, may impersonate the
+# deployer; PR refs and other workflows do not match these principals.
 resource "google_service_account_iam_member" "deployer_wif" {
+  # deploy.yml's environment names, one per Firebase target.
+  for_each = toset(["badgerpolitics-dev", "badgerpolitics-prod"])
+
   service_account_id = google_service_account.deployer.name
   role               = "roles/iam.workloadIdentityUser"
   member = join("", [
     "principalSet://iam.googleapis.com/",
     google_iam_workload_identity_pool.github.name,
-    "/attribute.repository_ref/${local.github_repo}@refs/heads/main",
+    "/attribute.deploy/",
+    "${local.github_repo}/.github/workflows/deploy.yml@refs/heads/main:refs/heads/main:${each.value}",
   ])
 }
 
@@ -70,11 +80,17 @@ resource "google_project_iam_member" "deployer_hosting" {
   member  = "serviceAccount:${google_service_account.deployer.email}"
 }
 
-# Snapshot reads do not grant overwrite or deletion.
+# Snapshot reads do not grant overwrite or deletion, nor parser state.
 resource "google_storage_bucket_iam_member" "deployer_snapshots" {
   bucket = local.snapshot_bucket
   role   = "roles/storage.objectViewer"
   member = "serviceAccount:${google_service_account.deployer.email}"
+
+  condition {
+    title       = "read_snapshots"
+    description = "Read published SQLite snapshots only."
+    expression  = "resource.name.startsWith('${local.storage_object_prefix}snapshots/')"
+  }
 }
 
 # Bucket listing lets gcloud resolve the newest snapshot.

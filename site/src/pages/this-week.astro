@@ -1,0 +1,119 @@
+---
+/** The week at the Capitol in one page, as of the build: committee
+ * hearings in the next seven days, any scheduled floorperiod, and the
+ * bills that had an action in the past seven days. Dates are Wisconsin's. */
+import Base from "../layouts/Base.astro";
+import BillLine from "../components/BillLine.astro";
+import HearingRow from "../components/HearingRow.astro";
+import LegiscanCredit from "../components/LegiscanCredit.astro";
+import SCHEDULE from "../data/session-schedule.json";
+import { actionsBetween, upcomingHearings } from "../lib/db";
+import { billSlug, fmtDate } from "../lib/format";
+import { addDays, wisconsinToday } from "../lib/today";
+
+const today = wisconsinToday();
+const weekEnd = addDays(today, 6);
+const weekAgo = addDays(today, -6);
+const long = (iso: string) =>
+  new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+
+const hearings = upcomingHearings(today).filter((h) => h.date! <= weekEnd);
+const floor = SCHEDULE.floorperiods.filter((f) => f.start <= weekEnd && f.end >= today);
+const nextFloor = SCHEDULE.floorperiods.find((f) => f.start > weekEnd);
+
+// one row per bill, newest action first, with that week's actions under it
+const moved = new Map<string, ReturnType<typeof actionsBetween>>();
+for (const a of actionsBetween(weekAgo, today)) {
+  moved.set(a.bill_id, [...(moved.get(a.bill_id) ?? []), a]);
+}
+const SHOWN_ACTIONS = 3;
+---
+
+<Base
+  title="This week at the Capitol"
+  description="Wisconsin Legislature committee hearings in the next seven days, scheduled floor sessions, and every bill that moved in the past week, in plain words."
+  layout="wide"
+>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">This week at the Capitol</h1>
+    <p class="sm:text-lead">
+      Committee hearings coming up in the next seven days, whether the full Assembly and Senate are scheduled to
+      meet, and the bills that moved in the past week.
+    </p>
+    <p class="text-small text-granite">
+      As of <strong class="font-semibold text-spruce">{fmtDate(today)}</strong>, when this page was last updated.
+      Hearings can be added, moved or canceled after that, so check the official notice before you go.
+    </p>
+    <ul class="mt-2 flex flex-wrap gap-3" role="list">
+      <li><a href="/testify/" class="btn btn-primary">How to testify at a hearing</a></li>
+      <li><a href="/feeds/weekly.xml" class="btn btn-secondary">Get the week in a feed reader</a></li>
+    </ul>
+  </header>
+
+  <section class="mt-10" aria-labelledby="hearings-heading">
+    <h2 id="hearings-heading" class="t-section">Committee hearings, {long(today)} to {long(weekEnd)}</h2>
+    {hearings.length ? (
+      <>
+        <p class="mt-2 max-w-[47.5rem]">
+          {hearings.length === 1 ? "One hearing is" : `${hearings.length.toLocaleString()} hearings are`} posted.
+          Anyone can attend, and anyone can <a href="/testify/" class="underline">testify</a>.
+        </p>
+        <ul class="mt-4 max-w-[60rem] border-b border-rule" role="list">
+          {hearings.map((h) => <HearingRow h={h} />)}
+        </ul>
+      </>
+    ) : (
+      <p class="mt-2 max-w-[47.5rem]">
+        No committee hearings were posted for these seven days. Committees usually post a notice a few days
+        ahead; the <a href="/calendar/#hearings" class="underline">calendar</a> has everything scheduled further out.
+      </p>
+    )}
+  </section>
+
+  <section class="mt-12 max-w-[47.5rem]" aria-labelledby="floor-heading">
+    <h2 id="floor-heading" class="t-section">Floor sessions</h2>
+    <p class="mt-2">
+      {floor.length ? (
+        <>
+          The full Assembly and Senate are scheduled to meet for votes during the floorperiod
+          {floor.map((f, i) => <>{i > 0 && " and "}<span class="figure">{fmtDate(f.start)}</span> to <span class="figure">{fmtDate(f.end)}</span>{"label" in f && f.label && ` (${f.label.toLowerCase()})`}</>)}.
+          Each house sets its own days within it.
+        </>
+      ) : nextFloor ? (
+        <>No floorperiod is scheduled these seven days. The next one starts <span class="figure">{fmtDate(nextFloor.start)}</span>.</>
+      ) : (
+        <>No more floorperiods are scheduled in the {SCHEDULE.session} session, which ends <span class="figure">{fmtDate(SCHEDULE.session_end)}</span>.</>
+      )}
+      {" "}Either house can still be called into a special or extraordinary session on short notice.
+    </p>
+    <p class="mt-2 text-small text-granite">
+      From the schedule set by <a href={SCHEDULE.source_url} class="underline">enrolled 2025 Senate Joint Resolution 1</a>.
+    </p>
+  </section>
+
+  <section class="mt-12 max-w-[47.5rem]" aria-labelledby="moved-heading">
+    <h2 id="moved-heading" class="t-section">Bills that moved, {fmtDate(weekAgo)} to {fmtDate(today)}</h2>
+    {moved.size ? (
+      <>
+        <p class="mt-2">
+          {moved.size === 1 ? "One bill or resolution" : `${moved.size.toLocaleString()} bills and resolutions`} had a
+          recorded action, newest first.
+        </p>
+        <ul class="mt-4 border-b border-rule" role="list">
+          {[...moved.values()].map((actions) => {
+            const b = actions[0];
+            const rest = actions.length - SHOWN_ACTIONS;
+            return (
+              <BillLine href={`/bills/${b.session_id}/${billSlug(b.identifier)}/`} identifier={b.identifier} title={b.title} date={fmtDate(b.date)}>
+                {actions.slice(0, SHOWN_ACTIONS).map((a) => `${fmtDate(a.date)}: ${a.description.replace(/\.\s*$/, "")}`).join(". ")}.{rest > 0 && ` And ${rest} more.`}
+                <LegiscanCredit v={b} class="block" />
+              </BillLine>
+            );
+          })}
+        </ul>
+      </>
+    ) : (
+      <p class="mt-2">No bill had a recorded action in the past seven days.</p>
+    )}
+  </section>
+</Base>

@@ -42,6 +42,26 @@ export const writeInSentence = (pending: { party: string; reason: string }[]): s
     )
     .join(" ");
 
+/** The district map a legislative general election was held under, or null
+ * for today's (2024 Act 94) maps: 2011 Act 43 for 2012 through 2020, then the
+ * maps the state Supreme Court adopted in 2022. A seat number names
+ * different ground under each, so an older result is never shown unlabeled. */
+export const mapsNote = (year: number): string | null =>
+  year >= 2024 ? null : year >= 2022 ? "2022 maps" : "2011 maps";
+
+/** A certified statewide referendum's subject, from the canvass heading:
+ * "State of Wisconsin Election Officials Referendum - Question 2" ->
+ * "Election officials". Headings that name no subject give null. */
+export const questionSubject = (title: string): string | null => {
+  const subject = title
+    .replace(/^state of wisconsin\s*/i, "")
+    .replace(/\s*-\s*question \d+$/i, "")
+    .replace(/^state\s+/i, "")
+    .replace(/\s*referendum$/i, "")
+    .trim();
+  return subject ? `${subject[0].toUpperCase()}${subject.slice(1).toLowerCase()}` : null;
+};
+
 // ---- words for races and results, shared by pages and client scripts ----
 
 /** The five statewide constitutional offices, in ballot order, as the

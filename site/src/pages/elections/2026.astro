@@ -13,7 +13,7 @@ import {
 } from "../../lib/db";
 import { fmtDate, partyWord, personSlug } from "../../lib/format";
 import { esc } from "../../lib/html";
-import { ballotStatus, raceSentenceHtml, seatOffice, STATEWIDE_OFFICES, writeInSentence } from "../../lib/ballot";
+import { ballotStatus, mapsNote, raceSentenceHtml, seatOffice, STATEWIDE_OFFICES, writeInSentence } from "../../lib/ballot";
 
 const seats = sittingPeople()
   .map((p) => ({
@@ -134,8 +134,8 @@ const raceRow = ({ person, election, margin }: (typeof seats)[number]) => {
       }) + (writeIn.length ? ` ${esc(writeInSentence(writeIn))}` : ""),
     note: margin
       ? margin.margin == null
-        ? `Unopposed in ${margin.year}${margin.year < 2024 ? ", on the previous maps" : ""}.`
-        : `Decided by ${margin.margin.toFixed(1)} points in ${margin.year}${margin.year < 2024 ? ", on the previous maps" : ""}.`
+        ? `Unopposed in ${margin.year}${mapsNote(margin.year) ? `, on the ${mapsNote(margin.year)}` : ""}.`
+        : `Decided by ${margin.margin.toFixed(1)} points in ${margin.year}${mapsNote(margin.year) ? `, on the ${mapsNote(margin.year)}` : ""}.`
       : "",
     text: `district ${person.district} ${person.name} ${others.map((o) => o.name).join(" ")}`.toLowerCase(),
   };
@@ -191,7 +191,8 @@ const chambers = [
     <h2 id="statewide-heading" class="t-section">Statewide offices</h2>
     <p class="mt-2 max-w-[47.5rem] text-small text-granite">
       All five constitutional offices are on every ballot in the state. Past results are the
-      Elections Commission's certified canvasses.
+      Elections Commission's certified canvasses. Judges are elected in the spring: see past
+      {" "}<a href="/elections/supreme-court/" class="underline">Supreme Court and Court of Appeals results</a>.
     </p>
     <div class="mt-5 grid gap-x-12 gap-y-8 lg:grid-cols-2">
       {statewide.map((o) => (

@@ -107,7 +107,8 @@ const build = (p: Person): RepSummary => {
           label: sessionPlainName(agreement.session, sessionNames().get(agreement.session) ?? agreement.session),
         }
       : null,
-    recentVotes: personVotes(p.id, 5).map((v) => ({
+    // public JSON: never LegiScan's rows (CLAUDE.md)
+    recentVotes: personVotes(p.id, 5, 0, { noLegiscan: true }).map((v) => ({
       date: v.date,
       option: v.option,
       // the same bill can appear twice in a day (suspension, then passage);

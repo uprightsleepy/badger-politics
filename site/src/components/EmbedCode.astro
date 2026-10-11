@@ -1,0 +1,47 @@
+---
+/** "Embed this": the iframe snippet for this page's /embed/ card, ready to
+ * copy into a newsroom's or blogger's page. */
+interface Props {
+  /** The card's path, e.g. /embed/bills/2025/ab1/. */
+  path: string;
+  /** What the frame shows, for the host page's screen-reader users. */
+  title: string;
+  height: number;
+}
+const { path, title, height } = Astro.props;
+const id = `embed-${path.replace(/[^a-z0-9]+/gi, "-")}`;
+const code =
+  `<iframe src="${new URL(path, Astro.site).href}" title="${title.replace(/"/g, "&quot;")}" ` +
+  `width="100%" height="${height}" style="border:1px solid #d6dcd7;border-radius:12px;max-width:640px" loading="lazy"></iframe>`;
+---
+<details class="group border-t border-rule pt-2" data-pagefind-ignore>
+  <summary class="inline-flex min-h-11 cursor-pointer list-none items-center font-display font-bold text-lake underline underline-offset-4 [&::-webkit-details-marker]:hidden">
+    Embed this on your site
+  </summary>
+  <div class="mt-1 flex flex-col gap-2">
+    <p class="text-small text-granite">
+      Paste this code into your page. The card shows the latest record each time it loads. <a href={path} class="underline">Preview the card</a>
+    </p>
+    <label for={id} class="sr-only">Embed code</label>
+    <textarea id={id} readonly rows="5" class="w-full rounded-[0.625rem] border-2 border-edge bg-limestone p-2 font-mono text-fine">{code}</textarea>
+    <button type="button" class="btn btn-secondary w-full" data-embed-copy={id}>Copy the code</button>
+    <p role="status" class="text-small text-granite" data-embed-status></p>
+  </div>
+</details>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>("[data-embed-copy]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const code = document.getElementById(btn.dataset.embedCopy!) as HTMLTextAreaElement;
+      const status = btn.parentElement!.querySelector<HTMLElement>("[data-embed-status]")!;
+      // selected either way, so a blocked clipboard still leaves one keystroke
+      code.select();
+      try {
+        await navigator.clipboard.writeText(code.value);
+        status.textContent = "Copied.";
+      } catch {
+        status.textContent = "Selected. Press Ctrl+C or Command+C to copy.";
+      }
+    });
+  });
+</script>

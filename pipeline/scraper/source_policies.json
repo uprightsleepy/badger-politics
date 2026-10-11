@@ -1,5 +1,5 @@
 {
-  "reviewed_on": "2026-09-13",
+  "reviewed_on": "2026-10-11",
   "documentation": "README.md#shared-daily-checks-2026-09-08",
   "sources": {
     "cg-519a459a-0ea3-42c2-b7bc-fa1143481f74.s3-us-gov-west-1.amazonaws.com": {
@@ -49,7 +49,6 @@
     "docs.legis.wisconsin.gov": {
       "paths": {
         "GET": [
-          "/search",
           "/\\d{4}/(?:proposals|related|legislators)/.*",
           "/document/(?:proposaltext|proposal|session|amendment|fe)/.*"
         ]
@@ -58,7 +57,7 @@
       "robots": {
         "status": 200,
         "url": "https://docs.legis.wisconsin.gov/robots.txt",
-        "sha256": "2c3601cc00d63c244d1b954cc362665e1203ca3250a47ee0d38da52226d0a530"
+        "sha256": "71a8ac719506a9d4455a7255519edcb235394a1bf017ba572da34660553327bf"
       }
     },
     "committeeschedule.legis.wisconsin.gov": {
@@ -88,7 +87,13 @@
       }
     },
     "elections.wi.gov": {
-      "paths": { "GET": ["/sites/default/files/documents/[^/]+\\.(?:pdf|xlsx)"] },
+      "paths": {
+        "GET": [
+          "/sites/default/files/documents/[^/]+\\.(?:pdf|xlsx)",
+          "/sites/default/files/legacy/[^/]+\\.xlsx"
+        ]
+      },
+      "literal_escapes": ["%20"],
       "delay_seconds": 10,
       "robots": {
         "status": 200,
@@ -279,8 +284,16 @@
     "data.milwaukee.gov": {
       "paused": "No active downloader; review dataset terms and permitted resource paths before introducing one."
     },
+    "www.courtlistener.com": {
+      "paused": "robots.txt and the terms page returned HTTP 403 (CloudFront) to the project User-Agent on 2026-10-11; record the robots response and review the API terms before enabling.",
+      "paths": { "GET": ["/api/rest/v4/dockets/\\d+/"] },
+      "delay_seconds": 12
+    },
     "img.logo.dev": {
       "paused": "Automatic logo downloads paused until provider terms and organization identity checks are verified."
+    },
+    "sfs.dpi.wi.gov": {
+      "paused": "No active downloader: the school referenda report host was unreachable for review on 2026-10-11 (robots unchecked), and DPI's site terms limit reuse to noncommercial and fair use; review both before introducing one."
     }
   }
 }

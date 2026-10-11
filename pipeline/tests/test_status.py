@@ -89,3 +89,10 @@ def test_bill_statuses_unchanged_by_classification() -> None:
     both = [action("passage", "lower"), action("passage", "upper")]
     assert derive_status(both, "bill") == "passed"
     assert derive_status([action("became-law")], "bill") == "enacted"
+
+
+def test_one_house_resolution_is_adopted_by_its_chamber() -> None:
+    adopted = [action("passage", "lower")]
+    assert derive_status(adopted, "resolution") == "adopted"
+    # a joint resolution still needs the other chamber
+    assert derive_status(adopted, "joint resolution") == "passed_chamber"

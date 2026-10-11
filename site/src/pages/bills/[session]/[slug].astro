@@ -1,6 +1,7 @@
 ---
 import Base from "../../../layouts/Base.astro";
 import FollowButton from "../../../components/FollowButton.astro";
+import EmbedCode from "../../../components/EmbedCode.astro";
 import RollCall from "../../../components/RollCall.astro";
 import Route from "../../../components/Route.astro";
 import PlainText from "../../../components/PlainText.astro";
@@ -13,11 +14,15 @@ import { companionsFor,
   sponsorsFor,
   votesFor,
   documentsFor,
+  documentLabel,
+  textsFor,
   subjectsForBill,
   personIdByName,
   vetoMessageUrl,
+  courtChallengesFor,
   meta,
 } from "../../../lib/db";
+import CourtCase from "../../../components/CourtCase.astro";
 import {
   billSlug, clip, fmtDate, lrbParagraphs, personSlug, chamberName, sessionYear, shortTitle,
   subjectDisplay, subjectSlug, STATUS_LABELS, identifierLong, sessionPlainName, partyWord, partyPlural,
@@ -27,6 +32,7 @@ import type { TermId } from "../../../lib/glossary";
 import JsonLd from "../../../components/JsonLd.astro";
 import { linkifyAction } from "../../../lib/actionLinks";
 import { LEGISCAN_LICENSE_URL, isLegiscan, legiscanBillUrl } from "../../../lib/legiscan";
+import { billCard } from "../../../lib/share";
 
 export function getStaticPaths() {
   return builtSessions().flatMap((session) =>
@@ -49,8 +55,8 @@ const fiscalEstimates = documentsFor(bill.id).filter((d) =>
   d.note.toLowerCase().includes("fiscal estimate"),
 );
 const subjects = subjectsForBill(bill.id);
-// "AB 12: Fiscal Estimate From DOA" -> "Fiscal Estimate From DOA"
-const fiscalLabel = (note: string) => note.replace(/^[A-Z]+\s*\d+:\s*/, "");
+const texts = textsFor(bill.id);
+const challenges = courtChallengesFor(bill.id);
 
 const vetoMsg = bill.status === "vetoed" || bill.status === "enacted"
   ? vetoMessageUrl(bill.id) : null;
@@ -77,7 +83,7 @@ const seoTitle = subject
 // status and session make the near-identical housekeeping bills distinct
 const seoDescription = [
   `${sessionName}.`,
-  `${STATUS_LABELS[bill.status ?? ""] ?? "Introduced"}.`,
+  `${STATUS_LABELS[status] ?? "Introduced"}.`,
   subject,
 ]
   .filter(Boolean)
@@ -191,16 +197,19 @@ const pulledOn = meta().imported_at?.slice(0, 10);
 const fromLegiscan = isLegiscan(bill);
 const legiscanUrl = legiscanBillUrl(bill.session_id, bill.identifier);
 const record = fromLegiscan ? "LegiScan's copy of the record" : "the official record";
+const share = billCard(bill, sessionName);
 ---
 
 <Base
   title={seoTitle}
   description={seoDescription}
+  image={share?.image}
+  imageAlt={share?.alt}
   layout="wide"
   filters={{
     type: isBill ? "Bill" : "Resolution",
     session: sessionName,
-    outcome: STATUS_LABELS[bill.status ?? ""] ?? "Introduced",
+    outcome: STATUS_LABELS[status] ?? "Introduced",
     chamber: passedChamberName,
   }}
   breadcrumbs={[
@@ -304,15 +313,24 @@ const record = fromLegiscan ? "LegiScan's copy of the record" : "the official re
           <p class="text-body" data-sponsor-note-text></p>
         </div>
         <div class="flex flex-col gap-2.5">
-          <FollowButton kind="bills" id={bill.id} label={`Follow this ${isBill ? "bill" : "proposal"}`} variant="primary" />
+          {/* following reads the JSON API and feeds, which never carry
+              LegiScan's records (lib/legiscan) */}
+          {!fromLegiscan && (
+            <FollowButton kind="bills" id={bill.id} label={`Follow this ${isBill ? "bill" : "proposal"}`} variant="primary" />
+          )}
           {bill.text_url && (
             <a href={bill.text_url} class="btn btn-secondary w-full">Read the {isBill ? "bill" : "proposal"}</a>
           )}
-          <p class="text-small text-granite">
-            Following saves it on this device. New actions show on your <a href="/following/" class="underline">Following page</a>.
-            You can also <a href={`/feeds/bills/${bill.id}.xml`} class="underline">get updates in a feed reader</a>.
-          </p>
+          {!fromLegiscan && (
+            <p class="text-small text-granite">
+              Following saves it on this device. New actions show on your <a href="/following/" class="underline">Following page</a>.
+              You can also <a href={`/feeds/bills/${bill.id}.xml`} class="underline">get updates in a feed reader</a>.
+            </p>
+          )}
         </div>
+        {share && (
+          <EmbedCode path={`/embed/bills/${bill.session_id}/${billSlug(bill.identifier)}/`} title={`${bill.identifier} on Badger Politics`} height={420} />
+        )}
         {companions.length > 0 && (
           <p class="border-t border-rule pt-4">
             {companions.map((c, i) => (
@@ -402,9 +420,41 @@ const record = fromLegiscan ? "LegiScan's copy of the record" : "the official re
           <ul class="flex flex-col">
             {fiscalEstimates.map((d) => (
               <li>
-                <a href={d.url} class="inline-flex min-h-11 items-center underline">{fiscalLabel(d.note)}</a>
+                <a href={d.url} class="inline-flex min-h-11 items-center underline">{documentLabel(d.note)}</a>
               </li>
             ))}
+          </ul>
+        </section>
+      )}
+
+      {texts.length > 0 && (
+        <section class="flex max-w-[45rem] flex-col gap-2" aria-labelledby="versions">
+          <h2 id="versions" class="t-section scroll-mt-4">Versions and amendments</h2>
+          <p>
+            Every text the Legislature printed for this {isBill ? "bill" : "proposal"}, including proposed changes. Each opens on the Legislature's site.
+          </p>
+          <ul class="flex flex-col">
+            {texts.map((t) => (
+              <li class="flex flex-wrap items-center gap-x-3">
+                <a href={t.url} class="inline-flex min-h-11 items-center underline">{t.label}</a>
+                {t.pdf && (
+                  <a href={t.pdf} class="inline-flex min-h-11 items-center text-granite underline" aria-label={`${t.label} (PDF)`}>PDF</a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {challenges.length > 0 && (
+        <section class="flex max-w-[45rem] flex-col gap-2" aria-labelledby="court">
+          <h2 id="court" class="t-section scroll-mt-4">Court challenges</h2>
+          <p>
+            {challenges.length === 1 ? "A federal court case challenges" : `${challenges.length} federal court cases challenge`} this law.
+            Each opens its docket on CourtListener. <a href="/laws/court-challenges/" class="underline">How cases are chosen</a>.
+          </p>
+          <ul class="flex flex-col border-b border-rule" role="list">
+            {challenges.map((c) => <CourtCase challenge={c} />)}
           </ul>
         </section>
       )}

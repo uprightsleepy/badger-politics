@@ -8,8 +8,9 @@ Precedence (first match wins):
                 veto overrides ("... Joint Rule 82") stay vetoed.
   failed_sjr1   "Failed to pass pursuant to Senate Joint Resolution 1" —
                 the end-of-biennium death of everything still pending.
-  passed        passage actions in both chambers.
-  passed_chamber passage action in exactly one chamber.
+  passed        passage actions in both chambers (adopted for resolutions).
+  passed_chamber passage action in exactly one chamber; a one-house
+                resolution (AR/SR) is adopted by that vote.
   in_committee  referred to committee, nothing further.
   introduced    everything else.
 """
@@ -61,7 +62,9 @@ def derive_status(actions: list[dict], classification: str | None = None) -> str
     if len(passage_chambers) >= 2:
         return "adopted" if is_resolution else "passed"
     if len(passage_chambers) == 1:
-        return "passed_chamber"
+        # an AR/SR is the business of one house: its vote is final adoption
+        one_house = is_resolution and "joint" not in classification
+        return "adopted" if one_house else "passed_chamber"
     if "referral-committee" in all_classes:
         return "in_committee"
     return "introduced"

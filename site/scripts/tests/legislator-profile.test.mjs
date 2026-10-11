@@ -5,6 +5,7 @@ import Database from "better-sqlite3";
 import { queries } from "./database.mjs";
 import { legislatorProfile } from "../../src/lib/legislator.ts";
 import { ballotStatus } from "../../src/lib/ballot.ts";
+import { repSummary } from "../../src/lib/repSummary.ts";
 
 const schema = await readFile(new URL("../../../pipeline/importer/schema.sql", import.meta.url), "utf8");
 
@@ -103,6 +104,34 @@ test("the profile derives attendance, loyalty, authorship and ballot status from
 
   assert.deepEqual(p.ballot, { kind: "pending", year: 2026 });
   assert.deepEqual(p.opponents.map((o) => o.name), ["Challenger"], "denied filings are not opponents");
+});
+
+test("LegiScan's roll calls are tagged on the pages and kept out of the public summary", (t) => {
+  const conn = new Database(":memory:");
+  t.after(() => conn.close());
+  conn.exec(schema);
+  conn.exec(`INSERT INTO sessions (id, identifier) VALUES ('2025', '2025');
+    INSERT INTO people (id, name, party, current_role, chamber, district) VALUES
+      ('lz', 'Member', 'Democratic', 'Representative', 'lower', 9),
+      ('p1', 'Peer One', 'Democratic', 'Representative', 'lower', 10),
+      ('p2', 'Peer Two', 'Democratic', 'Representative', 'lower', 11);
+    INSERT INTO bills (id, session_id, identifier, source) VALUES ('os', '2025', 'AB 1', 'openstates'), ('ls', '2025', 'AB 2', 'legiscan');
+    -- close votes (key votes), each one against the member's party
+    INSERT INTO vote_events (id, bill_id, date, chamber, source, source_url, yes_count, no_count) VALUES
+      ('v1', 'os', '2025-01-01', 'lower', NULL, 'https://example.invalid/votes/1', 50, 48),
+      ('v2', 'ls', '2025-01-02', 'lower', NULL, 'https://example.invalid/votes/2', 50, 48),
+      ('v3', 'os', '2025-01-03', 'lower', 'legiscan', 'https://example.invalid/votes/3', 50, 48);
+    INSERT INTO vote_records VALUES ('v1', 'lz', 'yes'), ('v2', 'lz', 'yes'), ('v3', 'lz', 'no'),
+      ('v1', 'p1', 'no'), ('v2', 'p1', 'no'), ('v3', 'p1', 'yes'),
+      ('v1', 'p2', 'no'), ('v2', 'p2', 'no'), ('v3', 'p2', 'yes');`);
+  const db = queries(conn);
+  const tagged = [["v3", "legiscan"], ["v2", "legiscan"], ["v1", null]];
+  const tags = (rows) => rows.map((v) => [v.vote_event_id, v.source]);
+  assert.deepEqual(tags(db.personVotes("lz", 10)), tagged, "a LegiScan bill or roll call marks the row");
+  assert.deepEqual(tags(db.keyVotesFor("lz")), tagged, "key votes carry the same tag");
+  assert.deepEqual(tags(db.partyBreaks("lz", "Democratic")), tagged, "party breaks carry the same tag");
+  const p = conn.prepare("SELECT * FROM people WHERE id = 'lz'").get();
+  assert.deepEqual(repSummary(p).recentVotes.map((v) => v.event), ["v1"]);
 });
 
 test("ballot status reads the Commission's report and never infers a candidacy or a retirement", () => {

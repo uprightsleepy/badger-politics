@@ -10,8 +10,10 @@ import { fmtDate } from "../lib/format";
 interface Props {
   title: string;
   description?: string;
-  /** Share-card image; pages may override the sitewide card. */
+  /** Share-card image and its alt text; pages may override the sitewide
+   * card (lib/share). */
   image?: string;
+  imageAlt?: string;
   /** Index this page's main content for search. Off for roll-call pages,
    * which are name lists whose substance lives on the bill and member
    * pages already. */
@@ -36,6 +38,7 @@ const {
   title,
   description = "Free, independent tracking of the Wisconsin Legislature. Every bill, every vote, and where each one stands, in plain words.",
   image = "/og.png",
+  imageAlt = "Badger Politics: Wisconsin's Legislature, in plain words.",
   searchable = true,
   noindex = false,
   breadcrumbs,
@@ -100,6 +103,7 @@ const NAV_GROUPS: { label: string; items: [string, string][] }[] = [
   },
 ];
 const NAV_DIRECT: [string, string][] = [
+  ["/this-week/", "This week"],
   ["/calendar/", "Calendar"],
   ["/elections/2026/", "Elections"],
   ["/following/", "Following"],
@@ -118,6 +122,9 @@ const mainClass =
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    {/* installable from the browser menu; no service worker, so a saved
+        copy can never serve yesterday's records */}
+    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="preload" href={overpassLatin} as="font" type="font/woff2" crossorigin />
     <link rel="preload" href={atkinsonLatin} as="font" type="font/woff2" crossorigin />
     <meta name="theme-color" content="#ffffff" />
@@ -137,13 +144,14 @@ const mainClass =
     <meta property="og:image" content={imageUrl} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Badger Politics: Wisconsin's Legislature, in plain words." />
+    <meta property="og:image:alt" content={imageAlt} />
     <meta property="og:locale" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={imageUrl} />
+    <meta name="twitter:image:alt" content={imageAlt} />
   </head>
   <body class="min-h-screen bg-limestone text-spruce antialiased">
     <a
@@ -277,7 +285,7 @@ const mainClass =
 
     <footer class="mt-14 border-t border-rule bg-white">
       <div class="mx-auto max-w-[72.5rem] space-y-3 px-5 pb-10 pt-7 text-small text-granite sm:px-8">
-        <p class="font-bold text-spruce">
+        <p class="font-bold text-spruce" data-disclaimer>
           Badger Politics is an independent project, not affiliated with the State of Wisconsin.
         </p>
         <p class="max-w-[45rem]">
@@ -379,6 +387,10 @@ const mainClass =
           .then((r) => r.json())
           .then((reps: Reps) => {
             const slugs = [reps.assembly[ad]?.slug, reps.senate[sd]?.slug].filter(Boolean);
+            const spoken: [string | undefined, string][] = [
+              [reps.assembly[ad]?.slug, "Your representative: "],
+              [reps.senate[sd]?.slug, "Your state senator: "],
+            ];
             // a bill page names the reader's own lawmakers when they are
             // among its authors or supporters
             const note = document.querySelector<HTMLElement>("[data-sponsor-note]");
@@ -418,14 +430,15 @@ const mainClass =
             document.querySelectorAll<HTMLElement>("[data-mine-person]").forEach((el) => {
               if (slugs.includes(el.dataset.minePerson)) el.hidden = false;
             });
-            for (const slug of slugs) {
+            for (const [slug, srLabel] of spoken) {
+              if (!slug) continue;
               document.querySelectorAll<HTMLAnchorElement>(`a[href="/legislators/${slug}/"]`).forEach((a) => {
                 if (
                   a.closest("[data-vote-row]") ||
                   a.closest("nav") ||
                   a.closest("[data-no-rep-highlight]")
                 ) return;
-                markAsMine(a, "Your representative: ");
+                markAsMine(a, srLabel);
               });
             }
           })

@@ -82,7 +82,11 @@ def cached_page(http: requests.Session, url: str, cache_dir: Path) -> tuple[str,
     response = http.get(url, timeout=60)
     response.raise_for_status()
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_file.write_text(response.text, encoding="utf-8")
+    # write-then-rename: a run killed mid-write must not leave a truncated
+    # page that every later run would trust
+    pending = cache_file.with_suffix(".html.tmp")
+    pending.write_text(response.text, encoding="utf-8")
+    pending.replace(cache_file)
     return response.text, False
 
 

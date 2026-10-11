@@ -1,0 +1,15 @@
+{
+  "name": "Badger Politics",
+  "short_name": "Badger Politics",
+  "description": "Free, independent tracking of the Wisconsin Legislature. Every bill, every vote, and where each one stands, in plain words.",
+  "lang": "en-US",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f2",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

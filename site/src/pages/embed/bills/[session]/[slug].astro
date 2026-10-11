@@ -1,0 +1,37 @@
+---
+/** A bill's status card for other sites to frame (layouts/Embed). */
+import Embed from "../../../../layouts/Embed.astro";
+import { actionsFor, billsFor, builtSessions, meta } from "../../../../lib/db";
+import { billSlug, clip, fmtDate, identifierLong, sessionPlainName, shortTitle } from "../../../../lib/format";
+import { tellStory, termRuns } from "../../../../lib/billStory";
+import { billShared } from "../../../../lib/share";
+
+export function getStaticPaths() {
+  return builtSessions().flatMap((session) =>
+    billsFor(session.id).filter(billShared).map((b) => ({
+      params: { session: session.id, slug: billSlug(b.identifier) },
+      props: { bill: b, sessionName: session.name ?? session.id },
+    })),
+  );
+}
+
+const { bill, sessionName } = Astro.props;
+const actions = actionsFor(bill.id);
+const story = tellStory(bill, actions, (meta().imported_at ?? new Date().toISOString()).slice(0, 10));
+const subject = shortTitle(bill.title).replace(/\.\s*$/, "") || identifierLong(bill.identifier);
+// the card has no room for definitions, so terms read as plain words
+const plain = (text: string) => termRuns(text).map((r) => r.text).join("");
+const latest = bill.latest_action_date ?? actions.at(-1)?.date;
+---
+
+<Embed title={`${bill.identifier}: ${clip(subject, 40)}`} page={`/bills/${bill.session_id}/${billSlug(bill.identifier)}/`}>
+  <p class="t-label text-granite">
+    {identifierLong(bill.identifier)}, {sessionPlainName(bill.session_id, sessionName)}
+  </p>
+  <h1 class="t-section">{clip(subject, 100)}</h1>
+  <div class="flex flex-col gap-1 rounded-2xl bg-limestone px-4 py-3">
+    <h2 class="t-question">{story.headline}</h2>
+    <p class="text-small">{plain(story.body[0] ?? "")}</p>
+    {latest && <p class="text-fine text-granite">Latest action {fmtDate(latest)}</p>}
+  </div>
+</Embed>
