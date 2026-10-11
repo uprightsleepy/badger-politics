@@ -134,12 +134,13 @@ jobs:
           echo "snapshot holds $bills bills"
           [ "$bills" -ge 15000 ]
 
-      # Disable dependency install scripts; build only the required SQLite addon.
+      # Disable dependency install scripts; compile only the required SQLite addon
+      # (from source: its prebuilt-binary download is not checksummed).
       - name: Install (locked, no lifecycle scripts)
         working-directory: site
         run: |
           npm ci --ignore-scripts
-          npm rebuild better-sqlite3
+          npm rebuild better-sqlite3 --build-from-source
 
       # Regenerate the linked API, feeds, and calendars from this same snapshot.
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
