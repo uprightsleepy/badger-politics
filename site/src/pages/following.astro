@@ -32,6 +32,15 @@ const KINDS: [string, string][] = [
     </p>
   </header>
 
+  <section id="follow-import" hidden class="sheet mt-6 max-w-[47.5rem] p-5 sm:p-6" aria-labelledby="follow-import-heading">
+    <h2 id="follow-import-heading" class="t-question text-[1.1875rem]" tabindex="-1"></h2>
+    <p id="follow-import-text" class="mt-2"></p>
+    <p class="mt-4 flex flex-wrap gap-3">
+      <button id="follow-import-yes" type="button" class="btn btn-primary">Add them to this browser</button>
+      <button id="follow-import-no" type="button" class="btn btn-secondary">Not now</button>
+    </p>
+  </section>
+
   <p id="follow-changed-note" hidden class="sheet mt-6 max-w-[47.5rem] p-4 font-bold"></p>
 
   <div id="follow-empty" hidden class="sheet mt-6 flex max-w-[47.5rem] flex-col gap-4 p-5 sm:p-6">
@@ -54,10 +63,38 @@ const KINDS: [string, string][] = [
     ))}
   </div>
 
+  <section id="follow-portable" hidden class="mt-12 max-w-[47.5rem]" aria-labelledby="follow-portable-heading">
+    <h2 id="follow-portable-heading" class="t-section">Take what you follow with you</h2>
+    <h3 class="t-question mt-5">In a feed reader</h3>
+    <p class="mt-1.5">
+      One file with a feed for each bill, state lawmaker, committee and council member you follow, for any feed
+      reader to import. Districts and races don't have feeds, so they aren't in it.
+    </p>
+    <button id="follow-opml" type="button" class="btn btn-secondary mt-3">Download the feeds (OPML)</button>
+    <h3 class="t-question mt-8">On another device</h3>
+    <p class="mt-1.5">
+      Open this link on your other phone or computer and it will offer to add everything here. The list rides in
+      the link itself, after the “#”, the part of a link browsers never send to a server, ours included. Anyone
+      you give the link to can see what's in it.
+    </p>
+    <label for="follow-share-link" class="mt-3 block text-small font-bold">Link to what you follow</label>
+    <div class="mt-1.5 flex flex-col gap-2 sm:flex-row">
+      <input
+        id="follow-share-link"
+        readonly
+        class="min-h-12 min-w-0 flex-1 rounded-[0.625rem] border-2 border-edge bg-white px-3 text-body text-spruce focus:border-lake lg:min-h-11"
+      />
+      <button id="follow-copy" type="button" class="btn btn-secondary">Copy link</button>
+    </div>
+  </section>
+
   <p id="follow-status" role="status" class="sr-only"></p>
 
   <script>
-    import { getFollows, toggleFollow, lastSeen, markSeen, isNewSince, heardSince, splitBillId, FOLLOW_KINDS } from "../scripts/follows";
+    import {
+      getFollows, toggleFollow, lastSeen, markSeen, isNewSince, heardSince, splitBillId, FOLLOW_KINDS,
+      decodeFollows, encodeFollows, followsOpml, mergeFollows,
+    } from "../scripts/follows";
     import { wisconsinToday } from "../lib/today";
     import type { Follows } from "../scripts/follows";
     import { esc } from "../lib/html";
@@ -250,6 +287,9 @@ const KINDS: [string, string][] = [
         : "";
       document.getElementById("follow-status")!.textContent =
         `${total} followed item${total === 1 ? "" : "s"} loaded${changedCount ? `, ${changedCount} with new action` : ""}.`;
+      document.getElementById("follow-portable")!.hidden = total === 0;
+      (document.getElementById("follow-share-link") as HTMLInputElement).value =
+        `${location.origin}/following/#follows=${encodeFollows(follows)}`;
 
       document.querySelectorAll<HTMLButtonElement>("[data-unfollow-kind]").forEach((b) =>
         b.addEventListener("click", async () => {
@@ -269,5 +309,84 @@ const KINDS: [string, string][] = [
     render().then(() => {
       if (!anyFailed) markSeen();
     });
+
+    const status = document.getElementById("follow-status")!;
+    document.getElementById("follow-opml")!.addEventListener("click", () => {
+      // each feed is titled with the name its row shows
+      const names = new Map(
+        [...document.querySelectorAll<HTMLElement>("[data-unfollow-kind]")].map((b) =>
+          [`${b.dataset.unfollowKind}|${b.dataset.unfollowId}`, b.dataset.unfollowName ?? ""]),
+      );
+      const blob = new Blob([followsOpml(getFollows(), location.origin, names)], { type: "text/x-opml" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "badger-politics-follows.opml";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      status.textContent = "Downloaded the feeds file.";
+    });
+    const copy = document.getElementById("follow-copy")!;
+    const shareLink = document.getElementById("follow-share-link") as HTMLInputElement;
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(shareLink.value);
+        status.textContent = "Link copied.";
+        copy.textContent = "Copied";
+        setTimeout(() => (copy.textContent = "Copy link"), 2000);
+      } catch {
+        // no clipboard access: leave the link selected to copy by hand
+        shareLink.select();
+        status.textContent = "Couldn't copy automatically; the link is selected for you to copy.";
+      }
+    });
+
+    // A link from another device: offer to add its follows, never on its own.
+    // The fragment is untrusted input; decodeFollows rejects any malformed part.
+    if (location.hash.startsWith("#follows=")) {
+      const incoming = decodeFollows(location.hash.slice("#follows=".length));
+      const box = document.getElementById("follow-import")!;
+      const heading = document.getElementById("follow-import-heading")!;
+      const yes = document.getElementById("follow-import-yes")!;
+      const no = document.getElementById("follow-import-no")!;
+      const WORDS: Record<string, [string, string]> = {
+        bills: ["bill", "bills"], legislators: ["state lawmaker", "state lawmakers"],
+        committees: ["committee", "committees"], races: ["2026 race", "2026 races"],
+        districts: ["district", "districts"], council: ["council member", "council members"],
+      };
+      const counts = incoming
+        ? FOLLOW_KINDS.filter((k) => incoming[k].length).map((k) => {
+            const n = incoming[k].length;
+            return `${n.toLocaleString()} ${WORDS[k][n === 1 ? 0 : 1]}`;
+          })
+        : [];
+      // the link has done its job once answered; drop it so a reload doesn't ask again
+      const done = (message: string) => {
+        history.replaceState(null, "", location.pathname + location.search);
+        box.hidden = true;
+        status.textContent = message;
+        const h1 = document.querySelector<HTMLElement>("h1")!;
+        h1.setAttribute("tabindex", "-1");
+        h1.focus();
+      };
+      if (incoming && counts.length) {
+        heading.textContent = "Add follows from another device?";
+        document.getElementById("follow-import-text")!.textContent =
+          `This link carries ${counts.length > 1 ? `${counts.slice(0, -1).join(", ")} and ${counts.at(-1)}` : counts[0]}. ` +
+          "Anything you already follow here stays as it is.";
+        yes.addEventListener("click", async () => {
+          const added = mergeFollows(incoming);
+          await render();
+          done(added ? `Added ${added.toLocaleString()} new item${added === 1 ? "" : "s"}.` : "You already follow everything in that link.");
+        });
+      } else {
+        heading.textContent = "This link's follow list can't be read";
+        document.getElementById("follow-import-text")!.textContent =
+          "It may have been cut off or changed, so nothing was added. Ask for a fresh link from the other device.";
+        yes.hidden = true;
+        no.textContent = "Dismiss";
+      }
+      no.addEventListener("click", () => done(""));
+      box.hidden = false;
+    }
   </script>
 </Base>
