@@ -58,7 +58,8 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
         "community": [["scraper.fetch_subjects"], ["scraper.fetch_contacts", "--refresh"],
                       ["scraper.fetch_local_profiles"], ["scraper.fetch_local_votes"]],
         "federal": [["scraper.fetch_federal_votes"],
-                    ["scraper.fetch_federal_finance", "--as-of", context["finance_as_of"]]],
+                    ["scraper.fetch_federal_finance", "--as-of", context["finance_as_of"]],
+                    ["scraper.fetch_court_dockets"]],
         "import": [rebuild,
                    # pinned per cycle; fetched once, then carried in the wec bundle
                    ["scraper.fetch_wec", "--cycle", cycle],
@@ -76,6 +77,7 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
                    ["importer.import_contacts", "_data/contacts/contacts.json", db],
                    ["importer.import_federal", "_data/federal", db],
                    ["importer.federal_finance", "_data/federal", db],
+                   ["importer.court_challenges", "_data/federal/court-dockets.json", db],
                    ["importer.import_local", "_data/local", db]],
         "enrich": [["importer.enrich_lrb", db], ["importer.enrich_companions", db],
                    # enrolled resolution pages share the LRB page cache

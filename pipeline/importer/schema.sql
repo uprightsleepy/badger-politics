@@ -111,6 +111,23 @@ CREATE TABLE hearing_videos (
     title      TEXT NOT NULL
 );
 
+-- federal court cases challenging a Wisconsin Act: the case-to-act link is
+-- human-verified curation (importer/court_challenges.json); docket facts
+-- come from CourtListener and are linked, never rehosted
+CREATE TABLE court_challenges (
+    docket_id        INTEGER NOT NULL,
+    bill_id          TEXT NOT NULL REFERENCES bills (id),
+    court            TEXT NOT NULL,
+    case_name        TEXT NOT NULL,
+    docket_number    TEXT,
+    date_filed       TEXT,
+    date_terminated  TEXT,
+    date_last_filing TEXT,
+    url              TEXT NOT NULL,
+    basis_url        TEXT NOT NULL,
+    PRIMARY KEY (docket_id, bill_id)
+);
+
 -- the state's own subject index terms per bill, matched by exact
 -- session + identifier only
 CREATE TABLE bill_subjects (
