@@ -240,6 +240,21 @@ def option_bucket(option: str) -> str:
     return option if option in ("yes", "no") else "other"
 
 
+def version_links(bill: dict) -> list[tuple[str, str | None, str, str | None]]:
+    """(note, date, url, media type) for every text the Legislature printed:
+    introduced, engrossed and enrolled texts and adopted amendments, one row
+    per format, in docs.legis order. Links only; the text is never copied."""
+    rows, seen = [], set()
+    for version in bill.get("versions", []):
+        for link in version.get("links", []):
+            url = link.get("url")
+            if url and url not in seen:
+                seen.add(url)
+                rows.append((version["note"], version.get("date") or None, url,
+                             link.get("media_type")))
+    return rows
+
+
 class Importer:
     def __init__(
         self,
@@ -450,12 +465,8 @@ class Importer:
                 )
         latest = actions[-1] if actions else None
         chamber = pseudo_chamber(bill.get("from_organization"))
-        html_links = [
-            link["url"]
-            for version in bill.get("versions", [])
-            for link in version.get("links", [])
-            if link.get("media_type") == "text/html"
-        ]
+        versions = version_links(bill)
+        html_links = [url for _, _, url, media in versions if media == "text/html"]
         # Prefer the original proposal text: enrolled/act versions of passed
         # bills omit the LRB analysis section.
         text_url = next(
@@ -499,6 +510,11 @@ class Importer:
                     ",".join(action.get("classification") or []),
                 ),
             )
+        self.conn.executemany(
+            "INSERT INTO bill_versions (bill_id, note, date, url, media_type)"
+            " VALUES (?, ?, ?, ?, ?)",
+            [(pk, *version) for version in versions],
+        )
         for doc in bill.get("documents", []):
             url = doc["links"][0]["url"] if doc.get("links") else None
             if url and doc.get("note"):
@@ -851,7 +867,8 @@ def run_import(
     stats = {
         table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]  # noqa: S608
         for table in ("sessions", "people", "bills", "actions", "sponsorships",
-                      "bill_documents", "vote_events", "vote_records", "committees",
+                      "bill_documents", "bill_versions", "vote_events", "vote_records",
+                      "committees",
                       "hearings")
     }
     quality = conn.execute(

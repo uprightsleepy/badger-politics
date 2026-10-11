@@ -155,6 +155,24 @@ def actions_for_session(conn: sqlite3.Connection, session_id: str) -> dict[str, 
     }
 
 
+def links_for_session(
+    conn: sqlite3.Connection, session_id: str, table: str
+) -> dict[str, list[dict]]:
+    """bill_id -> official links (bill_versions or bill_documents) for one
+    session, in import order."""
+    if table not in ("bill_versions", "bill_documents"):
+        raise ValueError(f"links_for_session: unknown table {table!r}")
+    cursor = conn.execute(
+        f"SELECT d.* FROM {table} d JOIN bills b ON b.id = d.bill_id"  # noqa: S608 - allowlisted
+        f" WHERE b.session_id = ? AND {exportable('b.')} ORDER BY d.bill_id, d.rowid",
+        (session_id,),
+    )
+    return {
+        bill_id: [{k: r[k] for k in r.keys() if k != "bill_id"} for r in rows]
+        for bill_id, rows in itertools.groupby(cursor, key=lambda r: r["bill_id"])
+    }
+
+
 def sponsors_for_session(conn: sqlite3.Connection, session_id: str) -> dict[str, list[dict]]:
     """bill_id -> sponsors for one session, from one ordered scan; row
     shape and per-bill order match sponsors_for exactly."""

@@ -78,6 +78,17 @@ CREATE TABLE bill_documents (
 );
 CREATE INDEX idx_bill_documents_bill ON bill_documents (bill_id);
 
+-- every printed text of a bill (introduced, enrolled, adopted amendments),
+-- one row per format, in docs.legis order; official links only
+CREATE TABLE bill_versions (
+    bill_id    TEXT NOT NULL REFERENCES bills (id),
+    note       TEXT NOT NULL,
+    date       TEXT,
+    url        TEXT NOT NULL,
+    media_type TEXT
+);
+CREATE INDEX idx_bill_versions_bill ON bill_versions (bill_id);
+
 -- service terms from the people files (recalls and resignations end
 -- terms mid-biennium); out-of-office gaps must never count against or
 -- toward a member
