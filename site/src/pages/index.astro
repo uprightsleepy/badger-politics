@@ -6,6 +6,7 @@ import BillList from "../components/BillList.astro";
 import SessionOutcomes from "../components/SessionOutcomes.astro";
 import { builtSessions, recentlyActedBills, subjectIndex } from "../lib/db";
 import { subjectSlug } from "../lib/subjects";
+import { TOPIC_ART, TOPIC_ART_DEFS } from "../lib/topicArt";
 import { sessionPlainName } from "../lib/format";
 import { sessionCounts, sessionOutcomes } from "../lib/billRows";
 const sessions = builtSessions();
@@ -29,24 +30,25 @@ const SEARCH_TYPES: [string, string][] = [
 // Topic doors in the words people use. Each opens the Legislature's own
 // subject page when this build has one, otherwise a search for the topic.
 const subjectSlugs = new Set(subjectIndex().map((x) => x.slug));
-// icons: 24px line drawings, decorative (the label carries the meaning)
-const TOPICS: { label: string; examples: string; subjects: string[]; q: string; icon: string }[] = [
+// art: hand-inked spot illustrations (lib/topicArt), decorative; the label carries the meaning.
+// tint, panel and accent are one muted hue per topic.
+const TOPICS: { label: string; examples: string; subjects: string[]; q: string; art: string; tint: string; panel: string; accent: string }[] = [
   { label: "Schools", examples: "School funding, vouchers, testing, teachers", subjects: ["Education", "Public instruction", "School districts"], q: "school",
-    icon: '<path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M10 21v-5h4v5"/><path d="M12 5V2l3 1-3 1"/>' },
+    art: "schools", tint: "#e4eff0", panel: "#9cc6c9", accent: "#0d5c63" },
   { label: "Taxes", examples: "Property, income and sales taxes", subjects: ["Taxation", "Property tax", "Income tax"], q: "tax",
-    icon: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M14.5 8.8c-.6-.9-1.5-1.3-2.5-1.3-1.3 0-2.5.7-2.5 1.9s1.2 1.7 2.5 2 2.5.8 2.5 2-1.2 2-2.5 2c-1 0-2-.4-2.6-1.3"/><path d="M12 6v1.5M12 16.5V18"/>' },
+    art: "taxes", tint: "#f8efd6", panel: "#e9cd7f", accent: "#8a6410" },
   { label: "Roads & Transit", examples: "Highways, road repair, buses, the gas tax", subjects: ["Highways", "Transportation"], q: "highway",
-    icon: '<rect x="5" y="3" width="14" height="15" rx="3"/><path d="M5 11h14"/><path d="M8 18v3M16 18v3"/><circle cx="8.5" cy="14.5" r="1"/><circle cx="15.5" cy="14.5" r="1"/>' },
+    art: "roads", tint: "#e8eddf", panel: "#b8c7a3", accent: "#3d5a35" },
   { label: "Health Care", examples: "Medicaid, prescriptions, hospitals, insurance", subjects: ["Health", "Medical assistance", "Health insurance"], q: "health",
-    icon: '<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/><path d="M12 10v4M10 12h4"/>' },
+    art: "health", tint: "#ebe7f2", panel: "#c2b8db", accent: "#4b3f72" },
   { label: "Data Centers", examples: "Big tech campuses, their power and water use, tax breaks", subjects: ["Data centers", "Data center"], q: "data center",
-    icon: '<rect x="4" y="3" width="16" height="5" rx="1.5"/><rect x="4" y="10" width="16" height="5" rx="1.5"/><path d="M4 19h16"/><path d="M8 5.5h.01M8 12.5h.01M12 5.5h4M12 12.5h4"/>' },
+    art: "datacenters", tint: "#e3e9f0", panel: "#adbfd2", accent: "#2c4a68" },
   { label: "Housing", examples: "Rent, home building, zoning, landlords and tenants", subjects: ["Housing", "Landlord and tenant"], q: "housing",
-    icon: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>' },
+    art: "housing", tint: "#f4e8de", panel: "#dcae8e", accent: "#7a4a26" },
   { label: "Water and Land", examples: "PFAS, lakes, farms, state parks", subjects: ["Natural resources", "Water", "Environment"], q: "water",
-    icon: '<path d="M3 12l5-6 4 4 3-3 6 5"/><path d="M3 17c1.5 0 1.5-1 3-1s1.5 1 3 1 1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1"/>' },
+    art: "water", tint: "#e0eee8", panel: "#a3cbb8", accent: "#245b46" },
   { label: "Jobs and Wages", examples: "Minimum wage, unemployment, workers' rights", subjects: ["Employment", "Labor"], q: "employment",
-    icon: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/>' },
+    art: "jobs", tint: "#efebdf", panel: "#d0c39c", accent: "#5a5136" },
 ];
 const topicHref = (t: (typeof TOPICS)[number]) => {
   const slug = t.subjects.map(subjectSlug).find((x) => subjectSlugs.has(x));
@@ -155,15 +157,25 @@ const FIELD =
   <section class="mt-14" aria-labelledby="topics-heading">
     <h2 id="topics-heading" class="t-section">What do you want to know about?</h2>
     <p class="mt-2 max-w-[47.5rem]">Pick a topic to see the bills about it and where each one stands.</p>
+    <svg width="0" height="0" class="absolute" aria-hidden="true"><defs set:html={TOPIC_ART_DEFS} /></svg>
     <ul class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4" role="list">
       {TOPICS.map((t) => (
         <li>
-          <a href={topicHref(t)} class="group sheet flex h-full flex-col gap-1.5 p-4 no-underline outline-offset-2 transition-colors hover:bg-prairie-tint sm:p-5">
-            <span class="mb-2 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-prairie-tint text-lake transition-colors group-hover:bg-white" aria-hidden="true">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={t.icon} />
+          <a
+            href={topicHref(t)}
+            class="topic group flex h-full flex-col rounded-[1.25rem] p-2 no-underline outline-offset-2 transition-transform motion-safe:hover:-translate-y-0.5"
+            style={`background:${t.tint};--panel:${t.panel};--accent:${t.accent}`}
+          >
+            <span class="block overflow-hidden rounded-[0.9rem] leading-none" aria-hidden="true">
+              <svg class="topic-art block h-auto w-full" viewBox="0 0 160 100">
+                <rect width="160" height="100" class="topic-panel" /><rect width="160" height="100" filter="url(#paper-grain)" />
+                <g filter="url(#ink-wobble)" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" set:html={TOPIC_ART[t.art]} />
+              </svg>
             </span>
-            <span class="font-display text-[1.125rem] leading-tight font-bold text-spruce sm:text-[1.25rem]">{t.label}</span>
-            <span class="text-small text-granite">{t.examples}</span>
+            <span class="flex flex-col gap-1 px-2 pt-3 pb-2 sm:px-3">
+              <span class="font-display text-[1.125rem] leading-tight font-bold text-spruce group-hover:underline sm:text-[1.25rem]">{t.label}</span>
+              <span class="text-small text-granite">{t.examples}</span>
+            </span>
           </a>
         </li>
       ))}
@@ -272,6 +284,11 @@ const FIELD =
   </section>
 
   <style is:global>
+    .topic-art { color: var(--color-spruce); }
+    .topic-art .topic-panel { fill: var(--panel); }
+    .topic-art .p { fill: #fffcf5; }
+    .topic-art .a { fill: var(--accent); }
+    .topic-art .ps { stroke: #fffcf5; }
     /* Pagefind marks matched words; bold reads as "here's your word"
        without spending the one Prairie highlight. */
     #search-results mark {
