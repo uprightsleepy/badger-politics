@@ -4,7 +4,8 @@
 import { upcomingHearings, recentHearings, findBillByIdentifier, allCommittees } from "../lib/db";
 import { committeeSlug, fmtDate, fmtTime, hearingDisplayName, billSlug, personSlug } from "../lib/format";
 import { safeHref } from "../lib/html";
-const today = new Date().toISOString().slice(0, 10);
+import { wisconsinToday } from "../lib/today";
+const today = wisconsinToday();
 const upcoming = upcomingHearings(today);
 const shown = upcoming.length ? upcoming : recentHearings(30);
 const heading = upcoming.length ? "Upcoming committee hearings" : "Recent committee hearings";

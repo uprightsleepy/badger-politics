@@ -57,7 +57,8 @@ const KINDS: [string, string][] = [
   <p id="follow-status" role="status" class="sr-only"></p>
 
   <script>
-    import { getFollows, toggleFollow, lastSeen, markSeen, FOLLOW_KINDS } from "../scripts/follows";
+    import { getFollows, toggleFollow, lastSeen, markSeen, isNewSince, heardSince, splitBillId, FOLLOW_KINDS } from "../scripts/follows";
+    import { wisconsinToday } from "../lib/today";
     import type { Follows } from "../scripts/follows";
     import { esc } from "../lib/html";
     import { fmtDate, partyWord, sessionPlainName, shortTitle } from "../lib/format";
@@ -69,7 +70,10 @@ const KINDS: [string, string][] = [
       const [kind, num] = id.split("-");
       return `${kind === "senate" ? "Senate" : "Assembly"} District ${num}`;
     };
-    const today = new Date().toISOString().slice(0, 10);
+    const today = wisconsinToday();
+    // the visit only counts as seen when every row loaded; otherwise the
+    // next visit would hide what this one couldn't show
+    let anyFailed = false;
 
     // every row: the item, what changed, then a button to stop following it
     const row = (kind: string, id: string, name: string, title: string, detail: string, changed = false): Row => ({
@@ -86,14 +90,13 @@ const KINDS: [string, string][] = [
         `</li>`,
     });
     const link = (href: string, text: string) => `<a href="${esc(href)}" class="font-bold underline">${esc(text)}</a>`;
-    const failed = (kind: string, id: string, href: string, what: string) =>
-      row(kind, id, id, link(href, what), "We couldn't load its latest record right now.");
+    const failed = (kind: string, id: string, href: string, what: string) => {
+      anyFailed = true;
+      return row(kind, id, id, link(href, what), "We couldn't load its latest record right now.");
+    };
 
     async function billRow(id: string, seen: string | null): Promise<Row> {
-      // ids are "{session}-{slug}"; a special session's key has a hyphen
-      // of its own ("2013s-dec"), a bill's slug never does
-      const at = id.lastIndexOf("-");
-      const [session, slug] = [id.slice(0, at), id.slice(at + 1)];
+      const { session, slug } = splitBillId(id);
       const href = `/bills/${session}/${slug}/`;
       try {
         const res = await fetch(`/api/v1/bills/${session}/${slug}.json`);
@@ -104,7 +107,7 @@ const KINDS: [string, string][] = [
             "Its record isn't in our data files, so its updates can't show here. Its page has the latest action.");
         }
         const b = await res.json();
-        const changed = !!(seen && b.latest_action_date && b.latest_action_date > seen);
+        const changed = isNewSince(seen, b.latest_action_date);
         const latest = b.latest_action_date
           ? `Latest action${b.latest_action_desc ? `: ${esc(b.latest_action_desc)},` : ""} ${esc(fmtDate(b.latest_action_date))}.`
           : "";
@@ -121,7 +124,7 @@ const KINDS: [string, string][] = [
       try {
         const p = await (await fetch(`/api/v1/legislators/${id}.json`)).json();
         const last = p.votes?.[0];
-        const changed = !!(seen && last?.date && last.date > seen);
+        const changed = isNewSince(seen, last?.date);
         const how = last?.option === "yes" ? "Voted yes" : last?.option === "no" ? "Voted no" : "Didn't vote";
         const detail = last
           ? `Latest roll call, ${esc(fmtDate(last.date))}: ${how.toLowerCase()} on ${esc(last.identifier ?? "a bill")}` +
@@ -144,9 +147,7 @@ const KINDS: [string, string][] = [
         const dates = [...xml.matchAll(/<entry>.*?<updated>([^<]+)<\/updated>/gs)].map((m) => m[1].slice(0, 10)).sort();
         const next = dates.find((d) => d >= today);
         const held = dates.filter((d) => d < today).at(-1);
-        // a hearing held since the last visit; an upcoming one was already
-        // on the list then, so it isn't news by itself
-        const changed = !!seen && dates.some((d) => d > seen && d < today);
+        const changed = heardSince(seen, dates, today);
         // the hearing that made it new is named, then what's next
         const detail = [
           held && (changed || !next) ? `Latest hearing: ${esc(fmtDate(held))}.` : "",
@@ -184,7 +185,7 @@ const KINDS: [string, string][] = [
       try {
         const m = await (await fetch(`/api/v1/local/${id}.json`)).json();
         const last = m.votes?.[0];
-        const changed = !!(seen && last?.date && last.date > seen);
+        const changed = isNewSince(seen, last?.date);
         const detail = last
           ? `Latest vote: ${esc(last.value ?? "recorded")} on ${esc(last.matter_file ?? "an item")}, ${esc(fmtDate(last.date))}.`
           : "No votes on record yet.";
@@ -265,6 +266,8 @@ const KINDS: [string, string][] = [
         }));
     }
 
-    render().then(markSeen);
+    render().then(() => {
+      if (!anyFailed) markSeen();
+    });
   </script>
 </Base>
