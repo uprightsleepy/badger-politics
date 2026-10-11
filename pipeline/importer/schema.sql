@@ -663,6 +663,19 @@ CREATE TABLE bill_companions (
     UNIQUE (bill_id, companion_bill_id)
 );
 
+-- ACS 5-year profile figures per district (importer/import_census.py), only
+-- for a release tabulated on the map in force; moe is the Census 90% margin.
+CREATE TABLE district_demographics (
+    chamber   TEXT NOT NULL,     -- lower / upper
+    district  INTEGER NOT NULL,
+    acs_year  INTEGER NOT NULL,  -- last year of the five-year release
+    map_year  INTEGER NOT NULL,  -- the district map the figures describe
+    measure   TEXT NOT NULL,
+    estimate  REAL NOT NULL,
+    moe       REAL NOT NULL,
+    PRIMARY KEY (chamber, district, measure)
+);
+
 -- Build metadata, e.g. key='data_through' for the site footer freshness badge.
 CREATE TABLE meta (
     key   TEXT PRIMARY KEY,

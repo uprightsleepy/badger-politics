@@ -82,7 +82,10 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
                    ["importer.import_federal", "_data/federal", db],
                    ["importer.federal_finance", "_data/federal", db],
                    ["importer.court_challenges", "_data/federal/court-dockets.json", db],
-                   ["importer.import_local", "_data/local", db]],
+                   ["importer.import_local", "_data/local", db],
+                   # pinned ACS release, committed; fetches only when the pin moves
+                   ["scraper.fetch_census"],
+                   ["importer.import_census", db]],
         "enrich": [["importer.enrich_lrb", db], ["importer.enrich_companions", db],
                    # enrolled resolution pages share the LRB page cache
                    ["importer.import_amendments", db, "--cycle", cycle],

@@ -102,6 +102,9 @@ python -m importer.import_federal _data/federal ../data/wi.sqlite
 python -m importer.federal_finance _data/federal ../data/wi.sqlite
 python -m importer.court_challenges _data/federal/court-dockets.json ../data/wi.sqlite
 
+python -m scraper.fetch_census                  # pinned ACS release, committed: no request once fetched
+python -m importer.import_census ../data/wi.sqlite
+
 python -m scraper.fetch_local_profiles          # bind cached profiles before refreshing the roster
 python -m scraper.fetch_local_votes             # council votes (cached)
 python -m importer.import_local _data/local ../data/wi.sqlite

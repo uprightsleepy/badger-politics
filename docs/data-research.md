@@ -52,11 +52,14 @@ the Blue Book.
   salary + the per-diem rates their chamber allows (Assembly $171
   overnight / $85.50 day; Senate $140, halved for Dane County members).
 
-### District demographics — Census ACS
-Free API (keyless at low volume; a free key removes limits) with state
-legislative district geographies.
-- **Product fit:** district profile boxes (population, median income,
-  urban/rural) on legislator pages. Nightly-cacheable, tiny.
+### District demographics — Census ACS (shipped)
+Free API with state legislative district geographies. Data requests need a
+free key (`CENSUS_API_KEY`) as of 2026-10-11; keyless requests redirect to a
+missing-key page.
+- **Product fit:** a "Who lives here" table on district pages and in the seat
+  API. The pinned ACS 2024 release is on the 2024 (Act 94) maps; fetched once
+  per release and committed. Method, vintage evidence and key setup:
+  [scraper README](../pipeline/scraper/README.md#census-acs-district-profiles-2026-10-11).
 
 ## Tier 2: free but manual (annual records, not posted as data)
 

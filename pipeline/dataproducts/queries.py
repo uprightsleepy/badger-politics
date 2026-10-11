@@ -332,6 +332,27 @@ def sitting_legislators(conn: sqlite3.Connection) -> list[dict]:
     )
 
 
+CENSUS_NOTICE = ("This product uses the Census Bureau Data API but is not endorsed or"
+                 " certified by the Census Bureau.")
+
+
+def district_demographics(conn: sqlite3.Connection) -> dict[tuple[str, int], dict]:
+    """ACS figures per seat, with their release, map and the Census notice.
+    Older snapshots predate the table: no seat has figures."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'district_demographics'"
+                        ).fetchone():
+        return {}
+    seats: dict[tuple[str, int], dict] = {}
+    for r in _rows(conn, "SELECT * FROM district_demographics ORDER BY chamber, district"):
+        seat = seats.setdefault((r["chamber"], r["district"]), {
+            "acs_year": r["acs_year"], "map_year": r["map_year"],
+            "source_url": f"https://api.census.gov/data/{r['acs_year']}/acs/acs5/profile.html",
+            "notice": CENSUS_NOTICE, "margin_of_error": "90% confidence", "figures": {}})
+        seat["figures"][r["measure"]] = {k: int(r[k]) if r[k].is_integer() else r[k]
+                                         for k in ("estimate", "moe")}
+    return seats
+
+
 def hearings(conn: sqlite3.Connection) -> list[dict]:
     rows = _rows(
         conn,

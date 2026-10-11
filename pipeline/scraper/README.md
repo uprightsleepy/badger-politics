@@ -137,6 +137,7 @@ See [scheduling and activation](../../docs/nightly-parser-hosting.md#daily-polic
 | WEC ballot, referendum-notice and canvass files (`fetch_wec`, `fetch_wec_results`) | [Robots](https://elections.wi.gov/robots.txt) permits the files paths and names no agents. Rechecked 2026-10-11 with the unchanged fingerprint. Results and report pages (`/election-result/...`, `/media/...`, `/sitemap.xml`) now answer the project identity with a Cloudflare challenge (HTTP 403, `cf-mitigated: challenge`); the files paths answer 200. GET only on `/sites/default/files/documents/*.pdf|xlsx` and `/sites/default/files/legacy/*.xlsx`, 10-second interval, pinned files fetched once. | The site publishes no separate terms of use; its footer carries a general copyright notice over public records (Wis. Stat. 19.31), the basis on which certified canvasses were already used. Never work around a denial: no other identity, browser or archive copy is used to read the challenged pages. See [canvass history](#canvass-history-2026-10-11). |
 | OpenStates people/committees; congressional roster | Robots returned 404 on [api.github.com](https://api.github.com/robots.txt), [raw.githubusercontent.com](https://raw.githubusercontent.com/robots.txt), and [unitedstates.github.io](https://unitedstates.github.io/robots.txt). Only the specific roster repositories/paths are enabled, minimum 1 second/request. | [GitHub API terms](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service#h-api-terms), [rate handling](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#handle-rate-limit-errors-appropriately), [people license](https://github.com/openstates/people/blob/main/LICENSE), [congress roster dedication](https://github.com/unitedstates/congress-legislators#public-domain). CC0/public-domain roster data; no unrelated GitHub user data. |
 | Federal roll calls | [House robots](https://clerk.house.gov/robots.txt) returns 404. [Senate robots](https://www.senate.gov/robots.txt) redirects to its specific `file_not_found.htm` page; this known missing response is recorded explicitly, not interpreted as an allow-all file. XML paths only, minimum 1 second/request. | [House rights/reproductions](https://clerk.house.gov/PrivacyPolicy), [Senate XML publication](https://www.senate.gov/legislative/LIS/roll_call_lists/vote_menu_119_2.htm), [Senate privacy policy](https://www.senate.gov/general/privacy.htm). Attribute factual voting records; no photos, broadcast footage, endorsements, or campaign advertising. |
+| Census ACS (`fetch_census`) | [api.census.gov/robots.txt](https://api.census.gov/robots.txt) answers 200 with an HTML "Request Rejected" page (a per-request support ID, so no fingerprint) to every client; no robots file is published. Recorded as a known missing page, not an allow-all file: a real robots file (non-HTML) stops collection for review. GET only on the pinned release's `/data/YYYY/acs/acs5/profile` and its `variables/DP0n_*.json` labels, minimum 2 seconds/request, about eight requests once per ACS release. | [Census Data API terms](https://www.census.gov/data/developers/about/terms-of-service.html): public-domain federal statistics; every display carries "This product uses the Census Bureau Data API but is not endorsed or certified by the Census Bureau." Data requests need a free key (`CENSUS_API_KEY`); never work around the missing-key redirect. Statistics only: LTSB stays the boundary source. |
 | Milwaukee / West Allis council records | Robots returns 404 on [Web API](https://webapi.legistar.com/robots.txt), [Milwaukee InSite](https://milwaukee.legistar.com/robots.txt), [West Allis InSite](https://westalliswi.legistar.com/robots.txt). Reviewed public tenant API and meeting/department pagination only, minimum 1 second/request. | [Published API](https://webapi.legistar.com/Help), [Milwaukee policies](https://city.milwaukee.gov/Information-and-Services/webpolicies). Public meeting/vote facts and source links; no login, unpublished tenants, video or attachments collection. |
 | Council profile pages | [Milwaukee robots](https://city.milwaukee.gov/robots.txt) returned HTTP 403 from the nightly runner on September 8; retrieval is **paused**, retaining the complete existing profile archive. [West Allis robots](https://www.westalliswi.gov/robots.txt) disallows `/api/`; reviewed district HTML remains enabled, minimum 1 second/request. | [Milwaukee disclaimer](https://city.milwaukee.gov/Information-and-Services/webpolicies/DisclaimerofLiabilit), [privacy](https://city.milwaukee.gov/Information-and-Services/webpolicies/Privacy), [West Allis site](https://www.westalliswi.gov/). No separate West Allis terms link found. Capture official office-contact facts and portrait URLs; this collector does not download image files. |
 | DPI school district referenda (not collected) | [dpi.wi.gov robots](https://dpi.wi.gov/robots.txt) (2026-10-11) disallows only administrative and search paths. The data itself is the [School District Referenda Report](https://sfs.dpi.wi.gov/wisfpr/SchoolDistrictReferendaReport?moduleId=11) and [custom reports](https://sfs.dpi.wi.gov/Referenda/CustomReporting.aspx) on `sfs.dpi.wi.gov`, linked from [Referenda Information](https://dpi.wi.gov/sfs/reporting/safr/referenda-info). That host could not be reached for review from the build environment (its robots.txt is unchecked), so no collector exists; `source_policies.json` lists it paused. | [DPI website use](https://dpi.wi.gov/about-dpi/copyright-dpi-website-use-and-disclaimer): files are copyrighted by DPI for noncommercial use by the public under fair use; other reuse needs permission. Recent per-election results are also posted as Google Sheets, which are not an official bulk download. Review `sfs.dpi.wi.gov` robots and whether factual referendum results fall within that notice before adding a collector. |
@@ -317,6 +318,38 @@ rebuilds the entire table. Keep original HTML, session, official source URL and
 download date outside public Git. Validate and merge partial approved updates
 into the existing archive before running an import. Archive importers fail on
 missing input rather than silently substituting empty data.
+## Census ACS district profiles (2026-10-11)
+
+`scraper.fetch_census` reads the ACS 5-year Data Profile for every Assembly
+(`state legislative district (lower chamber)`) and Senate (`upper chamber`)
+district in state 55: population, median age, share 65 and older, median
+household income, share of adults 25+ with a bachelor's degree or higher, and
+owner-occupied share of occupied homes, each with its 90% margin of error. It
+first confirms each variable's label in the release's own metadata, so a
+renumbered profile table stops the fetch instead of filling the wrong column.
+
+The release is pinned (`ACS_YEAR`/`MAP_YEAR` in the fetcher) and its response
+is committed as `importer/census_acs.json` (public domain, a few KB) rather
+than carried in a nightly bundle: once that file holds the pinned year the
+fetcher makes no request, so each release is fetched once. A run without the
+file needs `CENSUS_API_KEY`; since at least 2026-10-11 the API redirects every
+keyless data request to `missing_key.html` (metadata stays keyless), and the
+fetcher stops with that message. Request a free key at
+<https://api.census.gov/data/key_signup.html>, export it for the one fetch, and
+commit the file; the nightly needs no secret.
+
+**Map vintage.** ACS district geographies follow the Census Bureau's biennial
+state legislative district collection, not the release year. The
+[2024 ACS geography changes](https://www.census.gov/programs-surveys/acs/technical-documentation/table-and-geography-changes/2024/geography-changes.html)
+list Wisconsin among the states with new upper- and lower-chamber plans for the
+2024 cycle, so the 2020-2024 release (ACS 2024) describes the 2024 maps (2023
+Wis. Act 94) the site draws from LTSB. The 2022 and 2023 releases describe the
+2022 maps and must not be shown. Each district's `NAME` repeats its map year
+(for example `(2024)`); the importer refuses a row naming another map, and
+loads nothing at all when the pinned release's map is not `CURRENT_MAP`.
+Wisconsin's Great Lakes water is coded `ZZZ` and skipped. Before bumping the
+pin, read that release's geography-changes page and set `MAP_YEAR` to match.
+
 ## Federal campaign finance (2026-09-09)
 
 The [FEC bulk downloads](https://www.fec.gov/data/browse-data/?tab=bulk-data) publish
