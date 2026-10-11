@@ -191,6 +191,8 @@ def links_for_session(
 
 def executive_orders(conn: sqlite3.Connection) -> list[dict]:
     """Newest first. Official links only; no LegiScan rows exist here."""
+    if not has_table(conn, "executive_orders"):
+        return []
     return _rows(conn, "SELECT governor, year, number, suffix, url FROM executive_orders"
                        " ORDER BY year DESC, folder DESC, number DESC, suffix DESC")
 

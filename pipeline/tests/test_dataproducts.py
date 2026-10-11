@@ -429,8 +429,8 @@ def test_builds_from_a_snapshot_older_than_the_newest_tables(
 ) -> None:
     # Releases build from the newest snapshot, which can predate a new table.
     conn = sqlite3.connect(db_path)
-    for table in ("bill_versions", "court_challenges", "judicial_history",
-                  "referendum_history"):
+    for table in ("bill_versions", "court_challenges", "executive_orders",
+                  "judicial_history", "referendum_history"):
         conn.execute(f"DROP TABLE {table}")  # noqa: S608 - fixed names
     conn.commit()
     conn.row_factory = sqlite3.Row

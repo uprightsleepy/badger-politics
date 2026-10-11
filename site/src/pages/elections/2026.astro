@@ -5,6 +5,7 @@
  * seat. Records only: candidates and status from the Elections
  * Commission, past results from certified canvasses, no forecasts. */
 import Base from "../../layouts/Base.astro";
+import { PLACES_KEY } from "../../lib/placesKey";
 import FilterBar from "../../components/FilterBar.astro";
 import ElectionResult from "../../components/ElectionResult.astro";
 import {
@@ -181,7 +182,9 @@ const chambers = [
       </p>
       <a href="/my-reps/" class="btn btn-primary mt-4">Find your races</a>
       <p class="mt-3 text-fine text-granite">
-        Your address goes only to the U.S. Census geocoder to find your districts, and it's never stored.
+        {PLACES_KEY
+          ? "As you type, suggestions come from Google Places. The address you pick goes to the U.S. Census to find your districts, and it's never stored."
+          : "Your address goes only to the U.S. Census geocoder to find your districts, and it's never stored."}
       </p>
     </div>
     <div id="my-ballot-body" class="hidden" data-no-rep-highlight></div>
