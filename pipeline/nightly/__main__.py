@@ -15,6 +15,12 @@ from nightly.runner import Runner, seed
 from nightly.stages import STAGES, commands
 from nightly.storage import GCS
 
+CLOUD_CREDENTIALS = {
+    "ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+    "GOOGLE_APPLICATION_CREDENTIALS", "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE",
+    "GOOGLE_GHA_CREDS_PATH",
+}
+
 
 def run_stage(runner: Runner, stage: str, cycle: str):
     if not re.fullmatch(r"20[0-9]{2}", cycle):
@@ -27,6 +33,9 @@ def run_stage(runner: Runner, stage: str, cycle: str):
     success.unlink(missing_ok=True)
     runner.root.parent.joinpath("data").mkdir(exist_ok=True)
     started = time.monotonic()
+    # Collectors run third-party code and need no cloud access; withhold the
+    # Actions OIDC minting endpoint and the federated credential paths.
+    env = {k: v for k, v in os.environ.items() if k not in CLOUD_CREDENTIALS}
     # Subprocess output can contain private source data. Keep it off public
     # Actions logs. It is uploaded to the private checkpoint prefix separately.
     with (runner.scratch / f"{runner.log_name(stage)}.log").open("wb") as log:
@@ -37,7 +46,8 @@ def run_stage(runner: Runner, stage: str, cycle: str):
             if remaining <= 0:
                 raise TimeoutError("Stage reached its five-hour collection budget")
             subprocess.run([sys.executable, "-u", "-m", *command], cwd=runner.root,
-                           stdout=log, stderr=subprocess.STDOUT, check=True, timeout=remaining)
+                           env=env, stdout=log, stderr=subprocess.STDOUT, check=True,
+                           timeout=remaining)
             elapsed = time.monotonic() - command_started
             print(f"Completed {command[0]} in {elapsed:.0f}s", flush=True)
     success.write_text(json.dumps(runner.receipt(stage)), encoding="utf-8")
