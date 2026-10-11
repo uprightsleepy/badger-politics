@@ -246,6 +246,30 @@ def statewide_counties(conn: sqlite3.Connection) -> list[dict]:
     )
 
 
+def election_history(conn: sqlite3.Connection) -> list[dict]:
+    """Certified WEC results for every legislative seat, newest first."""
+    return _rows(
+        conn,
+        "SELECT chamber, district, year, candidate, party, votes, total_cast"
+        " FROM election_history ORDER BY chamber, district, year DESC, votes DESC",
+    )
+
+
+def congressional_races(conn: sqlite3.Connection) -> list[dict]:
+    return _rows(
+        conn,
+        f"SELECT * FROM congressional_races WHERE {EXPORTABLE} ORDER BY district, candidate",
+    )
+
+
+def sitting_legislators(conn: sqlite3.Connection) -> list[dict]:
+    return _rows(
+        conn,
+        "SELECT id, name, party, chamber, district FROM people"
+        " WHERE current_role IN ('Representative', 'Senator') ORDER BY chamber, district",
+    )
+
+
 def hearings(conn: sqlite3.Connection) -> list[dict]:
     rows = _rows(
         conn,
@@ -256,6 +280,60 @@ def hearings(conn: sqlite3.Connection) -> list[dict]:
     for row in rows:
         row["agenda_bills"] = json.loads(row.pop("agenda_bill_ids_json") or "[]")
     return rows
+
+
+def committees(conn: sqlite3.Connection) -> list[dict]:
+    return _rows(
+        conn,
+        "SELECT c.id, c.name, c.chamber, c.chair_person_id, p.name AS chair_name"
+        " FROM committees c LEFT JOIN people p ON p.id = c.chair_person_id ORDER BY c.name",
+    )
+
+
+def committee_members(conn: sqlite3.Connection) -> dict[str, list[dict]]:
+    """committee_id -> members, chairs first (the site's ROLE_ORDER)."""
+    cursor = conn.execute(
+        "SELECT m.committee_id, m.person_id, m.role, p.name, p.party, p.chamber, p.district"
+        " FROM committee_members m JOIN people p ON p.id = m.person_id"
+        " ORDER BY m.committee_id, CASE WHEN m.role = 'chair' THEN 0"
+        " WHEN m.role LIKE 'co-chair%' THEN 1 WHEN m.role LIKE 'vice%' THEN 2 ELSE 3 END,"
+        " p.name"
+    )
+    return {
+        committee_id: [
+            {k: r[k] for k in ("person_id", "role", "name", "party", "chamber", "district")}
+            for r in rows
+        ]
+        for committee_id, rows in itertools.groupby(cursor, key=lambda r: r["committee_id"])
+    }
+
+
+def subject_bills(conn: sqlite3.Connection) -> list[dict]:
+    """Every (subject heading, exportable bill) pair, newest session first."""
+    return _rows(
+        conn,
+        "SELECT s.subject, b.id, b.identifier, b.session_id, b.title, b.status"
+        " FROM bill_subjects s JOIN bills b ON b.id = s.bill_id"
+        f" WHERE {exportable('b.')} ORDER BY b.session_id DESC, b.id",
+    )
+
+
+def federal_members(conn: sqlite3.Connection) -> list[dict]:
+    return _rows(conn, "SELECT * FROM federal_members ORDER BY chamber DESC, district")
+
+
+def federal_votes_for(conn: sqlite3.Connection, member: dict) -> list[dict]:
+    """A member's floor roll calls, keyed as each chamber records them: the
+    Senate's LIS id for senators, bioguide for House members."""
+    key = member["lis_id"] if member["chamber"] == "senate" else member["bioguide"]
+    return _rows(
+        conn,
+        "SELECT v.id, v.congress, v.session, v.number, v.date, v.question, v.result,"
+        " v.title, v.yeas, v.nays, v.majority_requirement, v.document, v.source_url,"
+        " r.vote_cast FROM federal_votes v JOIN federal_vote_records r ON r.vote_id = v.id"
+        " WHERE r.member_id = ? ORDER BY v.date DESC, v.number DESC",
+        (key,),
+    )
 
 
 def local_bodies(conn: sqlite3.Connection) -> list[dict]:
@@ -286,4 +364,156 @@ def local_member_votes(
            WHERE v.tenant = ? AND v.person_id = ?
            ORDER BY e.date DESC, a.event_item_id DESC LIMIT ?""",
         (tenant, person_id, limit),
+    )
+
+
+# ---- Campaign money, at the level the site's money pages publish it
+# (README mandate 5): committees by name and CFIS entity id, individual
+# donors only in totals, outside spending one filing at a time.
+
+def money_people(conn: sqlite3.Connection) -> list[str]:
+    """People with collected receipts; anyone else is unlinked, never $0."""
+    return [r[0] for r in conn.execute(
+        "SELECT DISTINCT person_id FROM contributions ORDER BY person_id")]
+
+
+def legislator_money(conn: sqlite3.Connection, person_id: str) -> dict:
+    """All collected history of one person's receipts, as the profile's
+    money card groups it."""
+    p = (person_id,)
+    summary = _rows(
+        conn,
+        "SELECT COUNT(*) AS receipts, COALESCE(SUM(amount), 0) AS total,"
+        " COALESCE(SUM(CASE WHEN from_type = 'Individual' THEN amount ELSE 0 END), 0)"
+        " AS individual_total, MIN(date) AS first, MAX(date) AS last"
+        " FROM contributions WHERE person_id = ?", p,
+    )[0]
+    return {
+        **summary,
+        "by_type": _rows(
+            conn,
+            "SELECT COALESCE(from_type, 'Other') AS type, SUM(amount) AS total,"
+            " COUNT(*) AS receipts FROM contributions WHERE person_id = ?"
+            " GROUP BY COALESCE(from_type, 'Other') ORDER BY total DESC", p,
+        ),
+        "quarters": _rows(
+            conn,
+            "SELECT substr(date, 1, 4) || '-Q' || ((CAST(substr(date, 6, 2) AS INTEGER) + 2) / 3)"
+            " AS quarter, SUM(amount) AS total FROM contributions"
+            " WHERE person_id = ? AND date != '' GROUP BY quarter ORDER BY quarter", p,
+        ),
+        "top_committees": _rows(
+            conn,
+            "SELECT from_entity_id AS entity_id, MAX(from_name) AS name,"
+            " SUM(amount) AS total, COUNT(*) AS receipts FROM contributions"
+            " WHERE person_id = ? AND from_type = 'Registrant' AND from_entity_id IS NOT NULL"
+            " GROUP BY from_entity_id ORDER BY total DESC LIMIT 5", p,
+        ),
+        # donor-reported occupations, summed: says nothing about any employer
+        "top_occupations": _rows(
+            conn,
+            "SELECT MAX(TRIM(occupation)) AS occupation, SUM(amount) AS total,"
+            " COUNT(*) AS receipts FROM contributions"
+            " WHERE person_id = ? AND from_type = 'Individual'"
+            " AND occupation IS NOT NULL AND TRIM(occupation) != ''"
+            " GROUP BY LOWER(TRIM(occupation)) ORDER BY total DESC LIMIT 5", p,
+        ),
+    }
+
+
+def donor_committees(conn: sqlite3.Connection) -> list[dict]:
+    """Committees that gave today's legislators $1,000 or more in all
+    collected history: the site's /money/committees/ pages."""
+    return _rows(
+        conn,
+        "SELECT c.from_entity_id AS entity_id, MAX(c.from_name) AS name,"
+        " (SELECT committee_type FROM cf_committees WHERE entity_id = c.from_entity_id)"
+        " AS committee_type, SUM(c.amount) AS total, COUNT(*) AS receipts,"
+        " COUNT(DISTINCT c.person_id) AS recipients, MIN(c.date) AS first, MAX(c.date) AS last"
+        " FROM contributions c WHERE c.from_type = 'Registrant' AND c.from_entity_id IS NOT NULL"
+        " GROUP BY c.from_entity_id HAVING SUM(c.amount) >= 1000 ORDER BY total DESC",
+    )
+
+
+def donor_recipients(conn: sqlite3.Connection) -> dict[int, list[dict]]:
+    """committee entity id -> the legislators it gave to, largest first."""
+    cursor = conn.execute(
+        "SELECT c.from_entity_id, c.person_id, p.name, p.party, p.chamber, p.district,"
+        " SUM(c.amount) AS total, COUNT(*) AS receipts, MIN(c.date) AS first,"
+        " MAX(c.date) AS last FROM contributions c JOIN people p ON p.id = c.person_id"
+        " WHERE c.from_type = 'Registrant' AND c.from_entity_id IS NOT NULL"
+        " GROUP BY c.from_entity_id, c.person_id ORDER BY c.from_entity_id, total DESC"
+    )
+    return {
+        entity_id: [{k: r[k] for k in r.keys() if k != "from_entity_id"} for r in rows]
+        for entity_id, rows in itertools.groupby(cursor, key=lambda r: r["from_entity_id"])
+    }
+
+
+def committee_own_money(conn: sqlite3.Connection, entity_id: int) -> dict | None:
+    """A committee's own reported money, like the site's "Its own money".
+    None for candidate committees: their receipts are collected through the
+    verified legislator map, so the rows here would be a misleading fraction."""
+    committee = conn.execute(
+        "SELECT committee_type FROM cf_committees WHERE entity_id = ?", (entity_id,)
+    ).fetchone()
+    if committee is None or committee[0] in ("State Candidate", "Federal Candidate"):
+        return None
+    p = (entity_id,)
+    totals = _rows(
+        conn,
+        "SELECT COALESCE(SUM(CASE WHEN direction = 'INCOMING' THEN amount END), 0) AS raised,"
+        " COALESCE(SUM(CASE WHEN direction = 'OUTGOING' THEN amount END), 0) AS spent,"
+        " COUNT(*) AS transactions, MIN(date) AS first, MAX(date) AS last"
+        " FROM cf_transactions WHERE filer_entity_id = ?", p,
+    )[0]
+
+    def side(direction: str) -> dict:
+        named = _rows(
+            conn,
+            "SELECT other_entity_id AS entity_id, MAX(other_name) AS name,"
+            " MAX(other_type) AS type, SUM(amount) AS total, COUNT(*) AS transactions"
+            " FROM cf_transactions WHERE filer_entity_id = ? AND direction = ?"
+            f" AND other_name IS NOT NULL AND {named_donor('other_type')}"
+            " GROUP BY COALESCE(other_entity_id, other_name) ORDER BY total DESC LIMIT 50",
+            (entity_id, direction),
+        )
+        individuals = _rows(
+            conn,
+            "SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS transactions"
+            " FROM cf_transactions WHERE filer_entity_id = ? AND direction = ?"
+            f" AND NOT {named_donor('other_type')}",
+            (entity_id, direction),
+        )[0]
+        return {"largest": named, "individuals": individuals}
+
+    return {
+        **totals,
+        "itemized_donors": side("INCOMING"),
+        "payees": side("OUTGOING"),
+        "advocacy": _rows(
+            conn,
+            "SELECT id AS transaction_id, date, amount, stance, related_name,"
+            " related_office, related_district, purpose, report_id, report_name"
+            " FROM cf_transactions WHERE filer_entity_id = ? AND stance IS NOT NULL"
+            " AND related_name IS NOT NULL ORDER BY date DESC, id DESC LIMIT 100", p,
+        ),
+    }
+
+
+def independent_expenditures(conn: sqlite3.Connection, limit: int = -1) -> list[dict]:
+    """Every outside-spending filing, as filed. Candidates' own stanced ads
+    are their own spending, not third-party advocacy, and are left out."""
+    return _rows(
+        conn,
+        "SELECT t.id AS transaction_id, t.date, t.amount, t.stance, t.related_name,"
+        " t.related_office, t.related_district, t.purpose,"
+        f" CASE WHEN {named_donor('t.other_type')} THEN t.other_name END AS paid_to,"
+        " t.filer_entity_id, c.name AS filer_name, c.committee_type AS filer_type,"
+        " t.report_id, t.report_name"
+        " FROM cf_transactions t LEFT JOIN cf_committees c ON c.entity_id = t.filer_entity_id"
+        " WHERE t.stance IS NOT NULL AND t.related_name IS NOT NULL"
+        " AND COALESCE(t.filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')"
+        " ORDER BY t.date DESC, t.amount DESC, t.id DESC LIMIT ?",
+        (limit,),
     )

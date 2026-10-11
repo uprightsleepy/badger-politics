@@ -208,7 +208,11 @@ page added to one is scanned by both.
 ## Data products
 
 Everything on the site is also data, keyless: a static JSON API under
-`/api/v1/` (about 41,000 files), Atom feeds per bill, legislator and
+`/api/v1/` (more than 41,000 files: bills, roll calls, legislators, committees
+and hearings, subjects, seats and election results, the federal
+delegation's roll calls, city councils, and campaign money in separate
+files, with individual donors only in aggregate; the layout is in
+[api.py](pipeline/dataproducts/api.py)), Atom feeds per bill, legislator and
 committee plus a weekly digest (about 20,600), iCal calendars for every
 hearing and for election days (845), per-session CSVs, and a
 provenance-filtered SQLite snapshot. See [/data/](https://badgerpolitics.org/data/).

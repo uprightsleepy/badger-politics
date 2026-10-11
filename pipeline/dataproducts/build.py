@@ -31,8 +31,8 @@ def main(argv: list[str]) -> int:
     exports_dir = ns.exports_dir or ns.db_path.parent / "exports"
 
     conn = queries.connect(ns.db_path)
-    hearings = queries.hearings(conn)  # shared by feeds and ical
-    api_files = build_api(conn, ns.site_public)
+    hearings = queries.hearings(conn)  # shared by the API, feeds and ical
+    api_files = build_api(conn, ns.site_public, hearings)
     feed_files = build_feeds(conn, ns.site_public, hearings)
     ical_files = build_ical(conn, ns.site_public, hearings)
     bulk_files = build_bulk(conn, ns.db_path, exports_dir)
