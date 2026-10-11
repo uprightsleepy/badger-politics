@@ -43,7 +43,10 @@ SEARCH_TTL_DAYS = 7
 
 def _normalize(text: str) -> str:
     folded = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
-    return " ".join(folded.lower().replace(".", " ").replace("-", " ").split())
+    # commas split tokens too: 'Darrin Madison, Jr.' must yield 'madison'
+    return " ".join(
+        folded.lower().replace(".", " ").replace("-", " ").replace(",", " ").split()
+    )
 
 
 # Other-office committees require curation, never automatic attribution.
@@ -54,9 +57,10 @@ OTHER_OFFICE_WORDS = {
 }
 
 
-def _token_match(committee_word: str, name_word: str) -> bool:
-    """Allow prefixes only for tokens of 3+ characters; initials must match exactly."""
-    if len(committee_word) < 3 or len(name_word) < 3:
+def _token_match(committee_word: str, name_word: str, prefix: bool) -> bool:
+    """Allow prefixes only for a first name of 3+ characters ('Will'/'William');
+    surnames and initials must match exactly ('Born' is not 'Bornemann')."""
+    if not prefix or len(committee_word) < 3 or len(name_word) < 3:
         return committee_word == name_word
     return committee_word.startswith(name_word) or name_word.startswith(committee_word)
 
@@ -72,7 +76,7 @@ def match_committees(person_name: str, hits: list[dict]) -> list[dict]:
         cwords = _normalize(h["name"]).split()
         if set(cwords) & OTHER_OFFICE_WORDS:
             continue
-        if all(any(_token_match(c, w) for c in cwords) for w in words):
+        if all(any(_token_match(c, w, i == 0) for c in cwords) for i, w in enumerate(words)):
             matched.append(h)
     return matched
 

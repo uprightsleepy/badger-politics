@@ -31,6 +31,13 @@ def test_nickname_prefix_matches() -> None:
     assert len(match_committees("Will Penterman", hits)) == 1
 
 
+def test_surname_never_prefix_matches() -> None:
+    hits = [hit("Friends of Mark Bornemann"), hit("Mark Born for Assembly", entity_id=2)]
+    assert [m["id"] for m in match_committees("Mark Born", hits)] == [2]
+    # a comma-suffixed surname is still the surname
+    assert len(match_committees("Darrin Madison", [hit("Darrin Madison, Jr.")])) == 1
+
+
 def test_other_persons_committee_never_matches() -> None:
     # same surname, different first name: every-word rule rejects
     hits = [hit("Brent Jacobson for Assembly"), hit("Citizens for Lothian", entity_id=2)]
