@@ -129,7 +129,9 @@ These are hard rules. A change that violates one is wrong even if it works.
    to Wisconsin candidates; PAC money is the PAC's, not a corporate
    payment; occupations are donor-reported; a contribution is not an
    endorsement of a vote. Donations are never displayed next to votes.
-   Individual donors appear only in aggregate. Totals follow the selected
+   Site pages name the largest individual donors, as the public filings
+   do; the API, feeds and downloads carry individual donors only in
+   aggregate. Totals follow the selected
    two-year reporting period, with an optional filter to receipts during
    recorded legislative service. Outside spending is shown one filing at
    a time, as filed, with the Commission's transaction ID and the report
