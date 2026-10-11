@@ -72,19 +72,24 @@ Workload Identity, restricted in two places:
 
 - the provider refuses to exchange a token whose `repository` claim is not
   `uprightsleepy/badger-politics`, so no other repo can reach the pool
-- the service account is bound to a single principal built from a mapped
-  attribute combining both claims: `uprightsleepy/badger-politics@refs/heads/main`
+- the service account is bound to two principals built from a mapped
+  `deploy` attribute combining the workflow, ref, and environment claims:
+  `uprightsleepy/badger-politics/.github/workflows/deploy.yml@refs/heads/main:refs/heads/main:<env>`
+  for the `badgerpolitics-dev` and `badgerpolitics-prod` environments
 
-A pull request runs with `refs/pull/N/merge`, which produces a different
-principal that holds no roles, so it cannot assume the identity even from
-inside this repository. Note the restriction has to live in the principal,
-not in an IAM condition: mapped attributes are not visible to IAM
-conditions during impersonation, so a condition on
-`request.auth.claims['attribute.ref']` is silently always false and denies
-every deploy. The service account holds
-`firebasehosting.admin` on the prod project and *read-only* access to the
-snapshot bucket, so a compromised run can publish a site but cannot alter
-or delete the database.
+A pull request runs with `refs/pull/N/merge`, and any other workflow on
+`main` (including nightly parser stages, which run third-party scraper code)
+has a different `workflow_ref` or environment. Those principals hold no
+roles, so they cannot assume the identity even from inside this repository.
+Collector subprocesses also run without the Actions OIDC request variables.
+Note the restriction has to live in the principal, not in an IAM condition:
+mapped attributes are not visible to IAM conditions during impersonation, so
+a condition on `request.auth.claims['attribute.ref']` is silently always
+false and denies every deploy. The service account holds
+`firebasehosting.admin` on the prod and dev projects and *read-only* access
+to objects under `snapshots/` (plus bucket-wide name listing, which GCS IAM
+cannot prefix-filter; parser state and archives are not readable), so a
+compromised run can publish a site but cannot alter or delete the database.
 
 Two repository variables wire it up. They are not secrets — the conditions
 above are what make the identity safe, not the obscurity of these values:
