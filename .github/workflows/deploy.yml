@@ -172,21 +172,23 @@ jobs:
           BROWSER_PATH: /usr/bin/google-chrome
         run: |
           set -euo pipefail
+          # timed.sh keeps each check's full log; print only its tail here.
+          logs="$RUNNER_TEMP/badger-ci"
           # Run links alongside serial browser checks to avoid Chrome contention.
-          bash ../.github/scripts/timed.sh links node scripts/links.mjs > /tmp/links.log 2>&1 &
+          bash ../.github/scripts/timed.sh links node scripts/links.mjs > /dev/null 2>&1 &
           links_pid=$!
           browser_failed=0
           for h in responsive a11y verify money-periods ux; do
-            if bash ../.github/scripts/timed.sh "$h" node "scripts/$h.mjs" > "/tmp/$h.log" 2>&1; then
-              echo "::group::$h passed"; tail -3 "/tmp/$h.log"; echo "::endgroup::"
+            if bash ../.github/scripts/timed.sh "$h" node "scripts/$h.mjs" > /dev/null 2>&1; then
+              echo "::group::$h passed"; tail -3 "$logs/$h.log"; echo "::endgroup::"
             else
-              echo "::error::$h failed"; tail -25 "/tmp/$h.log"; browser_failed=1
+              echo "::error::$h failed"; tail -25 "$logs/$h.log"; browser_failed=1
             fi
           done
           if wait "$links_pid"; then
-            echo "::group::links passed"; tail -3 /tmp/links.log; echo "::endgroup::"
+            echo "::group::links passed"; tail -3 "$logs/links.log"; echo "::endgroup::"
           else
-            echo "::error::links failed"; tail -25 /tmp/links.log; browser_failed=1
+            echo "::error::links failed"; tail -25 "$logs/links.log"; browser_failed=1
           fi
           exit $browser_failed
 
@@ -287,9 +289,10 @@ jobs:
         with:
           name: deploy-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           # Artifact uploads do not apply GitHub's console secret masking.
-          # Keep credentialed logo/release logs out of the downloadable archive.
+          # Keep the credentialed release log out of the downloadable archive.
           path: |
             ${{ runner.temp }}/badger-ci/*.time
+            ${{ runner.temp }}/badger-ci/data-products.log
             ${{ runner.temp }}/badger-ci/astro.log
             ${{ runner.temp }}/badger-ci/pagefind.log
             ${{ runner.temp }}/badger-ci/preflight.log
@@ -297,5 +300,7 @@ jobs:
             ${{ runner.temp }}/badger-ci/responsive.log
             ${{ runner.temp }}/badger-ci/a11y.log
             ${{ runner.temp }}/badger-ci/verify.log
+            ${{ runner.temp }}/badger-ci/money-periods.log
+            ${{ runner.temp }}/badger-ci/ux.log
           if-no-files-found: ignore
           retention-days: 7
