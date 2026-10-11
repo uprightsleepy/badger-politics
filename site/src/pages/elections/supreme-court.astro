@@ -1,0 +1,87 @@
+---
+/** Statewide judicial elections, newest first: each spring's Supreme Court
+ * race and Court of Appeals districts, straight from the Elections
+ * Commission's certified canvasses, each linked to its official file. */
+import Base from "../../layouts/Base.astro";
+import ElectionResult from "../../components/ElectionResult.astro";
+import { judicialRaces, meta } from "../../lib/db";
+import { fmtDate } from "../../lib/format";
+import { safeHref } from "../../lib/html";
+
+const races = judicialRaces();
+const years = [...new Set(races.map((r) => r.year))];
+const first = years.at(-1);
+const pulledOn = meta().imported_at?.slice(0, 10);
+const raceTitle = (r: (typeof races)[number]) =>
+  r.district == null ? "Supreme Court" : `Court of Appeals, District ${r.district}`;
+---
+
+<Base
+  title="Supreme Court and Court of Appeals elections"
+  description="Certified results of Wisconsin's statewide judicial elections: every Supreme Court race and Court of Appeals district on the spring ballot, with votes, winners and the Elections Commission's official canvass files."
+  breadcrumbs={[{ name: "Elections", url: "/elections/2026/" }]}
+  filters={{ type: "Race" }}
+  layout="wide"
+>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <a href="/elections/2026/" class="self-start text-small underline">Everything on the 2026 ballot</a>
+    <h1 class="t-display">Supreme Court and Court of Appeals elections</h1>
+    <p class="sm:text-lead">
+      Wisconsin voters elect the seven justices of the state Supreme Court to ten-year terms, and
+      Court of Appeals judges by district to six-year terms. Both are nonpartisan races on the spring
+      ballot in April.
+    </p>
+    <p class="text-small text-granite">
+      {first
+        ? `Certified results from ${first} on, as the Wisconsin Elections Commission canvassed them. Earlier spring elections aren't in our records yet.`
+        : "No certified judicial results are in our records yet."}
+      {" "}Shares are of all votes cast, including write-ins.
+    </p>
+  </header>
+
+  {years.length > 1 && (
+    <nav aria-label="Elections by year" class="mt-6 max-w-[47.5rem]">
+      <ul class="flex flex-wrap gap-x-4 gap-y-1" role="list">
+        {years.map((y) => <li><a href={`#spring-${y}`} class="inline-flex min-h-11 items-center underline">{y}</a></li>)}
+      </ul>
+    </nav>
+  )}
+
+  {years.map((year) => {
+    const held = races.filter((r) => r.year === year);
+    const sources = [...new Set(held.map((r) => r.source_url))];
+    return (
+      <section id={`spring-${year}`} class="mt-10 max-w-[47.5rem] scroll-mt-4" aria-labelledby={`spring-${year}-heading`}>
+        <h2 id={`spring-${year}-heading`} class="t-section">{year} spring election</h2>
+        {!held.some((r) => r.district == null) && (
+          <p class="mt-2 text-small text-granite">The certified canvass has no Supreme Court race this year.</p>
+        )}
+        <div class="mt-2 flex flex-col">
+          {held.map((r) => (
+            <ElectionResult
+              id={`spring-${year}-${r.district ?? "supreme-court"}`}
+              title={raceTitle(r)}
+              context={`in ${year}`}
+              candidates={r.candidates}
+              total={r.total}
+            />
+          ))}
+        </div>
+        <p class="text-fine text-granite">
+          {sources.length === 1 ? "Official source: " : "Official sources: "}
+          {sources.map((url, i) => (
+            <>{i > 0 && ", "}<a href={safeHref(url)} class="underline">the Commission's certified {year} canvass{sources.length > 1 ? ` (file ${i + 1})` : ""}</a></>
+          ))}
+          {" "}(spreadsheet, ward by ward).
+        </p>
+      </section>
+    );
+  })}
+
+  <p class="mt-12 max-w-[47.5rem] text-fine text-granite">
+    Results from the
+    {" "}<a href="https://elections.wi.gov/elections/election-results" class="underline">Wisconsin Elections Commission</a>,
+    summed from its ward-by-ward canvass and checked against its certified totals{pulledOn && `; checked ${fmtDate(pulledOn)}`}.
+    Statewide referendum results are with the <a href="/elections/2026/amendments/#past-questions" class="underline">constitutional amendments</a>.
+  </p>
+</Base>

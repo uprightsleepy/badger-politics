@@ -105,6 +105,7 @@ const SAMPLE_PATHS = [
   "/governors-desk/", "/hearing-none/", "/hearing-none/2025/", "/subjects/",
   "/legislators/", "/districts/", "/districts/senate-21/", "/committees/", "/federal/",
   "/calendar/", "/this-week/", "/my-reps/", "/elections/2026/", "/elections/2026/senate-5/",
+  "/elections/2026/amendments/", "/elections/supreme-court/",
   "/legislators/compare/",
   "/money/", "/money/committees/", "/money/committees/651839/", "/money/independent/",
   "/local/", "/local/milwaukee/", "/local/west-allis/", "/embed/bills/2025/ab1/",

@@ -902,6 +902,49 @@ export const statewideHistory = () =>
     total_cast: number | null;
   }[];
 
+export interface JudicialRace {
+  year: number; election: string; office: string; district: number | null;
+  total: number; source_url: string;
+  candidates: { candidate: string; party: null; votes: number }[];
+}
+
+/** Certified Supreme Court and Court of Appeals races (WEC canvasses), newest
+ * first, the Supreme Court before the Court of Appeals districts in a year. */
+export const judicialRaces = once((): JudicialRace[] => {
+  if (!hasTable("judicial_history")) return [];
+  const rows = prep(
+      `SELECT * FROM judicial_history
+       ORDER BY year DESC, office DESC, district, votes DESC`,
+    ).all() as {
+    year: number; election: string; office: string; district: number | null;
+    candidate: string; votes: number; total_cast: number; source_url: string;
+  }[];
+  const races = new Map<string, JudicialRace>();
+  for (const r of rows) {
+    const key = `${r.year}|${r.election}|${r.office}|${r.district}`;
+    if (!races.has(key)) {
+      races.set(key, { year: r.year, election: r.election, office: r.office, district: r.district,
+                       total: r.total_cast, source_url: r.source_url, candidates: [] });
+    }
+    races.get(key)!.candidates.push({ candidate: r.candidate, party: null, votes: r.votes });
+  }
+  return [...races.values()];
+});
+
+/** Certified statewide referendum results (WEC canvasses), newest first. */
+export const referendumResults = once(() =>
+  hasTable("referendum_history")
+    ? (prep(
+        `SELECT * FROM referendum_history
+         ORDER BY year DESC, CASE election WHEN 'general' THEN 0 WHEN 'primary' THEN 1 ELSE 2 END,
+                  question`,
+      ).all() as {
+        year: number; election: string; question: number; title: string;
+        yes: number; no: number; total_cast: number; source_url: string;
+      }[])
+    : [],
+);
+
 // chair, then co-chair, then vice-chair, then rank-and-file
 const ROLE_ORDER =
   "CASE WHEN m.role = 'chair' THEN 0 WHEN m.role LIKE 'co-chair%' THEN 1 WHEN m.role LIKE 'vice%' THEN 2 ELSE 3 END";
