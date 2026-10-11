@@ -5,8 +5,12 @@ import pytest
 from importer.roster import (
     AmbiguousNameError,
     Member,
+    Person,
     Roster,
+    Term,
     UnmatchedNameError,
+    find_person,
+    merge_listing,
 )
 
 
@@ -102,3 +106,35 @@ def test_truncation_ambiguity_hard_fails() -> None:
     )
     with pytest.raises(AmbiguousNameError):
         r.resolve("GONZALEZ-RIV", "lower")
+
+
+def person(name: str, chamber: str, district: int, aliases: list[str] | None = None) -> Person:
+    return Person(
+        id=f"ocd-person/{name.replace(' ', '-').lower()}",
+        name=name,
+        family_name=name.split()[-1],
+        party="Test",
+        image_url=None,
+        aliases=aliases or [],
+        terms=[Term(chamber, district, "2019-01-07", "2023-01-03")],
+    )
+
+
+def test_listing_newcomer_never_inherits_a_retired_surname() -> None:
+    # Bob Smith has no people file; Alice Smith once held another seat
+    people = [person("Alice Smith", "lower", 40)]
+    with pytest.raises(UnmatchedNameError):
+        find_person(people, "Bob Smith", "lower", 12)
+    with pytest.raises(UnmatchedNameError):
+        merge_listing(
+            Roster([]), [{"name": "Bob Smith", "chamber": "lower", "district": 12}], people
+        )
+
+
+def test_listing_nickname_resolves_within_its_seat() -> None:
+    people = [person("Robert Smith", "lower", 12), person("Alice Smith", "lower", 40)]
+    roster = merge_listing(
+        Roster([]), [{"name": "Bob Smith", "chamber": "lower", "district": 12}], people
+    )
+    (m,) = roster.members
+    assert (m.name, m.district, m.from_listing) == ("Robert Smith", 12, True)
