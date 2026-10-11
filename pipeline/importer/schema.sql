@@ -288,6 +288,34 @@ CREATE TABLE statewide_county_results (
     votes     INTEGER NOT NULL
 );
 
+-- Statewide judicial races (Supreme Court; Court of Appeals by district),
+-- summed from the same WEC canvass spreadsheets. Display data (no FKs).
+CREATE TABLE judicial_history (
+    year       INTEGER NOT NULL,
+    election   TEXT NOT NULL CHECK (election IN ('spring', 'primary', 'general')),
+    office     TEXT NOT NULL CHECK (office IN ('JUSTICE OF THE SUPREME COURT',
+                                               'COURT OF APPEALS JUDGE')),
+    district   INTEGER,  -- Court of Appeals district; NULL for the Supreme Court
+    candidate  TEXT NOT NULL,
+    votes      INTEGER NOT NULL,
+    total_cast INTEGER NOT NULL,  -- official Total Votes Cast, repeated per row
+    source_url TEXT NOT NULL      -- the pinned certified canvass file
+);
+
+-- Statewide referendum questions as certified. The canvass gives the
+-- question's short title only; the full text is in the referendum notice.
+CREATE TABLE referendum_history (
+    year       INTEGER NOT NULL,
+    election   TEXT NOT NULL CHECK (election IN ('spring', 'primary', 'general')),
+    question   INTEGER NOT NULL,
+    title      TEXT NOT NULL,
+    yes        INTEGER NOT NULL,
+    no         INTEGER NOT NULL,
+    total_cast INTEGER NOT NULL,
+    source_url TEXT NOT NULL,
+    PRIMARY KEY (year, election, question)
+);
+
 -- Organizations registered as lobbying on a bill (Ethics Commission's Eye
 -- on Lobbying; registration of interest, NOT a for/against position).
 CREATE TABLE lobbying_interests (

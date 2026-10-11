@@ -27,7 +27,7 @@ import {
 } from "../../lib/db";
 import { legislatorProfile } from "../../lib/legislator";
 import { personCard } from "../../lib/share";
-import { seatOffice, ELECTION_CYCLE } from "../../lib/ballot";
+import { mapsNote, seatOffice, ELECTION_CYCLE } from "../../lib/ballot";
 import { chamberTypical, repSummary } from "../../lib/repSummary";
 import { answers } from "../../lib/repAnswers";
 import type { TermId } from "../../lib/glossary";
@@ -345,7 +345,7 @@ const ledSentence =
           <h2 id="results-heading" class="t-label text-[1.1875rem]">Past results for this seat</h2>
           {history.map((h) => (
             <div class="border-t border-rule pt-2">
-              <p class="text-fine font-semibold text-granite">November {h.year}</p>
+              <p class="text-fine font-semibold text-granite">November {h.year}{mapsNote(h.year) && <span class="font-normal">, {mapsNote(h.year)}</span>}</p>
               <ul>
                 {h.candidates.map((c) => {
                   const isThem = c.candidate.toLowerCase().includes(surname);
@@ -363,7 +363,8 @@ const ledSentence =
           ))}
           <p class="text-fine text-granite">
             Official canvass results from the Wisconsin Elections Commission for
-            {" "}{chamber} District {person.district}. District lines changed in 2024.
+            {" "}{chamber} District {person.district}. District lines changed in 2012, 2022 and 2024;
+            older results are labeled with the maps they were held under.
           </p>
         </section>
       )}

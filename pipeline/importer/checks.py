@@ -248,6 +248,51 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
     return failures
 
 
+def check_results(conn: sqlite3.Connection) -> list[str]:
+    """Certified results keep the shape of the elections they come from: one
+    row per candidate per contest, every Assembly seat each general election,
+    Senate seats only in their own cycle (odd districts in midterm years,
+    even in presidential years), candidates within the official ballots cast,
+    and each referendum's yes + no equal to its votes cast."""
+    queries = {
+        "a candidate listed twice in one legislative contest": (
+            "SELECT COUNT(*) FROM (SELECT 1 FROM election_history"
+            " GROUP BY year, chamber, district, candidate HAVING COUNT(*) > 1)"
+        ),
+        "general elections missing Assembly seats": (
+            "SELECT COUNT(*) FROM (SELECT year FROM election_history WHERE chamber = 'lower'"
+            " GROUP BY year HAVING COUNT(DISTINCT district) != 99)"
+        ),
+        "Senate results for a seat not on that year's ballot": (
+            "SELECT COUNT(*) FROM election_history WHERE chamber = 'upper'"
+            " AND district % 2 != CASE WHEN year % 4 = 2 THEN 1 ELSE 0 END"
+        ),
+        "legislative contests above their official ballots cast": (
+            "SELECT COUNT(*) FROM (SELECT 1 FROM election_history"
+            " GROUP BY year, chamber, district"
+            " HAVING MIN(total_cast) != MAX(total_cast) OR MIN(total_cast) < SUM(votes))"
+        ),
+        "a candidate listed twice in one judicial contest": (
+            "SELECT COUNT(*) FROM (SELECT 1 FROM judicial_history"
+            " GROUP BY year, election, office, district, candidate HAVING COUNT(*) > 1)"
+        ),
+        "judicial contests above their official ballots cast": (
+            "SELECT COUNT(*) FROM (SELECT 1 FROM judicial_history"
+            " GROUP BY year, election, office, district"
+            " HAVING MIN(total_cast) != MAX(total_cast) OR MIN(total_cast) < SUM(votes))"
+        ),
+        "referendum yes + no differs from votes cast": (
+            "SELECT COUNT(*) FROM referendum_history WHERE yes + no != total_cast"
+        ),
+    }
+    failures = []
+    for label, query in queries.items():
+        bad = conn.execute(query).fetchone()[0]
+        if bad:
+            failures.append(f"{label}: {bad}")
+    return failures
+
+
 def check_federal(conn: sqlite3.Connection) -> list[str]:
     """Federal tables must hold the invariants the importer enforced: stated
     tallies equal counted positions, and every Senate vote carries exactly
@@ -464,6 +509,7 @@ def run_checks(db_path: Path, counts_file: Path) -> list[str]:
         failures = check_vote_counts(conn)
         failures += check_bill_counts(conn, counts_file)
         failures += check_referential_integrity(conn)
+        failures += check_results(conn)
         failures += check_federal(conn)
         failures += check_local(conn)
         failures += check_campaign_finance(conn)

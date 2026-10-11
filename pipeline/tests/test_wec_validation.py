@@ -51,7 +51,7 @@ def run_case(tmp_path, monkeypatch, make_db):
         original = copy.deepcopy(workbooks)
         for name in workbooks:
             (archive / name).touch()
-        monkeypatch.setattr(wec, "parse_all", lambda path: workbooks[path.name])
+        monkeypatch.setattr(wec, "parse_all", lambda path: (*workbooks[path.name], [], []))
         if error:
             with pytest.raises(RuntimeError, match=f"^{re.escape(error)}$"):
                 wec.run(archive, db_path)

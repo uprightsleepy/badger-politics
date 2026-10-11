@@ -93,7 +93,12 @@ def db_path(tmp_path: Path, make_db) -> Path:
         INSERT INTO election_history (year, chamber, district, candidate, party, votes,
                                       total_cast)
           VALUES (2024, 'lower', 15, 'Ann Example', 'IND', 15000, 25010),
-                 (2024, 'lower', 15, 'Bob Rival', 'REP', 10000, 25010);
+                 (2024, 'lower', 15, 'Bob Rival', 'REP', 10000, 25010),
+                 (2020, 'lower', 15, 'Ann Example', 'IND', 9000, 9000);
+        INSERT INTO judicial_history VALUES (2025, 'spring',
+          'JUSTICE OF THE SUPREME COURT', NULL, 'Susan Crawford', 1301137, 2364887, 'u');
+        INSERT INTO referendum_history VALUES (2025, 'spring', 1,
+          'State of Wisconsin Referendum', 1437317, 851851, 2289168, 'u');
         INSERT INTO congressional_races (district, incumbent, incumbent_noncandidacy,
                                          candidate, party, ballot_status, source)
           VALUES (2, 'Mark Pocan', 0, 'Mark Pocan', 'Democratic', 'Approve', 'wec');
@@ -216,6 +221,10 @@ def test_wider_api_shapes(built: Path) -> None:
     assert seat["holder"]["id"] == "p1" and seat["election"]["cycle_year"] == 2026
     assert seat["results"][0]["candidates"][0] == {
         "candidate": "Ann Example", "party": "IND", "votes": 15000}
+    # each result names the map it was held under, never the current lines by default
+    assert [(r["year"], r["maps"]) for r in seat["results"]] == [(2024, "2024"), (2020, "2011")]
+    assert load("elections/judicial.json")["races"][0]["candidate"] == "Susan Crawford"
+    assert load("elections/referenda.json")["questions"][0]["yes"] == 1437317
     assert load("elections/seats/senate-33.json")["holder"] is None
     assert load("elections/us-house.json")["races"][0]["candidate"] == "Mark Pocan"
     assert load("federal/tammy-baldwin.json")["votes"][0]["vote_cast"] == "Yea"

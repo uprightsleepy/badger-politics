@@ -264,12 +264,35 @@ def statewide_counties(conn: sqlite3.Connection) -> list[dict]:
     )
 
 
+# The district map a general election was held under: 2011 Act 43 (first
+# used in 2012), the maps the state Supreme Court adopted in 2022, and 2024
+# Act 94. A seat's number names different ground under each.
+MAPS = ("CASE WHEN year >= 2024 THEN '2024' WHEN year >= 2022 THEN '2022'"
+        " WHEN year >= 2012 THEN '2011' END")
+
+
 def election_history(conn: sqlite3.Connection) -> list[dict]:
     """Certified WEC results for every legislative seat, newest first."""
     return _rows(
         conn,
-        "SELECT chamber, district, year, candidate, party, votes, total_cast"
+        f"SELECT chamber, district, year, {MAPS} AS maps, candidate, party, votes, total_cast"
         " FROM election_history ORDER BY chamber, district, year DESC, votes DESC",
+    )
+
+
+def judicial_history(conn: sqlite3.Connection) -> list[dict]:
+    """Certified Supreme Court and Court of Appeals results, newest first."""
+    return _rows(
+        conn,
+        "SELECT * FROM judicial_history"
+        " ORDER BY year DESC, office DESC, district, votes DESC",
+    )
+
+
+def referendum_history(conn: sqlite3.Connection) -> list[dict]:
+    """Certified statewide referendum results, newest first."""
+    return _rows(
+        conn, "SELECT * FROM referendum_history ORDER BY year DESC, election, question"
     )
 
 

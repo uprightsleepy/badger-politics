@@ -241,7 +241,7 @@ id).
 | Legislator campaign finance | electronic records 2008 to present, for members with a verified committee link (`docs/curation-worklist.md` holds the human-verification queue) |
 | Committee, PAC and outside spending | every filer's transactions since January 2025 |
 | Lobbying | Withheld from public pages and exports pending an approved source |
-| Election results | certified WEC canvasses per seat and statewide office |
+| Election results | certified WEC canvasses: legislative seats in every general election from 2014 (each labeled with the district maps it was held under), statewide offices 2014 and 2022, Supreme Court and Court of Appeals races from 2020, statewide referendum questions of 2014 and 2023-2025 |
 | Federal roll calls | U.S. Senate from the 112th Congress (2011); U.S. House from 2005 |
 | Council votes | Milwaukee from 2008; Madison from 2025 with five new meetings per run and visible backfill progress; West Allis from 2015 (earlier minutes record votes inconsistently). [Expansion order and source review](docs/research/wisconsin-city-expansion-2026-09.md). |
 
