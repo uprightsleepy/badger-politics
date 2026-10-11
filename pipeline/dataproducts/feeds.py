@@ -169,7 +169,7 @@ def build_feeds(
             datetime.fromisoformat(data_through).replace(tzinfo=UTC) - timedelta(days=7)
         ).date().isoformat()
         rows = conn.execute(
-            f"""SELECT a.date, a.description, b.id, b.identifier, b.title, b.session_id
+            f"""SELECT a.id, a.date, a.description, b.identifier, b.title, b.session_id
                 FROM actions a JOIN bills b ON b.id = a.bill_id
                 WHERE a.date >= ? AND {queries.exportable("b.")}
                 ORDER BY a.date DESC, a.rowid DESC LIMIT 200""",
@@ -179,10 +179,11 @@ def build_feeds(
             "This week in the Wisconsin Legislature", "/feeds/weekly.xml",
             _stamp(data_through),
         )
-        for i, (date, desc, bill_id, identifier, title, session_id) in enumerate(rows):
+        for action_id, date, desc, identifier, title, session_id in rows:
             _entry(
                 root,
-                f"{SITE}/feeds/weekly.xml#{bill_id}-{date}-{i}",
+                # the action's own id: a list position shifts every night
+                f"{SITE}/feeds/weekly.xml#{action_id}",
                 f"{identifier}: {desc[:100]}",
                 _stamp(date),
                 f"{SITE}/bills/{session_id}/{bill_slug(identifier)}",

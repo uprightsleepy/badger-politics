@@ -194,7 +194,10 @@ def test_feeds_are_valid_atom(built: Path) -> None:
     assert root.find("a:updated", ns) is not None
     entries = root.findall("a:entry", ns)
     assert entries and entries[0].find("a:id", ns) is not None
-    assert (built / "public" / "feeds" / "weekly.xml").exists()
+    weekly = ET.parse(built / "public" / "feeds" / "weekly.xml").getroot()
+    # entry ids are the actions' own ids, stable as the week's list shifts
+    ids = [e.find("a:id", ns).text for e in weekly.findall("a:entry", ns)]
+    assert ids == ["https://badgerpolitics.org/feeds/weekly.xml#a1"]
 
 
 def test_ical_structure(built: Path) -> None:
