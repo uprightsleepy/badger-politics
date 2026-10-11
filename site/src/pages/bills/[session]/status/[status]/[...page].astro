@@ -55,7 +55,8 @@ const MEANS: Record<string, string> = {
   passed: "Passed both chambers, with no decision by the governor recorded yet.",
   enacted: "Passed both chambers and became law.",
   vetoed: "Passed both chambers, then vetoed by the governor.",
-  adopted: "Resolutions adopted by both chambers. Resolutions don't go to the governor.",
+  // a one-house resolution is adopted by its own chamber's vote
+  adopted: "Resolutions adopted: by both chambers, or by the one chamber a resolution of its own house needs. Resolutions don't go to the governor.",
   failed_sjr1: "Not finished when the session's last voting day passed, so stopped there.",
 };
 const n = (x: number) => x.toLocaleString();

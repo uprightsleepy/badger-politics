@@ -77,7 +77,7 @@ const seoTitle = subject
 // status and session make the near-identical housekeeping bills distinct
 const seoDescription = [
   `${sessionName}.`,
-  `${STATUS_LABELS[bill.status ?? ""] ?? "Introduced"}.`,
+  `${STATUS_LABELS[status] ?? "Introduced"}.`,
   subject,
 ]
   .filter(Boolean)
@@ -200,7 +200,7 @@ const record = fromLegiscan ? "LegiScan's copy of the record" : "the official re
   filters={{
     type: isBill ? "Bill" : "Resolution",
     session: sessionName,
-    outcome: STATUS_LABELS[bill.status ?? ""] ?? "Introduced",
+    outcome: STATUS_LABELS[status] ?? "Introduced",
     chamber: passedChamberName,
   }}
   breadcrumbs={[

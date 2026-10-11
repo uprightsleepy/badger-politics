@@ -183,6 +183,17 @@ test("a one-house resolution that passed its chamber is adopted, not stuck in co
   assert.equal(story.stopped, false);
 });
 
+test("a one-house resolution stored as adopted tells the same story as the older passed_chamber rows", () => {
+  const actions = [
+    a("2025-03-01", "lower", "Introduced by Representative Smith", "introduction"),
+    a("2025-03-20", "lower", "Adopted", "passage"),
+  ];
+  const old = tellStory(bill("passed_chamber", { classification: "resolution" }), actions, AFTER);
+  const now = tellStory(bill("adopted", { classification: "resolution" }), actions, AFTER);
+  assert.equal(now.status, "adopted");
+  assert.deepEqual([now.headline, now.body, now.stops], [old.headline, old.body, old.stops]);
+});
+
 test("passing both chambers without reaching the governor says so", () => {
   const story = tellStory(bill("failed_sjr1"), [
     ...introduced,
