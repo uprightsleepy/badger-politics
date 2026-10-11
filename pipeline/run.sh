@@ -94,8 +94,10 @@ python -m importer.import_contacts _data/contacts/contacts.json ../data/wi.sqlit
 
 python -m scraper.fetch_federal_votes           # U.S. Senate roll calls + roster
 python -m scraper.fetch_federal_finance
+python -m scraper.fetch_court_dockets           # curated federal court challenges (CourtListener)
 python -m importer.import_federal _data/federal ../data/wi.sqlite
 python -m importer.federal_finance _data/federal ../data/wi.sqlite
+python -m importer.court_challenges _data/federal/court-dockets.json ../data/wi.sqlite
 
 python -m scraper.fetch_local_profiles          # bind cached profiles before refreshing the roster
 python -m scraper.fetch_local_votes             # council votes (cached)

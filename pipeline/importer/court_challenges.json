@@ -1,0 +1,4 @@
+{
+  "_comment": "Human-verified federal court cases challenging a Wisconsin Act. 'docket' is the CourtListener docket id; 'bills' are this site's ids for the bills that became the challenged acts (e.g. 2023-sb488); 'basis' is a public source (the complaint, an opinion, or a court notice) showing the case challenges those acts; 'verified' is the review date. Which case challenges which act is an editorial judgment: never add an entry from a search match alone. An entry whose docket or bill does not resolve fails the import.",
+  "challenges": []
+}

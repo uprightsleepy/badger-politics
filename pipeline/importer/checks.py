@@ -12,6 +12,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from importer.court_challenges import CURATION, curated
 from importer.import_wec import family_key, same_person
 from importer.roster import OPEN_END
 
@@ -420,6 +421,21 @@ def check_ballot(conn: sqlite3.Connection) -> list[str]:
     return failures
 
 
+def check_court_challenges(conn: sqlite3.Connection, curation: Path = CURATION) -> list[str]:
+    """Every curated case resolves to its docket on every curated act, and
+    nothing else is shown as a challenge."""
+    wanted = {(e["docket"], b) for e in curated(curation) for b in e["bills"]}
+    stored = set(conn.execute(
+        "SELECT c.docket_id, c.bill_id FROM court_challenges c JOIN bills b"
+        " ON b.id = c.bill_id WHERE b.status = 'enacted'"))
+    total = conn.execute("SELECT COUNT(*) FROM court_challenges").fetchone()[0]
+    failures = [f"court challenge docket {d} on {b} did not resolve"
+                for d, b in sorted(wanted - stored)]
+    if stored - wanted or total != len(stored):
+        failures.append("court_challenges holds rows that are not curated enacted acts")
+    return failures
+
+
 def check_congress(conn: sqlite3.Connection) -> list[str]:
     """The Commission's House incumbents are the members serving on election
     day, district for district: a misread report can never put a race under
@@ -453,6 +469,7 @@ def run_checks(db_path: Path, counts_file: Path) -> list[str]:
         failures += check_campaign_finance(conn)
         failures += check_ballot(conn)
         failures += check_congress(conn)
+        failures += check_court_challenges(conn)
         # the floor only moves on a fully clean run; saving after a failed
         # one would let repeated small dips ratchet it down
         if not failures:

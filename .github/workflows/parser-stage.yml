@@ -79,6 +79,9 @@ jobs:
         if: steps.restore.outputs.needed == 'true'
         timeout-minutes: 300
         working-directory: pipeline
+        env:
+          # A nightly-parser environment secret, exposed only to the federal stage.
+          COURTLISTENER_TOKEN: ${{ inputs.stage == 'federal' && secrets.COURTLISTENER_TOKEN || '' }}
         run: uv run --locked python -m nightly run --stage "$STAGE"
       # GitHub's OIDC assertion is short-lived. Mint a NEW assertion after
       # the multi-hour step before uploading data or private diagnostics.

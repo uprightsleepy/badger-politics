@@ -279,6 +279,11 @@
     "data.milwaukee.gov": {
       "paused": "No active downloader; review dataset terms and permitted resource paths before introducing one."
     },
+    "www.courtlistener.com": {
+      "paused": "robots.txt and the terms page returned HTTP 403 (CloudFront) to the project User-Agent on 2026-10-11; record the robots response and review the API terms before enabling.",
+      "paths": { "GET": ["/api/rest/v4/dockets/\\d+/"] },
+      "delay_seconds": 12
+    },
     "img.logo.dev": {
       "paused": "Automatic logo downloads paused until provider terms and organization identity checks are verified."
     }

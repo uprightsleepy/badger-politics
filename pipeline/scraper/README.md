@@ -143,6 +143,7 @@ See [scheduling and activation](../../docs/nightly-parser-hosting.md#daily-polic
 | WisconsinEye | [Robots](https://wiseye.org/robots.txt) permits crawling with a 10-second delay, but retrieval is **paused**. | [User agreement](https://wiseye.org/user-agreement/), especially sections 1 and 14, leaves metadata republication uncertain. Obtain approval/clarification before restoring retrieval. Existing local metadata can still match archived hearing links. |
 | FollowTheMoney | [API robots](https://api.followthemoney.org/robots.txt) disallows all crawling. Network requests are **paused**; cached research remains available. | Previously documented API-key/license access does not resolve the current robots conflict. Obtain explicit approval covering automated API use before restoring either research helper. |
 | Boundary utilities | [LTSB ArcGIS host](https://services1.arcgis.com/robots.txt) returned 403; [Milwaukee maps](https://milwaukeemaps.milwaukee.gov/robots.txt) disallows general crawlers. New requests are **paused**; committed boundaries/local caches remain. | [Milwaukee open data](https://data.milwaukee.gov/) resource files may be an alternative, but `/api/` is robots-disallowed. No active downloader exists for that host or West Allis GIS; review individual dataset terms before adding one. |
+| CourtListener (`fetch_court_dockets`) | [Robots](https://www.courtlistener.com/robots.txt) and the [terms page](https://www.courtlistener.com/terms/) returned HTTP 403 (CloudFront) to the project User-Agent on 2026-10-11. Collection is **paused**; with no curated dockets the fetcher sends no request. | Free Law Project [API v4 docs](https://wiki.free.law/c/courtlistener/help/api/rest/v4/overview) (not reachable from the review environment; see the section below). Docket metadata only: court, case name, number, dates, docket link. No filings or documents are downloaded or rehosted. |
 | Organization logos | Automatic retrieval is disabled. Existing assets/monogram fallback remain. | The former homepage checks lacked individual robots/terms reviews. The logo.dev terms recheck could not be completed (429). Review provider API/caching/attribution terms and each identity-verification source before restoring. |
 
 ## Robots transport recovery (2026-09-08)
@@ -308,3 +309,45 @@ general crawlers from images. Collect only the image URL metadata on the permitt
 city roster, and leave image loading to visitors' browsers. Do not download images
 or run automated image-load checks against that host. Waukesha redirects portraits
 to its `webfile.waukesha-wi.gov/waukeshawi25/` image host (robots 404 at review).
+
+## Federal court challenges (2026-10-11)
+
+`importer/court_challenges.json` is a human-verified list of CourtListener
+docket ids and the enacted bills each case challenges, each with a public basis
+URL and review date. Matching cases to acts is an editorial judgment, so nothing
+is added from search results. `fetch_court_dockets` reads only
+`/api/rest/v4/dockets/{id}/` for curated ids into `_data/federal/court-dockets.json`
+(the existing federal bundle). The import and the integrity gate fail when a
+curated docket or bill does not resolve. Only federal courts (W.D. Wis., E.D. Wis.,
+7th Cir., Supreme Court) are in scope. State court records need a separate review.
+
+Review findings. A single request to robots.txt and `/terms/` with the project
+User-Agent got HTTP 403 from CloudFront. An earlier anonymous probe got 429. This
+is a technical denial, not a published prohibition. Collection stays paused and
+the denial is not worked around. The API documentation has moved to the Free Law
+Project wiki, which the review environment could not reach. Secondary summaries of
+the [v4 overview](https://wiki.free.law/c/courtlistener/help/api/rest/v4/overview)
+and [API usage](https://wiki.free.law/c/courtlistener/help/api/rest/v4/api-usage)
+pages say the following. Requests send `Authorization: Token <token>`. Docket
+endpoints reject anonymous requests. The default limits are 5 requests per minute,
+50 per hour and 125 per day, on rolling windows. Each project may have only one account.
+Confirm these against the wiki before enabling collection. The fetcher's 12-second
+floor matches the per-minute limit. There are at most 40 curated dockets, one
+request each per run, and 429/Retry-After stops the source through the shared
+transport.
+
+Enabling collection (owner steps):
+
+1. Read the v4 overview, the API usage page and the
+   [terms](https://www.courtlistener.com/terms/) directly. Record the review date,
+   the limits and the constraints here.
+2. From the nightly runner's network, fetch `robots.txt` with the project
+   User-Agent. Then replace the `paused` key in `source_policies.json` with the
+   reviewed `robots` status, URL and `sha256` (`source_access.robots_fingerprint`).
+3. Create one free CourtListener account for the project. Add its API token as
+   the `COURTLISTENER_TOKEN` secret on the `nightly-parser` GitHub environment.
+   `parser-stage.yml` gives the token only to the federal stage. For local runs,
+   export the token in the shell. The fetcher fails if curated dockets exist and
+   the token is missing, because the integrity gate would reject the import anyway.
+4. Add curated entries, then run the policy-only workflow. The changed manifest
+   invalidates older reports. After that passes, run collection.
