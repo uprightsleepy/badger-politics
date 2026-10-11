@@ -42,6 +42,13 @@ export const writeInSentence = (pending: { party: string; reason: string }[]): s
     )
     .join(" ");
 
+/** The district map a legislative general election was held under, or null
+ * for today's (2024 Act 94) maps: 2011 Act 43 for 2012 through 2020, then the
+ * maps the state Supreme Court adopted in 2022. A seat number names
+ * different ground under each, so an older result is never shown unlabeled. */
+export const mapsNote = (year: number): string | null =>
+  year >= 2024 ? null : year >= 2022 ? "2022 maps" : "2011 maps";
+
 // ---- words for races and results, shared by pages and client scripts ----
 
 /** The five statewide constitutional offices, in ballot order, as the

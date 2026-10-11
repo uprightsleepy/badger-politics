@@ -22,7 +22,7 @@ import {
   writeInPending, meta,
 } from "../../../lib/db";
 import { chamberName, fmtDate, partyWord, personSlug } from "../../../lib/format";
-import { ballotStatus, raceSentenceHtml, seatOffice, writeInSentence } from "../../../lib/ballot";
+import { ballotStatus, mapsNote, raceSentenceHtml, seatOffice, writeInSentence } from "../../../lib/ballot";
 import { raceCard } from "../../../lib/share";
 
 export function getStaticPaths() {
@@ -79,8 +79,8 @@ const description =
   `${general ? " on the November ballot" : ""}, and official past results.`;
 const marginLine = margin
   ? margin.margin === null
-    ? `In ${margin.year}${margin.year < 2024 ? ", on the previous maps" : ""}, the winner ran unopposed.`
-    : `In ${margin.year}${margin.year < 2024 ? ", on the previous maps" : ""}, this seat was decided by ${margin.margin.toFixed(1)} points.`
+    ? `In ${margin.year}${mapsNote(margin.year) ? `, on the ${mapsNote(margin.year)}` : ""}, the winner ran unopposed.`
+    : `In ${margin.year}${mapsNote(margin.year) ? `, on the ${mapsNote(margin.year)}` : ""}, this seat was decided by ${margin.margin.toFixed(1)} points.`
   : "";
 const pulledOn = meta().imported_at?.slice(0, 10);
 // how each candidate got onto the ballot, said once per kind
@@ -194,15 +194,15 @@ const howOn = (party: string | null) =>
           <h2 id="past-heading" class="t-section">How this seat has voted</h2>
           <p class="mt-2 text-small text-granite">
             {marginLine && `${marginLine} `}Certified results. Wisconsin's legislative maps were redrawn for
-            2024, so earlier results are the previous District {person.district}: the same number over
-            substantially different lines.
+            2012, 2022 and 2024, so each earlier result is labeled with the maps it was held under: the
+            same District {person.district} number over substantially different lines.
           </p>
           <div class="mt-4 flex flex-col">
             {past.map((h) => (
               <ElectionResult
                 id={`results-${h.year}`}
                 title={`November ${h.year}`}
-                note={h.year < 2024 ? "previous maps" : undefined}
+                note={mapsNote(h.year) ?? undefined}
                 candidates={h.candidates}
                 total={h.total}
               />

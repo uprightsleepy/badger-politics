@@ -14,7 +14,7 @@ import {
 import { personSlug, monthYear, chamberName, partyWord, fmtDate } from "../../lib/format";
 import { safeHref } from "../../lib/html";
 import { mergeServiceSpans } from "../../lib/service";
-import { article, ballotStatus, nameList, seatOffice, withParty, writeInSentence } from "../../lib/ballot";
+import { article, ballotStatus, mapsNote, nameList, seatOffice, withParty, writeInSentence } from "../../lib/ballot";
 
 export function getStaticPaths() {
   const seats = [
@@ -218,11 +218,12 @@ const pulledOn = meta().imported_at?.slice(0, 10);
           <h2 id="results-heading" class="t-section">Election results</h2>
           <p class="mt-2 text-small text-granite">
             Official general-election counts from the Wisconsin Elections Commission. Shares are of all
-            votes cast, including write-ins.
+            votes cast, including write-ins. Results before 2024 are labeled with the maps they were held
+            under, when this district number covered different ground.
           </p>
           <div class="mt-4 flex flex-col">
             {history.map((h) => (
-              <ElectionResult id={`results-${h.year}`} title={`November ${h.year}`} note={h.year < 2024 ? "previous maps" : undefined} candidates={h.candidates} total={h.total} />
+              <ElectionResult id={`results-${h.year}`} title={`November ${h.year}`} note={mapsNote(h.year) ?? undefined} candidates={h.candidates} total={h.total} />
             ))}
           </div>
         </section>

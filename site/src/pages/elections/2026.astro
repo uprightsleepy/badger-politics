@@ -13,7 +13,7 @@ import {
 } from "../../lib/db";
 import { fmtDate, partyWord, personSlug } from "../../lib/format";
 import { esc } from "../../lib/html";
-import { ballotStatus, raceSentenceHtml, seatOffice, STATEWIDE_OFFICES, writeInSentence } from "../../lib/ballot";
+import { ballotStatus, mapsNote, raceSentenceHtml, seatOffice, STATEWIDE_OFFICES, writeInSentence } from "../../lib/ballot";
 
 const seats = sittingPeople()
   .map((p) => ({
@@ -134,8 +134,8 @@ const raceRow = ({ person, election, margin }: (typeof seats)[number]) => {
       }) + (writeIn.length ? ` ${esc(writeInSentence(writeIn))}` : ""),
     note: margin
       ? margin.margin == null
-        ? `Unopposed in ${margin.year}${margin.year < 2024 ? ", on the previous maps" : ""}.`
-        : `Decided by ${margin.margin.toFixed(1)} points in ${margin.year}${margin.year < 2024 ? ", on the previous maps" : ""}.`
+        ? `Unopposed in ${margin.year}${mapsNote(margin.year) ? `, on the ${mapsNote(margin.year)}` : ""}.`
+        : `Decided by ${margin.margin.toFixed(1)} points in ${margin.year}${mapsNote(margin.year) ? `, on the ${mapsNote(margin.year)}` : ""}.`
       : "",
     text: `district ${person.district} ${person.name} ${others.map((o) => o.name).join(" ")}`.toLowerCase(),
   };
