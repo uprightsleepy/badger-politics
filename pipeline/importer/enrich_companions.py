@@ -115,7 +115,9 @@ def enrich(db_path: Path, scrape_dirs: list[Path], limit: int | None, delay: flo
         f" {failed} fetch failures)"
     )
     conn.close()
-    return 0
+    # like enrich_lrb: the edges that did resolve are kept, but a page that
+    # could not be read fails the stage rather than silently dropping edges
+    return 1 if failed else 0
 
 
 def main(argv: list[str]) -> int:
