@@ -92,3 +92,16 @@ export type LocalReps = Record<
     districts: Record<string, { name: string; slug: string; image: string | null }[]>;
   }
 >;
+
+/** /data/agreement/{session}.json: each chamber's floor roll calls in the
+ * session and how each sitting member voted on them, one character per
+ * roll call ("y" Aye, "n" No, "." anything else; lib/agreement).
+ * LegiScan's roll calls are left out (lib/legiscan). */
+export type VoteMatrix = {
+  /** [roll call id, date, bill identifier, motion], oldest first. */
+  rollCalls: [string, string | null, string, string | null][];
+  /** [slug, name, party, district], in the same order as `votes`. */
+  members: [string, string, string | null, number | null][];
+  votes: string[];
+};
+export type SessionVotes = { session: string; chambers: { upper?: VoteMatrix; lower?: VoteMatrix } };

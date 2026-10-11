@@ -672,6 +672,13 @@ const ledSentence =
             </a>
           </p>
         )}
+        {sitting && voteTotal > 0 && (
+          <p>
+            <a href={`/legislators/compare/?a=${slug}`} class="inline-flex min-h-11 items-center underline">
+              Compare {person.name}'s votes with another lawmaker's
+            </a>
+          </p>
+        )}
       </section>
 
       <div class="lg:hidden">

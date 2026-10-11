@@ -4,6 +4,7 @@ import { hasTable, memoBy, once, prep } from "./connection.ts";
 import { OPEN_END, OPEN_START } from "./sentinels.ts";
 import type { MoneyBounds } from "./money-periods.ts";
 import { subjectDisplay, subjectSlug } from "./subjects.ts";
+import { voteChar } from "./agreement.ts";
 
 export interface Session {
   id: string;
@@ -594,6 +595,50 @@ export const partyBreaks = (personId: string, party: string | null) => {
     })
     .map((v) => ({ ...v, split: splits.get(`${v.vote_event_id}|${party}`)! }));
 };
+
+/** A session's floor roll calls per chamber and each sitting member's
+ * vote on them, for comparing two members (lib/agreement). LegiScan's
+ * rows are left out: the matrix is published as a data file. Roll calls
+ * no sitting member voted Aye or No on are dropped. */
+export const voteMatrix = memoBy((sessionId: string) => {
+  const official = "COALESCE(e.source, '') != 'legiscan' AND COALESCE(b.source, '') != 'legiscan'";
+  const records = prep(
+      `SELECT r.vote_event_id, r.person_id, r.option, e.chamber
+       FROM vote_records r
+       JOIN vote_events e ON e.id = r.vote_event_id
+       JOIN bills b ON b.id = e.bill_id
+       JOIN people p ON p.id = r.person_id
+       WHERE b.session_id = ? AND e.chamber IN ('lower', 'upper') AND ${official}
+         AND r.option IN ('yes', 'no') AND p.current_role IN ('Representative', 'Senator')`,
+    )
+    .all(sessionId) as { vote_event_id: string; person_id: string; option: string; chamber: string }[];
+  const events = prep(
+      `SELECT e.id, e.date, e.chamber, e.motion, b.identifier
+       FROM vote_events e JOIN bills b ON b.id = e.bill_id
+       WHERE b.session_id = ? AND e.chamber IN ('lower', 'upper') AND ${official}
+       ORDER BY e.date, e.id`,
+    )
+    .all(sessionId) as { id: string; date: string | null; chamber: string; motion: string | null; identifier: string }[];
+  const roster = new Map(sittingPeople().map((p) => [p.id, p]));
+  const out: Partial<Record<"upper" | "lower", {
+    rollCalls: typeof events; members: Person[]; votes: string[];
+  }>> = {};
+  for (const chamber of ["upper", "lower"] as const) {
+    const mine = records.filter((r) => r.chamber === chamber);
+    const voted = new Set(mine.map((r) => r.vote_event_id));
+    const rollCalls = events.filter((e) => e.chamber === chamber && voted.has(e.id));
+    if (!rollCalls.length) continue;
+    const column = new Map(rollCalls.map((e, i) => [e.id, i]));
+    const members = [...new Set(mine.map((r) => r.person_id))]
+      .map((id) => roster.get(id)!)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const row = new Map(members.map((m, i) => [m.id, i]));
+    const cells = members.map(() => Array<string>(rollCalls.length).fill("."));
+    for (const r of mine) cells[row.get(r.person_id)!][column.get(r.vote_event_id)!] = voteChar(r.option);
+    out[chamber] = { rollCalls, members, votes: cells.map((c) => c.join("")) };
+  }
+  return out;
+});
 
 /** Per-party Aye/Nay splits for one roll call, for the party-line /
  * bipartisan tag. Null when either party cast no recorded Aye/Nay. */

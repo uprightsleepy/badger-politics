@@ -1,0 +1,211 @@
+---
+/** Two lawmakers side by side: on how many of the roll calls they both
+ * voted on they voted the same way, and the ones where they didn't. A
+ * count, never a score. The picker and the result are drawn in the
+ * browser from /data/agreement/{session}.json (lib/agreement). */
+import Base from "../../layouts/Base.astro";
+import { builtSessions, voteMatrix } from "../../lib/db";
+import { sessionPlainName } from "../../lib/format";
+
+const sessions = builtSessions()
+  .filter((s) => Object.keys(voteMatrix(s.id)).length > 0)
+  .map((s) => ({ id: s.id, label: sessionPlainName(s.id, s.name ?? s.identifier) }));
+const FIELD =
+  "min-h-12 w-full max-w-full rounded-[0.625rem] border-2 border-edge bg-white px-3 font-sans text-body font-normal text-spruce focus:border-lake lg:min-h-11";
+---
+
+<Base
+  title="Compare two lawmakers' votes"
+  description="Pick two Wisconsin lawmakers in the same chamber and see how often they voted the same way on the roll calls they both voted on, with every roll call where they split."
+  layout="wide"
+  breadcrumbs={[{ name: "Legislators", url: "/legislators/" }]}
+>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">Compare two lawmakers' votes</h1>
+    <p class="sm:text-lead">
+      Choose two members of the same chamber to see how often they voted the same way, and every roll call
+      where they split.
+    </p>
+  </header>
+
+  {sessions.length === 0 ? (
+    <p class="sheet mt-6 max-w-[47.5rem] p-5">No roll calls are on record for the sessions on this site yet.</p>
+  ) : (
+    <>
+      <form id="compare-form" class="sheet mt-6 grid max-w-[47.5rem] gap-4 p-5 sm:grid-cols-2 sm:p-6" data-sessions={JSON.stringify(sessions)}>
+        <label class="flex min-w-0 flex-col gap-1.5 text-small font-bold">
+          Session
+          <select id="compare-session" class={FIELD}>
+            {sessions.map((s) => <option value={s.id}>{s.label}</option>)}
+          </select>
+        </label>
+        <label class="flex min-w-0 flex-col gap-1.5 text-small font-bold">
+          Chamber
+          <select id="compare-chamber" class={FIELD}>
+            <option value="lower">Assembly</option>
+            <option value="upper">Senate</option>
+          </select>
+        </label>
+        <label class="flex min-w-0 flex-col gap-1.5 text-small font-bold">
+          First lawmaker
+          <select id="compare-a" class={FIELD}></select>
+        </label>
+        <label class="flex min-w-0 flex-col gap-1.5 text-small font-bold">
+          Second lawmaker
+          <select id="compare-b" class={FIELD}></select>
+        </label>
+      </form>
+      <noscript>
+        <p class="mt-3 max-w-[47.5rem] text-small text-granite">
+          This comparison is worked out in your browser, so it needs JavaScript. Each lawmaker's page lists
+          every vote they cast.
+        </p>
+      </noscript>
+
+      <p id="compare-status" role="status" class="sr-only"></p>
+      <section id="compare-result" hidden class="mt-8 max-w-[47.5rem]" aria-labelledby="compare-heading" data-pagefind-ignore>
+        <h2 id="compare-heading" class="t-section" tabindex="-1"></h2>
+        <p id="compare-summary" class="mt-3 sm:text-lead"></p>
+        <div id="compare-split"></div>
+        <p id="compare-records" class="mt-6 text-small"></p>
+      </section>
+    </>
+  )}
+
+  <section class="mt-12 max-w-[47.5rem]" aria-labelledby="counting-heading">
+    <h2 id="counting-heading" class="t-section">How this is counted</h2>
+    <ul class="mt-3 flex list-disc flex-col gap-1.5 pl-5">
+      <li>
+        A roll call counts only when <strong>both</strong> lawmakers voted Aye or No on it. If either was absent,
+        excused or didn't vote, it's left out.
+      </li>
+      <li>
+        “The same way” means both voted Aye or both voted No. Every roll call counts once, whether it was on
+        passing a bill, an amendment or a procedural motion.
+      </li>
+      <li>
+        Only the floor roll calls in the Legislature's own records are counted, for members serving now. Members
+        of different chambers never vote on the same roll call, so they can't be compared.
+      </li>
+      <li>
+        This is a count, not a rating. It doesn't say which votes mattered more, or why either member voted as
+        they did.
+      </li>
+    </ul>
+  </section>
+
+  <script>
+    import { compareVotes } from "../../lib/agreement";
+    import { esc } from "../../lib/html";
+    import { fmtDate, partyWord } from "../../lib/format";
+    import type { SessionVotes, VoteMatrix } from "../../lib/wire";
+
+    const form = document.getElementById("compare-form") as HTMLFormElement | null;
+    if (form) {
+      const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+      const sessionSel = $<HTMLSelectElement>("compare-session");
+      const chamberSel = $<HTMLSelectElement>("compare-chamber");
+      const aSel = $<HTMLSelectElement>("compare-a");
+      const bSel = $<HTMLSelectElement>("compare-b");
+      const status = $("compare-status");
+      const result = $("compare-result");
+      const cache = new Map<string, Promise<SessionVotes>>();
+      const load = (id: string) => {
+        if (!cache.has(id)) cache.set(id, fetch(`/data/agreement/${id}.json`).then((r) => {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.json();
+        }));
+        return cache.get(id)!;
+      };
+      const optionWord = (c: string) => (c === "y" ? "Aye" : "No");
+      let matrix: VoteMatrix | undefined;
+
+      const fillMembers = (keepA: string, keepB: string) => {
+        const opts = (matrix?.members ?? []).map(([slug, name, party, district]) =>
+          `<option value="${esc(slug)}">${esc(name)}, ${esc(partyWord(party))}${district != null ? `, District ${district}` : ""}</option>`).join("");
+        for (const [sel, keep] of [[aSel, keepA], [bSel, keepB]] as const) {
+          sel.innerHTML = `<option value="">Choose a lawmaker</option>${opts}`;
+          sel.value = matrix?.members.some((m) => m[0] === keep) ? keep : "";
+        }
+      };
+
+      const show = () => {
+        const params = new URLSearchParams({ session: sessionSel.value, chamber: chamberSel.value });
+        if (aSel.value) params.set("a", aSel.value);
+        if (bSel.value) params.set("b", bSel.value);
+        history.replaceState(null, "", `?${params}`);
+        const ia = matrix?.members.findIndex((m) => m[0] === aSel.value) ?? -1;
+        const ib = matrix?.members.findIndex((m) => m[0] === bSel.value) ?? -1;
+        if (!matrix || ia < 0 || ib < 0 || ia === ib) {
+          result.hidden = true;
+          status.textContent = ia >= 0 && ia === ib ? "Choose two different lawmakers." : "";
+          return;
+        }
+        const [a, b] = [matrix.members[ia], matrix.members[ib]];
+        const { shared, same, differed } = compareVotes(matrix.votes[ia], matrix.votes[ib]);
+        const session = sessionSel.selectedOptions[0].textContent;
+        $("compare-heading").textContent = `${a[1]} and ${b[1]}`;
+        $("compare-summary").innerHTML = shared
+          ? `In the ${esc(session ?? "")}, they voted the same way on <span class="figure">${same.toLocaleString()}</span> of the <span class="figure">${shared.toLocaleString()}</span> ${shared === 1 ? "roll call" : "roll calls"} they both voted on.`
+          : `In the ${esc(session ?? "")}, there's no roll call they both voted Aye or No on.`;
+        const rows = differed.slice().reverse().map((i) => {
+          const [id, date, identifier, motion] = matrix!.rollCalls[i];
+          return `<li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-rule py-2.5 text-small">` +
+            `<span class="min-w-0 flex-[1_1_16rem] [overflow-wrap:anywhere]"><a href="/votes/${esc(id)}/" class="font-semibold underline">${esc(identifier)}</a>` +
+            (motion ? ` <span class="text-granite">${esc(motion)}</span>` : "") + `</span>` +
+            `<span class="ml-auto shrink-0 text-fine tabular-nums text-granite">${esc(fmtDate(date))}</span>` +
+            `<span class="basis-full">${esc(a[1])}: <strong>${optionWord(matrix!.votes[ia][i])}</strong>. ${esc(b[1])}: <strong>${optionWord(matrix!.votes[ib][i])}</strong>.</span></li>`;
+        }).join("");
+        $("compare-split").innerHTML = differed.length
+          ? `<h3 class="t-question mt-6">${differed.length === 1 ? "The roll call where they split" : `The ${differed.length.toLocaleString()} roll calls where they split, newest first`}</h3>` +
+            `<ul class="mt-2 border-b border-rule" role="list">${rows}</ul>`
+          : "";
+        $("compare-records").innerHTML =
+          `Every vote: <a href="/legislators/${esc(a[0])}/votes/1/" class="underline">${esc(a[1])}</a> · ` +
+          `<a href="/legislators/${esc(b[0])}/votes/1/" class="underline">${esc(b[1])}</a>`;
+        result.hidden = false;
+        status.textContent = shared
+          ? `Same way on ${same} of ${shared} shared roll calls.`
+          : "No shared roll calls.";
+      };
+
+      const pick = async (keepA: string, keepB: string) => {
+        try {
+          const data = await load(sessionSel.value);
+          const chambers = Object.keys(data.chambers);
+          for (const o of chamberSel.options) o.disabled = !chambers.includes(o.value);
+          if (!chambers.includes(chamberSel.value)) chamberSel.value = chambers[0];
+          matrix = data.chambers[chamberSel.value as "upper" | "lower"];
+          fillMembers(keepA, keepB);
+          show();
+        } catch {
+          matrix = undefined;
+          fillMembers("", "");
+          result.hidden = true;
+          status.textContent = "We couldn't load this session's roll calls right now.";
+        }
+      };
+
+      // a link in (/legislators/compare/?a=slug) picks the chamber the member sits in
+      const q = new URLSearchParams(location.search);
+      const sessions = JSON.parse(form.dataset.sessions!) as { id: string }[];
+      if (sessions.some((s) => s.id === q.get("session"))) sessionSel.value = q.get("session")!;
+      const wantA = q.get("a") ?? "";
+      const wantB = q.get("b") ?? "";
+      const chamberWanted = q.get("chamber");
+      if (chamberWanted === "upper" || chamberWanted === "lower") chamberSel.value = chamberWanted;
+      (async () => {
+        if (wantA && !chamberWanted) {
+          const d = await load(sessionSel.value).catch(() => null);
+          if (d?.chambers.upper?.members.some((m) => m[0] === wantA)) chamberSel.value = "upper";
+        }
+        await pick(wantA, wantB);
+      })();
+
+      sessionSel.addEventListener("change", () => pick(aSel.value, bSel.value));
+      chamberSel.addEventListener("change", () => pick("", ""));
+      aSel.addEventListener("change", show);
+      bSel.addEventListener("change", show);
+    }
+  </script>
+</Base>
