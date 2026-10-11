@@ -287,6 +287,9 @@
     },
     "img.logo.dev": {
       "paused": "Automatic logo downloads paused until provider terms and organization identity checks are verified."
+    },
+    "sfs.dpi.wi.gov": {
+      "paused": "No active downloader: the school referenda report host was unreachable for review on 2026-10-11 (robots unchecked), and DPI's site terms limit reuse to noncommercial and fair use; review both before introducing one."
     }
   }
 }
