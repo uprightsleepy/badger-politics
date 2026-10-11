@@ -102,7 +102,7 @@ const SAMPLE_PATHS = [
   "/", "/404.html", "/about/", "/data/", "/following/", "/glossary/", "/testify/",
   "/bills/", "/bills/2025/", "/bills/2025/ab656/", "/bills/2025/ab1/", "/bills/2025/sb23/",
   "/votes/2025-av0001-ar1/", "/laws/", "/laws/2025/", "/vetoes/", "/partial-veto/",
-  "/governors-desk/", "/hearing-none/", "/hearing-none/2025/", "/subjects/",
+  "/governors-desk/", "/governors-desk/executive-orders/", "/hearing-none/", "/hearing-none/2025/", "/subjects/",
   "/legislators/", "/districts/", "/districts/senate-21/", "/committees/", "/federal/",
   "/calendar/", "/this-week/", "/my-reps/", "/elections/2026/", "/elections/2026/senate-5/",
   "/elections/2026/amendments/", "/elections/supreme-court/",

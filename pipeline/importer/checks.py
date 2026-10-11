@@ -503,6 +503,33 @@ def check_congress(conn: sqlite3.Connection) -> list[str]:
                                   or family_key(races[d]) == family_key(members[d])))]
 
 
+def check_executive_orders(conn: sqlite3.Connection) -> list[str]:
+    """The governors' orders are listed, every link is the official archive
+    PDF that its own year, number and letter name, and every order falls in its
+    governor's tenure: from the folder's start year through the year the
+    next governor's folder starts (both governors issue orders that year)."""
+    if not conn.execute("SELECT 1 FROM executive_orders").fetchone():
+        return ["executive_orders: no orders imported"]
+    failures = []
+    bad = conn.execute(
+        "SELECT COUNT(*) FROM executive_orders WHERE NOT (suffix = '' OR suffix GLOB '[A-Z]')"
+        " OR url != 'https://docs.legis.wisconsin.gov/document/"
+        "executiveorders/' || year || '/' || number || lower(suffix) || '.pdf'"
+    ).fetchone()[0]
+    if bad:
+        failures.append(f"executive_orders: {bad} links outside the official archive")
+    outside = conn.execute(
+        "WITH tenure AS (SELECT folder, CAST(substr(folder, 1, 4) AS INTEGER) AS first,"
+        " LEAD(CAST(substr(folder, 1, 4) AS INTEGER)) OVER (ORDER BY folder) AS last"
+        " FROM (SELECT DISTINCT folder FROM executive_orders))"
+        " SELECT COUNT(*) FROM executive_orders JOIN tenure USING (folder)"
+        " WHERE year < first OR year > coalesce(last, year)"
+    ).fetchone()[0]
+    if outside:
+        failures.append(f"executive_orders: {outside} orders outside their governor's tenure")
+    return failures
+
+
 def run_checks(db_path: Path, counts_file: Path) -> list[str]:
     conn = sqlite3.connect(db_path)
     try:
@@ -516,6 +543,7 @@ def run_checks(db_path: Path, counts_file: Path) -> list[str]:
         failures += check_ballot(conn)
         failures += check_congress(conn)
         failures += check_court_challenges(conn)
+        failures += check_executive_orders(conn)
         # the floor only moves on a fully clean run; saving after a failed
         # one would let repeated small dips ratchet it down
         if not failures:

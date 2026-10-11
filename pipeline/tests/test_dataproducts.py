@@ -135,6 +135,13 @@ def db_path(tmp_path: Path, make_db) -> Path:
                  (12, 88, 'Independent Expenditure Committee', 'OUTGOING', '2025-09-01',
                   5000, NULL, 'Ad Vendor LLC', 'Business', 'AGAINST', 'Ann Example',
                   'State Assembly', '15', 'TV ad', 4242, 'Fall Report');
+        INSERT INTO executive_orders (folder, governor, year, number, suffix, url)
+          VALUES ('2019_tony_evers', 'Tony Evers', 2020, 72, '',
+                  'https://docs.legis.wisconsin.gov/document/executiveorders/2020/72.pdf'),
+                 ('2019_tony_evers', 'Tony Evers', 2019, 1, '',
+                  'https://docs.legis.wisconsin.gov/document/executiveorders/2019/1.pdf'),
+                 ('2011_scott_walker', 'Scott Walker', 2019, 319, '',
+                  'https://docs.legis.wisconsin.gov/document/executiveorders/2019/319.pdf');
         INSERT INTO statewide_races (office, incumbent, incumbent_noncandidacy,
                                      candidate, party, ballot_status, source)
           VALUES ('GOVERNOR', 'Tony Evers', 1, 'Sara Rodriguez', 'Democratic',
@@ -351,6 +358,16 @@ def test_feeds_are_valid_atom(built: Path) -> None:
     assert ids == ["https://badgerpolitics.org/feeds/weekly.xml#a1"]
 
 
+def test_executive_orders_json_is_newest_first(built: Path) -> None:
+    payload = json.loads(
+        (built / "public" / "api" / "v1" / "executive-orders.json").read_text(encoding="utf-8"))
+    # within a year, the later governor's orders come first
+    assert [(o["governor"], o["year"], o["number"]) for o in payload] == [
+        ("Tony Evers", 2020, 72), ("Tony Evers", 2019, 1), ("Scott Walker", 2019, 319)]
+    assert payload[0] == {"governor": "Tony Evers", "year": 2020, "number": 72, "suffix": "",
+                          "url": "https://docs.legis.wisconsin.gov/document/executiveorders/2020/72.pdf"}
+
+
 @pytest.mark.parametrize(("feed", "entry_ids"), [
     ("districts/assembly-15.xml", ["2025-v1"]),
     ("subjects/marriage-minimum-age.xml", ["a1"]),
@@ -412,8 +429,8 @@ def test_builds_from_a_snapshot_older_than_the_newest_tables(
 ) -> None:
     # Releases build from the newest snapshot, which can predate a new table.
     conn = sqlite3.connect(db_path)
-    for table in ("bill_versions", "court_challenges", "judicial_history",
-                  "referendum_history"):
+    for table in ("bill_versions", "court_challenges", "executive_orders",
+                  "judicial_history", "referendum_history"):
         conn.execute(f"DROP TABLE {table}")  # noqa: S608 - fixed names
     conn.commit()
     conn.row_factory = sqlite3.Row

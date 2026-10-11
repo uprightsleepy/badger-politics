@@ -132,7 +132,7 @@ See [scheduling and activation](../../docs/nightly-parser-hosting.md#daily-polic
 
 | Source / collector | Robots result and current decision | Terms / permitted scope |
 | --- | --- | --- |
-| Wisconsin Legislature (`scrape`, contacts, subjects, session rosters, enrichers) | [docs robots](https://docs.legis.wisconsin.gov/robots.txt) restrict internal mechanisms and `/search`; only reviewed year/document and executive-order routes are enabled. The changed robots file (now disallowing `/search`) was reviewed and approved by the repo owner on 2026-10-11. [Schedule robots](https://committeeschedule.legis.wisconsin.gov/robots.txt) returns 404. Minimum 1 second/request. | Reviewed [Legislature](https://legis.wisconsin.gov/) and [records site](https://docs.legis.wisconsin.gov/); no separate public-site terms link or conflicting collection restriction found. Official legislative records and office contacts only; retain attribution. |
+| Wisconsin Legislature (`scrape`, contacts, subjects, executive orders, session rosters, enrichers) | [docs robots](https://docs.legis.wisconsin.gov/robots.txt) restrict internal mechanisms and `/search`; only reviewed year/document and executive-order routes are enabled. The changed robots file (now disallowing `/search`) was reviewed and approved by the repo owner on 2026-10-11. [Schedule robots](https://committeeschedule.legis.wisconsin.gov/robots.txt) returns 404. Minimum 1 second/request. | Reviewed [Legislature](https://legis.wisconsin.gov/) and [records site](https://docs.legis.wisconsin.gov/); no separate public-site terms link or conflicting collection restriction found. Official legislative records and office contacts only; retain attribution. |
 | CFIS (`fetch_cfis`, `fetch_cf_committees`) | [Robots](https://campaignfinance.wi.gov/robots.txt) leaves the three used JSON procedures open to general crawlers; named AI agents are blocked. Both general groups were reviewed. Conservative 10-second interval because a crawl-delay directive has ambiguous placement. | [Official public search](https://ethics.wi.gov/Pages/CampaignFinance/ViewReports.aspx), [Commission reuse notice, pp. 8–9](https://ethics.wi.gov/Resources/20251021%20Open%20Session%20Materials%20Revised.pdf): noncommercial civic reporting only; no sale, commercial use, solicitations, or AI training. Preserve `alwaysRespectPiiRedaction`. This is the public frontend's JSON interface, not a documented API service guarantee. Do not use an AI browsing agent to collect its records or change identities to avoid restrictions. |
 | WEC ballot, referendum-notice and canvass files (`fetch_wec`, `fetch_wec_results`) | [Robots](https://elections.wi.gov/robots.txt) permits the files paths and names no agents. Rechecked 2026-10-11 with the unchanged fingerprint. Results and report pages (`/election-result/...`, `/media/...`, `/sitemap.xml`) now answer the project identity with a Cloudflare challenge (HTTP 403, `cf-mitigated: challenge`); the files paths answer 200. GET only on `/sites/default/files/documents/*.pdf|xlsx` and `/sites/default/files/legacy/*.xlsx`, 10-second interval, pinned files fetched once. | The site publishes no separate terms of use; its footer carries a general copyright notice over public records (Wis. Stat. 19.31), the basis on which certified canvasses were already used. Never work around a denial: no other identity, browser or archive copy is used to read the challenged pages. See [canvass history](#canvass-history-2026-10-11). |
 | OpenStates people/committees; congressional roster | Robots returned 404 on [api.github.com](https://api.github.com/robots.txt), [raw.githubusercontent.com](https://raw.githubusercontent.com/robots.txt), and [unitedstates.github.io](https://unitedstates.github.io/robots.txt). Only the specific roster repositories/paths are enabled, minimum 1 second/request. | [GitHub API terms](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service#h-api-terms), [rate handling](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#handle-rate-limit-errors-appropriately), [people license](https://github.com/openstates/people/blob/main/LICENSE), [congress roster dedication](https://github.com/unitedstates/congress-legislators#public-domain). CC0/public-domain roster data; no unrelated GitHub user data. |
@@ -225,6 +225,41 @@ accept that value while retaining the configured request interval. Access denial
 exhausted limits, error/redirect responses with Retry-After, and nonzero or malformed
 values still stop collection. Policy fingerprints and source permissions are unchanged.
 The nightly runner must produce a fresh successful report before collection resumes.
+
+## Executive orders (2026-10-11)
+
+`fetch_executive_orders` reads the Legislature's
+[executive order archive](https://docs.legis.wisconsin.gov/code/executive_orders).
+The records menu's `/document/executiveorders/top` entry redirects there. The
+index links one folder per governor (`/code/executive_orders/2019_tony_evers`,
+labelled "2019- Tony Evers"); each folder lists its orders as
+"2020 Executive Order 72", linking the official PDF at
+`/document/executiveorders/2020/72.pdf` (a few older orders carry a letter:
+"1969 Executive Order 12A", `12a.pdf`). The listing states no title or date,
+so none is recorded or shown. The index and the folder pages are the only GET
+shapes added to the docs.legis scope; the folder pattern cannot reach anything
+below a folder. Order PDFs are linked, never downloaded: `/document/executiveorders/YYYY/N`
+redirects to `/code/executive_orders/{folder}/YYYY-N`, which serves the PDF
+itself, and both stay outside the manifest. A former governor's folder is fetched
+once; the index and the sitting governor's folder refresh each run (two
+requests at the existing one-second floor). Raw pages and the parsed listing
+stay in the private subjects bundle.
+
+On 2026-10-11 the [docs robots file](https://docs.legis.wisconsin.gov/robots.txt)
+was read with the pipeline User-Agent: HTTP 200, `text/plain`, one `User-agent: *`
+group, no crawl delay. It disallows `/frame`, `/frame/`, `/scroll/`, `/feed/`,
+`/doc/feed/`, `/breadcrumbs/`, `/preferences`, `/preferences/`, `/search` and one
+LRB report PDF. Nothing under `/code/` or `/document/executiveorders/`, so the
+archive is allowed; its feed (`/feed/code/executive_orders`) and tree view
+(`/frame/...`) are disallowed and not used. The live file matches the reviewed
+fingerprint in `source_policies.json`, and the policy gate approved the host.
+
+The first live run read the index and all ten folders (11 requests): 1,874
+orders, Warren P. Knowles (1965) through Tony Evers. Numbering is each
+governor's own and some restart by year; Scott McCallum's first order continues
+Tommy Thompson's series as 2001 No. 418 before his own restarts at 1, and the
+archive files it in McCallum's folder as listed. The parser tests use reduced
+real captures in `tests/fixtures/executive_orders/`.
 
 ## Nightly finance windowing (2026-09-07)
 

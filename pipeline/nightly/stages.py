@@ -55,7 +55,8 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
                            "--as-of", context["finance_as_of"]]],
         "finance-committees": [["nightly.finance"]],
         # Bind retained profiles to archived members before refreshing office records.
-        "community": [["scraper.fetch_subjects"], ["scraper.fetch_contacts", "--refresh"],
+        "community": [["scraper.fetch_subjects"], ["scraper.fetch_executive_orders"],
+                      ["scraper.fetch_contacts", "--refresh"],
                       ["scraper.fetch_local_profiles"], ["scraper.fetch_local_votes"]],
         "federal": [["scraper.fetch_federal_votes"],
                     ["scraper.fetch_federal_finance", "--as-of", context["finance_as_of"]],
@@ -74,6 +75,8 @@ def commands(stage: str, root: Path, cycle: str, context: dict) -> list[list[str
                    ["importer.import_cf_committees", "_data/cfis", db],
                    ["importer.import_lobbying", "_data/lobbying", db],
                    ["importer.import_subjects", "_data/subjects", db],
+                   # archived inside the subjects bundle (scraper.fetch_executive_orders)
+                   ["importer.import_executive_orders", "_data/subjects/executive_orders", db],
                    ["importer.import_wiseye", "_data/wiseye/videos.json", db],
                    ["importer.import_contacts", "_data/contacts/contacts.json", db],
                    ["importer.import_federal", "_data/federal", db],

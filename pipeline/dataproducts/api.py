@@ -178,6 +178,9 @@ def build_api(
             )
             files += 1
 
+    write_json(api / "executive-orders.json", queries.executive_orders(conn))
+    files += 1
+
     write_json(
         api / "elections" / "statewide.json",
         {

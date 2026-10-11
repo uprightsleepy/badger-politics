@@ -1,0 +1,63 @@
+---
+/** Every Wisconsin governor's executive orders, as the Legislature's
+ * archive lists them: by number only, with no title or date. Links only:
+ * each order opens as its official PDF on docs.legis. */
+import Base from "../../layouts/Base.astro";
+import { executiveOrders, meta } from "../../lib/db";
+import { fmtDate } from "../../lib/format";
+
+const governors = executiveOrders();
+const total = governors.reduce((n, g) => n + g.years.reduce((m, y) => m + y.orders.length, 0), 0);
+const pulledOn = meta().imported_at?.slice(0, 10);
+const ARCHIVE = "https://docs.legis.wisconsin.gov/code/executive_orders";
+const count = (n: number) => `${n.toLocaleString()} ${n === 1 ? "order" : "orders"}`;
+---
+
+<Base
+  title="Governors' executive orders"
+  description="Every Wisconsin governor's executive orders, by governor and year, each linked to the official copy in the Legislature's archive."
+  layout="wide"
+  breadcrumbs={[{ name: "Governor's decisions", url: "/governors-desk/" }]}
+>
+  <header class="flex max-w-[47.5rem] flex-col gap-2.5">
+    <h1 class="t-display">Governors' executive orders</h1>
+    <p class="sm:text-lead">
+      An executive order is a governor's own directive to state agencies: declaring an emergency,
+      creating a task force, or ordering flags to half-staff. The Legislature doesn't vote on them.
+    </p>
+    <p class="text-small text-granite">
+      {total > 0 ? `${count(total)} from ${governors.length} ${governors.length === 1 ? "governor" : "governors"}, newest first.` : "No orders are on record yet."}
+      {" "}The archive lists each order by number only; each opens as a PDF on the Legislature's site.
+    </p>
+  </header>
+
+  {governors.map((g, i) => (
+    <section class="mt-10 max-w-[60rem]" aria-labelledby={`gov-${g.folder}`}>
+      <details open={i === 0}>
+        <summary class="cursor-pointer py-2">
+          <h2 id={`gov-${g.folder}`} class="t-section inline">{g.governor}</h2>
+          <span class="text-small text-granite">
+            {" "}· {count(g.years.reduce((n, y) => n + y.orders.length, 0))}, {g.years.at(-1)!.year}{g.years.length > 1 && `–${g.years[0].year}`}
+          </span>
+        </summary>
+        {g.years.map((y) => (
+          <div class="mt-4">
+            <h3 class="t-label text-spruce">{y.year}</h3>
+            <ul class="mt-1 flex flex-wrap gap-x-4">
+              {y.orders.map((o) => (
+                <li>
+                  <a href={o.url} class="inline-flex min-h-11 min-w-11 items-center underline"
+                    aria-label={`Executive Order ${o.number}${o.suffix} of ${y.year} (PDF)`}>{o.number}{o.suffix}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </details>
+    </section>
+  ))}
+
+  <p class="mt-12 max-w-[47.5rem] text-fine text-granite">
+    From the Legislature's <a href={ARCHIVE} class="underline">executive order archive</a>{pulledOn && `. Checked ${fmtDate(pulledOn)}`}.
+  </p>
+</Base>
