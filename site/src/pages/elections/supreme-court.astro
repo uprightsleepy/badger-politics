@@ -4,7 +4,7 @@
  * Commission's certified canvasses, each linked to its official file. */
 import Base from "../../layouts/Base.astro";
 import ElectionResult from "../../components/ElectionResult.astro";
-import { judicialRaces, meta } from "../../lib/db";
+import { judicialRaces, meta, referendumResults } from "../../lib/db";
 import { fmtDate } from "../../lib/format";
 import { safeHref } from "../../lib/html";
 
@@ -82,6 +82,8 @@ const raceTitle = (r: (typeof races)[number]) =>
     Results from the
     {" "}<a href="https://elections.wi.gov/elections/election-results" class="underline">Wisconsin Elections Commission</a>,
     summed from its ward-by-ward canvass and checked against its certified totals{pulledOn && `; checked ${fmtDate(pulledOn)}`}.
-    Statewide referendum results are with the <a href="/elections/2026/amendments/#past-questions" class="underline">constitutional amendments</a>.
+    {referendumResults().length > 0 && <>
+      {" "}Statewide referendum results are with the <a href="/elections/2026/amendments/#past-questions" class="underline">constitutional amendments</a>.
+    </>}
   </p>
 </Base>
