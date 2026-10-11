@@ -28,12 +28,21 @@
         ]
       },
       {
-        "comment": "Pagefind ships hashed index shards alongside its entry script.",
-        "source": "/pagefind/**",
+        "comment": "Pagefind's shards and metadata are content-hashed. Its fixed-name files (pagefind.js, pagefind-entry.json, wasm, UI) point at those hashes and keep the revalidating default, or search 404s after a release.",
+        "source": "/pagefind/@(fragment|index|filter)/**",
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "public, max-age=3600"
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      },
+      {
+        "source": "/pagefind/pagefind.*.pf_meta",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
           }
         ]
       },
