@@ -83,8 +83,12 @@ def sponsors_for(conn: sqlite3.Connection, bill_id: str) -> list[dict]:
 
 
 def vote_events(conn: sqlite3.Connection) -> list[dict]:
-    query = f"SELECT * FROM vote_events WHERE {EXPORTABLE}"
-    return _rows(conn, query + " ORDER BY date, id")
+    # an openstates roll call on a legiscan bill is withheld with its bill
+    query = (
+        "SELECT e.* FROM vote_events e JOIN bills b ON b.id = e.bill_id"
+        f" WHERE {exportable('e.')} AND {exportable('b.')}"
+    )
+    return _rows(conn, query + " ORDER BY e.date, e.id")
 
 
 def vote_records_for(conn: sqlite3.Connection, vote_event_id: str) -> list[dict]:
@@ -184,7 +188,7 @@ def votes_by_person(
                    e.bill_id, b.identifier, b.title
             FROM vote_records r
             JOIN vote_events e ON e.id = r.vote_event_id AND {exportable("e.")}
-            JOIN bills b ON b.id = e.bill_id
+            JOIN bills b ON b.id = e.bill_id AND {exportable("b.")}
             WHERE r.person_id = ? ORDER BY e.date DESC, e.id{tail}""",
         params,
     )

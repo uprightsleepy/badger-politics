@@ -29,15 +29,24 @@ CSV_TABLES = {
     ),
     "vote_events": (
         "SELECT e.* FROM vote_events e JOIN bills b ON b.id = e.bill_id"
-        f" WHERE {queries.exportable('e.')} AND b.session_id = ?"
+        f" WHERE {queries.exportable('e.')} AND {queries.exportable('b.')}"
+        " AND b.session_id = ?"
     ),
     "vote_records": (
         "SELECT r.* FROM vote_records r"
         " JOIN vote_events e ON e.id = r.vote_event_id"
         " JOIN bills b ON b.id = e.bill_id"
-        f" WHERE {queries.exportable('e.')} AND b.session_id = ?"
+        f" WHERE {queries.exportable('e.')} AND {queries.exportable('b.')}"
+        " AND b.session_id = ?"
     ),
 }
+
+
+# every table that references bills or vote_events
+BILL_CHILDREN = (
+    "actions", "sponsorships", "bill_subjects", "bill_documents", "bill_companions",
+    "ballot_measures", "vote_events", "vote_records", "lobbying_interests",
+)
 
 
 def _dump_csv(cursor: sqlite3.Cursor, path: Path) -> None:
@@ -70,18 +79,23 @@ def export_sqlite(db_path: Path, exports_dir: Path) -> Path:
         # Eye on Lobbying disallows collection. Retain its archive privately,
         # but do not publish even previously collected registrations.
         conn.execute("DELETE FROM lobbying_interests")
-        conn.execute(
-            "DELETE FROM vote_records WHERE vote_event_id IN"
-            " (SELECT id FROM vote_events WHERE source = 'legiscan')"
+        legiscan_bills = "(SELECT id FROM bills WHERE source = 'legiscan')"
+        # an openstates roll call on a legiscan bill goes with its bill
+        withheld_events = (
+            "(SELECT id FROM vote_events WHERE source = 'legiscan'"
+            f" OR bill_id IN {legiscan_bills})"
         )
-        conn.execute("DELETE FROM vote_events WHERE source = 'legiscan'")
+        conn.execute(f"DELETE FROM vote_records WHERE vote_event_id IN {withheld_events}")
+        conn.execute(f"DELETE FROM vote_events WHERE id IN {withheld_events}")
+        for table in ("actions", "sponsorships", "bill_subjects", "bill_documents"):
+            conn.execute(f"DELETE FROM {table} WHERE bill_id IN {legiscan_bills}")  # noqa: S608
         conn.execute(
-            "DELETE FROM actions WHERE bill_id IN"
-            " (SELECT id FROM bills WHERE source = 'legiscan')"
+            f"DELETE FROM bill_companions WHERE bill_id IN {legiscan_bills}"
+            f" OR companion_bill_id IN {legiscan_bills}"
         )
         conn.execute(
-            "DELETE FROM sponsorships WHERE bill_id IN"
-            " (SELECT id FROM bills WHERE source = 'legiscan')"
+            f"DELETE FROM ballot_measures WHERE bill_id IN {legiscan_bills}"
+            f" OR first_bill_id IN {legiscan_bills}"
         )
         conn.execute("DELETE FROM bills WHERE source = 'legiscan'")
         conn.execute("DELETE FROM elections WHERE source = 'legiscan'")
@@ -92,9 +106,18 @@ def export_sqlite(db_path: Path, exports_dir: Path) -> Path:
         " + (SELECT COUNT(*) FROM elections WHERE source='legiscan')"
         " + (SELECT COUNT(*) FROM lobbying_interests)"
     ).fetchone()[0]
+    # scoped to what the deletes above touch, so an unrelated pre-existing
+    # orphan elsewhere can't fail the export
+    orphans = [
+        row
+        for table in BILL_CHILDREN
+        for row in conn.execute(f"PRAGMA foreign_key_check({table})")
+    ]
     conn.close()
     if remaining:
         raise RuntimeError(f"provenance filter failed: {remaining} withheld rows remain")
+    if orphans:
+        raise RuntimeError(f"provenance filter left rows pointing at withheld ones: {orphans[:5]}")
     return snapshot
 
 

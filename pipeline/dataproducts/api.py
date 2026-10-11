@@ -112,9 +112,10 @@ def build_api(conn: sqlite3.Connection, out: Path) -> int:
         session_actions = queries.actions_for_session(conn, session_id)
         companions: dict[str, list[dict]] = {}
         for row in conn.execute(
-            """SELECT bc.bill_id, b.identifier, b.status FROM bill_companions bc
+            f"""SELECT bc.bill_id, b.identifier, b.status FROM bill_companions bc
                JOIN bills b ON b.id = bc.companion_bill_id
-               WHERE b.session_id = ? ORDER BY b.identifier""",
+               WHERE b.session_id = ? AND {queries.exportable("b.")}
+               ORDER BY b.identifier""",
             (session_id,),
         ):
             companions.setdefault(row[0], []).append({"identifier": row[1], "status": row[2]})

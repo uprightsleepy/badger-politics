@@ -48,6 +48,18 @@ def db_path(tmp_path: Path, make_db) -> Path:
           VALUES ('2025-v1', 'ocd-person/p1', 'yes');
         INSERT INTO vote_records (vote_event_id, person_id, option)
           VALUES ('2025-v9', 'ocd-person/p1', 'yes');
+        INSERT INTO bill_companions (bill_id, companion_bill_id, source_url)
+          VALUES ('2025-ab656', '2025-ab9999', 'https://example.gov/ab656'),
+                 ('2025-ab9999', '2025-ab656', 'https://example.gov/ab9999');
+        INSERT INTO bill_subjects (bill_id, subject) VALUES ('2025-ab9999', 'LEGISCAN SUBJECT');
+        INSERT INTO bill_documents (bill_id, note, url)
+          VALUES ('2025-ab9999', 'LEGISCAN FISCAL ESTIMATE', 'https://example.gov/fe');
+        -- an openstates roll call on the legiscan bill is withheld with it
+        INSERT INTO vote_events (id, bill_id, date, chamber, motion, result, source)
+          VALUES ('2025-v8', '2025-ab9999', '2025-06-02', 'lower', 'Concurrence',
+                  'pass', 'openstates');
+        INSERT INTO vote_records (vote_event_id, person_id, option)
+          VALUES ('2025-v8', 'ocd-person/p1', 'no');
         INSERT INTO committees (id, chamber, name, chair_person_id)
           VALUES ('c1', 'lower', 'Children and Families', 'ocd-person/p1');
         INSERT INTO hearings (id, committee_id, date, time, location,
@@ -126,11 +138,13 @@ def test_no_legiscan_anywhere(built: Path) -> None:
     hits = []
     for path in built.rglob("*"):
         if path.is_file() and path.suffix in (".json", ".xml", ".ics", ".csv"):
-            if "LEGISCAN" in path.read_text(encoding="utf-8", errors="replace").upper():
+            text = path.read_text(encoding="utf-8", errors="replace").upper()
+            if any(m in text for m in ("LEGISCAN", "AB 9999", "AB9999", "2025-V8")):
                 hits.append(str(path))
     assert hits == [], f"legiscan content escaped into: {hits}"
     assert not (built / "public" / "api" / "v1" / "bills" / "2025" / "ab9999.json").exists()
     assert not (built / "public" / "api" / "v1" / "votes" / "2025-v9.json").exists()
+    assert not (built / "public" / "api" / "v1" / "votes" / "2025-v8.json").exists()
 
 
 def test_filtered_sqlite_has_no_legiscan_rows(built: Path) -> None:
@@ -140,8 +154,16 @@ def test_filtered_sqlite_has_no_legiscan_rows(built: Path) -> None:
             f"SELECT COUNT(*) FROM {table} WHERE source = 'legiscan'"  # noqa: S608
         ).fetchone()[0]
         assert count == 0, table
-    # the exportable bill is still there
+    # the exportable bill is still there, and nothing points at the withheld one
     assert conn.execute("SELECT COUNT(*) FROM bills").fetchone()[0] == 1
+    assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+    for table in ("bill_companions", "bill_subjects", "bill_documents", "vote_events"):
+        assert conn.execute(
+            f"SELECT COUNT(*) FROM {table} WHERE bill_id = '2025-ab9999'"  # noqa: S608
+        ).fetchone()[0] == 0, table
+    assert conn.execute(
+        "SELECT COUNT(*) FROM vote_records WHERE vote_event_id = '2025-v8'"
+    ).fetchone()[0] == 0
     conn.close()
 
 
