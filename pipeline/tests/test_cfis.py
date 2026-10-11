@@ -88,6 +88,22 @@ def test_import_rejects_unknown_person(tmp_path: Path, make_db) -> None:
         import_run(archive, db)
 
 
+def test_import_rejects_a_receipt_without_an_amount(tmp_path: Path, make_db) -> None:
+    db = tmp_path / "wi.sqlite"
+    conn = make_db(db)
+    conn.execute("INSERT INTO people (id, name) VALUES ('p1', 'A')")
+    conn.commit()
+    conn.close()
+    archive = tmp_path / "cfis"
+    archive.mkdir()
+    row = {"id": 1, "person_id": "p1", "committee_entity_id": 9, "date": "2026-01-05",
+           "amount": None, "from_name": "Jane Donor", "from_type": "Individual",
+           "occupation": "Teacher", "category": "Monetary"}
+    (archive / "tx-2026-01.json").write_text(json.dumps([row]), encoding="utf-8")
+    with pytest.raises(ValueError, match="no amount"):
+        import_run(archive, db)
+
+
 def test_month_windows_run_to_each_month_last_instant() -> None:
     from scraper.cfis_api import month_windows
 
