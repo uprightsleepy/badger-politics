@@ -2,6 +2,7 @@
  * covered city (Milwaukee, West Allis). Device-only, same as the state
  * districts; this module owns the key. */
 import { cityDistrictAt } from "./lookup.ts";
+import { store } from "./store.ts";
 
 export type CityDistrict = { t: string; d: number };
 
@@ -9,7 +10,7 @@ const KEY = "bp-city-district";
 
 export const savedCityDistrict = (): CityDistrict | null => {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = store.get(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     const d = Number(parsed?.d);
@@ -18,17 +19,17 @@ export const savedCityDistrict = (): CityDistrict | null => {
     }
     return { t: parsed.t, d };
   } catch {
-    localStorage.removeItem(KEY);
+    store.remove(KEY);
     return null;
   }
 };
 
 export const saveCityDistrict = (c: CityDistrict): void => {
-  localStorage.setItem(KEY, JSON.stringify(c));
+  store.set(KEY, JSON.stringify(c));
 };
 
 export const forgetCityDistrict = (): void => {
-  localStorage.removeItem(KEY);
+  store.remove(KEY);
 };
 
 export const resolveCity = async (lng: number, lat: number): Promise<void> => {

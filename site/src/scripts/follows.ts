@@ -3,6 +3,7 @@
  *
  * Six kinds share one store. Older stores migrate silently: any missing
  * list is simply empty. */
+import { store } from "../lib/store.ts";
 import { wisconsinToday } from "../lib/today.ts";
 
 export interface Follows {
@@ -23,9 +24,9 @@ const SEEN_KEY = "bp-follows-seen";
 export function getFollows(): Follows {
   let raw: unknown = null;
   try {
-    raw = JSON.parse(localStorage.getItem(KEY) ?? "null");
+    raw = JSON.parse(store.get(KEY) ?? "null");
   } catch {
-    localStorage.removeItem(KEY);
+    store.remove(KEY);
   }
   const out = {} as Follows;
   for (const kind of FOLLOW_KINDS) {
@@ -45,17 +46,17 @@ export function toggleFollow(kind: keyof Follows, id: string): boolean {
   const at = list.indexOf(id);
   if (at >= 0) list.splice(at, 1);
   else list.push(id);
-  localStorage.setItem(KEY, JSON.stringify(follows));
+  store.set(KEY, JSON.stringify(follows));
   return at < 0;
 }
 
 /** Wisconsin date of the previous visit to /following/, updated on view. */
 export function lastSeen(): string | null {
-  return localStorage.getItem(SEEN_KEY);
+  return store.get(SEEN_KEY);
 }
 
 export function markSeen(now = new Date()): void {
-  localStorage.setItem(SEEN_KEY, wisconsinToday(now));
+  store.set(SEEN_KEY, wisconsinToday(now));
 }
 
 /** Whether a record dated `date` is news to someone last here on `seen`.
