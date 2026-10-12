@@ -34,7 +34,7 @@
 <!-- fence -->
 <g stroke-width="3">
 <path d="M212 150 H266 M212 162 H266" stroke-width="3"/>
-<path d="M216 174 V144 L220 138 L224 144 V174 Z" fill="#F6EADB"/>
+<path d="M218 174 V144 L222 138 L226 144 V174 Z" fill="#F6EADB"/>
 <path d="M230 174 V144 L234 138 L238 144 V174 Z" fill="#F6EADB"/>
 <path d="M242 174 V144 L246 138 L250 144 V174 Z" fill="#F6EADB"/>
 <path d="M254 174 V144 L258 138 L262 144 V174 Z" fill="#F6EADB"/>
