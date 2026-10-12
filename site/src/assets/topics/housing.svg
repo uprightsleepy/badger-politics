@@ -7,13 +7,14 @@
 <g fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
 <ellipse cx="160" cy="178" rx="124" ry="7" fill="#2E2A26" opacity=".14" stroke="none"/>
 <!-- tree -->
-<rect x="54" y="126" width="12" height="46" rx="2" fill="#8C5A3C"/>
+<ellipse cx="60" cy="174" rx="24" ry="3.5" fill="#2E2A26" opacity=".12" stroke="none"/>
+<rect x="54" y="126" width="12" height="48" rx="2" fill="#8C5A3C"/>
 <path d="M60 66 C78 66 90 78 90 92 C101 96 103 116 90 124 C84 136 36 136 30 124 C17 116 19 96 30 92 C30 78 42 66 60 66 Z" fill="#6FA36B"/>
 <path d="M76 84 C92 92 96 112 86 124 C78 130 62 130 52 126 C72 122 84 108 76 84 Z" fill="#4C8550" stroke="none"/>
 <ellipse cx="46" cy="86" rx="9" ry="6" fill="#FFFFFF" opacity=".3" stroke="none" transform="rotate(-30 46 86)"/>
 <!-- chimney sits behind the roof -->
-<rect x="184" y="58" width="16" height="44" fill="#B9694A"/>
-<rect x="180" y="54" width="24" height="9" rx="1.5" fill="#9A5538"/>
+<rect x="184" y="56" width="16" height="28" fill="#B9694A"/>
+<rect x="180" y="52" width="24" height="9" rx="1.5" fill="#9A5538"/>
 <!-- walls -->
 <rect x="108" y="104" width="104" height="70" fill="#F6EADB"/>
 <rect x="108" y="104" width="104" height="10" fill="#2E2A26" opacity=".1" stroke="none"/>
@@ -29,10 +30,10 @@
 </g>
 <path d="M148 174 V140 a12 12 0 0 1 24 0 V174 Z" fill="url(#bp-housing-door)"/>
 <circle cx="166" cy="156" r="2.5" fill="#F6D97E" stroke="none"/>
-<path d="M96 174 H224"/>
+<path d="M40 174 H270"/>
 <!-- fence -->
 <g stroke-width="3">
-<path d="M228 150 H266 M228 162 H266" stroke-width="3"/>
+<path d="M212 150 H266 M212 162 H266" stroke-width="3"/>
 <path d="M230 174 V144 L234 138 L238 144 V174 Z" fill="#F6EADB"/>
 <path d="M242 174 V144 L246 138 L250 144 V174 Z" fill="#F6EADB"/>
 <path d="M254 174 V144 L258 138 L262 144 V174 Z" fill="#F6EADB"/>

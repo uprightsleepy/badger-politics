@@ -4,16 +4,6 @@
 </defs>
 <g fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
 <ellipse cx="170" cy="178" rx="118" ry="7" fill="#2E2A26" opacity=".14" stroke="none"/>
-<!-- pencil lying beside the stack -->
-<g transform="translate(262 168) rotate(-9)">
-<rect x="-68" y="-7" width="92" height="14" rx="1" fill="#F2C35C"/>
-<rect x="-68" y="-7" width="92" height="4.5" fill="#FFFFFF" opacity=".35" stroke="none"/>
-<rect x="-68" y="2.5" width="92" height="4.5" fill="#2E2A26" opacity=".12" stroke="none"/>
-<rect x="-56" y="-7" width="10" height="14" fill="#C9CED3"/>
-<path d="M-56 -7 H-66 a7 7 0 0 0 0 14 H-56 Z" fill="#E59A8B"/>
-<path d="M24 -7 L46 0 L24 7 Z" fill="#F4E3C4"/>
-<path d="M40 -2.2 L46 0 L40 2.2 Z" fill="#2E2A26" stroke-width="2"/>
-</g>
 <!-- three books seen from the side: spines facing out, page edges on the right -->
 <g>
 <rect x="70" y="154" width="142" height="20" rx="3" fill="#4E8C8A"/>
@@ -47,5 +37,15 @@
 <path d="M150 80 C150 72 152 66 156 60" stroke-width="3.5"/>
 <path d="M152 70 C158 60 170 58 176 62 C170 70 160 74 152 70 Z" fill="#6FA36B"/>
 <path d="M155 69 C161 66 168 64 173 63" stroke-width="2"/>
+<!-- pencil lying in front of the stack -->
+<g transform="translate(262 168) rotate(-9)">
+<rect x="-68" y="-7" width="92" height="14" rx="1" fill="#F2C35C"/>
+<rect x="-68" y="-7" width="92" height="4.5" fill="#FFFFFF" opacity=".35" stroke="none"/>
+<rect x="-68" y="2.5" width="92" height="4.5" fill="#2E2A26" opacity=".12" stroke="none"/>
+<rect x="-56" y="-7" width="10" height="14" fill="#C9CED3"/>
+<path d="M-56 -7 H-66 a7 7 0 0 0 0 14 H-56 Z" fill="#E59A8B"/>
+<path d="M24 -7 L46 0 L24 7 Z" fill="#F4E3C4"/>
+<path d="M40 -2.2 L46 0 L40 2.2 Z" fill="#2E2A26" stroke-width="2"/>
+</g>
 </g>
 </svg>

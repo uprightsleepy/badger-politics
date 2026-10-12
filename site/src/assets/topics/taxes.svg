@@ -20,15 +20,13 @@
 <path d="M116 102 C110 118 110 150 116 170" stroke="#FFFFFF" stroke-width="6" opacity=".85"/>
 <path d="M205 100 C210 116 210 152 204 172" stroke="#2E2A26" stroke-width="9" opacity=".07"/>
 <path d="M118 84 C106 94 102 110 102 126 L102 164 C102 176 112 184 124 184 L196 184 C208 184 218 176 218 164 L218 126 C218 110 214 94 202 84"/>
-<!-- lid with a coin slot -->
+<!-- a coin half-way into the slot: drawn first, so the lid hides its lower edge -->
+<circle cx="160" cy="50" r="18" fill="url(#bp-taxes-coin)" stroke-width="3"/>
+<circle cx="160" cy="50" r="10" stroke-width="2.5"/>
+<!-- lid with the slot -->
 <rect x="110" y="62" width="100" height="24" rx="8" fill="url(#bp-taxes-lid)"/>
 <rect x="114" y="65" width="92" height="5" rx="2.5" fill="#FFFFFF" opacity=".3" stroke="none"/>
 <rect x="110" y="78" width="100" height="5" fill="#2E2A26" opacity=".12" stroke="none"/>
-<rect x="142" y="70" width="36" height="6" rx="3" fill="#2E2A26" stroke="none"/>
-<!-- a coin on its way in -->
-<circle cx="160" cy="30" r="18" fill="url(#bp-taxes-coin)"/>
-<circle cx="160" cy="30" r="11" stroke-width="2.5"/>
-<path d="M160 22.5 V37.5 M164.5 26 C163 23.5 157 23.5 156 26 C155 29.5 165 29 164.5 33 C164 36 156.5 36.5 155 34" stroke-width="2.5"/>
-<path d="M153 50 L150 56 M167 50 L170 56" stroke-width="3"/>
+<rect x="140" y="63" width="40" height="7" rx="3.5" fill="#2E2A26" stroke="none"/>
 </g>
 </svg>
