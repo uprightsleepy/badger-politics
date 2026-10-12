@@ -1,46 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
 <defs>
 <linearGradient id="bp-water-sun" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FCE89A"/><stop offset="1" stop-color="#EDB93F"/></linearGradient>
-<linearGradient id="bp-water-lake" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#94C9E2"/><stop offset="1" stop-color="#5B9CC0"/></linearGradient>
 </defs>
 <g fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-<!-- sun -->
-<circle cx="258" cy="48" r="30" fill="#FFFFFF" opacity=".22" stroke="none"/>
-<path d="M258 15 V21 M281.3 24.7 L277.1 28.9 M291 48 H285 M281.3 71.3 L277.1 67.1 M258 81 V75 M234.7 71.3 L238.9 67.1 M225 48 H231 M234.7 24.7 L238.9 28.9" stroke-width="3.5"/>
-<circle cx="258" cy="48" r="17" fill="url(#bp-water-sun)"/>
-<!-- hills, far to near -->
-<path d="M-10 112 C40 86 110 86 160 104 C210 122 260 92 330 100 L330 210 L-10 210 Z" fill="#C6E0C4"/>
-<path d="M150 142 C200 122 260 120 330 132 L330 210 L150 210 Z" fill="#8FBE8A"/>
-<!-- barn on the right hill -->
-<path d="M258 118 L266 102 L282 94 L298 102 L306 118 Z" fill="#B9694A"/>
-<path d="M282 94 L298 102 L306 118 L282 118 Z" fill="#9A5538" stroke="none"/>
-<rect x="262" y="118" width="40" height="26" fill="#F5EDE0"/>
-<rect x="290" y="118" width="12" height="26" fill="#2E2A26" opacity=".07" stroke="none"/>
-<path d="M258 118 L266 102 L282 94 L298 102 L306 118 Z M262 118 H302 V144 H262 Z"/>
-<rect x="276" y="126" width="12" height="18" fill="#A9603F" stroke-width="2.5"/><path d="M276 126 L288 144 M288 126 L276 144" stroke-width="2"/>
-<path d="M-10 140 C40 120 100 122 150 142 L150 210 L-10 210 Z" fill="#8FBE8A"/>
-<!-- pines on the left hill, each tier lit from the left -->
-<g>
-<rect x="48" y="138" width="8" height="12" fill="#8C5A3C" stroke-width="3"/>
-<path d="M52 98 L84 140 L20 140 Z" fill="#3F7A4B"/><path d="M52 98 L84 140 L52 140 Z" fill="#2F5F3A" stroke="none"/>
-<path d="M52 84 L78 122 L26 122 Z" fill="#3F7A4B"/><path d="M52 84 L78 122 L52 122 Z" fill="#2F5F3A" stroke="none"/>
-<path d="M52 72 L72 104 L32 104 Z" fill="#3F7A4B"/><path d="M52 72 L72 104 L52 104 Z" fill="#2F5F3A" stroke="none"/>
-<path d="M52 98 L84 140 L20 140 Z M52 84 L78 122 L26 122 Z M52 72 L72 104 L32 104 Z" stroke-linejoin="round"/>
-</g>
-<g transform="translate(100 150) scale(.68) translate(-52 -150)">
-<rect x="48" y="138" width="8" height="12" fill="#8C5A3C" stroke-width="4"/>
-<path d="M52 98 L84 140 L20 140 Z" fill="#3F7A4B"/><path d="M52 98 L84 140 L52 140 Z" fill="#2F5F3A" stroke="none"/>
-<path d="M52 84 L78 122 L26 122 Z" fill="#3F7A4B"/><path d="M52 84 L78 122 L52 122 Z" fill="#2F5F3A" stroke="none"/>
-<path d="M52 72 L72 104 L32 104 Z" fill="#3F7A4B"/><path d="M52 72 L72 104 L52 104 Z" fill="#2F5F3A" stroke="none"/>
-<path d="M52 98 L84 140 L20 140 Z M52 84 L78 122 L26 122 Z M52 72 L72 104 L32 104 Z" stroke-width="5"/>
-</g>
-<!-- lake -->
-<path d="M96 148 C130 136 190 134 236 142 C262 146 274 158 266 170 C256 182 200 186 160 184 C120 182 84 176 86 162 C86 156 90 150 96 148 Z" fill="url(#bp-water-lake)"/>
-<ellipse cx="124" cy="150" rx="20" ry="5" fill="#FFFFFF" opacity=".3" stroke="none" transform="rotate(-8 124 150)"/>
-<path d="M130 160 q8 -4 16 0 M184 168 q8 -4 16 0 M218 156 q6 -3 12 0" stroke="#FFFFFF" stroke-width="3" opacity=".75"/>
-<!-- near bank -->
-<path d="M-10 186 C60 176 140 182 200 186 C250 190 300 184 330 180 L330 210 L-10 210 Z" fill="#6FA36B"/>
-<path d="M78 170 V154 M84 168 V158 M250 172 V160" stroke="#3F7A4B" stroke-width="3"/>
-<ellipse cx="78" cy="152" rx="2.5" ry="5" fill="#8C5A3C" stroke="none"/><ellipse cx="250" cy="158" rx="2.5" ry="5" fill="#8C5A3C" stroke="none"/>
+<circle cx="246" cy="46" r="26" fill="#FFFFFF" opacity=".22" stroke="none"/><circle cx="246" cy="46" r="14" fill="url(#bp-water-sun)"/><path d="M267.0 46.0 L275.0 46.0 M260.8 60.8 L266.5 66.5 M246.0 67.0 L246.0 75.0 M231.2 60.8 L225.5 66.5 M225.0 46.0 L217.0 46.0 M231.2 31.2 L225.5 25.5 M246.0 25.0 L246.0 17.0 M260.8 31.2 L266.5 25.5" stroke-width="3.5"/>
+<path d="M0 118 C50 92 110 92 168 114 C210 128 262 96 320 102 L330 102 L330 212 L-10 212 L-10 118 Z" fill="#CBE6DB"/>
+<path d="M42 98 V106" stroke-width="3.5"/><ellipse cx="42" cy="84" rx="10" ry="16" fill="#6E9F86"/><path d="M62 98 V104" stroke-width="3.5"/><ellipse cx="62" cy="88" rx="8" ry="12" fill="#6E9F86"/>
+<path d="M0 146 C50 134 104 136 150 148 L150 212 L-10 212 L-10 146 Z" fill="#8EC3AA"/><path d="M180 150 C228 136 278 138 320 132 L330 132 L330 212 L180 212 Z" fill="#8EC3AA"/>
+<path d="M168 116 C150 128 130 134 140 148 C150 162 100 176 70 200 L60 212 L234 212 L230 200 C236 182 222 162 196 150 C176 140 168 130 178 116 Z" fill="#E2F3F0"/>
+<path d="M106 190 q8 -5 16 0 M198 166 q7 -4 14 0" stroke="#FFFFFF" stroke-width="2.5"/>
+<path d="M24 162 l3 -6 l3 6 M108 156 l3 -6 l3 6 M266 156 l3 -6 l3 6" stroke-width="2.5"/>
 </g>
 </svg>
