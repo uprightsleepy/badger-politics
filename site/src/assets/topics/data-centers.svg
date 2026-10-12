@@ -1,13 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="Data Centers">
-<title>Data Centers</title>
-<defs><clipPath id="bp-tile-data-centers"><rect width="320" height="200" rx="16"/></clipPath></defs>
-<rect class="tile" width="320" height="200" rx="16" fill="#A7B7CE"/>
-<g clip-path="url(#bp-tile-data-centers)" fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-<rect x="64" y="26" width="56" height="150" rx="4" fill="#E3E9F2"/>
-<rect x="72" y="36" width="40" height="16" rx="2" fill="#F8FAFC"/><circle cx="79" cy="44" r="2" fill="#2E2A26" stroke="none"/><circle cx="85" cy="44" r="2" fill="#2E2A26" stroke="none"/><path d="M92 44 H105" stroke-width="2.5"/><rect x="72" y="58" width="40" height="16" rx="2" fill="#F8FAFC"/><circle cx="79" cy="66" r="2" fill="#2E2A26" stroke="none"/><circle cx="85" cy="66" r="2" fill="#2E2A26" stroke="none"/><path d="M92 66 H105" stroke-width="2.5"/><rect x="72" y="80" width="40" height="16" rx="2" fill="#F8FAFC"/><circle cx="79" cy="88" r="2" fill="#2E2A26" stroke="none"/><circle cx="85" cy="88" r="2" fill="#2E2A26" stroke="none"/><path d="M92 88 H105" stroke-width="2.5"/><rect x="72" y="102" width="40" height="16" rx="2" fill="#F8FAFC"/><circle cx="79" cy="110" r="2" fill="#2E2A26" stroke="none"/><circle cx="85" cy="110" r="2" fill="#2E2A26" stroke="none"/><path d="M92 110 H105" stroke-width="2.5"/><path transform="translate(92 148) scale(1.4)" d="M3 -14 L-7 2 L0 2 L-3 14 L8 -3 L1 -3 Z" fill="#F2C94C" stroke-width="2"/>
-<rect x="130" y="26" width="56" height="150" rx="4" fill="#E3E9F2"/>
-<rect x="138" y="36" width="40" height="16" rx="2" fill="#F8FAFC"/><circle cx="145" cy="44" r="2" fill="#2E2A26" stroke="none"/><circle cx="151" cy="44" r="2" fill="#2E2A26" stroke="none"/><path d="M158 44 H171" stroke-width="2.5"/><rect x="138" y="58" width="40" height="16" rx="2" fill="#F8FAFC"/><circle cx="145" cy="66" r="2" fill="#2E2A26" stroke="none"/><circle cx="151" cy="66" r="2" fill="#2E2A26" stroke="none"/><path d="M158 66 H171" stroke-width="2.5"/><rect x="138" y="80" width="40" height="16" rx="2" fill="#F8FAFC"/><circle cx="145" cy="88" r="2" fill="#2E2A26" stroke="none"/><circle cx="151" cy="88" r="2" fill="#2E2A26" stroke="none"/><path d="M158 88 H171" stroke-width="2.5"/><rect x="138" y="102" width="40" height="16" rx="2" fill="#F8FAFC"/><circle cx="145" cy="110" r="2" fill="#2E2A26" stroke="none"/><circle cx="151" cy="110" r="2" fill="#2E2A26" stroke="none"/><path d="M158 110 H171" stroke-width="2.5"/><path transform="translate(158 148) scale(1.4)" d="M3 -14 L-7 2 L0 2 L-3 14 L8 -3 L1 -3 Z" fill="#F2C94C" stroke-width="2"/>
-<path d="M230 22 L204 70 L220 70 L208 108 L244 54 L226 54 L240 22 Z"/>
-<path d="M186 166 C196 170 204 170 212 164"/><ellipse cx="238" cy="162" rx="26" ry="12"/><ellipse cx="238" cy="162" rx="18" ry="7"/><path d="M264 162 C266 150 266 142 264 134"/><rect x="256" y="112" width="16" height="22" rx="3" fill="#E3E9F2"/><path d="M260 112 V103 M268 112 V103"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+<defs>
+<linearGradient id="bp-dc-bolt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F8DB80"/><stop offset="1" stop-color="#E0AE3C"/></linearGradient>
+<linearGradient id="bp-dc-drop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8FC2E6"/><stop offset="1" stop-color="#4F8FC4"/></linearGradient>
+</defs>
+<g fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+<ellipse cx="146" cy="178" rx="104" ry="7" fill="#2E2A26" opacity=".14" stroke="none"/>
+<!-- two racks drawn as slabs: top face, side face, front face -->
+<g id="bp-dc-rack">
+<path d="M56 46 L70 34 L134 34 L120 46 Z" fill="#F7F9FC"/>
+<path d="M120 46 L134 34 L134 160 L120 172 Z" fill="#B7C3D5"/>
+<rect x="56" y="46" width="64" height="126" rx="2" fill="#E9EEF5"/>
+<g stroke-width="2.5">
+<rect x="64" y="56" width="48" height="18" rx="2" fill="#FFFFFF"/><circle cx="72" cy="65" r="2.5" fill="#5FBF6A" stroke="none"/><circle cx="80" cy="65" r="2.5" fill="#E8B84A" stroke="none"/><path d="M90 61 h14 M90 69 h14" stroke="#B7C3D5" stroke-width="2"/>
+<rect x="64" y="80" width="48" height="18" rx="2" fill="#FFFFFF"/><circle cx="72" cy="89" r="2.5" fill="#5FBF6A" stroke="none"/><circle cx="80" cy="89" r="2.5" fill="#5FBF6A" stroke="none"/><path d="M90 85 h14 M90 93 h14" stroke="#B7C3D5" stroke-width="2"/>
+<rect x="64" y="104" width="48" height="18" rx="2" fill="#FFFFFF"/><circle cx="72" cy="113" r="2.5" fill="#E8B84A" stroke="none"/><circle cx="80" cy="113" r="2.5" fill="#5FBF6A" stroke="none"/><path d="M90 109 h14 M90 117 h14" stroke="#B7C3D5" stroke-width="2"/>
+<rect x="64" y="128" width="48" height="18" rx="2" fill="#FFFFFF"/><circle cx="72" cy="137" r="2.5" fill="#5FBF6A" stroke="none"/><circle cx="80" cy="137" r="2.5" fill="#5FBF6A" stroke="none"/><path d="M90 133 h14 M90 141 h14" stroke="#B7C3D5" stroke-width="2"/>
+<circle cx="88" cy="160" r="8" fill="#D5DEE9"/><path d="M88 152 V168 M80 160 H96 M82.3 154.3 L93.7 165.7 M93.7 154.3 L82.3 165.7" stroke-width="1.5"/>
+</g>
+<rect x="56" y="46" width="64" height="5" fill="#FFFFFF" opacity=".5" stroke="none"/>
+</g>
+<use href="#bp-dc-rack" transform="translate(90 0)"/>
+<!-- power and water -->
+<path d="M268 36 L286 36 L270 76 L262 92 L240 92 Z" fill="url(#bp-dc-bolt)" stroke="none"/>
+<path d="M270 76 L292 76 L250 140 L262 92 Z" fill="#D6A032" stroke="none"/>
+<path d="M268 36 L240 92 L262 92 L250 140 L292 76 L270 76 L286 36 Z"/>
+<path d="M264 44 L248 78" stroke="#FFFFFF" stroke-width="3" opacity=".5"/>
+<path d="M276 130 C290 148 296 158 296 168 a20 20 0 0 1 -40 0 C256 158 262 148 276 130 Z" fill="url(#bp-dc-drop)"/>
+<path d="M266 160 C266 166 268 172 272 176" stroke="#FFFFFF" stroke-width="4" opacity=".75"/>
 </g>
 </svg>

@@ -1,12 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="Taxes">
-<title>Taxes</title>
-<defs><clipPath id="bp-tile-taxes"><rect width="320" height="200" rx="16"/></clipPath></defs>
-<rect class="tile" width="320" height="200" rx="16" fill="#E2BE6C"/>
-<g clip-path="url(#bp-tile-taxes)" fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-<ellipse cx="160" cy="184" rx="54" ry="5" fill="#C9A456" stroke="none"/>
-<circle cx="160" cy="52" r="22" fill="#F4D27A"/><circle cx="160" cy="52" r="15" stroke-width="3"/>
-<path d="M132 82 C112 90 106 104 106 124 L106 160 C106 172 116 180 128 180 L192 180 C204 180 214 172 214 160 L214 124 C214 104 208 90 188 82 Z" fill="#F8EDD3"/>
-<rect x="124" y="66" width="72" height="18" rx="5" fill="#FBF5E7"/>
-<path d="M122 110 C119 124 119 142 122 158" stroke="#FFFFFF" stroke-width="5"/><path d="M131 97 L136 94" stroke="#FFFFFF" stroke-width="4"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+<defs>
+<linearGradient id="bp-taxes-lid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E9BD5E"/><stop offset="1" stop-color="#C3923A"/></linearGradient>
+<linearGradient id="bp-taxes-coin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F8DB80"/><stop offset="1" stop-color="#D6A53A"/></linearGradient>
+<linearGradient id="bp-taxes-glass" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".5"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".12"/><stop offset="1" stop-color="#FFFFFF" stop-opacity=".4"/></linearGradient>
+</defs>
+<g fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+<ellipse cx="160" cy="186" rx="66" ry="6" fill="#2E2A26" opacity=".14" stroke="none"/>
+<!-- the glass, then the coins inside it -->
+<path d="M118 84 C106 94 102 110 102 126 L102 164 C102 176 112 184 124 184 L196 184 C208 184 218 176 218 164 L218 126 C218 110 214 94 202 84 Z" fill="url(#bp-taxes-glass)" stroke="none"/>
+<g stroke-width="3">
+<path d="M112 160 v9 a16 6 0 0 0 32 0 v-9" fill="#D6A53A"/><ellipse cx="128" cy="160" rx="16" ry="6" fill="url(#bp-taxes-coin)"/>
+<path d="M144 160 v9 a16 6 0 0 0 32 0 v-9" fill="#D6A53A"/><ellipse cx="160" cy="160" rx="16" ry="6" fill="url(#bp-taxes-coin)"/>
+<path d="M176 160 v9 a16 6 0 0 0 32 0 v-9" fill="#D6A53A"/><ellipse cx="192" cy="160" rx="16" ry="6" fill="url(#bp-taxes-coin)"/>
+<path d="M128 146 v9 a16 6 0 0 0 32 0 v-9" fill="#D6A53A"/><ellipse cx="144" cy="146" rx="16" ry="6" fill="url(#bp-taxes-coin)"/>
+<path d="M160 146 v9 a16 6 0 0 0 32 0 v-9" fill="#D6A53A"/><ellipse cx="176" cy="146" rx="16" ry="6" fill="url(#bp-taxes-coin)"/>
+<g transform="translate(160 128) rotate(-18)"><ellipse cx="0" cy="0" rx="17" ry="7" fill="url(#bp-taxes-coin)"/><ellipse cx="0" cy="0" rx="9" ry="3.5" stroke-width="2"/></g>
+</g>
+<!-- the jar's edge light and shade, then its outline -->
+<path d="M116 102 C110 118 110 150 116 170" stroke="#FFFFFF" stroke-width="6" opacity=".85"/>
+<path d="M205 100 C210 116 210 152 204 172" stroke="#2E2A26" stroke-width="9" opacity=".07"/>
+<path d="M118 84 C106 94 102 110 102 126 L102 164 C102 176 112 184 124 184 L196 184 C208 184 218 176 218 164 L218 126 C218 110 214 94 202 84"/>
+<!-- lid with a coin slot -->
+<rect x="110" y="62" width="100" height="24" rx="8" fill="url(#bp-taxes-lid)"/>
+<rect x="114" y="65" width="92" height="5" rx="2.5" fill="#FFFFFF" opacity=".3" stroke="none"/>
+<rect x="110" y="78" width="100" height="5" fill="#2E2A26" opacity=".12" stroke="none"/>
+<rect x="142" y="70" width="36" height="6" rx="3" fill="#2E2A26" stroke="none"/>
+<!-- a coin on its way in -->
+<circle cx="160" cy="30" r="18" fill="url(#bp-taxes-coin)"/>
+<circle cx="160" cy="30" r="11" stroke-width="2.5"/>
+<path d="M160 22.5 V37.5 M164.5 26 C163 23.5 157 23.5 156 26 C155 29.5 165 29 164.5 33 C164 36 156.5 36.5 155 34" stroke-width="2.5"/>
+<path d="M153 50 L150 56 M167 50 L170 56" stroke-width="3"/>
 </g>
 </svg>

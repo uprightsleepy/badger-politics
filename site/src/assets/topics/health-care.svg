@@ -1,11 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="Health Care">
-<title>Health Care</title>
-<defs><clipPath id="bp-tile-health-care"><rect width="320" height="200" rx="16"/></clipPath></defs>
-<rect class="tile" width="320" height="200" rx="16" fill="#C9B8E2"/>
-<g clip-path="url(#bp-tile-health-care)" fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-<path d="M160 128 C120 100 100 80 100 62 C100 44 114 34 130 34 C144 34 154 42 160 52 C166 42 176 34 190 34 C206 34 220 44 220 62 C220 80 200 100 160 128 Z" fill="#8C77B4"/>
-<path d="M152 56 h16 v14 h14 v16 h-14 v14 h-16 v-14 h-14 v-16 h14 Z" fill="#FFFFFF"/>
-<path d="M38 146 C52 146 62 144 72 140 C80 128 92 123 97 129 C100 135 93 142 87 148 L118 148 C130 148 138 144 145 137 C150 133 155 139 151 145 C142 158 122 167 100 169 L38 171 Z" fill="#F7F3EE"/><path d="M112 155 C124 154 133 150 140 144 M108 162 C120 161 130 157 137 152" stroke-width="2.5"/><path d="M14 141 H38 V175 H14" fill="#EDE6F5"/>
-<g transform="translate(320 0) scale(-1 1)"><path d="M38 146 C52 146 62 144 72 140 C80 128 92 123 97 129 C100 135 93 142 87 148 L118 148 C130 148 138 144 145 137 C150 133 155 139 151 145 C142 158 122 167 100 169 L38 171 Z" fill="#F7F3EE"/><path d="M112 155 C124 154 133 150 140 144 M108 162 C120 161 130 157 137 152" stroke-width="2.5"/><path d="M14 141 H38 V175 H14" fill="#EDE6F5"/></g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+<defs>
+<linearGradient id="bp-health-heart" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#A68FD1"/><stop offset="1" stop-color="#6A519F"/></linearGradient>
+<linearGradient id="bp-health-skin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FBF4EA"/><stop offset="1" stop-color="#EADFCF"/></linearGradient>
+</defs>
+<g fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+<!-- sparkles -->
+<path d="M100 36 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3 z" fill="#F5D277" stroke="none"/>
+<path d="M224 28 l2.5 6 6 2.5 -6 2.5 -2.5 6 -2.5 -6 -6 -2.5 6 -2.5 z" fill="#F5D277" stroke="none"/>
+<path d="M236 70 l2 4.5 4.5 2 -4.5 2 -2 4.5 -2 -4.5 -4.5 -2 4.5 -2 z" fill="#F5D277" stroke="none"/>
+<!-- heart with a cross -->
+<path d="M160 120 C130 100 112 84 112 64 C112 48 124 38 138 38 C148 38 156 44 160 52 C164 44 172 38 182 38 C196 38 208 48 208 64 C208 84 190 100 160 120 Z" fill="url(#bp-health-heart)"/>
+<ellipse cx="134" cy="54" rx="11" ry="6" fill="#FFFFFF" opacity=".45" stroke="none" transform="rotate(-30 134 54)"/>
+<path d="M152 58 h20 v14 h14 v20 h-14 v14 h-20 v-14 h-14 v-20 h14 Z" fill="#2E2A26" opacity=".15" stroke="none" transform="translate(3 3)"/>
+<path d="M152 58 h20 v14 h14 v20 h-14 v14 h-20 v-14 h-14 v-20 h14 Z" fill="#FFFFFF"/>
+<!-- two cupped hands; the right one is the left mirrored -->
+<g id="bp-health-hand" transform="translate(-16 0)">
+<rect x="16" y="134" width="36" height="48" rx="4" fill="#DCD2EC"/>
+<rect x="44" y="134" width="8" height="48" fill="#2E2A26" opacity=".1" stroke="none"/>
+<path d="M50 138 C66 134 84 132 100 132 C106 122 116 116 124 120 C132 124 130 132 120 132 C130 132 140 132 150 132 C162 126 170 134 160 142 C172 140 176 150 164 154 C174 154 176 164 162 166 C168 168 168 176 156 176 C120 180 84 180 50 178 Z" fill="url(#bp-health-skin)"/>
+<path d="M160 142 C152 144 146 146 140 146 M164 154 C154 156 148 156 142 156 M162 166 C154 168 148 168 142 166" stroke-width="2.5"/>
+<path d="M72 152 C84 160 100 166 118 166" stroke="#2E2A26" stroke-width="2.5" opacity=".25"/>
+<path d="M60 172 C100 176 130 174 150 170" stroke="#2E2A26" stroke-width="8" opacity=".07"/>
+<path d="M64 140 C82 136 98 136 112 137" stroke="#FFFFFF" stroke-width="3" opacity=".55"/>
+</g>
+<use href="#bp-health-hand" transform="matrix(-1 0 0 1 352 0)"/>
 </g>
 </svg>

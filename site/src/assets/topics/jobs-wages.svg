@@ -1,11 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="Jobs and Wages">
-<title>Jobs and Wages</title>
-<defs><clipPath id="bp-tile-jobs-wages"><rect width="320" height="200" rx="16"/></clipPath></defs>
-<rect class="tile" width="320" height="200" rx="16" fill="#C8AC80"/>
-<g clip-path="url(#bp-tile-jobs-wages)" fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-<rect x="38" y="162" width="58" height="13" rx="6" fill="#EBCB7E"/><rect x="38" y="149" width="58" height="13" rx="6" fill="#EBCB7E"/><rect x="38" y="136" width="58" height="13" rx="6" fill="#EBCB7E"/><rect x="38" y="123" width="58" height="13" rx="6" fill="#EBCB7E"/>
-<circle cx="67" cy="101" r="19" fill="#F2D58C"/><circle cx="67" cy="101" r="14" stroke-width="2.5"/><path d="M73.5 94 C71 90 63 90 61 94 C59 99 63 100.5 67 101 C72 102 75 104 73 108 C71 112 63 112 60.5 108 M67 89 V113" stroke-width="3"/>
-<path d="M118 150 C118 112 138 92 160 92 C182 92 202 112 202 150 Z" fill="#EEA94D"/><rect x="153" y="92" width="14" height="58" rx="4" fill="#F6C373"/><rect x="106" y="146" width="108" height="12" rx="6" fill="#E39A3F"/>
-<g transform="translate(226 178) rotate(-58)"><path d="M0 -6 L83 -6 A18 18 0 0 1 117 -6 L100 -6 L100 6 L117 6 A18 18 0 0 1 83 6 L0 6 A6 6 0 0 1 0 -6 Z" fill="#E6E2DA"/><circle cx="8" cy="0" r="2.8" stroke-width="2.5"/></g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+<defs>
+<linearGradient id="bp-jobs-hat" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F7BB55"/><stop offset="1" stop-color="#D4851F"/></linearGradient>
+<linearGradient id="bp-jobs-coin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F8DB80"/><stop offset="1" stop-color="#D6A53A"/></linearGradient>
+<linearGradient id="bp-jobs-steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E9E9E3"/><stop offset="1" stop-color="#AEAEA7"/></linearGradient>
+</defs>
+<g fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+<ellipse cx="162" cy="180" rx="124" ry="7" fill="#2E2A26" opacity=".14" stroke="none"/>
+<!-- stack of coins -->
+<g>
+<path d="M44 160 v12 a30 9 0 0 0 60 0 v-12" fill="#D6A53A"/><ellipse cx="74" cy="160" rx="30" ry="9" fill="url(#bp-jobs-coin)"/>
+<path d="M44 148 v12 a30 9 0 0 0 60 0 v-12" fill="#D6A53A"/><ellipse cx="74" cy="148" rx="30" ry="9" fill="url(#bp-jobs-coin)"/>
+<path d="M44 136 v12 a30 9 0 0 0 60 0 v-12" fill="#D6A53A"/><ellipse cx="74" cy="136" rx="30" ry="9" fill="url(#bp-jobs-coin)"/>
+<path d="M44 124 v12 a30 9 0 0 0 60 0 v-12" fill="#D6A53A"/><ellipse cx="74" cy="124" rx="30" ry="9" fill="url(#bp-jobs-coin)"/>
+<path d="M44 112 v12 a30 9 0 0 0 60 0 v-12" fill="#D6A53A"/><ellipse cx="74" cy="112" rx="30" ry="9" fill="url(#bp-jobs-coin)"/>
+<ellipse cx="74" cy="112" rx="20" ry="5.5" stroke-width="2.5"/>
+<path d="M74 106.5 V117.5 M78 109 C76.5 107.5 71.5 107.5 70.5 109 C69.5 111.5 78.5 111 78 113.5 C77.5 115.5 71 116 69.5 114.5" stroke-width="2.5"/>
+<path d="M50 118 C50 116 54 114 60 113" stroke="#FFFFFF" stroke-width="3" opacity=".6"/>
+</g>
+<!-- hard hat -->
+<path d="M116 150 C116 108 136 86 166 86 C196 86 216 108 216 150 Z" fill="url(#bp-jobs-hat)"/>
+<path d="M132 134 C134 114 146 100 160 95" stroke="#FFFFFF" stroke-width="6" opacity=".45"/>
+<rect x="158" y="86" width="16" height="64" rx="6" fill="#FBCB6D"/>
+<rect x="104" y="148" width="124" height="14" rx="7" fill="#E39A3F"/>
+<rect x="108" y="150" width="116" height="4" rx="2" fill="#FFFFFF" opacity=".35" stroke="none"/>
+<rect x="104" y="156" width="124" height="6" rx="3" fill="#2E2A26" opacity=".14" stroke="none"/>
+<!-- wrench -->
+<g transform="translate(246 176) rotate(-58)">
+<path d="M0 -7 L84 -7 A20 20 0 0 1 120 -7 L102 -7 L102 7 L120 7 A20 20 0 0 1 84 7 L0 7 A7 7 0 0 1 0 -7 Z" fill="url(#bp-jobs-steel)"/>
+<path d="M10 -3 L82 -3" stroke="#FFFFFF" stroke-width="3" opacity=".6"/>
+<circle cx="10" cy="0" r="3" fill="#2E2A26" stroke="none"/>
+</g>
 </g>
 </svg>

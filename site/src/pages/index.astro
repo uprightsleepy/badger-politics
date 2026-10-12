@@ -29,25 +29,25 @@ const SEARCH_TYPES: [string, string][] = [
 // Topic doors in the words people use. Each opens the Legislature's own
 // subject page when this build has one, otherwise a search for the topic.
 const subjectSlugs = new Set(subjectIndex().map((x) => x.slug));
-// art: an illustrated tile in assets/topics/, decorative (the label carries the meaning);
-// tint is a pale wash of that tile's own color.
-const TOPICS: { label: string; examples: string; subjects: string[]; q: string; art: string; tint: string }[] = [
+// art: an outline illustration in assets/topics/, decorative (the label carries the meaning).
+// panel is the gradient it sits on, tint a pale wash of the same hue for the card.
+const TOPICS: { label: string; examples: string; subjects: string[]; q: string; art: string; tint: string; panel: [string, string] }[] = [
   { label: "Schools", examples: "School funding, vouchers, testing, teachers", subjects: ["Education", "Public instruction", "School districts"], q: "school",
-    art: "schools", tint: "#e6efef" },
+    art: "schools", tint: "#e6efef", panel: ["#a3d3cf", "#6cafab"] },
   { label: "Taxes", examples: "Property, income and sales taxes", subjects: ["Taxation", "Property tax", "Income tax"], q: "tax",
-    art: "taxes", tint: "#f9f1df" },
+    art: "taxes", tint: "#f9f1df", panel: ["#f3d98f", "#d6b14f"] },
   { label: "Roads & Transit", examples: "Highways, road repair, buses, the gas tax", subjects: ["Highways", "Transportation"], q: "highway",
-    art: "roads-transit", tint: "#ecefe5" },
+    art: "roads-transit", tint: "#ecefe5", panel: ["#c3d4a4", "#90ab70"] },
   { label: "Health Care", examples: "Medicaid, prescriptions, hospitals, insurance", subjects: ["Health", "Medical assistance", "Health insurance"], q: "health",
-    art: "health-care", tint: "#f3eff9" },
+    art: "health-care", tint: "#f3eff9", panel: ["#dccdf0", "#b39cd6"] },
   { label: "Data Centers", examples: "Big tech campuses, their power and water use, tax breaks", subjects: ["Data centers", "Data center"], q: "data center",
-    art: "data-centers", tint: "#eceff4" },
+    art: "data-centers", tint: "#eceff4", panel: ["#c4d1e4", "#92a6c5"] },
   { label: "Housing", examples: "Rent, home building, zoning, landlords and tenants", subjects: ["Housing", "Landlord and tenant"], q: "housing",
-    art: "housing", tint: "#f6eae2" },
+    art: "housing", tint: "#f6eae2", panel: ["#ebbd9f", "#cf946f"] },
   { label: "Water and Land", examples: "PFAS, lakes, farms, state parks", subjects: ["Natural resources", "Water", "Environment"], q: "water",
-    art: "water-land", tint: "#ebf5f3" },
+    art: "water-land", tint: "#ebf5f3", panel: ["#c4e6dc", "#8bc8b7"] },
   { label: "Jobs and Wages", examples: "Minimum wage, unemployment, workers' rights", subjects: ["Employment", "Labor"], q: "employment",
-    art: "jobs-wages", tint: "#f3ede3" },
+    art: "jobs-wages", tint: "#f3ede3", panel: ["#dcc7a3", "#b89e70"] },
 ];
 // Inlined at build, so the page makes no extra requests. Size, title and role come off:
 // CSS sizes the tile, and the card's label already names it for screen readers.
@@ -175,7 +175,11 @@ const FIELD =
             class="topic group flex h-full flex-col rounded-[1.25rem] p-2 no-underline outline-offset-2 transition-transform motion-safe:hover:-translate-y-0.5"
             style={`background:${t.tint}`}
           >
-            <span class="block overflow-hidden rounded-[0.9rem] leading-none" set:html={tile(t.art)} />
+            <span
+              class="topic-panel block overflow-hidden rounded-[0.9rem] leading-none"
+              style={`--a:${t.panel[0]};--b:${t.panel[1]}`}
+              set:html={tile(t.art)}
+            />
             <span class="flex flex-col gap-1 px-2 pt-3 pb-2 sm:px-3">
               <span class="font-display text-[1.125rem] leading-tight font-bold text-spruce group-hover:underline sm:text-[1.25rem]">{t.label}</span>
               <span class="text-small text-granite">{t.examples}</span>
@@ -288,6 +292,11 @@ const FIELD =
   </section>
 
   <style is:global>
+    .topic-panel {
+      background:
+        radial-gradient(120% 90% at 18% 12%, rgb(255 255 255 / 0.35), transparent 60%),
+        linear-gradient(150deg, var(--a), var(--b));
+    }
     /* Pagefind marks matched words; bold reads as "here's your word"
        without spending the one Prairie highlight. */
     #search-results mark {
