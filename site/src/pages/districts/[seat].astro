@@ -224,16 +224,16 @@ const peopleRows = people
               <thead>
                 <tr class="border-b border-edge text-small">
                   <th scope="col" class="py-2 pr-4 font-bold">Measure</th>
-                  <th scope="col" class="py-2 pr-4 text-right font-bold">Estimate</th>
-                  <th scope="col" class="py-2 text-right font-bold">Give or take</th>
+                  <th scope="col" class="py-2 pr-4 text-right font-bold whitespace-nowrap">Estimate</th>
+                  <th scope="col" class="py-2 text-right font-bold whitespace-nowrap">Give or take</th>
                 </tr>
               </thead>
               <tbody>
                 {peopleRows.map((r) => (
                   <tr class="border-b border-rule">
                     <th scope="row" class="py-2 pr-4 font-normal">{r.label}</th>
-                    <td class="py-2 pr-4 text-right">{r.value}</td>
-                    <td class="py-2 text-right text-granite">{r.moe}</td>
+                    <td class="py-2 pr-4 text-right whitespace-nowrap">{r.value}</td>
+                    <td class="py-2 text-right text-granite whitespace-nowrap">{r.moe}</td>
                   </tr>
                 ))}
               </tbody>

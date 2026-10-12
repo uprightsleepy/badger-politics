@@ -12,8 +12,8 @@ import sqlite3
 import sys
 from pathlib import Path
 
-from importer.court_challenges import CURATION, curated
 from importer import import_census
+from importer.court_challenges import CURATION, curated
 from importer.import_wec import family_key, same_person
 from importer.roster import OPEN_END
 
@@ -528,6 +528,9 @@ def check_executive_orders(conn: sqlite3.Connection) -> list[str]:
     ).fetchone()[0]
     if outside:
         failures.append(f"executive_orders: {outside} orders outside their governor's tenure")
+    return failures
+
+
 # Plausible bounds, not expectations: a value outside them is a misread
 # column or a release on another geography, never a real district.
 DEMOGRAPHIC_RANGES = {

@@ -336,7 +336,9 @@ file needs `CENSUS_API_KEY`; since at least 2026-10-11 the API redirects every
 keyless data request to `missing_key.html` (metadata stays keyless), and the
 fetcher stops with that message. Request a free key at
 <https://api.census.gov/data/key_signup.html>, export it for the one fetch, and
-commit the file; the nightly needs no secret.
+commit the file. The nightly's import stage also receives the `CENSUS_API_KEY`
+repository secret, so a bumped pin builds before its file is committed; with
+the file present no request is made.
 
 **Map vintage.** ACS district geographies follow the Census Bureau's biennial
 state legislative district collection, not the release year. The
