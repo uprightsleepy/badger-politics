@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="Health Care">
+<title>Health Care</title>
+<defs><clipPath id="bp-tile-health-care"><rect width="320" height="200" rx="16"/></clipPath></defs>
+<rect class="tile" width="320" height="200" rx="16" fill="#C9B8E2"/>
+<g clip-path="url(#bp-tile-health-care)" fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+<path d="M160 128 C120 100 100 80 100 62 C100 44 114 34 130 34 C144 34 154 42 160 52 C166 42 176 34 190 34 C206 34 220 44 220 62 C220 80 200 100 160 128 Z" fill="#8C77B4"/>
+<path d="M152 56 h16 v14 h14 v16 h-14 v14 h-16 v-14 h-14 v-16 h14 Z" fill="#FFFFFF"/>
+<path d="M38 146 C52 146 62 144 72 140 C80 128 92 123 97 129 C100 135 93 142 87 148 L118 148 C130 148 138 144 145 137 C150 133 155 139 151 145 C142 158 122 167 100 169 L38 171 Z" fill="#F7F3EE"/><path d="M112 155 C124 154 133 150 140 144 M108 162 C120 161 130 157 137 152" stroke-width="2.5"/><path d="M14 141 H38 V175 H14" fill="#EDE6F5"/>
+<g transform="translate(320 0) scale(-1 1)"><path d="M38 146 C52 146 62 144 72 140 C80 128 92 123 97 129 C100 135 93 142 87 148 L118 148 C130 148 138 144 145 137 C150 133 155 139 151 145 C142 158 122 167 100 169 L38 171 Z" fill="#F7F3EE"/><path d="M112 155 C124 154 133 150 140 144 M108 162 C120 161 130 157 137 152" stroke-width="2.5"/><path d="M14 141 H38 V175 H14" fill="#EDE6F5"/></g>
+</g>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="Jobs and Wages">
+<title>Jobs and Wages</title>
+<defs><clipPath id="bp-tile-jobs-wages"><rect width="320" height="200" rx="16"/></clipPath></defs>
+<rect class="tile" width="320" height="200" rx="16" fill="#C8AC80"/>
+<g clip-path="url(#bp-tile-jobs-wages)" fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+<rect x="38" y="162" width="58" height="13" rx="6" fill="#EBCB7E"/><rect x="38" y="149" width="58" height="13" rx="6" fill="#EBCB7E"/><rect x="38" y="136" width="58" height="13" rx="6" fill="#EBCB7E"/><rect x="38" y="123" width="58" height="13" rx="6" fill="#EBCB7E"/>
+<circle cx="67" cy="101" r="19" fill="#F2D58C"/><circle cx="67" cy="101" r="14" stroke-width="2.5"/><path d="M73.5 94 C71 90 63 90 61 94 C59 99 63 100.5 67 101 C72 102 75 104 73 108 C71 112 63 112 60.5 108 M67 89 V113" stroke-width="3"/>
+<path d="M118 150 C118 112 138 92 160 92 C182 92 202 112 202 150 Z" fill="#EEA94D"/><rect x="153" y="92" width="14" height="58" rx="4" fill="#F6C373"/><rect x="106" y="146" width="108" height="12" rx="6" fill="#E39A3F"/>
+<g transform="translate(226 178) rotate(-58)"><path d="M0 -6 L83 -6 A18 18 0 0 1 117 -6 L100 -6 L100 6 L117 6 A18 18 0 0 1 83 6 L0 6 A6 6 0 0 1 0 -6 Z" fill="#E6E2DA"/><circle cx="8" cy="0" r="2.8" stroke-width="2.5"/></g>
+</g>
+</svg>

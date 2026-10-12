@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="Housing">
+<title>Housing</title>
+<defs><clipPath id="bp-tile-housing"><rect width="320" height="200" rx="16"/></clipPath></defs>
+<rect class="tile" width="320" height="200" rx="16" fill="#D79E7C"/>
+<g clip-path="url(#bp-tile-housing)" fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+<path d="M60 172 V138" stroke-width="5"/><circle cx="60" cy="122" r="18" fill="#F1D3BC"/>
+<rect x="164" y="60" width="14" height="32" fill="#B9694A"/>
+<path d="M96 172 V104 L140 64 L184 104 V172 Z" fill="#F6EADB"/>
+<path d="M84 110 L140 56 L196 110" stroke-width="13"/><path d="M84 110 L140 56 L196 110" stroke="#9E5A3E" stroke-width="6"/>
+<rect x="132" y="82" width="16" height="14" rx="2" fill="#FBE7C9"/>
+<rect x="106" y="118" width="18" height="18" rx="1.5" fill="#FBE7C9"/><path d="M115 118 V136 M106 127 H124" stroke-width="2"/><rect x="156" y="118" width="18" height="18" rx="1.5" fill="#FBE7C9"/><path d="M165 118 V136 M156 127 H174" stroke-width="2"/>
+<rect x="131" y="136" width="18" height="36" rx="2" fill="#A9603F"/><circle cx="145" cy="155" r="1.8" fill="#2E2A26" stroke="none"/>
+<path d="M190 152 H240 M190 163 H240" stroke-width="3"/><path d="M194 172 V146 L197 141 L200 146 V172 Z" fill="#F6EADB" stroke-width="3"/><path d="M206 172 V146 L209 141 L212 146 V172 Z" fill="#F6EADB" stroke-width="3"/><path d="M218 172 V146 L221 141 L224 146 V172 Z" fill="#F6EADB" stroke-width="3"/><path d="M230 172 V146 L233 141 L236 146 V172 Z" fill="#F6EADB" stroke-width="3"/>
+<path d="M34 172 H250"/>
+<path d="M259 88 L259 168 Q259 172 263 172 L265 172 Q269 172 269 168 L269 164 L279 164 L279 156 L269 156 L269 150 L282 150 L282 140 L269 140 L269 88 Z" fill="#F3D9A4"/>
+<path fill-rule="evenodd" fill="#F3D9A4" d="M244 68 a20 20 0 1 0 40 0 a20 20 0 1 0 -40 0 Z M257 68 a7 7 0 1 0 14 0 a7 7 0 1 0 -14 0 Z"/>
+</g>
+</svg>

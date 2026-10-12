@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="Taxes">
+<title>Taxes</title>
+<defs><clipPath id="bp-tile-taxes"><rect width="320" height="200" rx="16"/></clipPath></defs>
+<rect class="tile" width="320" height="200" rx="16" fill="#E2BE6C"/>
+<g clip-path="url(#bp-tile-taxes)" fill="none" stroke="#2E2A26" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+<ellipse cx="160" cy="184" rx="54" ry="5" fill="#C9A456" stroke="none"/>
+<circle cx="160" cy="52" r="22" fill="#F4D27A"/><circle cx="160" cy="52" r="15" stroke-width="3"/>
+<path d="M132 82 C112 90 106 104 106 124 L106 160 C106 172 116 180 128 180 L192 180 C204 180 214 172 214 160 L214 124 C214 104 208 90 188 82 Z" fill="#F8EDD3"/>
+<rect x="124" y="66" width="72" height="18" rx="5" fill="#FBF5E7"/>
+<path d="M122 110 C119 124 119 142 122 158" stroke="#FFFFFF" stroke-width="5"/><path d="M131 97 L136 94" stroke="#FFFFFF" stroke-width="4"/>
+</g>
+</svg>
