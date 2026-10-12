@@ -38,7 +38,7 @@ export const TOPICS: Topic[] = [
       /^Drugs$/, "Pharmacy", "Mental health", "Public health", "Hospitals", "Hospitals and health care facilities",
       "Nursing homes and adult care", "Nurses", "Alcohol and other drug abuse"],
     ink: "#4b3f72", tint: "#f3eff9", panel: ["#dccdf0", "#b39cd6"] },
-  { slug: "data-centers", label: "Data Centers", examples: "Big tech campuses, their power and water use, tax breaks",
+  { slug: "data-centers", label: "Tech & Data Centers", examples: "Big tech campuses, their power and water use, tax breaks",
     headings: [/^Data processing$/, "Electric utility", "Electricity", "Public utility", "Energy conservation"],
     ink: "#2c4a68", tint: "#eceff4", panel: ["#c4d1e4", "#92a6c5"] },
   { slug: "housing", label: "Housing", examples: "Rent, home building, zoning, landlords and tenants",
