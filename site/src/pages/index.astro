@@ -4,7 +4,9 @@ import { PLACES_KEY } from "../lib/placesKey";
 import JsonLd from "../components/JsonLd.astro";
 import BillList from "../components/BillList.astro";
 import SessionOutcomes from "../components/SessionOutcomes.astro";
-import { builtSessions, recentlyActedBills } from "../lib/db";
+import { builtSessions, recentlyActedBills, subjectIndex } from "../lib/db";
+import { subjectSlug } from "../lib/subjects";
+import { TOPIC_ICONS } from "../lib/topicIcons";
 import { sessionPlainName } from "../lib/format";
 import { sessionCounts, sessionOutcomes } from "../lib/billRows";
 const sessions = builtSessions();
@@ -25,6 +27,33 @@ const SEARCH_TYPES: [string, string][] = [
   ["Districts", "District"],
   ["Money", "Campaign money"],
 ];
+// Topic doors in the words people use. Each opens the Legislature's own
+// subject page when this build has one, otherwise a search for the topic.
+const subjectSlugs = new Set(subjectIndex().map((x) => x.slug));
+// icon: a Lucide icon (lib/topicIcons), decorative; the label carries the meaning. ink colors it,
+// panel is the gradient behind it, and tint a pale wash of the same hue for the card.
+const TOPICS: { label: string; examples: string; subjects: string[]; q: string; icon: string; ink: string; tint: string; panel: [string, string] }[] = [
+  { label: "Schools", examples: "School funding, vouchers, testing, teachers", subjects: ["Education", "Public instruction", "School districts"], q: "school",
+    icon: "schools", ink: "#0d5c63", tint: "#e6efef", panel: ["#a3d3cf", "#6cafab"] },
+  { label: "Taxes", examples: "Property, income and sales taxes", subjects: ["Taxation", "Property tax", "Income tax"], q: "tax",
+    icon: "taxes", ink: "#8a6410", tint: "#f9f1df", panel: ["#f3d98f", "#d6b14f"] },
+  { label: "Roads & Transit", examples: "Highways, road repair, buses, the gas tax", subjects: ["Highways", "Transportation"], q: "highway",
+    icon: "roads-transit", ink: "#3d5a35", tint: "#ecefe5", panel: ["#c3d4a4", "#90ab70"] },
+  { label: "Health Care", examples: "Medicaid, prescriptions, hospitals, insurance", subjects: ["Health", "Medical assistance", "Health insurance"], q: "health",
+    icon: "health-care", ink: "#4b3f72", tint: "#f3eff9", panel: ["#dccdf0", "#b39cd6"] },
+  { label: "Data Centers", examples: "Big tech campuses, their power and water use, tax breaks", subjects: ["Data centers", "Data center"], q: "data center",
+    icon: "data-centers", ink: "#2c4a68", tint: "#eceff4", panel: ["#c4d1e4", "#92a6c5"] },
+  { label: "Housing", examples: "Rent, home building, zoning, landlords and tenants", subjects: ["Housing", "Landlord and tenant"], q: "housing",
+    icon: "housing", ink: "#7a4a26", tint: "#f6eae2", panel: ["#ebbd9f", "#cf946f"] },
+  { label: "Water and Land", examples: "PFAS, lakes, farms, state parks", subjects: ["Natural resources", "Water", "Environment"], q: "water",
+    icon: "water-land", ink: "#245b46", tint: "#ebf5f3", panel: ["#c4e6dc", "#8bc8b7"] },
+  { label: "Jobs and Wages", examples: "Minimum wage, unemployment, workers' rights", subjects: ["Employment", "Labor"], q: "employment",
+    icon: "jobs-wages", ink: "#5a5136", tint: "#f3ede3", panel: ["#dcc7a3", "#b89e70"] },
+];
+const topicHref = (t: (typeof TOPICS)[number]) => {
+  const slug = t.subjects.map(subjectSlug).find((x) => subjectSlugs.has(x));
+  return slug ? `/subjects/${slug}/` : `/?q=${encodeURIComponent(t.q)}#search`;
+};
 const FIELD =
   "min-h-12 min-w-0 rounded-[0.625rem] border-2 border-edge bg-white px-3 text-body text-spruce placeholder:text-granite focus:border-lake lg:min-h-11";
 ---
@@ -59,30 +88,29 @@ const FIELD =
     }}
   />
 
-  <div class="flex max-w-[47.5rem] flex-col gap-3">
-    <h1 class="t-display">Wisconsin's Legislature, in plain words</h1>
-    <p class="sm:text-lead">
-      Where every bill stands, how your lawmakers vote, and who pays for their campaigns. Built
-      from official state records, free, with no ads.
-    </p>
-  </div>
-
-  {/* data-saved (set by the script) folds the address card into a slim bar
-      above a full-width search; without it the two tools share the row */}
-  <div id="home-tools" class="group mt-8 grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:data-saved:grid-cols-1">
-    <section class="sheet flex min-w-0 flex-col gap-3 p-5 sm:p-7 group-data-saved:sm:flex-row group-data-saved:sm:flex-wrap group-data-saved:sm:items-center group-data-saved:sm:gap-x-6 group-data-saved:sm:py-4" aria-labelledby="home-addr-heading">
-      <h2 id="home-addr-heading" class="t-section">Find your lawmakers</h2>
+  {/* the one bold moment: a prairie-gold field holding the question the
+      site answers and the first step toward answering it */}
+  <div class="rounded-[1.75rem] bg-wheat px-5 py-8 sm:px-10 sm:py-12 lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-center lg:gap-12">
+    <div class="flex max-w-[40rem] flex-col gap-4">
+      <h1 class="t-display lg:text-[3.25rem] lg:leading-[1.06]">What are your lawmakers doing about the things you care about?</h1>
+      <p class="sm:text-lead">
+        Plain-language answers from the state's official records. Free, with no ads and nothing
+        to sign up for.
+      </p>
+    </div>
+    <section class="sheet mt-8 flex min-w-0 flex-col gap-3 p-5 sm:p-7 lg:mt-0" aria-labelledby="home-addr-heading">
+      <h2 id="home-addr-heading" class="t-section">Who represents me?</h2>
       <p id="home-addr-intro">
-        See your representative and state senator: how they vote and what they've tried to pass.
-        After that, every page marks them for you.
+        Enter your address to meet your state representative and state senator: how they vote
+        and what they're trying to pass.
       </p>
       <div id="home-addr-saved" class="hidden min-w-0 flex-1">
-        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
+        <div class="flex flex-col gap-3">
           <div class="min-w-0">
             <p id="home-addr-districts" class="font-bold"></p>
             <p class="text-small text-granite">Saved on this device only. Every page marks your two lawmakers.</p>
           </div>
-          <div class="flex flex-wrap gap-2.5 sm:ml-auto">
+          <div class="flex flex-wrap gap-2.5">
             <button type="button" id="home-addr-change" class="btn btn-secondary">Change address</button>
             <button type="button" id="home-addr-forget" class="btn btn-secondary">Forget</button>
           </div>
@@ -116,9 +144,51 @@ const FIELD =
       </p>
     </section>
 
+  </div>
+
+  <section id="my-reps-home" class="mt-14 hidden" aria-labelledby="my-reps-home-heading">
+    <h2 id="my-reps-home-heading" class="t-section">Your lawmakers</h2>
+    <div id="my-reps-cards" class="mt-4 grid items-start gap-5 lg:grid-cols-2" data-no-rep-highlight></div>
+    <p class="mt-4">
+      <a href="/my-reps/" class="font-bold underline">See their committees, ballot and contact details on My reps</a>
+    </p>
+  </section>
+
+  <section class="mt-14" aria-labelledby="topics-heading">
+    <h2 id="topics-heading" class="t-section">What do you want to know about?</h2>
+    <p class="mt-2 max-w-[47.5rem]">Pick a topic to see the bills about it and where each one stands.</p>
+    <ul class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4" role="list">
+      {TOPICS.map((t) => (
+        <li>
+          <a
+            href={topicHref(t)}
+            class="topic group flex h-full flex-col rounded-[1.25rem] p-2 no-underline outline-offset-2 transition-transform motion-safe:hover:-translate-y-0.5"
+            style={`background:${t.tint}`}
+          >
+            <span
+              class="topic-panel flex aspect-[8/5] items-center justify-center rounded-[0.9rem]"
+              style={`--a:${t.panel[0]};--b:${t.panel[1]};color:${t.ink}`}
+              aria-hidden="true"
+            >
+              <span class="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_2px_6px_rgb(0_0_0/0.12)] transition-transform group-hover:scale-105 sm:h-[4.5rem] sm:w-[4.5rem]">
+                <svg class="h-8 w-8 sm:h-9 sm:w-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={TOPIC_ICONS[t.icon]} />
+              </span>
+            </span>
+            <span class="flex flex-col gap-1 px-2 pt-3 pb-2 sm:px-3">
+              <span class="font-display text-[1.125rem] leading-tight font-bold text-spruce group-hover:underline sm:text-[1.25rem]">{t.label}</span>
+              <span class="text-small text-granite">{t.examples}</span>
+            </span>
+          </a>
+        </li>
+      ))}
+    </ul>
+    <p class="mt-4"><a href="/subjects/" class="underline">Every topic in the Legislature's index</a></p>
+  </section>
+
+  <div class="mt-14">
     <section id="search" class="sheet flex min-w-0 scroll-mt-4 flex-col gap-3 p-5 sm:p-7">
-      <h2 id="search-heading" class="t-section">Look something up</h2>
-      <p>Search every bill, lawmaker, committee and campaign donor.</p>
+      <h2 id="search-heading" class="t-section">Search for anything</h2>
+      <p>A bill number like AB 656, a lawmaker's name, a committee or a campaign donor.</p>
       <form id="search-form" action="/#search" method="get" class="flex flex-col gap-2" role="search" aria-labelledby="search-heading">
         <label class="text-small font-bold" for="q">Search bills, people and committees</label>
         <div class="flex flex-wrap gap-2.5">
@@ -168,20 +238,13 @@ const FIELD =
     </section>
   </div>
 
-  <section id="my-reps-home" class="mt-12 hidden" aria-labelledby="my-reps-home-heading">
-    <h2 id="my-reps-home-heading" class="t-section">Your lawmakers</h2>
-    <div id="my-reps-cards" class="mt-4 grid items-start gap-5 lg:grid-cols-2" data-no-rep-highlight></div>
-    <p class="mt-4">
-      <a href="/my-reps/" class="font-bold underline">See their committees, ballot and contact details on My reps</a>
-    </p>
-  </section>
 
   <section class="mt-14 max-w-[47.5rem]" aria-labelledby="outcomes-heading">
     <h2 id="outcomes-heading" class="t-section">
-      How far the {plain}'s {n(outcomes.bills)} bills got
+      Most bills never become law. Here's how far the {plain}'s {n(outcomes.bills)} got.
     </h2>
     <p class="mt-2">
-      Each bill is counted once, at the furthest point on its route.
+      Each bill is counted once, at the furthest point it reached.
     </p>
     <div class="mt-5">
       <SessionOutcomes session={current.id} />
@@ -198,8 +261,8 @@ const FIELD =
   </section>
 
   <section class="mt-14" aria-labelledby="latest-heading">
-    <h2 id="latest-heading" class="t-section">Latest activity</h2>
-    <p class="mt-2">Bills with the most recent action in the official record, newest first.</p>
+    <h2 id="latest-heading" class="t-section">What changed most recently</h2>
+    <p class="mt-2">The bills that moved last in the official record, newest first.</p>
     <BillList bills={recent} class="mt-4" />
     <p class="mt-4">
       <a href={`/bills/${current.id}/`} class="font-bold underline">
@@ -223,6 +286,11 @@ const FIELD =
   </section>
 
   <style is:global>
+    .topic-panel {
+      background:
+        radial-gradient(120% 90% at 18% 12%, rgb(255 255 255 / 0.35), transparent 60%),
+        linear-gradient(150deg, var(--a), var(--b));
+    }
     /* Pagefind marks matched words; bold reads as "here's your word"
        without spending the one Prairie highlight. */
     #search-results mark {
@@ -514,7 +582,6 @@ const FIELD =
 
   const heading = document.getElementById("home-addr-heading");
   const cardSaved = document.getElementById("home-addr-saved");
-  const tools = document.getElementById("home-tools");
   const districtsLine = document.getElementById("home-addr-districts");
   // the prompt-state pieces, toggled as a set
   const promptEls = ["home-addr-intro", "home-addr-form", "home-addr-privacy"]
@@ -531,14 +598,12 @@ const FIELD =
     }
     for (const el of promptEls) el?.classList.add("hidden");
     cardSaved?.classList.remove("hidden");
-    tools?.setAttribute("data-saved", "");
     if (addrStatus) addrStatus.textContent = "";
   };
   const showPrompt = () => {
     if (heading) heading.textContent = "Find your lawmakers";
     for (const el of promptEls) el?.classList.remove("hidden");
     cardSaved?.classList.add("hidden");
-    tools?.removeAttribute("data-saved");
     addr?.focus();
   };
 
