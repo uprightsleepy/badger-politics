@@ -3,12 +3,9 @@
  * the bills filed under it, the latest activity, then every bill by
  * session, each with where it stands (the same words as its own page). */
 import Base from "../../layouts/Base.astro";
-import BillList from "../../components/BillList.astro";
-import BillLine from "../../components/BillLine.astro";
-import MoreRows from "../../components/MoreRows.astro";
-import { allSessions, billsForSubject, subjectIndex, type Bill } from "../../lib/db";
-import { billSlug, fmtDate, sessionPlainName } from "../../lib/format";
-import { leadSentence, rowStory } from "../../lib/billRows";
+import BillsBySubject from "../../components/BillsBySubject.astro";
+import { billsForSubject, subjectIndex } from "../../lib/db";
+import { bySessionSpan, subjectLead } from "../../lib/subjectBills";
 
 export function getStaticPaths() {
   return subjectIndex().map(({ slug, subjects, title }) => ({
@@ -19,33 +16,8 @@ export function getStaticPaths() {
 const { subjects, title } = Astro.props;
 const seen = new Set<string>();
 const bills = subjects.flatMap((s) => billsForSubject(s)).filter((b) => !seen.has(b.id) && seen.add(b.id));
-
-// sessions newest first, in the order the site lists them everywhere
-const order = allSessions();
-const rank = new Map(order.map((s, i) => [s.id, i]));
-const nameOf = new Map(order.map((s) => [s.id, sessionPlainName(s.id, s.name)]));
-const bySession = [...Map.groupBy(bills, (b) => b.session_id)]
-  .sort((a, b) => (rank.get(a[0]) ?? 1e9) - (rank.get(b[0]) ?? 1e9) || b[0].localeCompare(a[0]));
-const lead = leadSentence({
-  total: bills.length,
-  enacted: bills.filter((b) => b.status === "enacted").length,
-  vetoed: bills.filter((b) => b.status === "vetoed").length,
-  noHearing: bills.filter((b) => b.died_without_hearing === 1).length,
-});
-const sessionName = (id: string) => nameOf.get(id) ?? sessionPlainName(id, `${id} session`);
-const span = bySession.length > 1
-  ? ` They span ${bySession.length.toLocaleString()} sessions, from the ${sessionName(bySession.at(-1)![0])} to the ${sessionName(bySession[0][0])}.`
-  : bySession.length === 1
-    ? bills.length === 1 ? ` It's from the ${sessionName(bySession[0][0])}.` : ` All are from the ${sessionName(bySession[0][0])}.`
-    : "";
-// most recent activity first, so a reader lands on what is live; only
-// when the full list below is long enough to bury it
-const LATEST = 5;
-const recent = bills.length > 10
-  ? [...bills].sort((a, b) => (b.latest_action_date ?? "").localeCompare(a.latest_action_date ?? "")).slice(0, LATEST)
-  : [];
-const SHOWN = 10;
-const href = (b: Bill) => `/bills/${b.session_id}/${billSlug(b.identifier)}/`;
+const { bySession, sessionName, span } = bySessionSpan(bills);
+const lead = subjectLead(bills);
 ---
 
 <Base
@@ -65,38 +37,5 @@ const href = (b: Bill) => `/bills/${b.session_id}/${billSlug(b.identifier)}/`;
     </p>
   </header>
 
-  {recent.length > 0 && (
-    <section class="mt-10 max-w-[60rem]" aria-labelledby="latest-heading">
-      <h2 id="latest-heading" class="t-section">Latest activity</h2>
-      <p class="mt-2 text-small text-granite">The {recent.length} bills on this subject with the newest recorded action.</p>
-      <BillList bills={recent} class="mt-3" />
-    </section>
-  )}
-
-  <section class="mt-10 max-w-[60rem]" aria-labelledby="every-heading">
-    <h2 id="every-heading" class="t-section">{bills.length === 1 ? "The bill on this subject" : "Every bill on this subject"}</h2>
-    {bySession.map(([sessionId, rows]) => {
-      const sid = `session-${sessionId}`;
-      return (
-        <section class="mt-6" aria-labelledby={sid}>
-          <h3 id={sid} class="t-question">{sessionName(sessionId)}: {rows.length.toLocaleString()}</h3>
-          <div class="mt-2">
-            <MoreRows rest={Math.max(0, rows.length - SHOWN)} label={`bills from the ${sessionName(sessionId)}`}>
-              {rows.slice(0, SHOWN).map((b) => (
-                <BillLine href={href(b)} identifier={b.identifier} title={b.title} date={fmtDate(b.latest_action_date)}>{rowStory(b).headline}.</BillLine>
-              ))}
-              <Fragment slot="rest">
-                {rows.slice(SHOWN).map((b) => (
-                  <BillLine href={href(b)} identifier={b.identifier} title={b.title} date={fmtDate(b.latest_action_date)}>{rowStory(b).headline}.</BillLine>
-                ))}
-              </Fragment>
-            </MoreRows>
-          </div>
-        </section>
-      );
-    })}
-    <p class="mt-4 text-small text-granite">
-      Dates are each bill's latest recorded action. <a href="/subjects/" class="underline">Every subject</a>
-    </p>
-  </section>
+  <BillsBySubject bills={bills} bySession={bySession} sessionName={sessionName} />
 </Base>

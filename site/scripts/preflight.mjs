@@ -142,6 +142,13 @@ for (const c of counts) {
   }
 }
 
+// --- the homepage's eight topic doors each open their own page ------------
+{
+  const topics = (await subdirs("topics")) ?? [];
+  if (topics.length < 8) fail(`topic pages: ${topics.length} built, expected 8`);
+  else pass(`topic pages: ${topics.length}`);
+}
+
 // --- council member pages mirror the local tables, when present ------------
 const hasLocal = db
   .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='local_members'")
