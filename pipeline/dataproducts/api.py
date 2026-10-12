@@ -12,7 +12,8 @@ Layout (all CDN-served static files):
   /api/v1/local/{body}/{member}.json     one member + their latest votes
   /api/v1/elections/statewide.json       statewide races + certified results
   /api/v1/elections/us-house.json        U.S. House candidates on the ballot
-  /api/v1/elections/seats/{seat}.json    assembly-15 / senate-5: holder, race, results
+  /api/v1/elections/seats/{seat}.json    assembly-15 / senate-5: holder, race, results,
+                                         Census ACS figures
   /api/v1/elections/judicial.json        Supreme Court + Court of Appeals results
   /api/v1/elections/referenda.json       statewide referendum results
   /api/v1/committees/index.json          every committee + chair
@@ -271,6 +272,7 @@ def _build_elections(conn: sqlite3.Connection, api: Path) -> int:
                                                "total_cast": r["total_cast"], "candidates": []})
         contest["candidates"].append({k: r[k] for k in ("candidate", "party", "votes")})
     holders = {(p["chamber"], p["district"]): p for p in queries.sitting_legislators(conn)}
+    demographics = queries.district_demographics(conn)
     seats = [("lower", d) for d in range(1, 100)] + [("upper", d) for d in range(1, 34)]
     for chamber, district in seats:
         holder = holders.get((chamber, district))
@@ -280,6 +282,7 @@ def _build_elections(conn: sqlite3.Connection, api: Path) -> int:
                                              party=holder["party"]),
             "election": holder and queries.election_for(conn, holder["id"]),
             "results": list(results.get((chamber, district), {}).values()),
+            "demographics": demographics.get((chamber, district)),
         })
     return 3 + len(seats)
 

@@ -149,6 +149,9 @@ def db_path(tmp_path: Path, make_db) -> Path:
         INSERT INTO statewide_history (year, office, candidate, party, votes)
           VALUES (2022, 'GOVERNOR / LIEUTENANT GOVERNOR',
                   'Tony Evers / Sara Rodriguez', 'DEM', 1358774);
+        INSERT INTO district_demographics VALUES
+          ('lower', 15, 2024, 2024, 'population', 59500, 1800),
+          ('lower', 15, 2024, 2024, 'median_age', 41.2, 1.1);
         """
     )
     conn.commit()
@@ -232,7 +235,13 @@ def test_wider_api_shapes(built: Path) -> None:
     assert [(r["year"], r["maps"]) for r in seat["results"]] == [(2024, "2024"), (2020, "2011")]
     assert load("elections/judicial.json")["races"][0]["candidate"] == "Susan Crawford"
     assert load("elections/referenda.json")["questions"][0]["yes"] == 1437317
+    assert seat["demographics"]["figures"] == {
+        "population": {"estimate": 59500, "moe": 1800},
+        "median_age": {"estimate": 41.2, "moe": 1.1}}
+    assert "not endorsed or certified by the Census Bureau" in seat["demographics"]["notice"]
+    assert seat["demographics"]["map_year"] == 2024
     assert load("elections/seats/senate-33.json")["holder"] is None
+    assert load("elections/seats/senate-33.json")["demographics"] is None
     assert load("elections/us-house.json")["races"][0]["candidate"] == "Mark Pocan"
     assert load("federal/tammy-baldwin.json")["votes"][0]["vote_cast"] == "Yea"
     # money: never beside votes, individuals only in totals

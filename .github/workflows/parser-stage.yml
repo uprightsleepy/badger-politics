@@ -12,6 +12,12 @@ on:
       month:
         type: string
         default: ""
+    # A called workflow sees only the secrets its caller passes.
+    secrets:
+      COURTLISTENER_TOKEN:
+        required: false
+      CENSUS_API_KEY:
+        required: false
     outputs:
       months:
         description: "Frozen committee month plan"
@@ -82,6 +88,8 @@ jobs:
         env:
           # A nightly-parser environment secret, exposed only to the federal stage.
           COURTLISTENER_TOKEN: ${{ inputs.stage == 'federal' && secrets.COURTLISTENER_TOKEN || '' }}
+          # Only used when the pinned ACS release is not yet committed (scraper/fetch_census.py).
+          CENSUS_API_KEY: ${{ inputs.stage == 'import' && secrets.CENSUS_API_KEY || '' }}
         run: uv run --locked python -m nightly run --stage "$STAGE"
       # GitHub's OIDC assertion is short-lived. Mint a NEW assertion after
       # the multi-hour step before uploading data or private diagnostics.

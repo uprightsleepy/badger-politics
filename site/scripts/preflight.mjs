@@ -142,6 +142,22 @@ for (const c of counts) {
   }
 }
 
+// --- Census figures ship with the notice the Census Data API terms require -
+{
+  const hasTable = db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'district_demographics'").get();
+  const seats = hasTable
+    ? db.prepare(`SELECT DISTINCT CASE chamber WHEN 'upper' THEN 'senate' ELSE 'assembly' END
+                    || '-' || district AS seat FROM district_demographics WHERE map_year = 2024`).all()
+    : [];
+  let bad = 0;
+  for (const { seat } of seats) {
+    const html = await readFile(join(DIST, "districts", seat, "index.html"), "utf-8").catch(() => "");
+    if (!html.includes("Who lives here") || !html.includes("not endorsed or certified by the Census Bureau")) bad++;
+  }
+  if (bad) fail(`district pages: ${bad} of ${seats.length} lack Census figures or the Census notice`);
+  else pass(`district pages: ${seats.length} with Census figures and notice`);
+}
+
 // --- council member pages mirror the local tables, when present ------------
 const hasLocal = db
   .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='local_members'")

@@ -152,6 +152,20 @@
         "missing_page": true
       }
     },
+    "api.census.gov": {
+      "paths": {
+        "GET": [
+          "/data/\\d{4}/acs/acs5/profile",
+          "/data/\\d{4}/acs/acs5/profile/variables/DP0[2-5]_\\d{4}P?E\\.json"
+        ]
+      },
+      "delay_seconds": 2,
+      "robots": {
+        "status": 200,
+        "url": "https://api.census.gov/robots.txt",
+        "missing_page": true
+      }
+    },
     "clerk.house.gov": {
       "paths": {
         "GET": [

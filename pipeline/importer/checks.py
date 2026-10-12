@@ -12,6 +12,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from importer import import_census
 from importer.court_challenges import CURATION, curated
 from importer.import_wec import family_key, same_person
 from importer.roster import OPEN_END
@@ -530,6 +531,50 @@ def check_executive_orders(conn: sqlite3.Connection) -> list[str]:
     return failures
 
 
+# Plausible bounds, not expectations: a value outside them is a misread
+# column or a release on another geography, never a real district.
+DEMOGRAPHIC_RANGES = {
+    "population": {"lower": (45_000, 75_000), "upper": (140_000, 220_000)},
+    "median_age": (18, 70),
+    "median_household_income": (15_000, 250_001),  # Census top-codes at 250,001
+    "age_65_plus_pct": (0, 100),
+    "bachelors_pct": (0, 100),
+    "owner_occupied_pct": (0, 100),
+}
+
+
+def check_demographics(conn: sqlite3.Connection) -> list[str]:
+    """When the imported ACS release is on the current map, every district has
+    every figure with its margin of error, inside plausible bounds."""
+    imported = conn.execute("SELECT value FROM meta WHERE key = 'census_acs'").fetchone()
+    if not imported:
+        return []  # an older snapshot; the import itself fails without its input
+    doc = json.loads(imported[0])
+    rows = conn.execute("SELECT chamber, district, acs_year, map_year, measure, estimate, moe"
+                        " FROM district_demographics").fetchall()
+    if doc["map_year"] != import_census.CURRENT_MAP:
+        return ["district figures from another map are loaded"] if rows else []
+    failures = []
+    have = {(c, d, m) for c, d, *_, m, _, _ in rows}
+    for chamber, seats in import_census.SEATS.items():
+        missing = sorted({d for d in range(1, seats + 1) for m in DEMOGRAPHIC_RANGES
+                          if (chamber, d, m) not in have})
+        if missing:
+            failures.append(f"district_demographics: {chamber} districts {missing} lack figures")
+    for chamber, district, acs_year, map_year, measure, estimate, moe in rows:
+        where = f"{chamber} {district} {measure}"
+        bounds = DEMOGRAPHIC_RANGES.get(measure)
+        if bounds is None or (acs_year, map_year) != (doc["acs_year"], doc["map_year"]):
+            failures.append(f"district_demographics: unexpected {where} ({acs_year}, {map_year})")
+            continue
+        low, high = bounds[chamber] if isinstance(bounds, dict) else bounds
+        if not low <= estimate <= high:
+            failures.append(f"district_demographics: {where} = {estimate} outside {low}-{high}")
+        if moe is None or not 0 <= moe < max(estimate, 1):
+            failures.append(f"district_demographics: {where} margin {moe} implausible")
+    return failures
+
+
 def run_checks(db_path: Path, counts_file: Path) -> list[str]:
     conn = sqlite3.connect(db_path)
     try:
@@ -544,6 +589,7 @@ def run_checks(db_path: Path, counts_file: Path) -> list[str]:
         failures += check_congress(conn)
         failures += check_court_challenges(conn)
         failures += check_executive_orders(conn)
+        failures += check_demographics(conn)
         # the floor only moves on a fully clean run; saving after a failed
         # one would let repeated small dips ratchet it down
         if not failures:

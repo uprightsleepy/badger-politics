@@ -157,6 +157,8 @@ jobs:
     with:
       stage: federal
       resume_run: ${{ inputs.resume_run || '' }}
+    secrets:
+      COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
 
   import:
     needs: federal
@@ -167,6 +169,8 @@ jobs:
     with:
       stage: import
       resume_run: ${{ inputs.resume_run || '' }}
+    secrets:
+      CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
 
   enrich:
     needs: import
