@@ -8,13 +8,22 @@
 <ellipse cx="160" cy="186" rx="66" ry="6" fill="#2E2A26" opacity=".14" stroke="none"/>
 <!-- the glass, then the coins inside it -->
 <path d="M118 84 C106 94 102 110 102 126 L102 164 C102 176 112 184 124 184 L196 184 C208 184 218 176 218 164 L218 126 C218 110 214 94 202 84 Z" fill="url(#bp-taxes-glass)" stroke="none"/>
-<g stroke-width="3">
-<path d="M112 160 v9 a16 6 0 0 0 32 0 v-9" fill="#D6A53A"/><ellipse cx="128" cy="160" rx="16" ry="6" fill="url(#bp-taxes-coin)"/>
-<path d="M144 160 v9 a16 6 0 0 0 32 0 v-9" fill="#D6A53A"/><ellipse cx="160" cy="160" rx="16" ry="6" fill="url(#bp-taxes-coin)"/>
-<path d="M176 160 v9 a16 6 0 0 0 32 0 v-9" fill="#D6A53A"/><ellipse cx="192" cy="160" rx="16" ry="6" fill="url(#bp-taxes-coin)"/>
-<path d="M128 146 v9 a16 6 0 0 0 32 0 v-9" fill="#D6A53A"/><ellipse cx="144" cy="146" rx="16" ry="6" fill="url(#bp-taxes-coin)"/>
-<path d="M160 146 v9 a16 6 0 0 0 32 0 v-9" fill="#D6A53A"/><ellipse cx="176" cy="146" rx="16" ry="6" fill="url(#bp-taxes-coin)"/>
-<g transform="translate(160 128) rotate(-18)"><ellipse cx="0" cy="0" rx="17" ry="7" fill="url(#bp-taxes-coin)"/><ellipse cx="0" cy="0" rx="9" ry="3.5" stroke-width="2"/></g>
+<!-- the same coin stack as the jobs tile, at 70% -->
+<g transform="translate(138 182) scale(.7)">
+<path d="M-30 -12 v12 a30 9 0 0 0 60 0 v-12" fill="#D6A53A"/><ellipse cx="0" cy="-12" rx="30" ry="9" fill="url(#bp-taxes-coin)"/>
+<path d="M-30 -24 v12 a30 9 0 0 0 60 0 v-12" fill="#D6A53A"/><ellipse cx="0" cy="-24" rx="30" ry="9" fill="url(#bp-taxes-coin)"/>
+<path d="M-30 -36 v12 a30 9 0 0 0 60 0 v-12" fill="#D6A53A"/><ellipse cx="0" cy="-36" rx="30" ry="9" fill="url(#bp-taxes-coin)"/>
+<path d="M-30 -48 v12 a30 9 0 0 0 60 0 v-12" fill="#D6A53A"/><ellipse cx="0" cy="-48" rx="30" ry="9" fill="url(#bp-taxes-coin)"/>
+<ellipse cx="0" cy="-48" rx="20" ry="5.5" stroke-width="2.5"/>
+<path d="M0 -53.5 V-42.5 M4 -51 C2.5 -52.5 -2.5 -52.5 -3.5 -51 C-4.5 -48.5 4.5 -49 4 -46.5 C3.5 -44.5 -3 -44 -4.5 -45.5" stroke-width="2.5"/>
+<path d="M-24 -42 C-24 -44 -20 -46 -14 -47" stroke="#FFFFFF" stroke-width="3" opacity=".6"/>
+</g>
+<g transform="translate(186 182) scale(.7)">
+<path d="M-30 -12 v12 a30 9 0 0 0 60 0 v-12" fill="#D6A53A"/><ellipse cx="0" cy="-12" rx="30" ry="9" fill="url(#bp-taxes-coin)"/>
+<path d="M-30 -24 v12 a30 9 0 0 0 60 0 v-12" fill="#D6A53A"/><ellipse cx="0" cy="-24" rx="30" ry="9" fill="url(#bp-taxes-coin)"/>
+<path d="M-30 -36 v12 a30 9 0 0 0 60 0 v-12" fill="#D6A53A"/><ellipse cx="0" cy="-36" rx="30" ry="9" fill="url(#bp-taxes-coin)"/>
+<ellipse cx="0" cy="-36" rx="20" ry="5.5" stroke-width="2.5"/>
+<path d="M-24 -30 C-24 -32 -20 -34 -14 -35" stroke="#FFFFFF" stroke-width="3" opacity=".6"/>
 </g>
 <!-- the jar's edge light and shade, then its outline -->
 <path d="M116 102 C110 118 110 150 116 170" stroke="#FFFFFF" stroke-width="6" opacity=".85"/>
@@ -23,6 +32,8 @@
 <!-- a coin half-way into the slot: drawn first, so the lid hides its lower edge -->
 <circle cx="160" cy="50" r="18" fill="url(#bp-taxes-coin)" stroke-width="3"/>
 <circle cx="160" cy="50" r="10" stroke-width="2.5"/>
+<path d="M160 44.5 V55.5 M164 47 C162.5 45.5 157.5 45.5 156.5 47 C155.5 49.5 164.5 49 164 51.5 C163.5 53.5 157 54 155.5 52.5" stroke-width="2.5"/>
+<path d="M147 46 a14 14 0 0 1 7 -9" stroke="#FFFFFF" stroke-width="3" opacity=".6"/>
 <!-- lid with the slot -->
 <rect x="110" y="62" width="100" height="24" rx="8" fill="url(#bp-taxes-lid)"/>
 <rect x="114" y="65" width="92" height="5" rx="2.5" fill="#FFFFFF" opacity=".3" stroke="none"/>

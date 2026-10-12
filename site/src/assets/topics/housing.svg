@@ -34,14 +34,14 @@
 <!-- fence -->
 <g stroke-width="3">
 <path d="M212 150 H266 M212 162 H266" stroke-width="3"/>
+<path d="M216 174 V144 L220 138 L224 144 V174 Z" fill="#F6EADB"/>
 <path d="M230 174 V144 L234 138 L238 144 V174 Z" fill="#F6EADB"/>
 <path d="M242 174 V144 L246 138 L250 144 V174 Z" fill="#F6EADB"/>
 <path d="M254 174 V144 L258 138 L262 144 V174 Z" fill="#F6EADB"/>
 </g>
 <!-- key -->
-<path fill-rule="evenodd" d="M262 70 a22 22 0 1 0 44 0 a22 22 0 1 0 -44 0 Z M276 70 a8 8 0 1 0 16 0 a8 8 0 1 0 -16 0 Z" fill="url(#bp-housing-key)"/>
-<path d="M278 94 V166 Q278 172 284 172 H288 Q294 172 294 166 V160 H302 V150 H294 V144 H306 V134 H294 V94 Z" fill="url(#bp-housing-key)"/>
-<path d="M270 62 a14 14 0 0 1 10 -10" stroke="#FFFFFF" stroke-width="3" opacity=".5"/>
+<path fill-rule="evenodd" d="M286 48 A22 22 0 0 1 294 90.5 V134 H306 V144 H294 V150 H302 V160 H294 V166 Q294 172 288 172 H284 Q278 172 278 166 V90.5 A22 22 0 0 1 286 48 Z M278 70 a8 8 0 1 0 16 0 a8 8 0 1 0 -16 0 Z" fill="url(#bp-housing-key)"/>
+<path d="M272 62 a14 14 0 0 1 10 -10" stroke="#FFFFFF" stroke-width="3" opacity=".5"/>
 <path d="M283 100 V150" stroke="#FFFFFF" stroke-width="3" opacity=".4"/>
 </g>
 </svg>
