@@ -63,121 +63,87 @@ const FIELD =
   />
 
   {/* the one bold moment: a prairie-gold field holding the question the
-      site answers and the first step toward answering it */}
-  <div class="rounded-[1.75rem] bg-wheat px-5 py-8 sm:px-10 sm:py-12 lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-center lg:gap-12">
-    <div class="flex max-w-[40rem] flex-col gap-4">
-      <h1 class="t-display lg:text-[3.25rem] lg:leading-[1.06]">What are your lawmakers doing about the things you care about?</h1>
-      <p class="sm:text-lead">
-        Plain-language answers from the state's official records. Free, with no ads and nothing
-        to sign up for.
-      </p>
-    </div>
-    <section class="sheet mt-8 flex min-w-0 flex-col gap-3 p-5 sm:p-7 lg:mt-0" aria-labelledby="home-addr-heading">
-      <h2 id="home-addr-heading" class="t-section">Who represents me?</h2>
-      <p id="home-addr-intro">
-        Enter your address to meet your state representative and state senator: how they vote
-        and what they're trying to pass.
-      </p>
-      <div id="home-addr-saved" class="hidden min-w-0 flex-1">
-        <div class="flex flex-col gap-3">
-          <div class="min-w-0">
-            <p id="home-addr-districts" class="font-bold"></p>
-            <p class="text-small text-granite">Saved on this device only. Every page marks your two lawmakers.</p>
-          </div>
-          <div class="flex flex-wrap gap-2.5">
-            <button type="button" id="home-addr-change" class="btn btn-secondary">Change address</button>
-            <button type="button" id="home-addr-forget" class="btn btn-secondary">Forget</button>
-          </div>
-        </div>
+      site answers and the first step toward answering it. Once a reader has
+      answered, the same field holds their two lawmakers instead. */}
+  <div class="rounded-[1.75rem] bg-wheat px-5 py-8 sm:px-10 sm:py-12">
+    <div id="hero-prompt">
+    <div class="lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-center lg:gap-12">
+      <div class="flex max-w-[40rem] flex-col gap-4">
+        <h1 class="t-display lg:text-[3.25rem] lg:leading-[1.06]">What are your lawmakers doing about the things you care about?</h1>
+        <p class="sm:text-lead">
+          Plain-language answers from the state's official records. Free, with no ads and nothing
+          to sign up for.
+        </p>
       </div>
-      <form id="home-addr-form" class="flex flex-col gap-2">
-        <label class="text-small font-bold" for="home-addr">Your Wisconsin address</label>
-        <input
-          id="home-addr"
-          type="text"
-          required
-          autocomplete="street-address"
-          placeholder="Street address and city"
-          class={`${FIELD} w-full`}
-        />
-        <div class="mt-1 flex flex-wrap gap-2.5">
-          <button type="submit" class="btn btn-primary">Find my lawmakers</button>
-          <button type="button" id="home-geo" class="btn btn-secondary">Use my location instead</button>
+      <section class="mt-6 flex min-w-0 flex-col gap-3 lg:mt-0" aria-labelledby="home-addr-heading">
+        <h2 id="home-addr-heading" class="t-section">Who represents me?</h2>
+        <form id="home-addr-form" class="flex flex-col gap-2">
+          <label class="text-small font-bold" for="home-addr">Your Wisconsin address</label>
+          <input
+            id="home-addr"
+            type="text"
+            required
+            autocomplete="street-address"
+            placeholder="Street address and city"
+            class={`${FIELD} w-full`}
+          />
+          <div class="mt-1 flex flex-wrap gap-2.5">
+            <button type="submit" class="btn btn-primary">Find my lawmakers</button>
+            <button type="button" id="home-geo" class="btn btn-secondary">Use my location instead</button>
+          </div>
+        </form>
+        <p id="home-addr-status" role="status" class="text-small empty:hidden"></p>
+        <p id="home-addr-privacy" class="flex items-start gap-2 text-small text-granite">
+          <svg class="mt-0.5 h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          <span>
+            Your address goes only to the U.S. Census geocoder to find your districts, and is never
+            stored. Your districts stay on this device.{PLACES_KEY && (
+              <> Suggestions as you type come from Google Places, so what you type is sent to
+              Google.</>
+            )}
+          </span>
+        </p>
+      </section>
+    </div>
+    </div>
+
+    {/* returning readers: no reintroduction, just their two lawmakers */}
+    <section id="hero-saved" class="hidden" aria-labelledby="my-reps-home-heading">
+      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-1">
+        <div class="min-w-0">
+          <h1 id="my-reps-home-heading" class="t-display">Your lawmakers</h1>
+          <p id="home-addr-districts" class="mt-1"></p>
         </div>
-      </form>
-      <p id="home-addr-status" role="status" class="text-small empty:hidden"></p>
-      <p id="home-addr-privacy" class="flex items-start gap-2 text-small text-granite">
-        <svg class="mt-0.5 h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-        <span>
-          Your address goes only to the U.S. Census geocoder to find your districts, and is never
-          stored. Your districts stay on this device.{PLACES_KEY && (
-            <> Suggestions as you type come from Google Places, so what you type is sent to
-            Google.</>
-          )}
-        </span>
+        <p class="flex flex-wrap gap-x-4 text-small">
+          <button type="button" id="home-addr-change" class="min-h-11 font-bold underline">Change address</button>
+          <button type="button" id="home-addr-forget" class="min-h-11 font-bold underline">Forget</button>
+        </p>
+      </div>
+      <div id="my-reps-cards" class="mt-5 grid items-stretch gap-4 lg:grid-cols-2" data-no-rep-highlight></div>
+      <p class="mt-4 text-small">
+        <a href="/my-reps/" class="font-bold underline">Committees, ballot and contact details on My reps</a>.
+        Saved on this device only; every page marks your two lawmakers.
       </p>
     </section>
-
   </div>
 
-  <section id="my-reps-home" class="mt-14 hidden" aria-labelledby="my-reps-home-heading">
-    <h2 id="my-reps-home-heading" class="t-section">Your lawmakers</h2>
-    <div id="my-reps-cards" class="mt-4 grid items-start gap-5 lg:grid-cols-2" data-no-rep-highlight></div>
-    <p class="mt-4">
-      <a href="/my-reps/" class="font-bold underline">See their committees, ballot and contact details on My reps</a>
-    </p>
-  </section>
-
-  <section class="mt-14" aria-labelledby="topics-heading">
-    <h2 id="topics-heading" class="t-section">What do you want to know about?</h2>
-    <p class="mt-2 max-w-[47.5rem]">Pick a topic to see the bills about it and where each one stands.</p>
-    <ul class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4" role="list">
-      {TOPICS.map((t) => (
-        <li>
-          <a
-            href={`/topics/${t.slug}/`}
-            class="topic group flex h-full flex-col rounded-[1.25rem] p-2 no-underline outline-offset-2 transition-transform motion-safe:hover:-translate-y-0.5"
-            style={`background:${t.tint}`}
-          >
-            <span
-              class="topic-panel flex aspect-[8/5] items-center justify-center rounded-[0.9rem]"
-              style={`--a:${t.panel[0]};--b:${t.panel[1]};color:${t.ink}`}
-              aria-hidden="true"
-            >
-              <span class="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_2px_6px_rgb(0_0_0/0.12)] transition-transform group-hover:scale-105 sm:h-[4.5rem] sm:w-[4.5rem]">
-                <svg class="h-8 w-8 sm:h-9 sm:w-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={TOPIC_ICONS[t.slug]} />
-              </span>
-            </span>
-            <span class="flex flex-col gap-1 px-2 pt-3 pb-2 sm:px-3">
-              <span class="font-display text-[1.125rem] leading-tight font-bold text-spruce group-hover:underline sm:text-[1.25rem]">{t.label}</span>
-              <span class="text-small text-granite">{t.examples}</span>
-            </span>
-          </a>
-        </li>
-      ))}
-    </ul>
-    <p class="mt-4"><a href="/subjects/" class="underline">Every topic in the Legislature's index</a></p>
-  </section>
-
-  <div class="mt-14">
-    <section id="search" class="sheet flex min-w-0 scroll-mt-4 flex-col gap-3 p-5 sm:p-7">
-      <h2 id="search-heading" class="t-section">Search for anything</h2>
-      <p>A bill number like AB 656, a lawmaker's name, a committee or a campaign donor.</p>
-      <form id="search-form" action="/#search" method="get" class="flex flex-col gap-2" role="search" aria-labelledby="search-heading">
-        <label class="text-small font-bold" for="q">Search bills, people and committees</label>
+  <section id="search" class="mt-6 flex min-w-0 scroll-mt-4 flex-col gap-3" aria-labelledby="search-heading">
+    <h2 id="search-heading" class="sr-only">Search bills, lawmakers and money</h2>
+    <form id="search-form" action="/#search" method="get" class="flex flex-col gap-2" role="search" aria-labelledby="search-heading">
+        <label class="sr-only" for="q">Search bills, lawmakers and money</label>
         <div class="flex flex-wrap gap-2.5">
           <input
             id="q"
             name="q"
             type="search"
-            placeholder="Try child care or AB 656"
+            placeholder="Search bills, lawmakers and money: try child care or AB 656"
             class={`${FIELD} flex-1 basis-48`}
             autocomplete="off"
           />
           <button type="submit" class="btn btn-secondary">Search</button>
         </div>
         {/* facets baked into the index at build time; "All" is no filter */}
-        <div id="search-filters" class="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label="Show only" data-pagefind-ignore>
+        <div id="search-filters" class="mt-2 hidden flex-wrap items-center gap-2" role="group" aria-label="Show only" data-pagefind-ignore>
           {SEARCH_TYPES.map(([label, type], i) => (
             <button type="button" data-type-chip={type} aria-pressed={i === 0 ? "true" : "false"} class="chip">
               {label}
@@ -208,10 +174,39 @@ const FIELD =
         </div>
         <div id="search-results" class="hidden divide-y divide-rule border-y border-rule"></div>
         <button id="search-more" type="button" class="btn btn-secondary mt-2 hidden self-start">Show more results</button>
-      </form>
-    </section>
-  </div>
+    </form>
+  </section>
 
+  <section class="mt-12" aria-labelledby="topics-heading">
+    <h2 id="topics-heading" class="t-section">What do you want to know about?</h2>
+    <p class="mt-2 max-w-[47.5rem]">Pick a topic to see the bills about it and where each one stands.</p>
+    <ul class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4" role="list">
+      {TOPICS.map((t) => (
+        <li>
+          <a
+            href={`/topics/${t.slug}/`}
+            class="topic group flex h-full flex-col rounded-[1.25rem] p-2 no-underline outline-offset-2 transition-transform motion-safe:hover:-translate-y-0.5"
+            style={`background:${t.tint}`}
+          >
+            <span
+              class="topic-panel flex aspect-[8/5] items-center justify-center rounded-[0.9rem]"
+              style={`--a:${t.panel[0]};--b:${t.panel[1]};color:${t.ink}`}
+              aria-hidden="true"
+            >
+              <span class="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_2px_6px_rgb(0_0_0/0.12)] transition-transform group-hover:scale-105 sm:h-[4.5rem] sm:w-[4.5rem]">
+                <svg class="h-8 w-8 sm:h-9 sm:w-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={TOPIC_ICONS[t.slug]} />
+              </span>
+            </span>
+            <span class="flex flex-col gap-1 px-2 pt-3 pb-2 sm:px-3">
+              <span class="font-display text-[1.125rem] leading-tight font-bold text-spruce group-hover:underline sm:text-[1.25rem]">{t.label}</span>
+              <span class="text-small text-granite">{t.examples}</span>
+            </span>
+          </a>
+        </li>
+      ))}
+    </ul>
+    <p class="mt-4"><a href="/subjects/" class="underline">Every topic in the Legislature's index</a></p>
+  </section>
 
   <section class="mt-14 max-w-[47.5rem]" aria-labelledby="outcomes-heading">
     <h2 id="outcomes-heading" class="t-section">
@@ -289,6 +284,7 @@ const FIELD =
     const fOutcome = document.getElementById("f-outcome");
     const more = document.getElementById("search-more");
     const clear = document.getElementById("search-clear");
+    const filterBar = document.getElementById("search-filters");
     let pagefind;
     let timer;
 
@@ -429,6 +425,9 @@ const FIELD =
       results = null;
       more.classList.add("hidden");
       box.innerHTML = "";
+      // the chips only matter once there is something to filter
+      filterBar.classList.toggle("hidden", q.length < 2);
+      filterBar.classList.toggle("flex", q.length >= 2);
       if (q.length < 2) {
         box.classList.add("hidden");
         status.textContent = "";
@@ -546,7 +545,6 @@ const FIELD =
   import { attachSuggest } from "../scripts/addressSuggest";
   import { partyWord } from "../lib/format";
   import type { RepSlim, RepSummaries, RepSummary, Reps } from "../lib/wire";
-  import type { answers as Answers } from "../lib/repAnswers";
 
   // Show saved representatives inline using browser storage and static JSON.
   const form = document.getElementById("home-addr-form") as HTMLFormElement | null;
@@ -554,30 +552,27 @@ const FIELD =
   const addrStatus = document.getElementById("home-addr-status");
   const geoBtn = document.getElementById("home-geo");
 
-  const heading = document.getElementById("home-addr-heading");
-  const cardSaved = document.getElementById("home-addr-saved");
+  // the wheat field shows one of two states: the question with the address
+  // step, or the reader's two lawmakers
+  const heroPrompt = document.getElementById("hero-prompt");
+  const heroSaved = document.getElementById("hero-saved");
   const districtsLine = document.getElementById("home-addr-districts");
-  // the prompt-state pieces, toggled as a set
-  const promptEls = ["home-addr-intro", "home-addr-form", "home-addr-privacy"]
-    .map((id) => document.getElementById(id));
   if (form && addr) attachSuggest(addr, () => form.requestSubmit());
 
   const showSaved = (d: { ad: number; sd: number }) => {
-    if (heading) heading.textContent = "Your districts";
     if (districtsLine) {
       const c = savedCityDistrict();
       const city = c && (c.t === "milwaukee" ? "Milwaukee" : c.t === "westalliswi" ? "West Allis" : null);
       districtsLine.textContent = `Assembly District ${d.ad} and Senate District ${d.sd}.`
         + (city ? ` ${city} Common Council District ${c.d}.` : "");
     }
-    for (const el of promptEls) el?.classList.add("hidden");
-    cardSaved?.classList.remove("hidden");
+    heroPrompt?.classList.add("hidden");
+    heroSaved?.classList.remove("hidden");
     if (addrStatus) addrStatus.textContent = "";
   };
   const showPrompt = () => {
-    if (heading) heading.textContent = "Find your lawmakers";
-    for (const el of promptEls) el?.classList.remove("hidden");
-    cardSaved?.classList.add("hidden");
+    heroSaved?.classList.add("hidden");
+    heroPrompt?.classList.remove("hidden");
     addr?.focus();
   };
 
@@ -591,7 +586,6 @@ const FIELD =
   document.getElementById("home-addr-forget")?.addEventListener("click", () => {
     forgetDistrict();
     forgetCityDistrict();
-    document.getElementById("my-reps-home")?.classList.add("hidden");
     showPrompt();
     if (addrStatus) addrStatus.textContent = "Forgotten.";
   });
@@ -646,15 +640,14 @@ const FIELD =
     render(saved);
   }
 
-  // the same questions, in the same words, as My reps and each lawmaker's
-  // page; the homepage asks the two that say the most at a glance
-  const GLANCE = new Set(["voting", "recent"]);
   const PORTRAIT_FALLBACK =
     '<svg width="56" height="56" viewBox="0 0 48 48" aria-hidden="true" class="shrink-0 rounded-full">' +
     '<circle cx="24" cy="24" r="24" fill="#E6EBE7"/><circle cx="24" cy="19" r="7.5" fill="#848E88"/>' +
     '<rect x="10" y="30.5" width="28" height="24" rx="12" fill="#848E88"/></svg>';
 
-  function card(answers: typeof Answers, house: "assembly" | "senate", district: number, slim: RepSlim | undefined, full: RepSummary | undefined, summaries: RepSummaries | null): string {
+  // one row per lawmaker: who they are and the one figure that says the
+  // most at a glance (the same count My reps and their page report)
+  function row(house: "assembly" | "senate", district: number, slim: RepSlim | undefined, full: RepSummary | undefined): string {
     if (!slim) return "";
     const chamber = house === "assembly" ? "Assembly" : "Senate";
     const title = house === "assembly" ? "representative" : "state senator";
@@ -662,45 +655,31 @@ const FIELD =
     const portrait = slim.image
       ? `<img src="${esc(slim.image)}" alt="" width="56" height="56" loading="lazy" decoding="async" class="h-14 w-14 shrink-0 rounded-full bg-fog object-cover object-[50%_20%]">`
       : PORTRAIT_FALLBACK;
-    const questions = full
-      ? answers(full, {
-          house, district, typical: summaries?.typical?.[house], phase: summaries?.phase, general: "", mine: false,
-        })
-          .filter((a) => GLANCE.has(a.id))
-          .map((a) => `<div class="flex flex-col gap-1.5 border-t border-rule pt-4"><h4 class="t-question">${esc(a.q)}</h4>${a.html}</div>`)
-          .join("")
-      : "";
+    const voted = full?.voted;
+    const votes = voted?.total
+      ? `Voted on <b>${voted.cast.toLocaleString()} of ${voted.total.toLocaleString()}</b> roll calls this session.`
+      : "No roll call votes recorded for them yet this session.";
     return (
-      `<section class="sheet flex min-w-0 flex-col gap-4 break-words p-5 sm:p-6" aria-labelledby="${headingId}">` +
-      '<div class="flex flex-wrap items-center gap-4">' + portrait +
-      '<div class="min-w-0 flex-[1_1_12rem]">' +
-      `<h3 id="${headingId}" class="t-section text-[1.375rem]"><a href="/legislators/${esc(slim.slug)}/" class="text-spruce no-underline hover:underline">${esc(slim.name)}</a></h3>` +
-      `<p class="text-granite">Your ${title} for <a href="/districts/${house}-${district}/" class="underline">${chamber} District ${district}</a>.` +
+      `<section class="flex min-w-0 items-start gap-4 rounded-[1rem] bg-white/70 p-4 sm:p-5" aria-labelledby="${headingId}">` + portrait +
+      '<div class="min-w-0 flex-1">' +
+      `<h2 id="${headingId}" class="t-section text-[1.25rem]"><a href="/legislators/${esc(slim.slug)}/" class="text-spruce no-underline hover:underline">${esc(slim.name)}</a></h2>` +
+      `<p class="text-small text-granite">Your ${title} for <a href="/districts/${house}-${district}/" class="underline">${chamber} District ${district}</a>.` +
       `${slim.party ? ` ${esc(partyWord(slim.party))}.` : ""}</p>` +
-      '</div></div>' +
-      questions +
-      `<p class="border-t border-rule pt-4"><a href="/legislators/${esc(slim.slug)}/" class="font-bold underline">Full record</a></p>` +
-      '</section>'
+      `<p class="mt-2 text-small">${votes} <a href="/legislators/${esc(slim.slug)}/" class="font-bold underline">Full record</a></p>` +
+      '</div></section>'
     );
   }
 
   function render(saved: { ad: number; sd: number }) {
-    const section = document.getElementById("my-reps-home")!;
-    const cards = document.getElementById("my-reps-cards")!;
-    // the answer wording loads only for readers with a saved district
+    const rows = document.getElementById("my-reps-cards")!;
     Promise.all([
       fetch("/data/reps.json").then((r) => r.json()),
       fetch("/data/rep-summaries.json").then((r) => r.json()).catch(() => null),
-      import("../lib/repAnswers"),
     ])
-      .then(([reps, summaries, { answers }]: [Reps, RepSummaries | null, { answers: typeof Answers }]) => {
-        const html =
-          card(answers, "assembly", saved.ad, reps.assembly?.[saved.ad], summaries?.assembly?.[saved.ad], summaries) +
-          card(answers, "senate", saved.sd, reps.senate?.[saved.sd], summaries?.senate?.[saved.sd], summaries);
-        if (html) {
-          cards.innerHTML = html;
-          section.classList.remove("hidden");
-        }
+      .then(([reps, summaries]: [Reps, RepSummaries | null]) => {
+        rows.innerHTML =
+          row("assembly", saved.ad, reps.assembly?.[saved.ad], summaries?.assembly?.[saved.ad]) +
+          row("senate", saved.sd, reps.senate?.[saved.sd], summaries?.senate?.[saved.sd]);
       })
       .catch(() => {});
   }
