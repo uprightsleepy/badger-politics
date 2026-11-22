@@ -261,6 +261,20 @@ Tommy Thompson's series as 2001 No. 418 before his own restarts at 1, and the
 archive files it in McCallum's folder as listed. The parser tests use reduced
 real captures in `tests/fixtures/executive_orders/`.
 
+## CFIS robots recheck (2026-11-22)
+
+The nightly stopped on 2026-09-16 because the CFIS [robots file](https://campaignfinance.wi.gov/robots.txt)
+changed, and the policy gate holds every stage until a person reviews the new
+directives. Reviewed and approved by the repo owner on 2026-11-22: the file
+still answers 200 at the same URL and keeps `Crawl-delay: 10`. Named AI and
+aggressive agents (GPTBot, ChatGPT-User, Google-Extended, CCBot, anthropic-ai,
+ClaudeBot, facebookexternalhit, Bytespider, Yeti) are disallowed everywhere;
+the collector's own identifying User-Agent is none of them. The general group
+now disallows `/registrant-dashboard`, `/admin`, `/staff-admin` and
+`/browse-data/report/`, none of which the collector reads: its three reviewed
+`/api/trpc/` procedures remain open. The manifest records the new fingerprint;
+paths, pacing, identity, redaction and reuse scope are unchanged.
+
 ## Nightly finance windowing (2026-09-07)
 
 The CFIS [robots file](https://campaignfinance.wi.gov/robots.txt) was rechecked
