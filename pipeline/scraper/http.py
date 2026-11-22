@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 
@@ -90,10 +91,21 @@ def cached_page(http: requests.Session, url: str, cache_dir: Path) -> tuple[str,
     return response.text, False
 
 
+def github_api_headers(url: str) -> dict[str, str]:
+    """GitHub rate-limits anonymous API calls per address, and shared Actions
+    runners exhaust that budget; the workflow's own token raises it. The
+    token goes only to the API host, never to the raw download host."""
+    token = os.environ.get("GITHUB_TOKEN")
+    if token and url.startswith("https://api.github.com/"):
+        return {"Authorization": f"Bearer {token}"}
+    return {}
+
+
 def fetch_github_dir(repo_path: str, dest: Path) -> int:
     """Download every .yml file in a GitHub contents directory."""
     http = session()
-    listing = http.get(f"{repo_path}?per_page=1000", timeout=30)
+    listing_url = f"{repo_path}?per_page=1000"
+    listing = http.get(listing_url, timeout=30, headers=github_api_headers(listing_url))
     listing.raise_for_status()
     entries = [e for e in listing.json() if e["name"].endswith(".yml")]
     if not entries:

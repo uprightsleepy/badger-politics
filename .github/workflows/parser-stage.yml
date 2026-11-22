@@ -82,6 +82,9 @@ jobs:
         env:
           # A nightly-parser environment secret, exposed only to the federal stage.
           COURTLISTENER_TOKEN: ${{ inputs.stage == 'federal' && secrets.COURTLISTENER_TOKEN || '' }}
+          # Read-only job token, so the roster listing is not rate-limited as an
+          # anonymous call from a shared runner address (scraper/http.py).
+          GITHUB_TOKEN: ${{ inputs.stage == 'legislature' && github.token || '' }}
         run: uv run --locked python -m nightly run --stage "$STAGE"
       # GitHub's OIDC assertion is short-lived. Mint a NEW assertion after
       # the multi-hour step before uploading data or private diagnostics.

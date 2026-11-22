@@ -261,6 +261,20 @@ Tommy Thompson's series as 2001 No. 418 before his own restarts at 1, and the
 archive files it in McCallum's folder as listed. The parser tests use reduced
 real captures in `tests/fixtures/executive_orders/`.
 
+## GitHub API authentication (2026-11-22)
+
+The first run after the long pause stopped in `fetch_people`: the
+openstates/people directory listing on `api.github.com` answered HTTP 403.
+GitHub rate-limits anonymous API calls per source address, and the shared
+Actions runner addresses exhaust that budget, which the shared transport
+correctly treats as a stop. Following GitHub's
+[rate-limit guidance](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#handle-rate-limit-errors-appropriately),
+the legislature stage now passes the workflow's read-only job token, and
+`fetch_github_dir` sends it as a bearer header only to `api.github.com`; the
+raw download host still receives anonymous requests. Paths, pacing and the
+CC0 roster scope are unchanged, and a 403 or exhausted limit still stops
+the source.
+
 ## Green Bay robots recheck (2026-11-22)
 
 Both Green Bay hosts changed their robots responses after the September
