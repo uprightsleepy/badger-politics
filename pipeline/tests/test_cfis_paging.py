@@ -215,3 +215,43 @@ def test_duplicate_rows_and_latest_registry_observation_are_retained(configure):
     rows, registry = committees._fetch_month(http, FIRST, LAST)[:2]
     assert rows == [COMMITTEE_ROW, {**COMMITTEE_ROW, "other_name": "Amended PAC Name"}]
     assert registry == {**REGISTRY, 30: {**REGISTRY[30], "name": "Amended PAC Name"}}
+
+
+def test_window_past_the_offset_cap_is_read_as_date_halves(configure, monkeypatch):
+    monkeypatch.setattr(api, "MAX_OFFSET", 2)
+    first, second, third, fourth, fifth = ({**RAW, "id": key} for key in range(1, 6))
+    # January counts 5 rows: past skip 2 with pages of 2, so it splits at the 16th;
+    # the halves count 2 and 3, and the second half is still read in pages of 2
+    http = configure([page(first, second), page(), page(third, fourth), page(fifth)],
+                     counts=(5, 2, 3))
+    assert receipts.fetch_window(http, {20: "p1"}, FIRST, LAST) == (
+        [{**RECEIPT, "id": key} for key in range(1, 6)], 5, 5, {1, 2, 3, 4, 5})
+    assert http.requests() == [
+        ("publicFrontendApi.getTransactionsTotalCount", {"dateFrom": FIRST, "dateTo": LAST}, 60),
+        ("publicFrontendApi.getTransactionsTotalCount",
+         {"dateFrom": "2025-01-01", "dateTo": "2025-01-16T23:59:59"}, 60),
+        ("publicFrontendApi.getTransactionsTotalCount",
+         {"dateFrom": "2025-01-17", "dateTo": LAST}, 60),
+        ("publicFrontendApi.getTransactions", {
+            "take": 2, "skip": 0, "sortBy": "date", "sortDirection": "asc",
+            "dateFrom": "2025-01-01", "dateTo": "2025-01-16T23:59:59"}, 60),
+        ("publicFrontendApi.getTransactions", {
+            "take": 2, "skip": 2, "sortBy": "date", "sortDirection": "asc",
+            "dateFrom": "2025-01-01", "dateTo": "2025-01-16T23:59:59"}, 60),
+        ("publicFrontendApi.getTransactions", {
+            "take": 2, "skip": 0, "sortBy": "date", "sortDirection": "asc",
+            "dateFrom": "2025-01-17", "dateTo": LAST}, 60),
+        ("publicFrontendApi.getTransactions", {
+            "take": 2, "skip": 2, "sortBy": "date", "sortDirection": "asc",
+            "dateFrom": "2025-01-17", "dateTo": LAST}, 60),
+    ]
+
+
+def test_halves_that_do_not_add_up_or_a_single_day_past_the_cap_stop(configure, monkeypatch):
+    monkeypatch.setattr(api, "MAX_OFFSET", 2)
+    http = configure([], counts=(5, 2, 2))
+    with pytest.raises(RuntimeError, match="halves count 4"):
+        receipts.fetch_window(http, {20: "p1"}, FIRST, LAST)
+    http = configure([], counts=(5,))
+    with pytest.raises(RuntimeError, match="one day"):
+        receipts.fetch_window(http, {20: "p1"}, "2025-01-31", LAST)
