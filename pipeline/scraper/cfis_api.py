@@ -17,13 +17,13 @@ import requests
 
 BASE = "https://campaignfinance.wi.gov/api/trpc/"
 PAGE = 1000
-# CFIS rejects any `skip` above this (observed 2026-11-22: a zod "too_big"
-# error), so a window is split by date until every part fits.
-MAX_OFFSET = 10_000
 
 
-def call(http: requests.Session, proc: str, payload: dict, timeout: int = 60):
-    url = BASE + proc + "?input=" + requests.utils.quote(json.dumps({"json": payload}))
+def call(http: requests.Session, proc: str, payload: dict, timeout: int = 60,
+         meta: dict | None = None):
+    # superjson envelope: `meta` names the payload fields the server must revive
+    envelope = {"json": payload, **({"meta": meta} if meta else {})}
+    url = BASE + proc + "?input=" + requests.utils.quote(json.dumps(envelope))
     response = http.get(url, timeout=timeout)
     response.raise_for_status()
     body = response.json()
@@ -33,47 +33,28 @@ def call(http: requests.Session, proc: str, payload: dict, timeout: int = 60):
     return result
 
 
-def split_window(first: str, last: str) -> list[tuple[str, str]]:
-    """Two date halves of [first, last]; the end keeps its end-of-day time."""
-    start, end = date.fromisoformat(first[:10]), date.fromisoformat(last[:10])
-    if start >= end:
-        raise RuntimeError(f"CFIS drift: {first} holds more rows than the API can page in one day")
-    mid = start + (end - start) // 2
-    return [(first, mid.isoformat() + "T23:59:59"), ((mid + timedelta(days=1)).isoformat(), last)]
-
-
 def transaction_pages(
     http: requests.Session, first: str, last: str, *, timeout: int = 60,
-    offset_step: int | None = None, page_size: int | None = None,
-    expected: int | None = None,
+    page_size: int | None = None,
 ) -> Iterator[list[dict]]:
-    """Yield date-sorted pages; advance by received rows unless a fixed step is supplied.
-    With the window's row count known, a window whose rows would need an offset
-    past MAX_OFFSET is read as date halves whose counts must add up to it."""
+    """Yield date-sorted pages, following the source's cursor. CFIS caps the
+    offset form of paging at 10,000 rows (2026-11-22) and its own site pages
+    by `nextCursor`, a (date, id) key the next request echoes as a Date."""
     size = PAGE if page_size is None else page_size
-    if expected is not None and expected > MAX_OFFSET + size:
-        halves = split_window(first, last)
-        counts = [transaction_count(http, a, b) for a, b in halves]
-        if sum(counts) != expected:
-            raise RuntimeError(f"CFIS drift: {first[:10]}..{last[:10]} counts {expected}"
-                               f" but its halves count {sum(counts)}")
-        for (a, b), count in zip(halves, counts, strict=True):
-            yield from transaction_pages(http, a, b, timeout=timeout, offset_step=offset_step,
-                                         page_size=size, expected=count)
-        return
-    skip = 0
+    cursor = None
     while True:
-        page = call(
-            http, "publicFrontendApi.getTransactions",
-            {"take": size, "skip": skip, "sortBy": "date",
-             "sortDirection": "asc", "dateFrom": first, "dateTo": last},
-            timeout=timeout,
-        )
+        payload = {"take": size, "sortBy": "date", "sortDirection": "asc",
+                   "dateFrom": first, "dateTo": last}
+        meta = None
+        if cursor is not None:
+            payload["cursor"] = cursor
+            meta = {"values": {"cursor.date": ["Date"]}}
+        page = call(http, "publicFrontendApi.getTransactions", payload, timeout=timeout, meta=meta)
         results = page.get("results", [])
         yield results
-        if len(results) < size:
+        cursor = page.get("nextCursor")
+        if len(results) < size or not cursor:
             return
-        skip += len(results) if offset_step is None else offset_step
 
 
 def verified(http, first, last, fetch, label, attempts=3):

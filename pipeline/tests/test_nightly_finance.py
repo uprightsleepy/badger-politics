@@ -71,8 +71,12 @@ def test_split_and_unsplit_archives_and_database_are_identical(tmp_path, monkeyp
             return len(selected)
         assert procedure == "publicFrontendApi.getTransactions"
         calls.append(copy.deepcopy(payload))
-        return {"results": copy.deepcopy(selected[payload["skip"]:
-                                                  payload["skip"] + payload["take"]])}
+        ids = [row["id"] for row in selected]
+        start = ids.index(payload["cursor"]["id"]) + 1 if "cursor" in payload else 0
+        results = selected[start:start + payload["take"]]
+        full = len(results) == payload["take"]
+        cursor = {"id": results[-1]["id"], "date": results[-1]["date"]} if full else None
+        return {"results": copy.deepcopy(results), "nextCursor": cursor}
 
     monkeypatch.setattr(cfis_api, "call", api)
     monkeypatch.setattr(cfis_api, "PAGE", 2)
@@ -88,7 +92,8 @@ def test_split_and_unsplit_archives_and_database_are_identical(tmp_path, monkeyp
     for month in ("2025-02", "2025-01"):
         monkeypatch.setattr(collector, "DATA_DIR", inputs / month / "cfis")
         collector.main(["--since", month, "--until", month])
-    assert sorted(calls, key=lambda p: (p["dateFrom"], p["skip"])) == unsplit_calls
+    order = lambda p: (p["dateFrom"], p.get("cursor", {}).get("id", 0))  # noqa: E731
+    assert sorted(calls, key=order) == unsplit_calls
     merge_months(split, inputs, ["2025-01", "2025-02"])
     assert {p.name for p in split.iterdir()} == {p.name for p in unsplit.iterdir()}
     for path in unsplit.iterdir():
