@@ -50,18 +50,22 @@ REGISTRY = {
 }
 
 
-def page(*rows):
-    return {"results": list(rows)}
+CURSOR = {"id": 1, "date": "2025-01-31T05:00:00Z"}
+
+
+def page(*rows, cursor=None):
+    """A source page; a full page carries the cursor the next request echoes."""
+    return {"results": list(rows), "nextCursor": cursor}
 
 
 SCENARIOS = {
     "empty": [page()],
     "short": [page(RAW)],
-    "exact": [page(RAW, RAW), page()],
-    "multiple": [page(RAW, RAW), page(RAW)],
-    "oversized": [page(RAW, RAW, RAW), page()],
+    "exact": [page(RAW, RAW, cursor=CURSOR), page()],
+    "multiple": [page(RAW, RAW, cursor=CURSOR), page(RAW)],
+    "oversized": [page(RAW, RAW, RAW, cursor=CURSOR), page()],
     "missing-results": [{}],
-    "timeout": [page(RAW, RAW), requests.Timeout("fixture timeout")],
+    "timeout": [page(RAW, RAW, cursor=CURSOR), requests.Timeout("fixture timeout")],
     "denied": [SourceAccessError("fixture source stopped")],
     "http-error": [requests.HTTPError("fixture HTTP 503")],
     "malformed-page": [None],
@@ -111,6 +115,10 @@ class FakeHttp:
             ))
         return requests_made
 
+    def envelopes(self):
+        return [json.loads(parse_qs(urlsplit(url).query)["input"][0])
+                for kind, url, _ in self.events if kind == "request"]
+
 
 @pytest.fixture
 def configure(monkeypatch):
@@ -143,15 +151,15 @@ def test_complete_rows_requests_and_sleeps(kind, timeout, scenario, row_count, c
         assert result == ([RECEIPT] * row_count, row_count, row_count, {1} if row_count else set())
     else:
         assert result == ([COMMITTEE_ROW] * row_count, REGISTRY if row_count else {})
-    skips = [0]
+    cursors = [None]
     if scenario in ("exact", "multiple", "oversized"):
-        skips.append(3 if scenario == "oversized" and kind == "receipts" else 2)
+        cursors.append(CURSOR)
     expected = [
         ("publicFrontendApi.getTransactions", {
-            "take": 2, "skip": skip, "sortBy": "date", "sortDirection": "asc",
-            "dateFrom": FIRST, "dateTo": LAST,
+            "take": 2, "sortBy": "date", "sortDirection": "asc",
+            "dateFrom": FIRST, "dateTo": LAST, **({"cursor": cursor} if cursor else {}),
         }, timeout)
-        for skip in skips
+        for cursor in cursors
     ]
     expected.insert(0, ("publicFrontendApi.getTransactionsTotalCount",
                         {"dateFrom": FIRST, "dateTo": LAST}, 60))
@@ -193,7 +201,7 @@ def test_errors_propagate_without_advancing(
 
 def test_receipt_count_mismatch_retake_keeps_both_waits(configure):
     second = {**RAW, "id": 2}
-    http = configure([page(RAW), page(RAW, second), page()], counts=(2, 2, 2))
+    http = configure([page(RAW), page(RAW, second, cursor=CURSOR), page()], counts=(2, 2, 2))
     assert api.verified(
         http, FIRST, LAST,
         lambda size: receipts.fetch_window(http, {20: "p1"}, FIRST, LAST, page_size=size),
@@ -217,41 +225,11 @@ def test_duplicate_rows_and_latest_registry_observation_are_retained(configure):
     assert registry == {**REGISTRY, 30: {**REGISTRY[30], "name": "Amended PAC Name"}}
 
 
-def test_window_past_the_offset_cap_is_read_as_date_halves(configure, monkeypatch):
-    monkeypatch.setattr(api, "MAX_OFFSET", 2)
-    first, second, third, fourth, fifth = ({**RAW, "id": key} for key in range(1, 6))
-    # January counts 5 rows: past skip 2 with pages of 2, so it splits at the 16th;
-    # the halves count 2 and 3, and the second half is still read in pages of 2
-    http = configure([page(first, second), page(), page(third, fourth), page(fifth)],
-                     counts=(5, 2, 3))
-    assert receipts.fetch_window(http, {20: "p1"}, FIRST, LAST) == (
-        [{**RECEIPT, "id": key} for key in range(1, 6)], 5, 5, {1, 2, 3, 4, 5})
-    assert http.requests() == [
-        ("publicFrontendApi.getTransactionsTotalCount", {"dateFrom": FIRST, "dateTo": LAST}, 60),
-        ("publicFrontendApi.getTransactionsTotalCount",
-         {"dateFrom": "2025-01-01", "dateTo": "2025-01-16T23:59:59"}, 60),
-        ("publicFrontendApi.getTransactionsTotalCount",
-         {"dateFrom": "2025-01-17", "dateTo": LAST}, 60),
-        ("publicFrontendApi.getTransactions", {
-            "take": 2, "skip": 0, "sortBy": "date", "sortDirection": "asc",
-            "dateFrom": "2025-01-01", "dateTo": "2025-01-16T23:59:59"}, 60),
-        ("publicFrontendApi.getTransactions", {
-            "take": 2, "skip": 2, "sortBy": "date", "sortDirection": "asc",
-            "dateFrom": "2025-01-01", "dateTo": "2025-01-16T23:59:59"}, 60),
-        ("publicFrontendApi.getTransactions", {
-            "take": 2, "skip": 0, "sortBy": "date", "sortDirection": "asc",
-            "dateFrom": "2025-01-17", "dateTo": LAST}, 60),
-        ("publicFrontendApi.getTransactions", {
-            "take": 2, "skip": 2, "sortBy": "date", "sortDirection": "asc",
-            "dateFrom": "2025-01-17", "dateTo": LAST}, 60),
-    ]
-
-
-def test_halves_that_do_not_add_up_or_a_single_day_past_the_cap_stop(configure, monkeypatch):
-    monkeypatch.setattr(api, "MAX_OFFSET", 2)
-    http = configure([], counts=(5, 2, 2))
-    with pytest.raises(RuntimeError, match="halves count 4"):
-        receipts.fetch_window(http, {20: "p1"}, FIRST, LAST)
-    http = configure([], counts=(5,))
-    with pytest.raises(RuntimeError, match="one day"):
-        receipts.fetch_window(http, {20: "p1"}, "2025-01-31", LAST)
+def test_a_cursor_is_echoed_as_a_date_and_a_full_page_without_one_ends(configure):
+    http = configure([page(RAW, RAW, cursor=CURSOR), page(RAW, RAW)], counts=(4,))
+    assert receipts.fetch_window(http, {20: "p1"}, FIRST, LAST)[1] == 4
+    envelopes = [e for e in http.envelopes() if "take" in e["json"]]
+    assert "meta" not in envelopes[0]
+    assert envelopes[1]["json"]["cursor"] == CURSOR
+    assert envelopes[1]["meta"] == {"values": {"cursor.date": ["Date"]}}
+    assert not http.pages, "a full page with no cursor is the last page"

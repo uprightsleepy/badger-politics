@@ -261,18 +261,19 @@ Tommy Thompson's series as 2001 No. 418 before his own restarts at 1, and the
 archive files it in McCallum's folder as listed. The parser tests use reduced
 real captures in `tests/fixtures/executive_orders/`.
 
-## CFIS offset cap (2026-11-22)
+## CFIS cursor paging (2026-11-22)
 
 The first finance stage after the pause stopped on October 2026: CFIS now
-answers HTTP 400 (`skip` "must be less than or equal to 10000") to any page
-offset above 10,000, and that month holds 136,245 transactions. Both
-fetchers already count a window before paging it; `transaction_pages` now
-reads a window whose rows lie past the cap as two date halves, recursively,
-and stops as drift when the halves' counts do not add up to the window's or
-when a single day exceeds the cap. The month-level completeness check
-(paged rows equal the month's count, every id unique) is unchanged, as are
-the request shapes, reviewed paths and ten-second pacing; only the count
-calls for oversized windows are added.
+answers HTTP 400 (`skip` "cannot exceed 10000; use cursor for deeper
+pagination") to any page offset above 10,000, and that month holds 136,245
+transactions, 56,033 of them on October 19 alone. The site's own
+transactions page now pages with a cursor, so `transaction_pages` does the
+same: each page returns `nextCursor`, a (date, id) key, and the next request
+echoes it (as a superjson Date) instead of an offset. Verified from the
+review machine across 13,000 rows of October with no duplicate ids. The
+month-level completeness check (paged rows equal the month's count, every
+id unique), the request procedures, reviewed paths and ten-second pacing
+are unchanged.
 
 ## GitHub API authentication (2026-11-22)
 

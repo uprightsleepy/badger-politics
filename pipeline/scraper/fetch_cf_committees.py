@@ -61,8 +61,7 @@ def _fetch_month(http: requests.Session, first: str, last: str, page_size: int |
     expected = transaction_count(http, first, last)
     rows, registry = [], {}
     scanned, seen_ids = 0, set()
-    for results in transaction_pages(http, first, last, timeout=90, offset_step=page_size,
-                                     page_size=page_size, expected=expected):
+    for results in transaction_pages(http, first, last, timeout=90, page_size=page_size):
         scanned += len(results)
         for t in results:
             seen_ids.add(t["id"])

@@ -220,8 +220,7 @@ def fetch_window(
 ) -> tuple[list[dict], int, int, set]:
     expected = transaction_count(http, first, last)
     rows, skip, seen_ids = [], 0, set()
-    for results in transaction_pages(http, first, last, page_size=page_size,
-                                     expected=expected):
+    for results in transaction_pages(http, first, last, page_size=page_size):
         for t in results:
             seen_ids.add(t["id"])
             committee_id = t.get("createdByEntityId")

@@ -34,6 +34,13 @@ def rows(count):
     return [{**copy.deepcopy(RAW), "id": key} for key in range(1, count + 1)]
 
 
+def paged(rows_, size):
+    """Source pages of `size`; every full page carries a cursor to the next."""
+    pages = [rows_[start:start + size] for start in range(0, len(rows_) + 1, size)]
+    return [{"results": chunk, "nextCursor": {"id": chunk[-1]["id"], "date": chunk[-1]["date"]}
+             if len(chunk) == size else None} for chunk in pages]
+
+
 def page_requests(http):
     return [payload for proc, payload, _ in http.requests()
             if proc == "publicFrontendApi.getTransactions"]
@@ -43,8 +50,7 @@ def page_requests(http):
 @pytest.mark.parametrize("count", [87, 100, 250, 1000])
 def test_smaller_pages_recover_every_row_and_field(kind, count):
     complete = rows(count)
-    pages = [{"results": complete[:32]}]
-    pages.extend({"results": complete[start:start + 100]} for start in range(0, count + 1, 100))
+    pages = [{"results": complete[:32], "nextCursor": None}, *paged(complete, 100)]
     http = FakeHttp(pages, counts=(count, count, count))
 
     actual, registry = collect(kind, http)
@@ -52,9 +58,13 @@ def test_smaller_pages_recover_every_row_and_field(kind, count):
     template = RECEIPT if kind == "receipts" else COMMITTEE_ROW
     assert actual == [{**template, "id": key} for key in range(1, count + 1)]
     assert registry == (None if kind == "receipts" else REGISTRY)
-    assert [(p["take"], p["skip"]) for p in page_requests(http)] == [
-        (1000, 0), *((100, start) for start in range(0, count + 1, 100)),
-    ]
+    retakes = len(range(0, count + 1, 100))
+    assert [p["take"] for p in page_requests(http)] == [1000, *([100] * retakes)]
+    # every later page asks for the cursor the page before it returned
+    retake = page_requests(http)[1:]
+    assert "cursor" not in retake[0]
+    for before, after in zip(retake, retake[1:], strict=False):
+        assert after["cursor"]["id"] == before.get("cursor", {}).get("id", 0) + 100
     for _, payload, _ in http.requests():
         assert payload["dateFrom"] == FIRST and payload["dateTo"] == LAST
     assert not http.pages and not http.counts
@@ -64,7 +74,7 @@ def test_smaller_pages_recover_every_row_and_field(kind, count):
 @pytest.mark.parametrize("count", [0, 87, 1000, 1001])
 def test_complete_default_listing_does_not_add_retries(kind, count):
     complete = rows(count)
-    pages = [{"results": complete[start:start + 1000]} for start in range(0, count + 1, 1000)]
+    pages = paged(complete, 1000)
     http = FakeHttp(pages, counts=(count,))
     actual, _ = collect(kind, http)
     assert len(actual) == count
