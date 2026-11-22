@@ -17,6 +17,9 @@ import requests
 
 BASE = "https://campaignfinance.wi.gov/api/trpc/"
 PAGE = 1000
+# CFIS rejects any `skip` above this (observed 2026-11-22: a zod "too_big"
+# error), so a window is split by date until every part fits.
+MAX_OFFSET = 10_000
 
 
 def call(http: requests.Session, proc: str, payload: dict, timeout: int = 60):
@@ -30,12 +33,34 @@ def call(http: requests.Session, proc: str, payload: dict, timeout: int = 60):
     return result
 
 
+def split_window(first: str, last: str) -> list[tuple[str, str]]:
+    """Two date halves of [first, last]; the end keeps its end-of-day time."""
+    start, end = date.fromisoformat(first[:10]), date.fromisoformat(last[:10])
+    if start >= end:
+        raise RuntimeError(f"CFIS drift: {first} holds more rows than the API can page in one day")
+    mid = start + (end - start) // 2
+    return [(first, mid.isoformat() + "T23:59:59"), ((mid + timedelta(days=1)).isoformat(), last)]
+
+
 def transaction_pages(
     http: requests.Session, first: str, last: str, *, timeout: int = 60,
     offset_step: int | None = None, page_size: int | None = None,
+    expected: int | None = None,
 ) -> Iterator[list[dict]]:
-    """Yield date-sorted pages; advance by received rows unless a fixed step is supplied."""
+    """Yield date-sorted pages; advance by received rows unless a fixed step is supplied.
+    With the window's row count known, a window whose rows would need an offset
+    past MAX_OFFSET is read as date halves whose counts must add up to it."""
     size = PAGE if page_size is None else page_size
+    if expected is not None and expected > MAX_OFFSET + size:
+        halves = split_window(first, last)
+        counts = [transaction_count(http, a, b) for a, b in halves]
+        if sum(counts) != expected:
+            raise RuntimeError(f"CFIS drift: {first[:10]}..{last[:10]} counts {expected}"
+                               f" but its halves count {sum(counts)}")
+        for (a, b), count in zip(halves, counts, strict=True):
+            yield from transaction_pages(http, a, b, timeout=timeout, offset_step=offset_step,
+                                         page_size=size, expected=count)
+        return
     skip = 0
     while True:
         page = call(
