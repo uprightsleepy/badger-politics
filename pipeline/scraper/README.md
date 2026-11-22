@@ -261,6 +261,21 @@ Tommy Thompson's series as 2001 No. 418 before his own restarts at 1, and the
 archive files it in McCallum's folder as listed. The parser tests use reduced
 real captures in `tests/fixtures/executive_orders/`.
 
+## Green Bay robots recheck (2026-11-22)
+
+Both Green Bay hosts changed their robots responses after the September
+review; the repo owner reviewed and approved both on 2026-11-22. The
+CivicClerk API host now publishes a Cloudflare-managed file (HTTP 200)
+instead of 404: `User-agent: *` is `Allow: /` with
+`Content-Signal: search=yes,ai-train=no,use=reference`, and a list of named
+AI-training and SEO crawlers is disallowed. The collector is none of those
+agents, trains nothing, and reads only `/v1/Events` and `/v1/Meetings/{id}`.
+The city site's file (rules added 2026-10-20) adds `Crawl-delay: 10` to the
+general group and disallows RSS, error, calendar, login and other utility
+paths; `/617/Common-Council` stays permitted. The request floor for that host
+rises from five to ten seconds to honor the new directive. Both fingerprints
+are recorded; paths, identity and scope are unchanged.
+
 ## CFIS robots recheck (2026-11-22)
 
 The nightly stopped on 2026-09-16 because the CFIS [robots file](https://campaignfinance.wi.gov/robots.txt)

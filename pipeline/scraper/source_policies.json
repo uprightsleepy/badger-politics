@@ -35,15 +35,19 @@
     "greenbaywi.api.civicclerk.com": {
       "paths": { "GET": ["/v1/Events", "/v1/Meetings/\\d+"] },
       "delay_seconds": 5,
-      "robots": { "status": 404, "url": "https://greenbaywi.api.civicclerk.com/robots.txt" }
+      "robots": {
+        "status": 200,
+        "url": "https://greenbaywi.api.civicclerk.com/robots.txt",
+        "sha256": "e5643b5c6d0e50ffa3c33fbf8751d2f18bdc4adcf3242e26f19a715fb22f28b5"
+      }
     },
     "www.greenbaywi.gov": {
       "paths": { "GET": ["/617/Common-Council"] },
-      "delay_seconds": 5,
+      "delay_seconds": 10,
       "robots": {
         "status": 200,
         "url": "https://www.greenbaywi.gov/robots.txt",
-        "sha256": "28961269f16c315262919fdd37023c4c20caca776390133340526bd9a4699d18"
+        "sha256": "0e37c9748c6912d9b1cf868989b20b4c64c57fbdd34e219dfbd066a986bcc9a8"
       }
     },
     "docs.legis.wisconsin.gov": {
