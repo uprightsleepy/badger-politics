@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from scraper.http import USER_AGENT, PolicyAdapter, cached_page, session
+from scraper import http as http_module
+from scraper.http import USER_AGENT, PolicyAdapter, cached_page, fetch_github_dir, session
 
 
 def test_session_identifies_and_retries() -> None:
@@ -59,3 +60,33 @@ def test_cached_page_never_leaves_a_partial_page(tmp_path, monkeypatch) -> None:
     assert cached_page(Page(), "https://docs.legis.wisconsin.gov/x", cache) == (
         "<p>full page</p>", False
     )
+
+
+def test_github_listing_uses_the_job_token_only_on_the_api_host(tmp_path, monkeypatch) -> None:
+    seen: dict[str, dict] = {}
+
+    class Fake:
+        def get(self, url, timeout, headers=None):
+            seen[url] = headers or {}
+            return self
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return [{"name": "a.yml", "download_url": "https://raw.githubusercontent.com/x/a.yml"}]
+
+        content = b"x: 1"
+
+    monkeypatch.setattr(http_module, "session", lambda: Fake())
+    monkeypatch.setattr(http_module.time, "sleep", lambda s: None)
+    api = "https://api.github.com/repos/openstates/people/contents/data/wi/legislature"
+
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    assert fetch_github_dir(api, tmp_path / "a") == 1
+    assert seen[f"{api}?per_page=1000"] == {}
+
+    monkeypatch.setenv("GITHUB_TOKEN", "job-token")
+    assert fetch_github_dir(api, tmp_path / "b") == 1
+    assert seen[f"{api}?per_page=1000"] == {"Authorization": "Bearer job-token"}
+    assert seen["https://raw.githubusercontent.com/x/a.yml"] == {}
