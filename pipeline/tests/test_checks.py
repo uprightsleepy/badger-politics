@@ -178,6 +178,34 @@ def test_advocacy_race_may_be_named_in_either_field(
     assert (named == []) is passes, failures
 
 
+@pytest.mark.parametrize("related_name,passes", [
+    ("Tiffany for Wisconsin", True),     # a registered candidate committee names the race
+    ("Unregistered Referendums", True),  # the Commission's placeholder for a ballot question
+    ("Tiffany", False),                  # a person named with no race is still an orphan
+])
+def test_advocacy_naming_a_committee_or_referendum_placeholder_is_not_an_orphan(
+    db_path: Path, tmp_path: Path, related_name, passes,
+) -> None:
+    conn = sqlite3.connect(db_path)
+    conn.executemany(
+        "INSERT INTO cf_committees (entity_id, name, committee_type) VALUES (?, ?, ?)",
+        [(6668931, "Example IE Committee", "Independent Expenditure Committee"),
+         (16621, "Tiffany for Wisconsin", "State Candidate")],
+    )
+    conn.execute(
+        "INSERT INTO cf_transactions (id, filer_entity_id, filer_type, direction, date,"
+        " amount, stance, related_name)"
+        " VALUES (1, 6668931, 'Independent Expenditure Committee', 'OUTGOING', '2026-09-11',"
+        " 8129.54, 'AGAINST', ?)",
+        (related_name,),
+    )
+    conn.commit()
+    conn.close()
+    failures = run_checks(db_path, tmp_path / "c.json")
+    named = [f for f in failures if "advocacy naming a candidate" in f]
+    assert (named == []) is passes, failures
+
+
 def test_orphan_vote_record_fails(db_path: Path, tmp_path: Path) -> None:
     conn = sqlite3.connect(db_path)
     conn.execute("DELETE FROM people WHERE id = 'p3'")

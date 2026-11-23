@@ -154,6 +154,13 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
         # ("Supreme Court"), sometimes only related_district ("State Senate,
         # District No. 23", first seen on four 2026-09-08 filings by entity
         # 30614). Either identifies the race; neither does not.
+        # Two filings in the 2026 September reports name no race because the
+        # related entity is not a person: SEIU's IE committee named the
+        # registered candidate committee "Tiffany for Wisconsin" (entity 16621,
+        # whose registration is the race), and Grassroots North Shore named the
+        # Commission's "Unregistered Referendums" placeholder (entity 9681528)
+        # for a ballot question. Both are kept and shown as filed; neither is a
+        # candidate named without a race.
         "advocacy naming a race but not the candidate": (
             "SELECT COUNT(*) FROM cf_transactions WHERE stance IS NOT NULL"
             " AND (related_office IS NOT NULL OR related_district IS NOT NULL)"
@@ -165,6 +172,9 @@ def check_referential_integrity(conn: sqlite3.Connection) -> list[str]:
             " AND related_name IS NOT NULL"
             " AND related_office IS NULL AND related_district IS NULL"
             " AND COALESCE(filer_type, '') NOT IN ('State Candidate', 'Federal Candidate')"
+            " AND related_name != 'Unregistered Referendums'"
+            " AND related_name NOT IN (SELECT name FROM cf_committees"
+            "   WHERE committee_type IN ('State Candidate', 'Federal Candidate'))"
         ),
         # a conduit pass-through whose final recipient is missing would be
         # shown as the conduit's own money
