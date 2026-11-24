@@ -261,6 +261,21 @@ Tommy Thompson's series as 2001 No. 418 before his own restarts at 1, and the
 archive files it in McCallum's folder as listed. The parser tests use reduced
 real captures in `tests/fixtures/executive_orders/`.
 
+## Advocacy rows naming a committee or a ballot question (2026-11-23)
+
+The first full import after the pause stopped on the gate that requires
+third-party advocacy to name both a candidate and a race. The two rows are
+in the 2026 September reports and are filed correctly; the related entity
+is just not a person. SEIU's independent expenditure committee reported
+$8,129.54 against "Tiffany for Wisconsin", the registered State Candidate
+committee (entity 16621) whose registration is the race, and Grassroots
+North Shore reported $120.02 against the Commission's "Unregistered
+Referendums" placeholder (entity 9681528) for a fall ballot question. The
+gate now sets aside exactly those two shapes: a related name that is a
+registered candidate committee in the registry, or the referendum
+placeholder. Both rows are kept and shown as filed, with no race, and a
+person named with no race still stops the run.
+
 ## CFIS cursor paging (2026-11-22)
 
 The first finance stage after the pause stopped on October 2026: CFIS now
