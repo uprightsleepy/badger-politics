@@ -302,7 +302,9 @@ the legislature stage now passes the workflow's read-only job token, and
 `fetch_github_dir` sends it as a bearer header only to `api.github.com`; the
 raw download host still receives anonymous requests. Paths, pacing and the
 CC0 roster scope are unchanged, and a 403 or exhausted limit still stops
-the source.
+the source. The daily policy job's robots probe of `api.github.com` hit the
+same 403 on 2026-11-24 and marked the host blocked, so the probe and the
+policy job carry the token as well (2026-11-24).
 
 ## Green Bay robots recheck (2026-11-22)
 

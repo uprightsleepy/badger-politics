@@ -9,14 +9,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import time
 from pathlib import Path
 
 import requests
 from requests.adapters import HTTPAdapter
 
-from scraper.source_access import ACCESS, USER_AGENT, SourceAccessError
+from scraper.source_access import ACCESS, USER_AGENT, SourceAccessError, github_api_headers
 
 
 def save_json(path: Path, value) -> None:
@@ -89,16 +88,6 @@ def cached_page(http: requests.Session, url: str, cache_dir: Path) -> tuple[str,
     pending.write_text(response.text, encoding="utf-8")
     pending.replace(cache_file)
     return response.text, False
-
-
-def github_api_headers(url: str) -> dict[str, str]:
-    """GitHub rate-limits anonymous API calls per address, and shared Actions
-    runners exhaust that budget; the workflow's own token raises it. The
-    token goes only to the API host, never to the raw download host."""
-    token = os.environ.get("GITHUB_TOKEN")
-    if token and url.startswith("https://api.github.com/"):
-        return {"Authorization": f"Bearer {token}"}
-    return {}
 
 
 def fetch_github_dir(repo_path: str, dest: Path) -> int:

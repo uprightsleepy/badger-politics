@@ -64,6 +64,10 @@ jobs:
       - name: Check policies and save private results
         timeout-minutes: 20
         working-directory: pipeline
+        env:
+          # Read-only job token, so the api.github.com robots probe is not
+          # rate-limited as an anonymous call from a shared runner address.
+          GITHUB_TOKEN: ${{ github.token }}
         run: uv run --locked python -m nightly.policies refresh
       - name: Release this execution's lock
         if: always()

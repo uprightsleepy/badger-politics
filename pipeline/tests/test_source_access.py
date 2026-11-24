@@ -482,3 +482,30 @@ def test_nightly_job_keeps_archives_and_omits_paused_fetchers():
     assert policies["sources"]["elections.wi.gov"]["paths"] == {
         "GET": [r"/sites/default/files/documents/[^/]+\.(?:pdf|xlsx)",
                 r"/sites/default/files/legacy/[^/]+\.xlsx"]}
+
+
+@pytest.mark.parametrize("host,token,expected", [
+    ("api.github.com", "job-token", "Bearer job-token"),
+    ("api.github.com", None, None),
+    ("raw.githubusercontent.com", "job-token", None),
+])
+def test_robots_probe_sends_the_job_token_only_to_the_github_api(
+    monkeypatch, host, token, expected,
+):
+    if token:
+        monkeypatch.setenv("GITHUB_TOKEN", token)
+    else:
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    policy = {"paths": {"GET": ["/x"]}, "delay_seconds": 1,
+              "robots": {"status": 404, "url": f"https://{host}/robots.txt"}}
+    access = SourceAccess({host: policy})
+    seen = {}
+
+    def send(adapter, request, **kwargs):
+        seen["authorization"] = request.headers.get("Authorization")
+        return response(request, 404, "")
+
+    monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", send)
+    monkeypatch.setattr(source_access.time, "sleep", lambda _: None)
+    access.verify_robots(host, policy)
+    assert seen["authorization"] == expected
