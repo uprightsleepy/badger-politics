@@ -20,6 +20,16 @@ from urllib.parse import unquote, urljoin, urlsplit
 import requests
 
 USER_AGENT = "badgerpolitics.org data pipeline (contact: https://badgerpolitics.org/about/#contact)"
+
+
+def github_api_headers(url: str) -> dict[str, str]:
+    """GitHub rate-limits anonymous API calls per address, and shared Actions
+    runners exhaust that budget; the workflow's own token raises it. The
+    token goes only to the API host, never to the raw download host."""
+    token = os.environ.get("GITHUB_TOKEN")
+    if token and url.startswith("https://api.github.com/"):
+        return {"Authorization": f"Bearer {token}"}
+    return {}
 MANIFEST = Path(__file__).with_name("source_policies.json")
 POLICY_TTL = 3600  # Local commands without a shared report check again in each process.
 REPORT_TTL = 24 * 3600
@@ -175,7 +185,8 @@ class SourceAccess:
         """Retry transport outages; access decisions and changed policies still stop collection."""
         for attempt in range(4):
             try:
-                response = http.get(url, timeout=30, allow_redirects=False)
+                response = http.get(url, timeout=30, allow_redirects=False,
+                                    headers=github_api_headers(url))
             except requests.RequestException as error:
                 transient = isinstance(error, (requests.ConnectionError, requests.Timeout))
                 if (not transient or isinstance(error, requests.exceptions.SSLError)
